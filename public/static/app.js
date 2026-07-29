@@ -555,7 +555,7 @@ function showUploadPreview(file, dataUrl) {
   const previewMeta = document.getElementById('previewMeta');
   if (previewMeta) previewMeta.textContent = `${(file.size / 1024).toFixed(1)} KB · ${file.type.split('/')[1].toUpperCase()}`;
 
-  const btn = document.getElementById('nextBtn2');
+  const btn = document.getElementById('nextBtn1');
   if (btn) btn.disabled = false;
 
   showToast('이미지가 업로드되었습니다!', 'success');
@@ -571,12 +571,12 @@ function resetUpload() {
   const fileInput = document.getElementById('fileInput');
   if (fileInput) fileInput.value = '';
 
-  const btn = document.getElementById('nextBtn2');
+  const btn = document.getElementById('nextBtn1');
   if (btn) btn.disabled = true;
 }
 
 // ─────────────────────────────────────────────────────────
-// STEP 3: Model Selection (aifashion.co.kr 실제 이미지)
+// STEP 2: Model Selection (aifashion.co.kr 실제 이미지)
 // ─────────────────────────────────────────────────────────
 function renderModels(models) {
   const grid = document.getElementById('modelsGrid');
