@@ -8,7 +8,6 @@
 // ─────────────────────────────────────────────────────────
 const AppState = {
   currentStep: 1,
-  direction: null,
   uploadedFile: null,
   uploadedImageUrl: null,  // base64 데이터URL
   selectedModel: null,     // { id, name, description, gender, ... }
@@ -419,26 +418,22 @@ function goToStep(step) {
 }
 
 function nextStep(currentStep) {
-  if (currentStep === 1 && !AppState.direction) {
-    showToast('의류 방향을 선택해주세요.', 'warning');
-    return;
-  }
-  if (currentStep === 2 && !AppState.uploadedImageUrl) {
+  if (currentStep === 1 && !AppState.uploadedImageUrl) {
     showToast('의류 이미지를 업로드해주세요.', 'warning');
     return;
   }
-  if (currentStep === 3 && !AppState.selectedModel) {
+  if (currentStep === 2 && !AppState.selectedModel) {
     showToast('AI 모델을 선택해주세요.', 'warning');
     return;
   }
-  if (currentStep === 4 && !AppState.selectedBg) {
+  if (currentStep === 3 && !AppState.selectedBg) {
     showToast('배경을 선택해주세요.', 'warning');
     return;
   }
 
   changeStep(currentStep + 1);
 
-  if (currentStep + 1 === 5) {
+  if (currentStep + 1 === 4) {
     updateGenSummary();
   }
 }
@@ -451,6 +446,7 @@ function prevStep(currentStep) {
   changeStep(currentStep - 1);
 }
 
+
 function changeStep(newStep) {
   const currentPanel = document.getElementById(`step-${AppState.currentStep}`);
   if (currentPanel) currentPanel.classList.remove('active');
@@ -458,7 +454,7 @@ function changeStep(newStep) {
   const newPanel = document.getElementById(`step-${newStep}`);
   if (newPanel) newPanel.classList.add('active');
 
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 5; i++) {
     const dot = document.getElementById(`dot-${i}`);
     const line = document.getElementById(`line-${i}`);
     if (dot) {
@@ -474,8 +470,8 @@ function changeStep(newStep) {
   AppState.currentStep = newStep;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // Step 3: 모델 그리드 초기화
-  if (newStep === 3) {
+  // Step 2: 모델 그리드 초기화
+  if (newStep === 2) {
     const grid = document.getElementById('modelsGrid');
     const loading = document.getElementById('modelsLoading');
     if (AppState.allModels.length > 0) {
@@ -486,8 +482,8 @@ function changeStep(newStep) {
     }
   }
 
-  // Step 4: 배경 그리드 초기화
-  if (newStep === 4) {
+  // Step 3: 배경 그리드 초기화
+  if (newStep === 3) {
     const grid = document.getElementById('backgroundsGrid');
     const loading = document.getElementById('bgsLoading');
     if (AppState.allBackgrounds.length > 0) {
@@ -500,19 +496,7 @@ function changeStep(newStep) {
 }
 
 // ─────────────────────────────────────────────────────────
-// STEP 1: Direction
-// ─────────────────────────────────────────────────────────
-function selectDirection(dir) {
-  AppState.direction = dir;
-  document.querySelectorAll('.direction-card').forEach(c => c.classList.remove('selected'));
-  const card = document.getElementById(`dir-${dir}`);
-  if (card) card.classList.add('selected');
-  const btn = document.getElementById('nextBtn1');
-  if (btn) btn.disabled = false;
-}
-
-// ─────────────────────────────────────────────────────────
-// STEP 2: Upload
+// STEP 1: Upload
 // ─────────────────────────────────────────────────────────
 function handleDragOver(e) {
   e.preventDefault();
@@ -607,34 +591,58 @@ function renderModels(models) {
 
   models.forEach(model => {
     const isSelected = AppState.selectedModel?.id === model.id;
-    const card = document.createElement('div');
-    card.className = 'model-card' + (isSelected ? ' selected' : '');
-    card.dataset.id = model.id;
-
-    // 실제 aifashion 이미지 URL 사용
-    const imageUrl = `/api/proxy/model-image/${model.id}`;
     const displayName = model.name && !model.name.match(/^\d+$/)
       ? model.name
       : `모델 ${model.name || model.id}`;
 
-    card.innerHTML = `
-      <div class="model-thumb" style="overflow:hidden;background:#f0f0f0;position:relative;">
-        <img
-          src="${imageUrl}"
-          alt="${displayName}"
-          style="width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;"
-          onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\\"width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:linear-gradient(135deg,#f0e6ff,#e6f0ff);\\">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>'"
-          onmouseover="this.style.transform='scale(1.05)'"
-          onmouseout="this.style.transform='scale(1)'"
-        />
-        <div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;">#${model.id}</div>
-      </div>
-      <div class="model-info">
-        <div class="model-name">${displayName}</div>
-        <div class="model-tags">${model.gender || '여성'} · ${model.age || '20대'} · ${model.mood || '내추럴'}</div>
-      </div>
-      <div class="model-selected-check">✓</div>
-    `;
+    const card = document.createElement('div');
+    card.className = 'model-card' + (isSelected ? ' selected' : '');
+    card.dataset.id = model.id;
+
+    // ── thumb 컨테이너 (createElement로 onerror HTML 파싱 버그 방지) ──
+    const thumb = document.createElement('div');
+    thumb.className = 'model-thumb';
+    thumb.style.cssText = 'overflow:hidden;background:#f0f0f0;position:relative;';
+
+    const img = document.createElement('img');
+    img.src = `/api/proxy/model-image/${model.id}`;
+    img.alt = displayName;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;';
+    img.addEventListener('mouseover', () => { img.style.transform = 'scale(1.05)'; });
+    img.addEventListener('mouseout',  () => { img.style.transform = 'scale(1)'; });
+    img.addEventListener('error', () => {
+      img.style.display = 'none';
+      const fallback = document.createElement('div');
+      fallback.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:linear-gradient(135deg,#f0e6ff,#e6f0ff);';
+      fallback.textContent = model.gender === '남성' ? '🧍\u200d♂️' : '🧍\u200d♀️';
+      thumb.appendChild(fallback);
+    });
+    thumb.appendChild(img);
+
+    const badge = document.createElement('div');
+    badge.style.cssText = 'position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;';
+    badge.textContent = `#${model.id}`;
+    thumb.appendChild(badge);
+
+    const info = document.createElement('div');
+    info.className = 'model-info';
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'model-name';
+    nameDiv.textContent = displayName;
+    const tagsDiv = document.createElement('div');
+    tagsDiv.className = 'model-tags';
+    tagsDiv.textContent = `${model.gender || '여성'} · ${model.age || '20대'} · ${model.mood || '내추럴'}`;
+    info.appendChild(nameDiv);
+    info.appendChild(tagsDiv);
+
+    const check = document.createElement('div');
+    check.className = 'model-selected-check';
+    check.textContent = '✓';
+
+    card.appendChild(thumb);
+    card.appendChild(info);
+    card.appendChild(check);
+
     card.addEventListener('click', () => selectModel(model, card));
     grid.appendChild(card);
   });
@@ -646,7 +654,7 @@ function selectModel(model, card) {
   document.querySelectorAll('.model-card').forEach(c => c.classList.remove('selected'));
   card.classList.add('selected');
 
-  const btn = document.getElementById('nextBtn3');
+  const btn = document.getElementById('nextBtn2');
   if (btn) btn.disabled = false;
 
   const displayName = model.name && !model.name.match(/^\d+$/)
@@ -684,6 +692,9 @@ function filterModels(value, btn) {
 }
 
 // ─────────────────────────────────────────────────────────
+// STEP 3: Background Selection (aifashion.co.kr 실제 이미지)
+// ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // STEP 4: Background Selection (aifashion.co.kr 실제 이미지)
 // ─────────────────────────────────────────────────────────
 function renderBackgrounds(bgs) {
@@ -703,27 +714,51 @@ function renderBackgrounds(bgs) {
     card.className = 'bg-card' + (isSelected ? ' selected' : '');
     card.dataset.id = bg.id;
 
-    // 실제 aifashion 배경 이미지 URL 사용
-    const imageUrl = `/api/proxy/bg-image/${bg.id}`;
+    // ── thumb (createElement로 onerror HTML 파싱 버그 방지) ──
+    const thumb = document.createElement('div');
+    thumb.className = 'bg-thumb';
+    thumb.style.cssText = 'overflow:hidden;background:#f0f0f0;position:relative;';
 
-    card.innerHTML = `
-      <div class="bg-thumb" style="overflow:hidden;background:#f0f0f0;position:relative;">
-        <img
-          src="${imageUrl}"
-          alt="${bg.name}"
-          style="width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;"
-          onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,#e0e0e0,#c0c0c0)';this.parentElement.innerHTML+='<div style=\\"position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#666;\\">${bg.name}</div>'"
-          onmouseover="this.style.transform='scale(1.05)'"
-          onmouseout="this.style.transform='scale(1)'"
-        />
-        <div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;">${bg.category || '기타'}</div>
-      </div>
-      <div class="bg-info">
-        <div class="bg-name">${bg.name}</div>
-        <div class="bg-mood">${bg.category || '기타'} · ${bg.mood || '뉴트럴'}</div>
-      </div>
-      <div class="bg-selected-check">✓</div>
-    `;
+    const img = document.createElement('img');
+    img.src = `/api/proxy/bg-image/${bg.id}`;
+    img.alt = bg.name;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;';
+    img.addEventListener('mouseover', () => { img.style.transform = 'scale(1.05)'; });
+    img.addEventListener('mouseout',  () => { img.style.transform = 'scale(1)'; });
+    img.addEventListener('error', () => {
+      img.style.display = 'none';
+      thumb.style.background = 'linear-gradient(135deg,#e0e0e0,#c0c0c0)';
+      const label = document.createElement('div');
+      label.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#666;text-align:center;padding:8px;';
+      label.textContent = bg.name;
+      thumb.appendChild(label);
+    });
+    thumb.appendChild(img);
+
+    const catBadge = document.createElement('div');
+    catBadge.style.cssText = 'position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;';
+    catBadge.textContent = bg.category || '기타';
+    thumb.appendChild(catBadge);
+
+    const info = document.createElement('div');
+    info.className = 'bg-info';
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'bg-name';
+    nameDiv.textContent = bg.name;
+    const moodDiv = document.createElement('div');
+    moodDiv.className = 'bg-mood';
+    moodDiv.textContent = `${bg.category || '기타'} · ${bg.mood || '뉴트럴'}`;
+    info.appendChild(nameDiv);
+    info.appendChild(moodDiv);
+
+    const check = document.createElement('div');
+    check.className = 'bg-selected-check';
+    check.textContent = '✓';
+
+    card.appendChild(thumb);
+    card.appendChild(info);
+    card.appendChild(check);
+
     card.addEventListener('click', () => selectBg(bg, card));
     grid.appendChild(card);
   });
@@ -735,7 +770,7 @@ function selectBg(bg, card) {
   document.querySelectorAll('.bg-card').forEach(c => c.classList.remove('selected'));
   card.classList.add('selected');
 
-  const btn = document.getElementById('nextBtn4');
+  const btn = document.getElementById('nextBtn3');
   if (btn) btn.disabled = false;
 
   showToast(`"${bg.name}" 배경을 선택했습니다.`, 'success');
@@ -753,7 +788,6 @@ function filterBg(category, btn) {
   }
 }
 
-// ─────────────────────────────────────────────────────────
 // STEP 5: Generation Options
 // ─────────────────────────────────────────────────────────
 function selectOption(chip, type) {
@@ -772,11 +806,8 @@ function updateCostDisplay() {
 }
 
 function updateGenSummary() {
-  const dirEl = document.getElementById('sumDirection');
   const modelEl = document.getElementById('sumModel');
   const bgEl = document.getElementById('sumBg');
-
-  if (dirEl) dirEl.textContent = AppState.direction === 'front' ? '앞면 (Front)' : '뒷면 (Back)';
 
   if (modelEl) {
     if (AppState.selectedModel) {
@@ -838,7 +869,7 @@ async function startGeneration() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        direction: AppState.direction,
+        direction: 'front',
         modelId: model?.id,
         modelName: model?.name || '패션 모델',
         modelDesc,
@@ -972,10 +1003,19 @@ async function pollGenerationStatus(jobId, count) {
 // 생성 완료 처리
 function completeGeneration(images, isFallback = false) {
   AppState.isGenerating = false;
-  AppState.generatedImages = images;
 
-  renderResults(images);
-  changeStep(6);
+  // Atlas Cloud 이미지 URL을 서버사이드 프록시로 변환 (CORS 우회)
+  const proxiedImages = images.map(img => {
+    if (img.url && img.url.startsWith('http')) {
+      return { ...img, url: `/api/proxy/gen-image?url=${encodeURIComponent(img.url)}`, originalUrl: img.url };
+    }
+    return img;
+  });
+
+  AppState.generatedImages = proxiedImages;
+
+  renderResults(proxiedImages);
+  changeStep(5);
 
   const count = images.length;
   if (isFallback) {

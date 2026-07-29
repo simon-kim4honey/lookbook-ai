@@ -110,53 +110,32 @@ app.get('/api/presets/models', async (c) => {
   }
 })
 
-// 배경 목록 프록시
-app.get('/api/presets/backgrounds', async (c) => {
-  try {
-    const res = await fetch(`${AIFASHION_BASE}/api/backgrounds`, {
-      headers: { 'Accept': 'application/json' },
-    })
-    if (!res.ok) {
-      throw new Error(`aifashion backgrounds API error: ${res.status}`)
-    }
-    const data: any = await res.json()
-
-    // aifashion 배경 이름 기반 카테고리/무드 매핑
-    const categoryMap: Record<string, { category: string; mood: string; bgDesc: string }> = {
-      '전차내부':   { category: '실내',     mood: '빈티지',   bgDesc: 'vintage train interior with retro seats' },
-      '지하복도':   { category: '실내',     mood: '어반',     bgDesc: 'underground corridor with dramatic lighting' },
-      '네온 식당':  { category: '실내',     mood: '트렌디',   bgDesc: 'neon-lit restaurant with vibrant atmosphere' },
-      '파스텔 모텔':{ category: '실내',     mood: '큐트',     bgDesc: 'pastel-colored motel room with retro vibe' },
-      '캔디왕국':   { category: '판타지',   mood: '큐트',     bgDesc: 'candy kingdom fantasy background, colorful and whimsical' },
-      '해변도로':   { category: '야외',     mood: '서머',     bgDesc: 'coastal road by the beach, golden hour light' },
-      '북촌 오르막':{ category: '스트리트', mood: '전통',     bgDesc: 'traditional Korean hanok village hillside street' },
-      '해변 카페':  { category: '카페',     mood: '웜',       bgDesc: 'beachside cafe with ocean view, warm ambiance' },
-      '모래사막':   { category: '야외',     mood: '익조틱',   bgDesc: 'golden sand desert dunes, dramatic sky' },
-      '실내 테니스코트': { category: '스포츠', mood: '스포티', bgDesc: 'indoor tennis court with clean lines' },
-      '팜시티 거리':{ category: '스트리트', mood: '트로피컬', bgDesc: 'palm tree lined city street, tropical urban' },
-      '에스컬레이터':{ category: '실내',    mood: '모던',     bgDesc: 'modern escalator in a mall, dynamic geometry' },
-      '극장 로비':  { category: '럭셔리',   mood: '하이엔드', bgDesc: 'grand theater lobby with elegant chandelier' },
-      '빈티지 관제실': { category: '실내',  mood: '빈티지',   bgDesc: 'vintage control room with retro equipment' },
-      '컨테이너 항구': { category: '야외',  mood: '어반',     bgDesc: 'industrial container port with colorful shipping containers' },
-    }
-
-    const backgrounds = (data.backgrounds || []).map((b: any) => {
-      const meta = categoryMap[b.name] || { category: '기타', mood: '뉴트럴', bgDesc: b.name }
-      return {
-        id: b.id,
-        name: b.name || `배경 ${b.id}`,
-        category: meta.category,
-        mood: meta.mood,
-        bgDesc: meta.bgDesc,
-        image_type: 'image/jpeg',
-      }
-    })
-
-    return c.json({ backgrounds })
-  } catch (err: any) {
-    console.error('Backgrounds API error:', err)
-    return c.json({ error: 'Failed to fetch backgrounds', message: err.message }, 500)
-  }
+// 배경 목록 - 패션 룩북 특화 큐레이션 (Unsplash + Pexels 고해상도)
+app.get('/api/presets/backgrounds', (c) => {
+  const backgrounds = [
+    // ── 스튜디오 ──
+    { id: 1,  name: '화이트 스튜디오',    category: '스튜디오', mood: '클린',     bgDesc: 'clean white studio background with professional lighting', unsplashId: 'photo-1558618666-fcd25c85cd64' },
+    { id: 2,  name: '베이지 스튜디오',    category: '스튜디오', mood: '웜',       bgDesc: 'warm beige minimalist studio background, soft shadows', unsplashId: 'photo-1490481651871-ab68de25d43d' },
+    { id: 3,  name: '그레이 시멘트',      category: '스튜디오', mood: '모던',     bgDesc: 'concrete gray textured studio wall, industrial minimalist', unsplashId: 'photo-1515886657613-9f3515b0c78f' },
+    // ── 럭셔리 ──
+    { id: 4,  name: '럭셔리 인테리어',    category: '럭셔리',   mood: '하이엔드', bgDesc: 'luxury interior with marble floors and elegant decor', unsplashId: 'photo-1469334031218-e382a71b716b' },
+    { id: 5,  name: '호텔 로비',          category: '럭셔리',   mood: '엘레강스', bgDesc: 'grand hotel lobby with chandeliers and opulent architecture', unsplashId: 'photo-1543163521-1bf539c55dd2' },
+    { id: 6,  name: '갤러리 화이트',      category: '럭셔리',   mood: '미니멀',   bgDesc: 'modern art gallery with white walls and natural light', unsplashId: 'photo-1523275335684-37898b6baf30' },
+    // ── 스트리트 ──
+    { id: 7,  name: '도심 스트리트',      category: '스트리트', mood: '어반',     bgDesc: 'urban city street with bokeh lights, fashion editorial', unsplashId: 'photo-1558769132-cb1aea458c5e' },
+    { id: 8,  name: '벽돌 골목',          category: '스트리트', mood: '빈티지',   bgDesc: 'vintage brick alley with artistic graffiti wall', unsplashId: 'photo-1445205170230-053b83016050' },
+    { id: 9,  name: '야간 네온',          category: '스트리트', mood: '시크',     bgDesc: 'neon lights night street, moody urban fashion backdrop', unsplashId: 'photo-1483985988355-763728e1935b' },
+    // ── 자연/야외 ──
+    { id: 10, name: '해변 골든아워',      category: '야외',     mood: '서머',     bgDesc: 'golden hour beach with soft sand and ocean waves', unsplashId: 'photo-1507003211169-0a1dd7228f2d' },
+    { id: 11, name: '꽃밭 초원',          category: '야외',     mood: '로맨틱',   bgDesc: 'blooming flower field with soft bokeh, dreamy outdoor', unsplashId: 'photo-1539109136881-3be0616acf4b' },
+    { id: 12, name: '초록 숲',            category: '야외',     mood: '내추럴',   bgDesc: 'lush green forest path with dappled sunlight', unsplashId: 'photo-1496747611176-843222e1e57c' },
+    // ── 카페/인도어 ──
+    { id: 13, name: '빈티지 카페',        category: '카페',     mood: '코지',     bgDesc: 'cozy vintage cafe with warm lighting and wooden furniture', unsplashId: 'photo-1525507119028-ed4c629a60a3' },
+    { id: 14, name: '모던 오피스',        category: '실내',     mood: '프로페셔널', bgDesc: 'modern minimalist office with large windows and city view', unsplashId: 'photo-1490481651871-ab68de25d43d' },
+    { id: 15, name: '파리지앵 발코니',    category: '럭셔리',   mood: '로맨틱',   bgDesc: 'Parisian balcony overlooking city rooftops, sunset light', unsplashId: 'photo-1509631179647-0177331693ae' },
+    { id: 16, name: '재패니즈 스트리트',  category: '스트리트', mood: '트렌디',   bgDesc: 'Japanese street fashion district, colorful Tokyo backdrop', unsplashId: 'photo-1551854-cf6c8e8d89f6' },
+  ]
+  return c.json({ backgrounds })
 })
 
 // 모델 이미지 프록시
@@ -181,25 +160,98 @@ app.get('/api/proxy/model-image/:id', async (c) => {
   }
 })
 
-// 배경 이미지 프록시
+// 배경 이미지 프록시 (Unsplash 패션 룩북 특화)
+const BG_UNSPLASH_MAP: Record<string, string> = {
+  '1':  'photo-1558618666-fcd25c85cd64',
+  '2':  'photo-1490481651871-ab68de25d43d',
+  '3':  'photo-1515886657613-9f3515b0c78f',
+  '4':  'photo-1469334031218-e382a71b716b',
+  '5':  'photo-1543163521-1bf539c55dd2',
+  '6':  'photo-1523275335684-37898b6baf30',
+  '7':  'photo-1558769132-cb1aea458c5e',
+  '8':  'photo-1445205170230-053b83016050',
+  '9':  'photo-1483985988355-763728e1935b',
+  '10': 'photo-1507003211169-0a1dd7228f2d',
+  '11': 'photo-1539109136881-3be0616acf4b',
+  '12': 'photo-1496747611176-843222e1e57c',
+  '13': 'photo-1525507119028-ed4c629a60a3',
+  '14': 'photo-1490481651871-ab68de25d43d',
+  '15': 'photo-1509631179647-0177331693ae',
+  '16': 'photo-1551854-cf6c8e8d89f6',
+}
+
 app.get('/api/proxy/bg-image/:id', async (c) => {
   const id = c.req.param('id')
+  const unsplashId = BG_UNSPLASH_MAP[id]
+
+  if (!unsplashId) {
+    return c.notFound()
+  }
+
   try {
-    const res = await fetch(`${AIFASHION_BASE}/api/backgrounds/${id}/image`)
+    // Unsplash CDN - 고해상도 패션 배경 이미지 (800×600)
+    const unsplashUrl = `https://images.unsplash.com/${unsplashId}?w=800&h=600&fit=crop&q=85&fm=jpg`
+    const res = await fetch(unsplashUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LookbookAI/1.0)',
+        'Accept': 'image/jpeg,image/*',
+      },
+    })
     if (!res.ok) {
       return c.notFound()
     }
     const buffer = await res.arrayBuffer()
-    const contentType = res.headers.get('Content-Type') || 'image/jpeg'
     return new Response(buffer, {
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': 'image/jpeg',
         'Cache-Control': 'public, max-age=86400',
         'Access-Control-Allow-Origin': '*',
       },
     })
   } catch (err) {
     return c.notFound()
+  }
+})
+
+// 생성 결과 이미지 프록시 (Atlas Cloud CDN CORS 우회)
+app.get('/api/proxy/gen-image', async (c) => {
+  const url = c.req.query('url')
+  if (!url) return c.json({ error: 'Missing url param' }, 400)
+
+  try {
+    // 허용된 도메인인지 확인 (보안)
+    const parsed = new URL(url)
+    const allowedHosts = ['cdn.atlascloud.ai', 'storage.atlascloud.ai', 'replicate.delivery', 'pbxt.replicate.delivery', 'delivery.replicate.com', 'cdn2.atlascloud.ai']
+    const isAllowed = allowedHosts.some(h => parsed.hostname.endsWith(h)) || parsed.hostname.includes('atlascloud') || parsed.hostname.includes('replicate')
+
+    // 모든 https URL 허용 (Atlas Cloud 다양한 CDN 사용)
+    if (!parsed.protocol.startsWith('https')) {
+      return c.json({ error: 'Only HTTPS URLs allowed' }, 400)
+    }
+
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LookbookAI/1.0)',
+      },
+    })
+
+    if (!res.ok) {
+      return c.json({ error: `Upstream error: ${res.status}` }, res.status as any)
+    }
+
+    const buffer = await res.arrayBuffer()
+    const contentType = res.headers.get('Content-Type') || 'image/png'
+
+    return new Response(buffer, {
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=3600',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+  } catch (err: any) {
+    console.error('Gen image proxy error:', err)
+    return c.json({ error: err.message }, 500)
   }
 })
 
@@ -657,38 +709,33 @@ app.get('/', (c) => {
     <div class="container">
       <div class="section-header">
         <div class="section-tag"><i class="fas fa-route"></i> 이용 방법</div>
-        <h2 class="section-title">6단계로 완성되는<br />AI 룩북 제작</h2>
-        <p class="section-desc">복잡한 촬영 과정을 단 6단계로 간소화했습니다.</p>
+        <h2 class="section-title">5단계로 완성되는<br />AI 룩북 제작</h2>
+        <p class="section-desc">복잡한 촬영 과정을 단 5단계로 간소화했습니다.</p>
       </div>
       <div class="steps-grid">
         <div class="step-card">
-          <div class="step-num">👔</div>
-          <div class="step-title">Step 1. 방향 선택</div>
-          <div class="step-desc">앞모습 또는 뒷모습 의류 방향을 선택합니다</div>
-        </div>
-        <div class="step-card">
           <div class="step-num">📤</div>
-          <div class="step-title">Step 2. 의류 업로드</div>
-          <div class="step-desc">의류 이미지를 업로드합니다. JPG/PNG/WEBP 지원</div>
+          <div class="step-title">Step 1. 의류 업로드</div>
+          <div class="step-desc">의류 이미지를 업로드합니다. 여러 장일수록 좋아요!</div>
         </div>
         <div class="step-card">
           <div class="step-num">🧍</div>
-          <div class="step-title">Step 3. 모델 선택</div>
+          <div class="step-title">Step 2. 모델 선택</div>
           <div class="step-desc">성별, 체형, 피부톤으로 AI 모델을 선택합니다</div>
         </div>
         <div class="step-card">
           <div class="step-num">🏙️</div>
-          <div class="step-title">Step 4. 배경 선택</div>
+          <div class="step-title">Step 3. 배경 선택</div>
           <div class="step-desc">브랜드에 맞는 배경을 카테고리별로 선택합니다</div>
         </div>
         <div class="step-card">
           <div class="step-num">⚡</div>
-          <div class="step-title">Step 5. 생성 실행</div>
+          <div class="step-title">Step 4. 생성 실행</div>
           <div class="step-desc">수량, 구도, 포즈를 설정하고 AI 생성을 시작합니다</div>
         </div>
         <div class="step-card">
           <div class="step-num">✅</div>
-          <div class="step-title">Step 6. 결과 확인</div>
+          <div class="step-title">Step 5. 결과 확인</div>
           <div class="step-desc">생성된 이미지를 확인하고 다운로드합니다</div>
         </div>
       </div>
@@ -1147,41 +1194,34 @@ app.get('/generator', (c) => {
           <div class="step-item">
             <div class="step-dot active" id="dot-1" onclick="goToStep(1)">
               1
-              <div class="step-label">방향</div>
+              <div class="step-label">업로드</div>
             </div>
             <div class="step-line" id="line-1"></div>
           </div>
           <div class="step-item">
             <div class="step-dot" id="dot-2" onclick="goToStep(2)">
               2
-              <div class="step-label">업로드</div>
+              <div class="step-label">모델</div>
             </div>
             <div class="step-line" id="line-2"></div>
           </div>
           <div class="step-item">
             <div class="step-dot" id="dot-3" onclick="goToStep(3)">
               3
-              <div class="step-label">모델</div>
+              <div class="step-label">배경</div>
             </div>
             <div class="step-line" id="line-3"></div>
           </div>
           <div class="step-item">
             <div class="step-dot" id="dot-4" onclick="goToStep(4)">
               4
-              <div class="step-label">배경</div>
+              <div class="step-label">생성</div>
             </div>
             <div class="step-line" id="line-4"></div>
           </div>
           <div class="step-item">
-            <div class="step-dot" id="dot-5" onclick="goToStep(5)">
+            <div class="step-dot" id="dot-5">
               5
-              <div class="step-label">생성</div>
-            </div>
-            <div class="step-line" id="line-5"></div>
-          </div>
-          <div class="step-item">
-            <div class="step-dot" id="dot-6">
-              6
               <div class="step-label">결과</div>
             </div>
           </div>
@@ -1192,43 +1232,10 @@ app.get('/generator', (c) => {
     <!-- Generator Body -->
     <div class="generator-body">
 
-      <!-- ─── Step 1: Direction ─── -->
+      <!-- ─── Step 1: Upload ─── -->
       <div class="step-panel active" id="step-1">
         <div class="step-title-area">
-          <div class="step-num-badge">Step 1 / 6 · 방향 선택</div>
-          <h2 class="step-heading">의류 방향을 선택하세요</h2>
-          <p class="step-sub">업로드할 의류 이미지가 앞면인지 뒷면인지 선택해주세요.</p>
-        </div>
-        <div class="direction-grid">
-          <div class="direction-card" id="dir-front" onclick="selectDirection('front')">
-            <div class="direction-visual">
-              <span style="font-size:64px;">👔</span>
-            </div>
-            <div class="direction-name">앞면 (Front)</div>
-            <div class="direction-desc">의류의 정면 모습이 찍힌 이미지</div>
-            <div class="direction-check">✓</div>
-          </div>
-          <div class="direction-card" id="dir-back" onclick="selectDirection('back')">
-            <div class="direction-visual">
-              <span style="font-size:64px;">🔄</span>
-            </div>
-            <div class="direction-name">뒷면 (Back)</div>
-            <div class="direction-desc">의류의 뒷면 모습이 찍힌 이미지</div>
-            <div class="direction-check">✓</div>
-          </div>
-        </div>
-        <div class="step-nav">
-          <div></div>
-          <button class="step-nav-next" id="nextBtn1" onclick="nextStep(1)" disabled>
-            다음 단계 <i class="fas fa-arrow-right"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- ─── Step 2: Upload ─── -->
-      <div class="step-panel" id="step-2">
-        <div class="step-title-area">
-          <div class="step-num-badge">Step 2 / 6 · 의류 업로드</div>
+          <div class="step-num-badge">Step 1 / 5 · 의류 업로드</div>
           <h2 class="step-heading">의류 이미지를 업로드하세요</h2>
           <p class="step-sub">배경이 흰색이거나 투명한 이미지를 사용하면 가장 좋은 결과를 얻을 수 있어요.</p>
         </div>
@@ -1254,14 +1261,15 @@ app.get('/generator', (c) => {
             <div class="upload-preview-info">
               <div class="upload-preview-name" id="previewName">-</div>
               <div class="upload-preview-meta" id="previewMeta">-</div>
-              <div class="upload-tips">
-                <h4>💡 좋은 결과를 위한 팁</h4>
-                <ul>
-                  <li><span>✓</span> 배경이 깨끗한 이미지를 사용하세요</li>
-                  <li><span>✓</span> 의류가 화면 중앙에 위치해야 합니다</li>
-                  <li><span>✓</span> 고해상도 이미지일수록 결과가 좋습니다</li>
-                  <li><span>✓</span> 구겨진 의류보다 펼쳐진 의류가 좋아요</li>
-                </ul>
+              <div class="upload-tips" style="background:linear-gradient(135deg,rgba(108,71,255,0.08),rgba(0,212,170,0.08));border:1px solid rgba(108,71,255,0.2);border-radius:10px;padding:12px 16px;">
+                <p style="margin:0;font-size:13px;color:var(--text-primary);font-weight:600;">📸 이미지가 여러 장일수록 더 좋은 결과를 얻을 수 있어요!</p>
+                <p style="margin:8px 0 0;font-size:12px;color:var(--text-muted);">더 많은 촬영 팁이 필요하다면 →
+                  <a href="https://www.style-room.ai" target="_blank" rel="noopener"
+                    style="color:var(--primary);font-weight:600;text-decoration:none;">
+                    www.style-room.ai
+                  </a>
+                  를 참고하세요
+                </p>
               </div>
               <button class="btn btn-ghost btn-sm" style="margin-top:16px;" onclick="resetUpload()">
                 <i class="fas fa-redo"></i> 다시 선택
@@ -1271,19 +1279,19 @@ app.get('/generator', (c) => {
         </div>
 
         <div class="step-nav">
-          <button class="step-nav-back" onclick="prevStep(2)">
+          <button class="step-nav-back" onclick="prevStep(1)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
-          <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)" disabled>
+          <button class="step-nav-next" id="nextBtn1" onclick="nextStep(1)" disabled>
             다음 단계 <i class="fas fa-arrow-right"></i>
           </button>
         </div>
       </div>
 
-      <!-- ─── Step 3: Model ─── -->
-      <div class="step-panel" id="step-3">
+      <!-- ─── Step 2: Model ─── -->
+      <div class="step-panel" id="step-2">
         <div class="step-title-area">
-          <div class="step-num-badge">Step 3 / 6 · 모델 선택</div>
+          <div class="step-num-badge">Step 2 / 5 · 모델 선택</div>
           <h2 class="step-heading">AI 모델을 선택하세요</h2>
           <p class="step-sub">의류에 가장 잘 어울리는 AI 모델을 선택하세요.</p>
         </div>
@@ -1305,19 +1313,19 @@ app.get('/generator', (c) => {
         </div>
 
         <div class="step-nav">
-          <button class="step-nav-back" onclick="prevStep(3)">
+          <button class="step-nav-back" onclick="prevStep(2)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
-          <button class="step-nav-next" id="nextBtn3" onclick="nextStep(3)" disabled>
+          <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)" disabled>
             다음 단계 <i class="fas fa-arrow-right"></i>
           </button>
         </div>
       </div>
 
-      <!-- ─── Step 4: Background ─── -->
-      <div class="step-panel" id="step-4">
+      <!-- ─── Step 3: Background ─── -->
+      <div class="step-panel" id="step-3">
         <div class="step-title-area">
-          <div class="step-num-badge">Step 4 / 6 · 배경 선택</div>
+          <div class="step-num-badge">Step 3 / 5 · 배경 선택</div>
           <h2 class="step-heading">배경을 선택하세요</h2>
           <p class="step-sub">브랜드 분위기에 맞는 배경을 선택해 완성도 높은 이미지를 만드세요.</p>
         </div>
@@ -1343,19 +1351,19 @@ app.get('/generator', (c) => {
         </div>
 
         <div class="step-nav">
-          <button class="step-nav-back" onclick="prevStep(4)">
+          <button class="step-nav-back" onclick="prevStep(3)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
-          <button class="step-nav-next" id="nextBtn4" onclick="nextStep(4)" disabled>
+          <button class="step-nav-next" id="nextBtn3" onclick="nextStep(3)" disabled>
             다음 단계 <i class="fas fa-arrow-right"></i>
           </button>
         </div>
       </div>
 
-      <!-- ─── Step 5: Generate ─── -->
-      <div class="step-panel" id="step-5">
+      <!-- ─── Step 4: Generate ─── -->
+      <div class="step-panel" id="step-4">
         <div class="step-title-area" id="step5TitleArea">
-          <div class="step-num-badge">Step 5 / 6 · 생성 옵션</div>
+          <div class="step-num-badge">Step 4 / 5 · 생성 옵션</div>
           <h2 class="step-heading">생성 옵션을 설정하세요</h2>
           <p class="step-sub">생성할 이미지 수량, 구도, 포즈를 선택하세요. 크레딧이 차감됩니다.</p>
         </div>
@@ -1399,10 +1407,6 @@ app.get('/generator', (c) => {
             <div class="gen-summary-title">생성 요약</div>
             <div class="gen-summary-grid">
               <div class="gen-summary-item">
-                <div class="gen-summary-label">의류 방향</div>
-                <div class="gen-summary-val" id="sumDirection">-</div>
-              </div>
-              <div class="gen-summary-item">
                 <div class="gen-summary-label">선택된 모델</div>
                 <div class="gen-summary-val" id="sumModel">-</div>
               </div>
@@ -1439,7 +1443,7 @@ app.get('/generator', (c) => {
         </div>
 
         <div class="step-nav" id="step5Nav">
-          <button class="step-nav-back" onclick="prevStep(5)">
+          <button class="step-nav-back" onclick="prevStep(4)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
           <button class="step-nav-next" onclick="startGeneration()">
@@ -1448,10 +1452,10 @@ app.get('/generator', (c) => {
         </div>
       </div>
 
-      <!-- ─── Step 6: Results ─── -->
-      <div class="step-panel" id="step-6">
+      <!-- ─── Step 5: Results ─── -->
+      <div class="step-panel" id="step-5">
         <div class="step-title-area">
-          <div class="step-num-badge">Step 6 / 6 · 생성 완료 ✅</div>
+          <div class="step-num-badge">Step 5 / 5 · 생성 완료 ✅</div>
           <h2 class="step-heading">이미지가 생성되었습니다!</h2>
           <p class="step-sub">AI가 생성한 실사 피팅컷을 확인하고 다운로드하세요.</p>
         </div>
