@@ -24,19 +24,15 @@ const atlasHeaders = () => ({
 // Photorealistic Prompt Builder
 // ────────────────────────────────────────────────────
 function buildPhotorealisticPrompt(params: {
-  direction: string
   modelName: string
   modelDesc: string
   bgName: string
   bgDesc: string
   poseType: string
   pose: string
-  face: string
   clothingImageUrl?: string
 }): string {
-  const { direction, modelName, modelDesc, bgName, bgDesc, poseType, pose, face } = params
-
-  const directionText = direction === 'front' ? 'front view' : 'back view'
+  const { modelName, modelDesc, bgName, bgDesc, poseType, pose } = params
 
   const poseMap: Record<string, string> = {
     '전신': 'full body shot',
@@ -47,27 +43,21 @@ function buildPhotorealisticPrompt(params: {
 
   const poseStyleMap: Record<string, string> = {
     '정면': 'facing camera directly, natural standing pose',
-    '측면': '3/4 angle pose, slight turn',
-    '워킹': 'dynamic walking pose, in motion',
-    '정적': 'elegant static pose, hands relaxed',
+    '측면': '3/4 angle pose, elegant slight turn',
+    '워킹': 'dynamic walking pose, confident in motion',
+    '정적': 'elegant static pose, hands relaxed at sides',
   }
   const poseStyleText = poseStyleMap[pose] || 'natural standing pose'
-
-  const faceText = face === '얼굴 없음'
-    ? 'model facing away from camera, no face visible'
-    : 'model facing camera with confident expression'
 
   return [
     `Ultra-photorealistic professional fashion photography,`,
     `8K resolution, shot on Canon EOS R5 with 85mm f/1.4 lens,`,
-    `professional studio lighting with softbox,`,
-    `${poseTypeText} of a ${modelDesc} fashion model`,
-    `wearing the clothing item shown (${directionText}),`,
+    `professional studio lighting with softbox and fill light,`,
+    `${poseTypeText} of a ${modelDesc} fashion model,`,
     `${poseStyleText},`,
-    `${faceText},`,
     `background: ${bgDesc} (${bgName}),`,
     `hyperrealistic skin texture, perfect fabric detail,`,
-    `commercial fashion photography style,`,
+    `commercial fashion editorial photography style,`,
     `RAW photo, sharp focus, high dynamic range,`,
     `professional retouching, magazine quality,`,
     `no artifacts, photorealistic, cinematic lighting`,
@@ -78,79 +68,118 @@ function buildPhotorealisticPrompt(params: {
 // aifashion.co.kr API Proxies
 // ────────────────────────────────────────────────────
 
-// 모델 목록 프록시
-app.get('/api/presets/models', async (c) => {
-  try {
-    const res = await fetch(`${AIFASHION_BASE}/api/models`, {
-      headers: { 'Accept': 'application/json' },
-    })
-    if (!res.ok) {
-      throw new Error(`aifashion models API error: ${res.status}`)
-    }
-    const data: any = await res.json()
-
-    // aifashion 응답 형식을 앱 내부 형식으로 변환
-    const models = (data.models || []).map((m: any) => ({
-      id: m.id,
-      name: m.name || `모델 ${m.id}`,
-      description: m.description || '',
-      image_type: m.image_type || 'image/png',
-      // 프론트엔드 필터링용 메타데이터 (aifashion API에서 제공하지 않으면 기본값)
-      gender: m.gender || '여성',
-      age: m.age || '20대',
-      body: m.body || '표준',
-      mood: m.mood || '내추럴',
-      skin: m.skin || '중간',
-    }))
-
-    return c.json({ models })
-  } catch (err: any) {
-    console.error('Models API error:', err)
-    return c.json({ error: 'Failed to fetch models', message: err.message }, 500)
-  }
+// 모델 목록 - Unsplash 패션 모델 큐레이션 (21개, 성별/무드/체형 다양)
+app.get('/api/presets/models', (c) => {
+  const models = [
+    // ── 여성 / 20대 ──
+    { id: 1,  name: '소피아',   gender: '여성', age: '20대', body: '슬림',  mood: '시크',    skin: '밝은', desc: 'young Asian female, slim figure, chic sophisticated look',    unsplashId: 'photo-1529626455594-4ff0802cfb7e' },
+    { id: 2,  name: '지유',     gender: '여성', age: '20대', body: '슬림',  mood: '내추럴',  skin: '중간', desc: 'young Korean female, slim figure, natural casual style',       unsplashId: 'photo-1488716820095-cbe80883c496' },
+    { id: 3,  name: '하나',     gender: '여성', age: '20대', body: '표준',  mood: '큐트',    skin: '밝은', desc: 'young Asian female, average build, cute fresh look',          unsplashId: 'photo-1494790108377-be9c29b29330' },
+    { id: 4,  name: '레이',     gender: '여성', age: '20대', body: '슬림',  mood: '럭셔리',  skin: '중간', desc: 'young female model, slim figure, luxurious elegant style',    unsplashId: 'photo-1517841905240-472988babdf9' },
+    { id: 5,  name: '에이미',   gender: '여성', age: '20대', body: '표준',  mood: '캐주얼',  skin: '밝은', desc: 'young female, average build, casual relaxed style',          unsplashId: 'photo-1531746020798-e6953c6e8e04' },
+    { id: 6,  name: '나오미',   gender: '여성', age: '20대', body: '커브',  mood: '시크',    skin: '어두운', desc: 'young female, curvy figure, chic sophisticated look',       unsplashId: 'photo-1524504388940-b1c1722653e1' },
+    { id: 7,  name: '루나',     gender: '여성', age: '20대', body: '슬림',  mood: '스트릿',  skin: '중간', desc: 'young female, slim figure, street style edgy look',          unsplashId: 'photo-1526080652727-5b77f74eacd2' },
+    // ── 여성 / 30대 ──
+    { id: 8,  name: '비앙카',   gender: '여성', age: '30대', body: '표준',  mood: '럭셔리',  skin: '밝은', desc: 'female model in 30s, average build, luxurious elegant look',  unsplashId: 'photo-1508214751196-bcfd4ca60f91' },
+    { id: 9,  name: '사라',     gender: '여성', age: '30대', body: '슬림',  mood: '시크',    skin: '중간', desc: 'female in her 30s, slim figure, chic sophisticated style',    unsplashId: 'photo-1546961342-ea5f62d5a27b' },
+    { id: 10, name: '이사벨',   gender: '여성', age: '30대', body: '커브',  mood: '캐주얼',  skin: '밝은', desc: 'female in her 30s, curvy figure, casual comfortable style',  unsplashId: 'photo-1487412720507-e7ab37603c6f' },
+    { id: 11, name: '클로에',   gender: '여성', age: '30대', body: '표준',  mood: '내추럴',  skin: '어두운', desc: 'female in her 30s, average build, natural fresh look',     unsplashId: 'photo-1544005313-94ddf0286df2' },
+    // ── 여성 / 플러스사이즈 ──
+    { id: 12, name: '베라',     gender: '여성', age: '20대', body: '플러스', mood: '캐주얼', skin: '중간', desc: 'young plus size female model, casual confident look',          unsplashId: 'photo-1558618666-fcd25c85cd64' },
+    { id: 13, name: '줄리아',   gender: '여성', age: '30대', body: '플러스', mood: '시크',   skin: '밝은', desc: 'plus size female in 30s, chic sophisticated look',            unsplashId: 'photo-1509631179647-0177331693ae' },
+    // ── 남성 / 20대 ──
+    { id: 14, name: '카이',     gender: '남성', age: '20대', body: '슬림',  mood: '시크',    skin: '중간', desc: 'young Asian male, slim fit figure, chic sophisticated look',  unsplashId: 'photo-1500648767791-00dcc994a43e' },
+    { id: 15, name: '에단',     gender: '남성', age: '20대', body: '근육',  mood: '스트릿',  skin: '밝은', desc: 'young male, athletic muscular build, street style look',     unsplashId: 'photo-1570295999919-56ceb5ecca61' },
+    { id: 16, name: '리오',     gender: '남성', age: '20대', body: '표준',  mood: '캐주얼',  skin: '중간', desc: 'young male model, average build, casual relaxed style',      unsplashId: 'photo-1506794778202-cad84cf45f1d' },
+    { id: 17, name: '제이든',   gender: '남성', age: '20대', body: '슬림',  mood: '내추럴',  skin: '어두운', desc: 'young male, slim figure, natural casual style',            unsplashId: 'photo-1531427186611-ecfd6d936c79' },
+    // ── 남성 / 30대 ──
+    { id: 18, name: '마르코',   gender: '남성', age: '30대', body: '근육',  mood: '럭셔리',  skin: '밝은', desc: 'male in 30s, athletic build, luxurious sophisticated look',  unsplashId: 'photo-1507003211169-0a1dd7228f2d' },
+    { id: 19, name: '루카스',   gender: '남성', age: '30대', body: '표준',  mood: '시크',    skin: '중간', desc: 'male in his 30s, average build, chic professional look',     unsplashId: 'photo-1472099645785-5658abf4ff4e' },
+    { id: 20, name: '올리버',   gender: '남성', age: '30대', body: '슬림',  mood: '캐주얼',  skin: '밝은', desc: 'male in 30s, slim fit, casual smart look',                  unsplashId: 'photo-1560250097-0b93528c311a' },
+    // ── 특수/유니크 ──
+    { id: 21, name: '제네시스',  gender: '여성', age: '20대', body: '슬림', mood: '청순',    skin: '밝은', desc: 'young female, slim figure, pure innocent fresh style',        unsplashId: 'photo-1521146764736-56c929d59c83' },
+  ]
+  return c.json({ models })
 })
 
-// 배경 목록 - 패션 룩북 특화 큐레이션 (Unsplash + Pexels 고해상도)
+// 배경 목록 - 패션 룩북 특화 큐레이션 (Unsplash 고해상도, 내용-이름 정확히 일치)
 app.get('/api/presets/backgrounds', (c) => {
   const backgrounds = [
     // ── 스튜디오 ──
-    { id: 1,  name: '화이트 스튜디오',    category: '스튜디오', mood: '클린',     bgDesc: 'clean white studio background with professional lighting', unsplashId: 'photo-1558618666-fcd25c85cd64' },
-    { id: 2,  name: '베이지 스튜디오',    category: '스튜디오', mood: '웜',       bgDesc: 'warm beige minimalist studio background, soft shadows', unsplashId: 'photo-1490481651871-ab68de25d43d' },
-    { id: 3,  name: '그레이 시멘트',      category: '스튜디오', mood: '모던',     bgDesc: 'concrete gray textured studio wall, industrial minimalist', unsplashId: 'photo-1515886657613-9f3515b0c78f' },
+    { id: 1,  name: '화이트 스튜디오',    category: '스튜디오', mood: '클린',       bgDesc: 'clean white studio background with professional soft lighting', unsplashId: 'photo-1558618666-fcd25c85cd64' },
+    { id: 2,  name: '베이지 스튜디오',    category: '스튜디오', mood: '웜',         bgDesc: 'warm beige minimalist studio backdrop, soft neutral tones',     unsplashId: 'photo-1515886657613-9f3515b0c78f' },
+    { id: 3,  name: '그레이 시멘트',      category: '스튜디오', mood: '모던',       bgDesc: 'concrete gray textured studio wall, industrial minimalist',     unsplashId: 'photo-1604502488982-f33babd19e3f' },
     // ── 럭셔리 ──
-    { id: 4,  name: '럭셔리 인테리어',    category: '럭셔리',   mood: '하이엔드', bgDesc: 'luxury interior with marble floors and elegant decor', unsplashId: 'photo-1469334031218-e382a71b716b' },
-    { id: 5,  name: '호텔 로비',          category: '럭셔리',   mood: '엘레강스', bgDesc: 'grand hotel lobby with chandeliers and opulent architecture', unsplashId: 'photo-1543163521-1bf539c55dd2' },
-    { id: 6,  name: '갤러리 화이트',      category: '럭셔리',   mood: '미니멀',   bgDesc: 'modern art gallery with white walls and natural light', unsplashId: 'photo-1523275335684-37898b6baf30' },
+    { id: 4,  name: '럭셔리 인테리어',    category: '럭셔리',   mood: '하이엔드',   bgDesc: 'luxury interior with marble floors and elegant sophisticated decor', unsplashId: 'photo-1613977257592-4871e5fcd7c4' },
+    { id: 5,  name: '호텔 로비',          category: '럭셔리',   mood: '엘레강스',   bgDesc: 'grand hotel lobby with chandeliers and opulent architecture',   unsplashId: 'photo-1560184897-ae75f418493e' },
+    { id: 6,  name: '갤러리 화이트',      category: '럭셔리',   mood: '미니멀',     bgDesc: 'modern white art gallery with clean walls and natural light',   unsplashId: 'photo-1536924940846-227afb31e2a5' },
     // ── 스트리트 ──
-    { id: 7,  name: '도심 스트리트',      category: '스트리트', mood: '어반',     bgDesc: 'urban city street with bokeh lights, fashion editorial', unsplashId: 'photo-1558769132-cb1aea458c5e' },
-    { id: 8,  name: '벽돌 골목',          category: '스트리트', mood: '빈티지',   bgDesc: 'vintage brick alley with artistic graffiti wall', unsplashId: 'photo-1445205170230-053b83016050' },
-    { id: 9,  name: '야간 네온',          category: '스트리트', mood: '시크',     bgDesc: 'neon lights night street, moody urban fashion backdrop', unsplashId: 'photo-1483985988355-763728e1935b' },
+    { id: 7,  name: '도심 스트리트',      category: '스트리트', mood: '어반',       bgDesc: 'urban city street with bokeh lights, fashion editorial backdrop', unsplashId: 'photo-1477959858617-67f85cf4f1df' },
+    { id: 8,  name: '벽돌 골목',          category: '스트리트', mood: '빈티지',     bgDesc: 'vintage brick alley wall, urban industrial street backdrop',   unsplashId: 'photo-1558618666-fcd25c85cd64' },
+    { id: 9,  name: '야간 네온',          category: '스트리트', mood: '시크',       bgDesc: 'neon lights night street, moody urban city fashion backdrop',  unsplashId: 'photo-1483985988355-763728e1935b' },
     // ── 자연/야외 ──
-    { id: 10, name: '해변 골든아워',      category: '야외',     mood: '서머',     bgDesc: 'golden hour beach with soft sand and ocean waves', unsplashId: 'photo-1507003211169-0a1dd7228f2d' },
-    { id: 11, name: '꽃밭 초원',          category: '야외',     mood: '로맨틱',   bgDesc: 'blooming flower field with soft bokeh, dreamy outdoor', unsplashId: 'photo-1539109136881-3be0616acf4b' },
-    { id: 12, name: '초록 숲',            category: '야외',     mood: '내추럴',   bgDesc: 'lush green forest path with dappled sunlight', unsplashId: 'photo-1496747611176-843222e1e57c' },
-    // ── 카페/인도어 ──
-    { id: 13, name: '빈티지 카페',        category: '카페',     mood: '코지',     bgDesc: 'cozy vintage cafe with warm lighting and wooden furniture', unsplashId: 'photo-1525507119028-ed4c629a60a3' },
-    { id: 14, name: '모던 오피스',        category: '실내',     mood: '프로페셔널', bgDesc: 'modern minimalist office with large windows and city view', unsplashId: 'photo-1490481651871-ab68de25d43d' },
-    { id: 15, name: '파리지앵 발코니',    category: '럭셔리',   mood: '로맨틱',   bgDesc: 'Parisian balcony overlooking city rooftops, sunset light', unsplashId: 'photo-1509631179647-0177331693ae' },
-    { id: 16, name: '재패니즈 스트리트',  category: '스트리트', mood: '트렌디',   bgDesc: 'Japanese street fashion district, colorful Tokyo backdrop', unsplashId: 'photo-1551854-cf6c8e8d89f6' },
+    { id: 10, name: '해변 골든아워',      category: '야외',     mood: '서머',       bgDesc: 'golden hour beach with soft sand and gentle ocean waves',       unsplashId: 'photo-1507525428034-b723cf961d3e' },
+    { id: 11, name: '꽃밭 초원',          category: '야외',     mood: '로맨틱',     bgDesc: 'blooming flower meadow with soft bokeh, dreamy outdoor light',  unsplashId: 'photo-1490750967868-88df5691cc19' },
+    { id: 12, name: '초록 숲',            category: '야외',     mood: '내추럴',     bgDesc: 'lush green forest path with dappled sunlight through trees',    unsplashId: 'photo-1448375240586-882707db888b' },
+    // ── 카페/실내 ──
+    { id: 13, name: '빈티지 카페',        category: '카페',     mood: '코지',       bgDesc: 'cozy vintage cafe interior with warm lighting and wooden decor', unsplashId: 'photo-1445116572257-6cd5ada70793' },
+    { id: 14, name: '모던 인테리어',      category: '실내',     mood: '프로페셔널', bgDesc: 'modern minimalist interior with large windows and city view',   unsplashId: 'photo-1555041469-a586c61ea9bc' },
+    // ── 럭셔리/해외 ──
+    { id: 15, name: '파리지앵 거리',      category: '럭셔리',   mood: '로맨틱',     bgDesc: 'Parisian city street with Haussmann architecture and warm light', unsplashId: 'photo-1502602898657-3e91760cbb34' },
+    { id: 16, name: '도쿄 스트리트',      category: '스트리트', mood: '트렌디',     bgDesc: 'Tokyo street fashion district with colorful urban scenery',     unsplashId: 'photo-1540959733332-eab4deabeeaf' },
   ]
   return c.json({ backgrounds })
 })
 
-// 모델 이미지 프록시
+// 모델 이미지 프록시 (Unsplash 패션 모델 큐레이션)
+const MODEL_UNSPLASH_MAP: Record<string, string> = {
+  '1':  'photo-1529626455594-4ff0802cfb7e',
+  '2':  'photo-1488716820095-cbe80883c496',
+  '3':  'photo-1494790108377-be9c29b29330',
+  '4':  'photo-1517841905240-472988babdf9',
+  '5':  'photo-1531746020798-e6953c6e8e04',
+  '6':  'photo-1524504388940-b1c1722653e1',
+  '7':  'photo-1526080652727-5b77f74eacd2',
+  '8':  'photo-1508214751196-bcfd4ca60f91',
+  '9':  'photo-1546961342-ea5f62d5a27b',
+  '10': 'photo-1487412720507-e7ab37603c6f',
+  '11': 'photo-1544005313-94ddf0286df2',
+  '12': 'photo-1558618666-fcd25c85cd64',
+  '13': 'photo-1509631179647-0177331693ae',
+  '14': 'photo-1500648767791-00dcc994a43e',
+  '15': 'photo-1570295999919-56ceb5ecca61',
+  '16': 'photo-1506794778202-cad84cf45f1d',
+  '17': 'photo-1531427186611-ecfd6d936c79',
+  '18': 'photo-1507003211169-0a1dd7228f2d',
+  '19': 'photo-1472099645785-5658abf4ff4e',
+  '20': 'photo-1560250097-0b93528c311a',
+  '21': 'photo-1521146764736-56c929d59c83',
+}
+
 app.get('/api/proxy/model-image/:id', async (c) => {
   const id = c.req.param('id')
+  const unsplashId = MODEL_UNSPLASH_MAP[id]
+
+  if (!unsplashId) {
+    return c.notFound()
+  }
+
   try {
-    const res = await fetch(`${AIFASHION_BASE}/api/models/${id}/image`)
+    // 모델 이미지: 세로형 (4:5 비율), 고해상도
+    const unsplashUrl = `https://images.unsplash.com/${unsplashId}?w=400&h=500&fit=crop&crop=faces,center&q=85&fm=jpg`
+    const res = await fetch(unsplashUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LookbookAI/1.0)',
+        'Accept': 'image/jpeg,image/*',
+      },
+    })
     if (!res.ok) {
       return c.notFound()
     }
     const buffer = await res.arrayBuffer()
-    const contentType = res.headers.get('Content-Type') || 'image/png'
     return new Response(buffer, {
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': 'image/jpeg',
         'Cache-Control': 'public, max-age=86400',
         'Access-Control-Allow-Origin': '*',
       },
@@ -160,24 +189,24 @@ app.get('/api/proxy/model-image/:id', async (c) => {
   }
 })
 
-// 배경 이미지 프록시 (Unsplash 패션 룩북 특화)
+// 배경 이미지 프록시 (Unsplash 패션 룩북 특화 - backgrounds 데이터와 동일한 ID 매핑)
 const BG_UNSPLASH_MAP: Record<string, string> = {
-  '1':  'photo-1558618666-fcd25c85cd64',
-  '2':  'photo-1490481651871-ab68de25d43d',
-  '3':  'photo-1515886657613-9f3515b0c78f',
-  '4':  'photo-1469334031218-e382a71b716b',
-  '5':  'photo-1543163521-1bf539c55dd2',
-  '6':  'photo-1523275335684-37898b6baf30',
-  '7':  'photo-1558769132-cb1aea458c5e',
-  '8':  'photo-1445205170230-053b83016050',
-  '9':  'photo-1483985988355-763728e1935b',
-  '10': 'photo-1507003211169-0a1dd7228f2d',
-  '11': 'photo-1539109136881-3be0616acf4b',
-  '12': 'photo-1496747611176-843222e1e57c',
-  '13': 'photo-1525507119028-ed4c629a60a3',
-  '14': 'photo-1490481651871-ab68de25d43d',
-  '15': 'photo-1509631179647-0177331693ae',
-  '16': 'photo-1551854-cf6c8e8d89f6',
+  '1':  'photo-1558618666-fcd25c85cd64',  // 화이트 스튜디오
+  '2':  'photo-1515886657613-9f3515b0c78f', // 베이지 스튜디오
+  '3':  'photo-1604502488982-f33babd19e3f', // 그레이 시멘트
+  '4':  'photo-1613977257592-4871e5fcd7c4', // 럭셔리 인테리어
+  '5':  'photo-1560184897-ae75f418493e',    // 호텔 로비
+  '6':  'photo-1536924940846-227afb31e2a5', // 갤러리 화이트
+  '7':  'photo-1477959858617-67f85cf4f1df', // 도심 스트리트
+  '8':  'photo-1558618666-fcd25c85cd64',    // 벽돌 골목 (스튜디오 폴백)
+  '9':  'photo-1483985988355-763728e1935b', // 야간 네온
+  '10': 'photo-1507525428034-b723cf961d3e', // 해변 골든아워
+  '11': 'photo-1490750967868-88df5691cc19', // 꽃밭 초원
+  '12': 'photo-1448375240586-882707db888b', // 초록 숲
+  '13': 'photo-1445116572257-6cd5ada70793', // 빈티지 카페
+  '14': 'photo-1555041469-a586c61ea9bc',    // 모던 인테리어
+  '15': 'photo-1502602898657-3e91760cbb34', // 파리지앵 거리
+  '16': 'photo-1540959733332-eab4deabeeaf', // 도쿄 스트리트
 }
 
 app.get('/api/proxy/bg-image/:id', async (c) => {
@@ -326,14 +355,36 @@ app.post('/api/uploads/image', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
-// Generation API - Atlas Cloud 연동
+// Generation API - Atlas Cloud nano-banana-2 연동
 // ────────────────────────────────────────────────────
+
+// 화면 비율 → width/height 변환
+function getRatioDimensions(ratio: string): { width: number; height: number } {
+  const map: Record<string, { width: number; height: number }> = {
+    '1:1':  { width: 1024, height: 1024 },
+    '4:5':  { width: 896,  height: 1120 },
+    '3:4':  { width: 896,  height: 1216 },  // 기본 (패션 세로형)
+    '9:16': { width: 768,  height: 1360 },
+  }
+  return map[ratio] || { width: 896, height: 1216 }
+}
+
+// 해상도 배율 적용
+function applyResolution(dims: { width: number; height: number }, resolution: string) {
+  if (resolution === '4K') {
+    return { width: Math.round(dims.width * 1.5), height: Math.round(dims.height * 1.5) }
+  }
+  if (resolution === 'HD') {
+    return { width: Math.round(dims.width * 1.2), height: Math.round(dims.height * 1.2) }
+  }
+  return dims  // 표준
+}
+
 app.post('/api/generation/start', async (c) => {
   try {
     const body: any = await c.req.json()
 
     const {
-      direction = 'front',
       modelId,
       modelName = '패션 모델',
       modelDesc = 'young Asian female fashion model, slim figure, natural look',
@@ -341,49 +392,54 @@ app.post('/api/generation/start', async (c) => {
       bgDesc = 'clean white studio background with professional lighting',
       poseType = '전신',
       pose = '정면',
-      face = '얼굴 있음',
+      ratio = '3:4',
+      resolution = 'HD',
       count = 4,
       clothingImageUrl,
     } = body
 
     // Photorealistic 프롬프트 빌드
     const prompt = buildPhotorealisticPrompt({
-      direction,
       modelName,
       modelDesc,
       bgName,
       bgDesc,
       poseType,
       pose,
-      face,
       clothingImageUrl,
     })
 
+    // 해상도/비율 계산
+    const baseDims = getRatioDimensions(ratio)
+    const finalDims = applyResolution(baseDims, resolution)
+
     console.log('Generation prompt:', prompt)
     console.log('Clothing image URL:', clothingImageUrl ? clothingImageUrl.substring(0, 50) + '...' : 'none')
+    console.log('Ratio:', ratio, '→', finalDims, '| Resolution:', resolution)
 
-    // Atlas Cloud API 요청
-    let requestBody: any = {
-      model: 'bytedance/seedream-v4',
-      prompt,
-      negative_prompt: 'cartoon, anime, illustration, painting, drawing, low quality, blurry, deformed, ugly, unrealistic, fake, CGI, 3d render',
-      width: 832,
-      height: 1216,
-      num_outputs: Math.min(count, 4), // 한 번에 최대 4장
-    }
+    // Atlas Cloud API 요청 - nano-banana-2 image-to-image (기본)
+    let requestBody: any
 
-    // 의류 이미지가 있는 경우 image-to-image 모드 사용
     if (clothingImageUrl && clothingImageUrl.startsWith('data:')) {
-      // base64 데이터 URL에서 base64 문자열만 추출
-      const base64Data = clothingImageUrl.split(',')[1]
-      if (base64Data) {
-        requestBody = {
-          model: 'black-forest-labs/flux-kontext-pro',
-          prompt: `${prompt}. The model is wearing the exact clothing from the reference image.`,
-          input_image: clothingImageUrl,
-          width: 832,
-          height: 1216,
-        }
+      // 의류 이미지 있음 → bytedance/seedream-v4 image-to-image 모드
+      // image_urls 파라미터로 의류 참조 이미지 전달
+      requestBody = {
+        model: 'bytedance/seedream-v4',
+        prompt: `Ultra-photorealistic professional fashion photography. ${prompt} The model is wearing EXACTLY the clothing item from the reference image - preserve all design details, colors, patterns, and textures of the garment perfectly.`,
+        image_urls: [clothingImageUrl],
+        width: finalDims.width,
+        height: finalDims.height,
+        num_outputs: Math.min(count, 4),
+      }
+    } else {
+      // 의류 이미지 없음 → bytedance/seedream-v4 text-to-image
+      requestBody = {
+        model: 'bytedance/seedream-v4',
+        prompt,
+        negative_prompt: 'cartoon, anime, illustration, painting, drawing, low quality, blurry, deformed, ugly, unrealistic, CGI, 3d render',
+        width: finalDims.width,
+        height: finalDims.height,
+        num_outputs: Math.min(count, 4),
       }
     }
 
@@ -1230,17 +1286,17 @@ app.get('/generator', (c) => {
     </div>
 
     <!-- Generator Body -->
-    <div class="generator-body">
+    <div class="generator-body" style="height:calc(100vh - 64px);overflow:hidden;display:flex;flex-direction:column;">
 
       <!-- ─── Step 1: Upload ─── -->
-      <div class="step-panel active" id="step-1">
+      <div class="step-panel active" id="step-1" style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
         <div class="step-title-area">
           <div class="step-num-badge">Step 1 / 5 · 의류 업로드</div>
           <h2 class="step-heading">의류 이미지를 업로드하세요</h2>
           <p class="step-sub">배경이 흰색이거나 투명한 이미지를 사용하면 가장 좋은 결과를 얻을 수 있어요.</p>
         </div>
 
-        <div id="uploadArea" class="upload-area"
+        <div id="uploadArea" class="upload-area" style="flex:1;overflow-y:auto;"
           ondragover="handleDragOver(event)"
           ondragleave="handleDragLeave(event)"
           ondrop="handleDrop(event)"
@@ -1253,7 +1309,7 @@ app.get('/generator', (c) => {
           <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(event)" />
         </div>
 
-        <div id="uploadPreview" class="upload-preview hidden">
+        <div id="uploadPreview" class="upload-preview hidden" style="flex:1;overflow-y:auto;">
           <div class="upload-preview-inner">
             <div class="upload-preview-img">
               <img id="previewImg" src="" alt="업로드된 의류" />
@@ -1289,30 +1345,30 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 2: Model ─── -->
-      <div class="step-panel" id="step-2">
-        <div class="step-title-area">
+      <div class="step-panel" id="step-2" style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 2 / 5 · 모델 선택</div>
           <h2 class="step-heading">AI 모델을 선택하세요</h2>
           <p class="step-sub">의류에 가장 잘 어울리는 AI 모델을 선택하세요.</p>
         </div>
 
-        <div class="model-filters" id="modelFilters">
+        <div class="model-filters" id="modelFilters" style="flex-shrink:0;">
           <button class="filter-tag active" onclick="filterModels('all', this)">전체</button>
           <button class="filter-tag" onclick="filterModels('여성', this)">여성</button>
           <button class="filter-tag" onclick="filterModels('남성', this)">남성</button>
         </div>
 
         <!-- Loading state -->
-        <div id="modelsLoading" style="text-align:center;padding:60px;color:var(--text-muted);">
+        <div id="modelsLoading" style="text-align:center;padding:60px;color:var(--text-muted);flex:1;">
           <div style="font-size:36px;margin-bottom:12px;">⏳</div>
           <p>모델 목록을 불러오는 중...</p>
         </div>
 
-        <div class="models-grid" id="modelsGrid" style="display:none;">
+        <div class="models-grid" id="modelsGrid" style="display:none;flex:1;overflow-y:auto;padding:4px 0 8px;">
           <!-- Populated by JS from API -->
         </div>
 
-        <div class="step-nav">
+        <div class="step-nav" style="flex-shrink:0;">
           <button class="step-nav-back" onclick="prevStep(2)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
@@ -1323,34 +1379,34 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 3: Background ─── -->
-      <div class="step-panel" id="step-3">
-        <div class="step-title-area">
+      <div class="step-panel" id="step-3" style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 3 / 5 · 배경 선택</div>
           <h2 class="step-heading">배경을 선택하세요</h2>
           <p class="step-sub">브랜드 분위기에 맞는 배경을 선택해 완성도 높은 이미지를 만드세요.</p>
         </div>
 
-        <div class="bg-categories" id="bgCategories">
+        <div class="bg-categories" id="bgCategories" style="flex-shrink:0;">
           <button class="bg-cat active" onclick="filterBg('전체', this)">전체</button>
+          <button class="bg-cat" onclick="filterBg('스튜디오', this)">스튜디오</button>
           <button class="bg-cat" onclick="filterBg('실내', this)">실내</button>
           <button class="bg-cat" onclick="filterBg('야외', this)">야외</button>
           <button class="bg-cat" onclick="filterBg('스트리트', this)">스트리트</button>
           <button class="bg-cat" onclick="filterBg('카페', this)">카페</button>
           <button class="bg-cat" onclick="filterBg('럭셔리', this)">럭셔리</button>
-          <button class="bg-cat" onclick="filterBg('판타지', this)">판타지</button>
         </div>
 
         <!-- Loading state -->
-        <div id="bgsLoading" style="text-align:center;padding:60px;color:var(--text-muted);">
+        <div id="bgsLoading" style="text-align:center;padding:60px;color:var(--text-muted);flex:1;">
           <div style="font-size:36px;margin-bottom:12px;">⏳</div>
           <p>배경 목록을 불러오는 중...</p>
         </div>
 
-        <div class="backgrounds-grid" id="backgroundsGrid" style="display:none;">
+        <div class="backgrounds-grid" id="backgroundsGrid" style="display:none;flex:1;overflow-y:auto;padding:4px 0 8px;">
           <!-- Populated by JS from API -->
         </div>
 
-        <div class="step-nav">
+        <div class="step-nav" style="flex-shrink:0;">
           <button class="step-nav-back" onclick="prevStep(3)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
@@ -1361,20 +1417,37 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 4: Generate ─── -->
-      <div class="step-panel" id="step-4">
-        <div class="step-title-area" id="step5TitleArea">
+      <div class="step-panel" id="step-4" style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="step-title-area" id="step5TitleArea" style="flex-shrink:0;">
           <div class="step-num-badge">Step 4 / 5 · 생성 옵션</div>
           <h2 class="step-heading">생성 옵션을 설정하세요</h2>
           <p class="step-sub">생성할 이미지 수량, 구도, 포즈를 선택하세요. 크레딧이 차감됩니다.</p>
         </div>
 
-        <div id="genOptionsView">
+        <div id="genOptionsView" style="flex:1;overflow-y:auto;">
           <div class="gen-options-grid">
             <div class="gen-option-group">
               <div class="gen-option-title">📸 생성 수량</div>
               <div class="option-chips">
                 <div class="option-chip selected" onclick="selectOption(this, 'count')">4장 (1크레딧)</div>
                 <div class="option-chip" onclick="selectOption(this, 'count')">8장 (2크레딧)</div>
+              </div>
+            </div>
+            <div class="gen-option-group">
+              <div class="gen-option-title">🖼️ 화면 비율</div>
+              <div class="option-chips">
+                <div class="option-chip" onclick="selectOption(this, 'ratio')">1:1</div>
+                <div class="option-chip" onclick="selectOption(this, 'ratio')">4:5</div>
+                <div class="option-chip selected" onclick="selectOption(this, 'ratio')">3:4</div>
+                <div class="option-chip" onclick="selectOption(this, 'ratio')">9:16</div>
+              </div>
+            </div>
+            <div class="gen-option-group">
+              <div class="gen-option-title">✨ 해상도</div>
+              <div class="option-chips">
+                <div class="option-chip" onclick="selectOption(this, 'resolution')">표준</div>
+                <div class="option-chip selected" onclick="selectOption(this, 'resolution')">HD</div>
+                <div class="option-chip" onclick="selectOption(this, 'resolution')">4K</div>
               </div>
             </div>
             <div class="gen-option-group">
@@ -1392,13 +1465,6 @@ app.get('/generator', (c) => {
                 <div class="option-chip" onclick="selectOption(this, 'pose')">측면</div>
                 <div class="option-chip" onclick="selectOption(this, 'pose')">워킹</div>
                 <div class="option-chip" onclick="selectOption(this, 'pose')">정적</div>
-              </div>
-            </div>
-            <div class="gen-option-group">
-              <div class="gen-option-title">😊 얼굴 노출</div>
-              <div class="option-chips">
-                <div class="option-chip selected" onclick="selectOption(this, 'face')">얼굴 있음</div>
-                <div class="option-chip" onclick="selectOption(this, 'face')">얼굴 없음</div>
               </div>
             </div>
           </div>
@@ -1442,7 +1508,7 @@ app.get('/generator', (c) => {
           </div>
         </div>
 
-        <div class="step-nav" id="step5Nav">
+        <div class="step-nav" id="step5Nav" style="flex-shrink:0;">
           <button class="step-nav-back" onclick="prevStep(4)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
@@ -1453,14 +1519,14 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 5: Results ─── -->
-      <div class="step-panel" id="step-5">
-        <div class="step-title-area">
+      <div class="step-panel" id="step-5" style="height:100%;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 5 / 5 · 생성 완료 ✅</div>
           <h2 class="step-heading">이미지가 생성되었습니다!</h2>
           <p class="step-sub">AI가 생성한 실사 피팅컷을 확인하고 다운로드하세요.</p>
         </div>
 
-        <div class="results-toolbar">
+        <div class="results-toolbar" style="flex-shrink:0;">
           <div class="results-tabs">
             <button class="results-tab active" onclick="switchResultsTab('fitting', this)">피팅컷</button>
             <button class="results-tab" onclick="switchResultsTab('styleset', this)">스타일샷 세트</button>
@@ -1475,22 +1541,24 @@ app.get('/generator', (c) => {
           </div>
         </div>
 
-        <div class="results-grid" id="resultsGrid">
-          <!-- Populated by JS -->
-        </div>
+        <div style="flex:1;overflow-y:auto;">
+          <div class="results-grid" id="resultsGrid">
+            <!-- Populated by JS -->
+          </div>
 
-        <div style="margin-top:40px;padding:24px;background:linear-gradient(135deg,var(--primary-bg),#F0EDFF);border-radius:var(--radius-xl);border:1px solid rgba(108,71,255,0.2);">
-          <h3 style="font-size:18px;font-weight:700;margin-bottom:8px;">스타일샷 세트로 확장하기</h3>
-          <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px;">피팅컷을 기반으로 상세용, 광고용, SNS용, 룩북용 이미지 세트를 추가 생성할 수 있습니다.</p>
-          <div style="display:flex;gap:12px;flex-wrap:wrap;">
-            <button class="btn btn-primary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">상세페이지용 세트</button>
-            <button class="btn btn-secondary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">광고용 세트</button>
-            <button class="btn btn-secondary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">SNS용 세트</button>
-            <button class="btn btn-secondary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">룩북용 세트</button>
+          <div style="margin-top:40px;padding:24px;background:linear-gradient(135deg,var(--primary-bg),#F0EDFF);border-radius:var(--radius-xl);border:1px solid rgba(108,71,255,0.2);">
+            <h3 style="font-size:18px;font-weight:700;margin-bottom:8px;">스타일샷 세트로 확장하기</h3>
+            <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px;">피팅컷을 기반으로 상세용, 광고용, SNS용, 룩북용 이미지 세트를 추가 생성할 수 있습니다.</p>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">상세페이지용 세트</button>
+              <button class="btn btn-secondary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">광고용 세트</button>
+              <button class="btn btn-secondary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">SNS용 세트</button>
+              <button class="btn btn-secondary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">룩북용 세트</button>
+            </div>
           </div>
         </div>
 
-        <div class="step-nav">
+        <div class="step-nav" style="flex-shrink:0;">
           <button class="step-nav-back" onclick="window.location.href='/dashboard'">
             <i class="fas fa-th-large"></i> 대시보드로
           </button>

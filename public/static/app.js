@@ -14,9 +14,10 @@ const AppState = {
   selectedBg: null,        // { id, name, category, mood, bgDesc }
   genOptions: {
     count: '4장 (1크레딧)',
+    ratio: '3:4',
+    resolution: 'HD',
     pose_type: '전신',
     pose: '정면',
-    face: '얼굴 있음'
   },
   generatedImages: [],
   isGenerating: false,
@@ -869,7 +870,6 @@ async function startGeneration() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        direction: 'front',
         modelId: model?.id,
         modelName: model?.name || '패션 모델',
         modelDesc,
@@ -877,7 +877,8 @@ async function startGeneration() {
         bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
         poseType: AppState.genOptions.pose_type,
         pose: AppState.genOptions.pose,
-        face: AppState.genOptions.face,
+        ratio: AppState.genOptions.ratio || '3:4',
+        resolution: AppState.genOptions.resolution || 'HD',
         count,
         clothingImageUrl,
       })
