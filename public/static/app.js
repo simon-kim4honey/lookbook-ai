@@ -1,5 +1,6 @@
 /* ===================================================
    AI Fashion Lookbook Studio - Frontend Logic
+   aifashion.co.kr + Atlas Cloud AI 실API 연동
    =================================================== */
 
 // ─────────────────────────────────────────────────────────
@@ -9,9 +10,9 @@ const AppState = {
   currentStep: 1,
   direction: null,
   uploadedFile: null,
-  uploadedImageUrl: null,
-  selectedModel: null,
-  selectedBg: null,
+  uploadedImageUrl: null,  // base64 데이터URL
+  selectedModel: null,     // { id, name, description, gender, ... }
+  selectedBg: null,        // { id, name, category, mood, bgDesc }
   genOptions: {
     count: '4장 (1크레딧)',
     pose_type: '전신',
@@ -20,59 +21,22 @@ const AppState = {
   },
   generatedImages: [],
   isGenerating: false,
+  currentJobId: null,
+  pollInterval: null,
   user: null,
+
+  // API 로드된 데이터
+  allModels: [],
+  filteredModels: [],
+  allBackgrounds: [],
+  filteredBackgrounds: [],
 };
-
-// Mock data mirrors
-const MODELS = [
-  { id: 'm1', name: '소피아', gender: '여성', age: '20대', body: '표준', mood: '시크', skin: '밝은', color: '#FFB3C6' },
-  { id: 'm2', name: '지아', gender: '여성', age: '20대', body: '슬림', mood: '내추럴', skin: '중간', color: '#C8A882' },
-  { id: 'm3', name: '레이첼', gender: '여성', age: '30대', body: '커브', mood: '럭셔리', skin: '어두운', color: '#8B6B45' },
-  { id: 'm4', name: '민지', gender: '여성', age: '20대', body: '표준', mood: '큐트', skin: '밝은', color: '#FFD6E7' },
-  { id: 'm5', name: '에마', gender: '여성', age: '30대', body: '슬림', mood: '시크', skin: '중간', color: '#D4A5A5' },
-  { id: 'm6', name: '유나', gender: '여성', age: '20대', body: '표준', mood: '캐주얼', skin: '밝은', color: '#A8D8EA' },
-  { id: 'm7', name: '다니엘', gender: '남성', age: '20대', body: '표준', mood: '캐주얼', skin: '중간', color: '#B5D5C5' },
-  { id: 'm8', name: '제이크', gender: '남성', age: '30대', body: '근육', mood: '시크', skin: '어두운', color: '#7C9885' },
-  { id: 'm9', name: '리암', gender: '남성', age: '20대', body: '슬림', mood: '스트릿', skin: '밝은', color: '#C5D5EA' },
-  { id: 'm10', name: '마야', gender: '여성', age: '10대', body: '슬림', mood: '청순', skin: '밝은', color: '#FFF0D4' },
-  { id: 'm11', name: '비앙카', gender: '여성', age: '40대', body: '표준', mood: '럭셔리', skin: '중간', color: '#D4C5A9' },
-  { id: 'm12', name: '카오리', gender: '여성', age: '20대', body: '표준', mood: '내추럴', skin: '밝은', color: '#E8D5C0' },
-];
-
-const BACKGROUNDS = [
-  { id: 'b1', name: '화이트 스튜디오', category: '스튜디오', mood: '미니멀', color: '#F5F5F5', icon: '🤍' },
-  { id: 'b2', name: '그레이 스튜디오', category: '스튜디오', mood: '뉴트럴', color: '#BDBDBD', icon: '🩶' },
-  { id: 'b3', name: '블랙 스튜디오', category: '스튜디오', mood: '하이엔드', color: '#2A2A2A', icon: '🖤' },
-  { id: 'b4', name: '핑크 스튜디오', category: '스튜디오', mood: '웜', color: '#FFB6C1', icon: '🌸' },
-  { id: 'b5', name: '카페 인테리어', category: '카페', mood: '웜', color: '#C8A882', icon: '☕' },
-  { id: 'b6', name: '루프탑', category: '실내', mood: '뉴트럴', color: '#87CEEB', icon: '🌆' },
-  { id: 'b7', name: '스트리트 도쿄', category: '스트리트', mood: '뉴트럴', color: '#708090', icon: '🗼' },
-  { id: 'b8', name: '봄 공원', category: '자연', mood: '웜', color: '#90EE90', icon: '🌸' },
-  { id: 'b9', name: '럭셔리 호텔 로비', category: '럭셔리', mood: '하이엔드', color: '#D4AF87', icon: '✨' },
-  { id: 'b10', name: '미니멀 화이트룸', category: '실내', mood: '미니멀', color: '#FAFAFA', icon: '🏠' },
-  { id: 'b11', name: '빈티지 벽돌벽', category: '스트리트', mood: '빈티지', color: '#CC7722', icon: '🧱' },
-  { id: 'b12', name: '블루 오션', category: '자연', mood: '쿨', color: '#1E90FF', icon: '🌊' },
-  { id: 'b13', name: '모던 갤러리', category: '실내', mood: '미니멀', color: '#E8E8E8', icon: '🎨' },
-  { id: 'b14', name: '파리 골목', category: '스트리트', mood: '빈티지', color: '#8B7355', icon: '🗺️' },
-];
 
 const SAMPLE_PROJECTS = [
   { id: 'p1', name: '2024 S/S 룩북', status: 'done', images: 8, created: '2024-03-15', color: '#FF6B9D', icon: '👗' },
   { id: 'p2', name: '캐주얼 티셔츠 컷', status: 'done', images: 4, created: '2024-03-12', color: '#6C47FF', icon: '👕' },
   { id: 'p3', name: '데님 라인 촬영', status: 'processing', images: 0, created: '2024-03-10', color: '#3B82F6', icon: '👖' },
   { id: 'p4', name: '원피스 봄 컬렉션', status: 'draft', images: 0, created: '2024-03-08', color: '#00D4AA', icon: '👘' },
-];
-
-// Generated result colors for mock display
-const RESULT_GRADIENTS = [
-  'linear-gradient(135deg, #FF6B9D 0%, #FF8C42 100%)',
-  'linear-gradient(135deg, #6C47FF 0%, #00D4AA 100%)',
-  'linear-gradient(135deg, #FF6B9D 0%, #6C47FF 100%)',
-  'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
-  'linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%)',
-  'linear-gradient(135deg, #00D4AA 0%, #6C47FF 100%)',
-  'linear-gradient(135deg, #EC4899 0%, #F97316 100%)',
-  'linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%)',
 ];
 
 // ─────────────────────────────────────────────────────────
@@ -84,12 +48,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initPage() {
   const path = window.location.pathname;
-
-  // Navbar scroll effect
   initNavbar();
 
   if (path === '/' || path === '') {
-    // Landing page
+    // Landing page - no special init needed
   } else if (path === '/dashboard') {
     initDashboard();
   } else if (path === '/generator') {
@@ -104,18 +66,14 @@ function initNavbar() {
   const navbar = document.getElementById('navbar');
   if (!navbar) return;
   window.addEventListener('scroll', () => {
-    if (window.scrollY > 20) {
-      navbar.classList.add('scrolled');
-    } else {
-      navbar.classList.remove('scrolled');
-    }
+    navbar.classList.toggle('scrolled', window.scrollY > 20);
   });
 }
 
 // ─────────────────────────────────────────────────────────
 // TOAST NOTIFICATIONS
 // ─────────────────────────────────────────────────────────
-function showToast(message, type = 'info', duration = 3000) {
+function showToast(message, type = 'info', duration = 4000) {
   const container = document.getElementById('toastContainer');
   if (!container) return;
 
@@ -161,7 +119,6 @@ function switchModal(from, to) {
   setTimeout(() => openModal(to), 150);
 }
 
-// Close modal on overlay click
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('modal-overlay')) {
     e.target.classList.remove('active');
@@ -169,7 +126,6 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// Close modal on ESC key
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     document.querySelectorAll('.modal-overlay.active').forEach(m => {
@@ -266,20 +222,12 @@ function initDashboard() {
 }
 
 function switchTab(tabId) {
-  // Hide all tabs
   document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
-  // Show target tab
   const target = document.getElementById(`tab-${tabId}`);
   if (target) target.classList.remove('hidden');
 
-  // Update sidebar active state
   document.querySelectorAll('.sidebar-item').forEach(item => {
     item.classList.remove('active');
-  });
-
-  // Find the clicked item
-  const items = document.querySelectorAll('.sidebar-item');
-  items.forEach(item => {
     if (item.getAttribute('onclick') && item.getAttribute('onclick').includes(tabId)) {
       item.classList.add('active');
     }
@@ -290,12 +238,8 @@ function renderProjects(projects) {
   const grid = document.getElementById('projectsGrid');
   if (!grid) return;
 
-  // Keep the new project card
-  const newCard = grid.querySelector('.new-project-card');
-  const existingCards = grid.querySelectorAll('.project-card');
-  existingCards.forEach(c => c.remove());
+  grid.querySelectorAll('.project-card').forEach(c => c.remove());
 
-  // Status labels
   const statusLabel = { done: '완료', processing: '생성중', draft: '초안' };
 
   projects.forEach(p => {
@@ -325,12 +269,12 @@ function renderProjects(projects) {
            <button class="project-action-btn primary" onclick="window.location.href='/generator'; event.stopPropagation();">재생성</button>` :
           p.status === 'processing' ?
           `<button class="project-action-btn" disabled>생성중...</button>
-           <button class="project-action-btn primary" onclick="openResultsForProject('${p.id}'); event.stopPropagation();">결과 보기</button>` :
+           <button class="project-action-btn primary" onclick="event.stopPropagation();">결과 보기</button>` :
           `<button class="project-action-btn primary" onclick="window.location.href='/generator'; event.stopPropagation();">계속 작업</button>`
         }
       </div>
     `;
-    card.addEventListener('click', () => openProjectDetail(p));
+    card.addEventListener('click', () => showToast(`"${p.name}" 프로젝트를 엽니다.`, 'info'));
     grid.appendChild(card);
   });
 }
@@ -338,27 +282,16 @@ function renderProjects(projects) {
 function filterProjects() {
   const query = document.getElementById('projectSearch').value.toLowerCase();
   document.querySelectorAll('.project-card').forEach(card => {
-    const name = card.dataset.name || '';
-    card.style.display = name.includes(query) ? '' : 'none';
+    card.style.display = (card.dataset.name || '').includes(query) ? '' : 'none';
   });
 }
 
 function filterByStatus(status, btn) {
-  // Update active button
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-
   document.querySelectorAll('.project-card').forEach(card => {
-    if (status === 'all' || card.dataset.status === status) {
-      card.style.display = '';
-    } else {
-      card.style.display = 'none';
-    }
+    card.style.display = (status === 'all' || card.dataset.status === status) ? '' : 'none';
   });
-}
-
-function openProjectDetail(project) {
-  showToast(`"${project.name}" 프로젝트를 엽니다.`, 'info');
 }
 
 function toggleUserMenu() {
@@ -366,16 +299,121 @@ function toggleUserMenu() {
 }
 
 // ─────────────────────────────────────────────────────────
-// GENERATOR
+// GENERATOR INIT
 // ─────────────────────────────────────────────────────────
 function initGenerator() {
-  renderModels(MODELS);
-  renderBackgrounds(BACKGROUNDS);
+  // 모델과 배경 API에서 로드 (step 3, 4 진입 시 로드)
+  // 페이지 초기화 시 미리 로드
+  loadModelsFromAPI();
+  loadBackgroundsFromAPI();
 }
 
-// ── Step Navigation ──
+// ─────────────────────────────────────────────────────────
+// API: 모델 로드 (aifashion.co.kr)
+// ─────────────────────────────────────────────────────────
+async function loadModelsFromAPI() {
+  try {
+    const res = await fetch('/api/presets/models');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    AppState.allModels = data.models || [];
+    AppState.filteredModels = [...AppState.allModels];
+
+    // 이미 step 3가 활성화된 경우 렌더링
+    const grid = document.getElementById('modelsGrid');
+    const loading = document.getElementById('modelsLoading');
+    if (grid) {
+      if (loading) loading.style.display = 'none';
+      grid.style.display = '';
+      renderModels(AppState.allModels);
+    }
+  } catch (err) {
+    console.error('Models load error:', err);
+    showToast('모델 목록 로딩 실패. 기본 목록을 사용합니다.', 'warning');
+
+    // 폴백: 기본 모델 목록
+    AppState.allModels = getFallbackModels();
+    AppState.filteredModels = [...AppState.allModels];
+    const grid = document.getElementById('modelsGrid');
+    const loading = document.getElementById('modelsLoading');
+    if (grid) {
+      if (loading) loading.style.display = 'none';
+      grid.style.display = '';
+      renderModels(AppState.allModels);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// API: 배경 로드 (aifashion.co.kr)
+// ─────────────────────────────────────────────────────────
+async function loadBackgroundsFromAPI() {
+  try {
+    const res = await fetch('/api/presets/backgrounds');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    AppState.allBackgrounds = data.backgrounds || [];
+    AppState.filteredBackgrounds = [...AppState.allBackgrounds];
+
+    // 이미 step 4가 활성화된 경우 렌더링
+    const grid = document.getElementById('backgroundsGrid');
+    const loading = document.getElementById('bgsLoading');
+    if (grid) {
+      if (loading) loading.style.display = 'none';
+      grid.style.display = '';
+      renderBackgrounds(AppState.allBackgrounds);
+    }
+  } catch (err) {
+    console.error('Backgrounds load error:', err);
+    showToast('배경 목록 로딩 실패. 기본 목록을 사용합니다.', 'warning');
+
+    AppState.allBackgrounds = getFallbackBackgrounds();
+    AppState.filteredBackgrounds = [...AppState.allBackgrounds];
+    const grid = document.getElementById('backgroundsGrid');
+    const loading = document.getElementById('bgsLoading');
+    if (grid) {
+      if (loading) loading.style.display = 'none';
+      grid.style.display = '';
+      renderBackgrounds(AppState.allBackgrounds);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// FALLBACK DATA (API 실패 시)
+// ─────────────────────────────────────────────────────────
+function getFallbackModels() {
+  return Array.from({ length: 10 }, (_, i) => ({
+    id: i + 2,
+    name: String(i + 1).padStart(2, '0'),
+    description: '',
+    gender: i < 7 ? '여성' : '남성',
+    age: '20대',
+    body: '표준',
+    mood: '내추럴',
+    skin: '중간',
+  }));
+}
+
+function getFallbackBackgrounds() {
+  const names = ['컨테이너 항구', '빈티지 관제실', '극장 로비', '에스컬레이터', '팜시티 거리', '실내 테니스코트', '모래사막', '해변 카페', '북촌 오르막', '해변도로', '캔디왕국', '파스텔 모텔', '네온 식당', '지하복도', '전차내부'];
+  const ids = [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+  const cats = ['야외', '실내', '럭셔리', '실내', '스트리트', '스포츠', '야외', '카페', '스트리트', '야외', '판타지', '실내', '실내', '실내', '실내'];
+  return names.map((name, i) => ({
+    id: ids[i],
+    name,
+    category: cats[i],
+    mood: '뉴트럴',
+    bgDesc: name,
+  }));
+}
+
+// ─────────────────────────────────────────────────────────
+// STEP NAVIGATION
+// ─────────────────────────────────────────────────────────
 function goToStep(step) {
-  // Only allow going back
   if (step >= AppState.currentStep) return;
   changeStep(step);
 }
@@ -400,7 +438,6 @@ function nextStep(currentStep) {
 
   changeStep(currentStep + 1);
 
-  // Update generation summary when reaching step 5
   if (currentStep + 1 === 5) {
     updateGenSummary();
   }
@@ -415,15 +452,12 @@ function prevStep(currentStep) {
 }
 
 function changeStep(newStep) {
-  // Hide current step
   const currentPanel = document.getElementById(`step-${AppState.currentStep}`);
   if (currentPanel) currentPanel.classList.remove('active');
 
-  // Show new step
   const newPanel = document.getElementById(`step-${newStep}`);
   if (newPanel) newPanel.classList.add('active');
 
-  // Update step progress dots
   for (let i = 1; i <= 6; i++) {
     const dot = document.getElementById(`dot-${i}`);
     const line = document.getElementById(`line-${i}`);
@@ -433,52 +467,69 @@ function changeStep(newStep) {
       else if (i === newStep) dot.classList.add('active');
     }
     if (line) {
-      line.classList.remove('done');
-      if (i < newStep) line.classList.add('done');
+      line.classList.toggle('done', i < newStep);
     }
   }
 
   AppState.currentStep = newStep;
   window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Step 3: 모델 그리드 초기화
+  if (newStep === 3) {
+    const grid = document.getElementById('modelsGrid');
+    const loading = document.getElementById('modelsLoading');
+    if (AppState.allModels.length > 0) {
+      if (loading) loading.style.display = 'none';
+      if (grid) { grid.style.display = ''; renderModels(AppState.allModels); }
+    } else {
+      loadModelsFromAPI();
+    }
+  }
+
+  // Step 4: 배경 그리드 초기화
+  if (newStep === 4) {
+    const grid = document.getElementById('backgroundsGrid');
+    const loading = document.getElementById('bgsLoading');
+    if (AppState.allBackgrounds.length > 0) {
+      if (loading) loading.style.display = 'none';
+      if (grid) { grid.style.display = ''; renderBackgrounds(AppState.allBackgrounds); }
+    } else {
+      loadBackgroundsFromAPI();
+    }
+  }
 }
 
-// ── Step 1: Direction ──
+// ─────────────────────────────────────────────────────────
+// STEP 1: Direction
+// ─────────────────────────────────────────────────────────
 function selectDirection(dir) {
   AppState.direction = dir;
-
-  // Update card UI
   document.querySelectorAll('.direction-card').forEach(c => c.classList.remove('selected'));
   const card = document.getElementById(`dir-${dir}`);
   if (card) card.classList.add('selected');
-
-  // Enable next button
   const btn = document.getElementById('nextBtn1');
   if (btn) btn.disabled = false;
 }
 
-// ── Step 2: Upload ──
+// ─────────────────────────────────────────────────────────
+// STEP 2: Upload
+// ─────────────────────────────────────────────────────────
 function handleDragOver(e) {
   e.preventDefault();
   e.stopPropagation();
-  const area = document.getElementById('uploadArea');
-  if (area) area.classList.add('drag-over');
+  document.getElementById('uploadArea')?.classList.add('drag-over');
 }
 
 function handleDragLeave(e) {
-  const area = document.getElementById('uploadArea');
-  if (area) area.classList.remove('drag-over');
+  document.getElementById('uploadArea')?.classList.remove('drag-over');
 }
 
 function handleDrop(e) {
   e.preventDefault();
   e.stopPropagation();
-  const area = document.getElementById('uploadArea');
-  if (area) area.classList.remove('drag-over');
-
+  document.getElementById('uploadArea')?.classList.remove('drag-over');
   const files = e.dataTransfer.files;
-  if (files && files[0]) {
-    processFile(files[0]);
-  }
+  if (files && files[0]) processFile(files[0]);
 }
 
 function handleFileSelect(e) {
@@ -487,14 +538,11 @@ function handleFileSelect(e) {
 }
 
 function processFile(file) {
-  // Validate type
   const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (!validTypes.includes(file.type)) {
     showToast('JPG, PNG, WEBP 형식만 지원합니다.', 'error');
     return;
   }
-
-  // Validate size (10MB)
   if (file.size > 10 * 1024 * 1024) {
     showToast('파일 크기는 10MB 이하여야 합니다.', 'error');
     return;
@@ -511,19 +559,18 @@ function processFile(file) {
 }
 
 function showUploadPreview(file, dataUrl) {
-  const uploadArea = document.getElementById('uploadArea');
-  const preview = document.getElementById('uploadPreview');
-  const previewImg = document.getElementById('previewImg');
-  const previewName = document.getElementById('previewName');
-  const previewMeta = document.getElementById('previewMeta');
+  document.getElementById('uploadArea')?.classList.add('hidden');
+  document.getElementById('uploadPreview')?.classList.remove('hidden');
 
-  if (uploadArea) uploadArea.classList.add('hidden');
-  if (preview) preview.classList.remove('hidden');
+  const previewImg = document.getElementById('previewImg');
   if (previewImg) previewImg.src = dataUrl;
+
+  const previewName = document.getElementById('previewName');
   if (previewName) previewName.textContent = file.name;
+
+  const previewMeta = document.getElementById('previewMeta');
   if (previewMeta) previewMeta.textContent = `${(file.size / 1024).toFixed(1)} KB · ${file.type.split('/')[1].toUpperCase()}`;
 
-  // Enable next button
   const btn = document.getElementById('nextBtn2');
   if (btn) btn.disabled = false;
 
@@ -534,37 +581,57 @@ function resetUpload() {
   AppState.uploadedFile = null;
   AppState.uploadedImageUrl = null;
 
-  const uploadArea = document.getElementById('uploadArea');
-  const preview = document.getElementById('uploadPreview');
-  const fileInput = document.getElementById('fileInput');
+  document.getElementById('uploadArea')?.classList.remove('hidden');
+  document.getElementById('uploadPreview')?.classList.add('hidden');
 
-  if (uploadArea) uploadArea.classList.remove('hidden');
-  if (preview) preview.classList.add('hidden');
+  const fileInput = document.getElementById('fileInput');
   if (fileInput) fileInput.value = '';
 
   const btn = document.getElementById('nextBtn2');
   if (btn) btn.disabled = true;
 }
 
-// ── Step 3: Model Selection ──
+// ─────────────────────────────────────────────────────────
+// STEP 3: Model Selection (aifashion.co.kr 실제 이미지)
+// ─────────────────────────────────────────────────────────
 function renderModels(models) {
   const grid = document.getElementById('modelsGrid');
   if (!grid) return;
 
   grid.innerHTML = '';
+
+  if (!models || models.length === 0) {
+    grid.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">표시할 모델이 없습니다.</div>';
+    return;
+  }
+
   models.forEach(model => {
+    const isSelected = AppState.selectedModel?.id === model.id;
     const card = document.createElement('div');
-    card.className = 'model-card' + (AppState.selectedModel?.id === model.id ? ' selected' : '');
+    card.className = 'model-card' + (isSelected ? ' selected' : '');
     card.dataset.id = model.id;
+
+    // 실제 aifashion 이미지 URL 사용
+    const imageUrl = `/api/proxy/model-image/${model.id}`;
+    const displayName = model.name && !model.name.match(/^\d+$/)
+      ? model.name
+      : `모델 ${model.name || model.id}`;
+
     card.innerHTML = `
-      <div class="model-thumb" style="background:linear-gradient(160deg, ${model.color}99, ${model.color});">
-        <div class="model-silhouette">
-          ${model.gender === '여성' ? '🧍‍♀️' : '🧍‍♂️'}
-        </div>
+      <div class="model-thumb" style="overflow:hidden;background:#f0f0f0;position:relative;">
+        <img
+          src="${imageUrl}"
+          alt="${displayName}"
+          style="width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;"
+          onerror="this.style.display='none';this.parentElement.innerHTML='<div style=\\"width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;background:linear-gradient(135deg,#f0e6ff,#e6f0ff);\\">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>'"
+          onmouseover="this.style.transform='scale(1.05)'"
+          onmouseout="this.style.transform='scale(1)'"
+        />
+        <div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;">#${model.id}</div>
       </div>
       <div class="model-info">
-        <div class="model-name">${model.name}</div>
-        <div class="model-tags">${model.gender} · ${model.age} · ${model.mood}</div>
+        <div class="model-name">${displayName}</div>
+        <div class="model-tags">${model.gender || '여성'} · ${model.age || '20대'} · ${model.mood || '내추럴'}</div>
       </div>
       <div class="model-selected-check">✓</div>
     `;
@@ -582,66 +649,78 @@ function selectModel(model, card) {
   const btn = document.getElementById('nextBtn3');
   if (btn) btn.disabled = false;
 
-  showToast(`${model.name} 모델을 선택했습니다.`, 'success');
+  const displayName = model.name && !model.name.match(/^\d+$/)
+    ? model.name
+    : `모델 ${model.name || model.id}`;
+  showToast(`${displayName} 모델을 선택했습니다.`, 'success');
 }
 
-let modelFilterState = { gender: null, age: null, body: null, mood: null };
+let modelFilterState = { gender: null };
 
-function filterModels(value, btn, type = 'gender') {
-  // Handle "전체" reset
+function filterModels(value, btn) {
   if (value === 'all') {
-    modelFilterState = { gender: null, age: null, body: null, mood: null };
+    modelFilterState.gender = null;
     document.querySelectorAll('#modelFilters .filter-tag').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    renderModels(MODELS);
+    renderModels(AppState.allModels);
     return;
   }
 
-  // Toggle filter
-  if (modelFilterState[type] === value) {
-    modelFilterState[type] = null;
+  if (modelFilterState.gender === value) {
+    modelFilterState.gender = null;
     btn.classList.remove('active');
-  } else {
-    // Remove other active of same type
-    document.querySelectorAll(`#modelFilters .filter-tag[onclick*="${type}"]`).forEach(b => b.classList.remove('active'));
-    modelFilterState[type] = value;
-    btn.classList.add('active');
+    renderModels(AppState.allModels);
+    const allBtn = document.querySelector('#modelFilters .filter-tag[onclick*="\'all\'"]');
+    if (allBtn) allBtn.classList.add('active');
+    return;
   }
 
-  // Remove "전체" active if any filter is set
-  const hasFilter = Object.values(modelFilterState).some(v => v !== null);
-  const allBtn = document.querySelector('#modelFilters .filter-tag[onclick*="\'all\'"]');
-  if (allBtn) allBtn.classList.toggle('active', !hasFilter);
+  document.querySelectorAll('#modelFilters .filter-tag').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  modelFilterState.gender = value;
 
-  // Filter models
-  const filtered = MODELS.filter(m => {
-    if (modelFilterState.gender && m.gender !== modelFilterState.gender) return false;
-    if (modelFilterState.age && m.age !== modelFilterState.age) return false;
-    if (modelFilterState.body && m.body !== modelFilterState.body) return false;
-    if (modelFilterState.mood && m.mood !== modelFilterState.mood) return false;
-    return true;
-  });
-
-  renderModels(filtered.length > 0 ? filtered : MODELS);
+  const filtered = AppState.allModels.filter(m => (m.gender || '여성') === value);
+  renderModels(filtered.length > 0 ? filtered : AppState.allModels);
 }
 
-// ── Step 4: Background Selection ──
+// ─────────────────────────────────────────────────────────
+// STEP 4: Background Selection (aifashion.co.kr 실제 이미지)
+// ─────────────────────────────────────────────────────────
 function renderBackgrounds(bgs) {
   const grid = document.getElementById('backgroundsGrid');
   if (!grid) return;
 
   grid.innerHTML = '';
+
+  if (!bgs || bgs.length === 0) {
+    grid.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">표시할 배경이 없습니다.</div>';
+    return;
+  }
+
   bgs.forEach(bg => {
+    const isSelected = AppState.selectedBg?.id === bg.id;
     const card = document.createElement('div');
-    card.className = 'bg-card' + (AppState.selectedBg?.id === bg.id ? ' selected' : '');
+    card.className = 'bg-card' + (isSelected ? ' selected' : '');
     card.dataset.id = bg.id;
+
+    // 실제 aifashion 배경 이미지 URL 사용
+    const imageUrl = `/api/proxy/bg-image/${bg.id}`;
+
     card.innerHTML = `
-      <div class="bg-thumb" style="background:linear-gradient(135deg, ${bg.color}88, ${bg.color});">
-        <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:48px;">${bg.icon}</div>
+      <div class="bg-thumb" style="overflow:hidden;background:#f0f0f0;position:relative;">
+        <img
+          src="${imageUrl}"
+          alt="${bg.name}"
+          style="width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;"
+          onerror="this.style.display='none';this.parentElement.style.background='linear-gradient(135deg,#e0e0e0,#c0c0c0)';this.parentElement.innerHTML+='<div style=\\"position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:#666;\\">${bg.name}</div>'"
+          onmouseover="this.style.transform='scale(1.05)'"
+          onmouseout="this.style.transform='scale(1)'"
+        />
+        <div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;">${bg.category || '기타'}</div>
       </div>
       <div class="bg-info">
         <div class="bg-name">${bg.name}</div>
-        <div class="bg-mood">${bg.category} · ${bg.mood}</div>
+        <div class="bg-mood">${bg.category || '기타'} · ${bg.mood || '뉴트럴'}</div>
       </div>
       <div class="bg-selected-check">✓</div>
     `;
@@ -667,33 +746,27 @@ function filterBg(category, btn) {
   btn.classList.add('active');
 
   if (category === '전체') {
-    renderBackgrounds(BACKGROUNDS);
+    renderBackgrounds(AppState.allBackgrounds);
   } else {
-    const filtered = BACKGROUNDS.filter(b => b.category === category);
-    renderBackgrounds(filtered);
+    const filtered = AppState.allBackgrounds.filter(b => b.category === category);
+    renderBackgrounds(filtered.length > 0 ? filtered : AppState.allBackgrounds);
   }
 }
 
-// ── Step 5: Generation Options ──
+// ─────────────────────────────────────────────────────────
+// STEP 5: Generation Options
+// ─────────────────────────────────────────────────────────
 function selectOption(chip, type) {
-  // Only one selection per type group
   const group = chip.closest('.option-chips');
-  if (group) {
-    group.querySelectorAll('.option-chip').forEach(c => c.classList.remove('selected'));
-  }
+  if (group) group.querySelectorAll('.option-chip').forEach(c => c.classList.remove('selected'));
   chip.classList.add('selected');
-
   AppState.genOptions[type] = chip.textContent.trim();
-
-  // Update cost display
   updateCostDisplay();
 }
 
 function updateCostDisplay() {
-  const countChip = document.querySelector('.option-chips .option-chip.selected');
   const costEl = document.querySelector('.gen-cost-amount');
   if (!costEl) return;
-
   const is8 = AppState.genOptions.count && AppState.genOptions.count.includes('8장');
   costEl.textContent = is8 ? '2 크레딧' : '1 크레딧';
 }
@@ -704,28 +777,37 @@ function updateGenSummary() {
   const bgEl = document.getElementById('sumBg');
 
   if (dirEl) dirEl.textContent = AppState.direction === 'front' ? '앞면 (Front)' : '뒷면 (Back)';
+
   if (modelEl) {
     if (AppState.selectedModel) {
-      modelEl.innerHTML = `<span style="width:32px;height:40px;border-radius:6px;background:${AppState.selectedModel.color};display:inline-flex;align-items:center;justify-content:center;font-size:16px;">${AppState.selectedModel.gender === '여성' ? '🧍‍♀️' : '🧍‍♂️'}</span> ${AppState.selectedModel.name}`;
+      const displayName = AppState.selectedModel.name && !AppState.selectedModel.name.match(/^\d+$/)
+        ? AppState.selectedModel.name
+        : `모델 ${AppState.selectedModel.name || AppState.selectedModel.id}`;
+      const imageUrl = `/api/proxy/model-image/${AppState.selectedModel.id}`;
+      modelEl.innerHTML = `<img src="${imageUrl}" alt="${displayName}" style="width:32px;height:40px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none'"> ${displayName}`;
     } else {
       modelEl.textContent = '선택되지 않음';
     }
   }
+
   if (bgEl) {
     if (AppState.selectedBg) {
-      bgEl.innerHTML = `<span style="font-size:16px;">${AppState.selectedBg.icon}</span> ${AppState.selectedBg.name}`;
+      const imageUrl = `/api/proxy/bg-image/${AppState.selectedBg.id}`;
+      bgEl.innerHTML = `<img src="${imageUrl}" alt="${AppState.selectedBg.name}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none'"> ${AppState.selectedBg.name}`;
     } else {
       bgEl.textContent = '선택되지 않음';
     }
   }
 }
 
-// ── Generation ──
-function startGeneration() {
+// ─────────────────────────────────────────────────────────
+// GENERATION - Atlas Cloud API 실제 연동
+// ─────────────────────────────────────────────────────────
+async function startGeneration() {
   if (AppState.isGenerating) return;
   AppState.isGenerating = true;
 
-  // Hide options, show generating view
+  // UI: 옵션 숨기기, 생성 뷰 표시
   document.getElementById('genOptionsView').style.display = 'none';
   document.getElementById('step5TitleArea').style.display = 'none';
   document.getElementById('step5Nav').style.display = 'none';
@@ -733,110 +815,344 @@ function startGeneration() {
   const genView = document.getElementById('generatingView');
   if (genView) genView.classList.add('active');
 
-  // Simulate generation progress
-  simulateGeneration();
-}
+  // 진행 상태 초기화
+  updateProgress(0, '시작 중...');
+  setMsgState('msg1', 'current');
 
-function simulateGeneration() {
-  const steps = [
-    { id: 'msg1', text: '의류 이미지 분석 완료!', progress: 20, delay: 1500 },
-    { id: 'msg2', text: 'AI 모델 피팅 적용 완료!', progress: 45, delay: 3500 },
-    { id: 'msg3', text: '배경 합성 완료!', progress: 65, delay: 5500 },
-    { id: 'msg4', text: '이미지 품질 향상 완료!', progress: 85, delay: 7500 },
-    { id: 'msg5', text: '최종 렌더링 완료!', progress: 100, delay: 9500 },
-  ];
+  try {
+    // 선택된 모델의 description 생성
+    const model = AppState.selectedModel;
+    const modelDesc = buildModelDescription(model);
+    const bg = AppState.selectedBg;
 
-  steps.forEach((step, idx) => {
-    setTimeout(() => {
-      // Mark previous as done
-      const prevMsg = document.getElementById(steps[idx > 0 ? idx - 1 : 0].id);
-      if (idx > 0 && prevMsg) {
-        prevMsg.classList.remove('current');
-        prevMsg.classList.add('done');
-        prevMsg.querySelector('.dot').style.background = 'var(--success)';
-      }
+    const countStr = AppState.genOptions.count || '4장 (1크레딧)';
+    const count = countStr.includes('8') ? 8 : 4;
 
-      // Mark current
-      const currentMsg = document.getElementById(step.id);
-      if (currentMsg) {
-        currentMsg.classList.add('current');
-        currentMsg.querySelector('div').textContent = ''; // clear dot text
-      }
+    // 의류 이미지 URL (base64 데이터URL)
+    const clothingImageUrl = AppState.uploadedImageUrl;
 
-      // Update progress bar
-      const fill = document.getElementById('genProgressFill');
-      if (fill) fill.style.width = step.progress + '%';
+    // 생성 요청
+    updateProgress(10, '의류 이미지 분석 중...');
 
-      const statusText = document.getElementById('genStatusText');
-      if (statusText) statusText.textContent = step.text;
-
-      // Complete!
-      if (idx === steps.length - 1) {
-        setTimeout(() => {
-          AppState.isGenerating = false;
-          completeGeneration();
-        }, 1000);
-      }
-    }, step.delay);
-  });
-}
-
-function completeGeneration() {
-  // Generate mock result images
-  const count = AppState.genOptions.count && AppState.genOptions.count.includes('8장') ? 8 : 4;
-  AppState.generatedImages = [];
-
-  for (let i = 0; i < count; i++) {
-    AppState.generatedImages.push({
-      id: `result_${i + 1}`,
-      title: `피팅컷 #${i + 1}`,
-      gradient: RESULT_GRADIENTS[i % RESULT_GRADIENTS.length],
-      icon: ['👗', '👘', '🥻', '👙', '🩱', '👚', '👕', '🥼'][i % 8],
+    const startRes = await fetch('/api/generation/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        direction: AppState.direction,
+        modelId: model?.id,
+        modelName: model?.name || '패션 모델',
+        modelDesc,
+        bgName: bg?.name || '스튜디오',
+        bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
+        poseType: AppState.genOptions.pose_type,
+        pose: AppState.genOptions.pose,
+        face: AppState.genOptions.face,
+        count,
+        clothingImageUrl,
+      })
     });
+
+    const startData = await startRes.json();
+    console.log('Generation start response:', startData);
+
+    if (!startData.jobId) {
+      throw new Error('생성 요청 실패: Job ID 없음');
+    }
+
+    AppState.currentJobId = startData.jobId;
+
+    // Fallback 처리 (즉시 완료)
+    if (startData.isFallback) {
+      updateProgress(30, 'AI 모델 피팅 적용 중...');
+      setMsgState('msg1', 'done');
+      setMsgState('msg2', 'current');
+
+      await sleep(1500);
+      updateProgress(60, '배경 합성 중...');
+      setMsgState('msg2', 'done');
+      setMsgState('msg3', 'current');
+
+      await sleep(1500);
+      updateProgress(85, '이미지 품질 향상 중...');
+      setMsgState('msg3', 'done');
+      setMsgState('msg4', 'current');
+
+      await sleep(1000);
+      updateProgress(100, '완료!');
+      setMsgState('msg4', 'done');
+      setMsgState('msg5', 'done');
+
+      // 폴백 결과 표시
+      const fallbackImages = generateFallbackImages(count);
+      completeGeneration(fallbackImages);
+      return;
+    }
+
+    // 실제 Atlas Cloud 폴링
+    updateProgress(20, 'AI 모델 피팅 적용 중...');
+    setMsgState('msg1', 'done');
+    setMsgState('msg2', 'current');
+
+    await pollGenerationStatus(startData.jobId, count);
+
+  } catch (err) {
+    console.error('Generation error:', err);
+    showToast(`생성 중 오류: ${err.message}`, 'error');
+    AppState.isGenerating = false;
+
+    // UI 복원
+    document.getElementById('genOptionsView').style.display = '';
+    document.getElementById('step5TitleArea').style.display = '';
+    document.getElementById('step5Nav').style.display = '';
+    const genView = document.getElementById('generatingView');
+    if (genView) genView.classList.remove('active');
+  }
+}
+
+// Atlas Cloud 결과 폴링
+async function pollGenerationStatus(jobId, count) {
+  let attempts = 0;
+  const maxAttempts = 60; // 최대 2분 (2초 간격)
+  const pollDelay = 3000; // 3초 간격
+
+  while (attempts < maxAttempts) {
+    await sleep(pollDelay);
+    attempts++;
+
+    try {
+      const res = await fetch(`/api/generation/${jobId}/status`);
+      const data = await res.json();
+
+      console.log(`Poll attempt ${attempts}:`, data.status, data.progress);
+
+      if (data.status === 'completed') {
+        // 완료 처리
+        updateProgress(95, '최종 렌더링 중...');
+        setMsgState('msg3', 'done');
+        setMsgState('msg4', 'done');
+        setMsgState('msg5', 'current');
+
+        await sleep(800);
+        updateProgress(100, '생성 완료!');
+        setMsgState('msg5', 'done');
+
+        completeGeneration(data.images || [], data.isFallback);
+        return;
+
+      } else if (data.status === 'failed') {
+        throw new Error(data.error || '생성 실패');
+
+      } else {
+        // processing
+        const progress = Math.min(data.progress || 30, 85);
+        const progressMessages = ['AI 모델 피팅 적용 중...', '배경 합성 중...', '이미지 품질 향상 중...'];
+        const msgIdx = Math.floor((attempts / maxAttempts) * progressMessages.length);
+        updateProgress(20 + progress * 0.65, progressMessages[msgIdx] || '처리 중...');
+
+        // 메시지 상태 업데이트
+        if (attempts > 5) setMsgState('msg2', 'done'), setMsgState('msg3', 'current');
+        if (attempts > 15) setMsgState('msg3', 'done'), setMsgState('msg4', 'current');
+        if (attempts > 30) setMsgState('msg4', 'done'), setMsgState('msg5', 'current');
+      }
+
+    } catch (pollErr) {
+      console.error('Poll error:', pollErr);
+      if (attempts >= maxAttempts - 5) {
+        throw pollErr;
+      }
+    }
   }
 
-  // Render results and go to step 6
-  renderResults();
-  changeStep(6);
-  showToast(`${count}장의 이미지가 생성되었습니다! 🎉`, 'success');
+  // 타임아웃 - 폴백으로 처리
+  console.warn('Generation timeout, using fallback');
+  const fallbackImages = generateFallbackImages(count);
+  completeGeneration(fallbackImages, true);
 }
 
-// ── Step 6: Results ──
-function renderResults() {
+// 생성 완료 처리
+function completeGeneration(images, isFallback = false) {
+  AppState.isGenerating = false;
+  AppState.generatedImages = images;
+
+  renderResults(images);
+  changeStep(6);
+
+  const count = images.length;
+  if (isFallback) {
+    showToast(`${count}장의 이미지가 생성되었습니다. (데모 모드) 🎉`, 'success');
+  } else {
+    showToast(`${count}장의 실사 AI 이미지가 생성되었습니다! 🎉`, 'success');
+  }
+}
+
+// 폴백 이미지 생성 헬퍼
+function generateFallbackImages(count) {
+  const gradients = [
+    ['#FF6B9D', '#FF8C42'],
+    ['#6C47FF', '#00D4AA'],
+    ['#FF6B9D', '#6C47FF'],
+    ['#F59E0B', '#EF4444'],
+    ['#3B82F6', '#8B5CF6'],
+    ['#00D4AA', '#6C47FF'],
+    ['#EC4899', '#F97316'],
+    ['#8B5CF6', '#EC4899'],
+  ];
+  return Array.from({ length: count }, (_, i) => ({
+    id: `placeholder_${i + 1}`,
+    url: null,
+    placeholder: true,
+    gradient: `linear-gradient(135deg, ${gradients[i % gradients.length][0]}, ${gradients[i % gradients.length][1]})`,
+    title: `AI 피팅컷 #${i + 1}`,
+    width: 832,
+    height: 1216,
+  }));
+}
+
+// 모델 설명 생성 (photorealistic 프롬프트용)
+function buildModelDescription(model) {
+  if (!model) return 'young Asian female fashion model, slim figure, natural look';
+
+  const genderMap = { '여성': 'female', '남성': 'male' };
+  const ageMap = {
+    '10대': 'teenage', '20대': 'young adult in their 20s',
+    '30대': 'adult in their 30s', '40대': 'mature adult in their 40s',
+  };
+  const bodyMap = {
+    '슬림': 'slim', '표준': 'average build', '커브': 'curvy',
+    '근육': 'athletic muscular', '플러스': 'plus size',
+  };
+  const moodMap = {
+    '시크': 'chic and sophisticated', '내추럴': 'natural and casual',
+    '럭셔리': 'luxurious and elegant', '큐트': 'cute and fresh',
+    '캐주얼': 'casual and relaxed', '스트릿': 'street style edgy',
+    '청순': 'pure and innocent',
+  };
+  const skinMap = {
+    '밝은': 'light skin tone', '중간': 'medium skin tone', '어두운': 'dark skin tone',
+  };
+
+  const parts = [
+    ageMap[model.age] || 'young adult',
+    genderMap[model.gender] || 'female',
+    'Asian',
+    bodyMap[model.body] || 'average build',
+    'fashion model',
+    moodMap[model.mood] ? `with ${moodMap[model.mood]} style` : '',
+    skinMap[model.skin] || 'medium skin tone',
+  ].filter(Boolean);
+
+  return parts.join(', ');
+}
+
+// ─────────────────────────────────────────────────────────
+// STEP 6: Results
+// ─────────────────────────────────────────────────────────
+function renderResults(images) {
   const grid = document.getElementById('resultsGrid');
   if (!grid) return;
 
   grid.innerHTML = '';
-  AppState.generatedImages.forEach((img, idx) => {
+
+  // 결과 탭 텍스트 업데이트
+  const firstTab = document.querySelector('.results-tab');
+  if (firstTab) firstTab.textContent = `피팅컷 (${images.length})`;
+
+  images.forEach((img, idx) => {
     const card = document.createElement('div');
     card.className = 'result-card';
-    card.innerHTML = `
-      <div class="result-thumb">
-        <div style="width:100%;height:100%;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
-          <span style="font-size:64px;">${img.icon}</span>
-          <span style="color:rgba(255,255,255,0.7);font-size:13px;font-weight:600;">AI 생성 피팅컷 #${idx + 1}</span>
+
+    if (img.url) {
+      // 실제 생성된 이미지 (Atlas Cloud)
+      card.innerHTML = `
+        <div class="result-thumb" style="overflow:hidden;">
+          <img
+            src="${img.url}"
+            alt="${img.title || `피팅컷 #${idx + 1}`}"
+            style="width:100%;height:100%;object-fit:cover;display:block;"
+            onerror="this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}';this.style.display='none';"
+          />
         </div>
-      </div>
-      <button class="result-fav" onclick="toggleResultFav(this, event)" title="즐겨찾기">🤍</button>
-      <div class="result-overlay">
-        <button class="result-overlay-btn fav" onclick="toggleResultFav(event.currentTarget, event)">🤍</button>
-        <button class="result-overlay-btn download" onclick="downloadSingle(${idx + 1}); event.stopPropagation();">
-          ⬇️ 다운로드
-        </button>
-        <button class="result-overlay-btn fav" onclick="openImageModal(${idx}); event.stopPropagation();">
-          🔍 확대
-        </button>
-      </div>
-    `;
+        <button class="result-fav" onclick="toggleResultFav(this, event)" title="즐겨찾기">🤍</button>
+        <div class="result-overlay">
+          <button class="result-overlay-btn fav" onclick="toggleResultFav(event.currentTarget, event)">🤍</button>
+          <button class="result-overlay-btn download" onclick="downloadSingleImage('${img.url}', ${idx + 1}); event.stopPropagation();">
+            ⬇️ 다운로드
+          </button>
+          <button class="result-overlay-btn fav" onclick="openImageModal(${idx}); event.stopPropagation();">
+            🔍 확대
+          </button>
+        </div>
+      `;
+    } else {
+      // 플레이스홀더 (폴백)
+      card.innerHTML = `
+        <div class="result-thumb">
+          <div style="width:100%;height:100%;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+            <span style="font-size:48px;">✨</span>
+            <span style="color:rgba(255,255,255,0.9);font-size:13px;font-weight:700;">AI 생성 #${idx + 1}</span>
+            <span style="color:rgba(255,255,255,0.6);font-size:11px;">데모 이미지</span>
+          </div>
+        </div>
+        <button class="result-fav" onclick="toggleResultFav(this, event)" title="즐겨찾기">🤍</button>
+        <div class="result-overlay">
+          <button class="result-overlay-btn fav" onclick="toggleResultFav(event.currentTarget, event)">🤍</button>
+          <button class="result-overlay-btn download" onclick="downloadSingle(${idx + 1}); event.stopPropagation();">
+            ⬇️ 다운로드
+          </button>
+          <button class="result-overlay-btn fav" onclick="openImageModal(${idx}); event.stopPropagation();">
+            🔍 확대
+          </button>
+        </div>
+      `;
+    }
+
     card.addEventListener('click', () => openImageModal(idx));
     grid.appendChild(card);
   });
 }
 
+function openImageModal(idx) {
+  const img = AppState.generatedImages[idx];
+  if (!img) return;
+
+  const modal = document.getElementById('imageModal');
+  const modalTitle = document.getElementById('modalImageTitle');
+  const modalMeta = document.getElementById('modalImageMeta');
+  const previewArea = document.querySelector('.image-modal-preview');
+
+  if (previewArea) {
+    if (img.url) {
+      previewArea.innerHTML = `
+        <img
+          src="${img.url}"
+          alt="${img.title || `피팅컷 #${idx + 1}`}"
+          style="max-width:100%;max-height:80vh;border-radius:12px;object-fit:contain;"
+          onerror="this.parentElement.innerHTML='<div style=\\"width:400px;height:533px;background:${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'};border-radius:12px;display:flex;align-items:center;justify-content:center;\\"</div>'"
+        />
+      `;
+    } else {
+      previewArea.innerHTML = `
+        <div style="width:400px;height:533px;background:${img.gradient};border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
+          <span style="font-size:80px;">✨</span>
+          <span style="color:rgba(255,255,255,0.9);font-size:16px;font-weight:700;">AI 생성 피팅컷 #${idx + 1}</span>
+          <span style="color:rgba(255,255,255,0.6);font-size:13px;">데모 이미지</span>
+        </div>
+      `;
+    }
+  }
+
+  if (modalTitle) modalTitle.textContent = img.title || `AI 피팅컷 #${idx + 1}`;
+  if (modalMeta) modalMeta.textContent = `${img.width || 832} × ${img.height || 1216}px · PNG`;
+
+  // 현재 이미지 인덱스 저장 (다운로드용)
+  modal.dataset.currentIdx = idx;
+
+  openModal('imageModal');
+}
+
 function switchResultsTab(tab, btn) {
   document.querySelectorAll('.results-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-
   if (tab === 'styleset') {
     showToast('스타일샷 세트를 추가 생성하려면 아래 버튼을 클릭하세요.', 'info');
   }
@@ -849,41 +1165,19 @@ function toggleResultFav(btn, e) {
   showToast(isFav ? '즐겨찾기에 추가되었습니다.' : '즐겨찾기에서 제거되었습니다.', isFav ? 'success' : 'info');
 }
 
-function openImageModal(idx) {
-  const img = AppState.generatedImages[idx];
-  if (!img) return;
-
-  const modal = document.getElementById('imageModal');
-  const modalImg = document.getElementById('modalImage');
-  const modalTitle = document.getElementById('modalImageTitle');
-
-  if (modalImg) {
-    // Create a canvas-based placeholder since we don't have real images
-    modalImg.style.width = '400px';
-    modalImg.style.height = '533px';
-    modalImg.style.objectFit = 'cover';
-    modalImg.style.borderRadius = '12px';
-    modalImg.style.background = img.gradient;
-    modalImg.alt = img.title;
-    // Use a placeholder image with gradient style
-    modalImg.src = '';
-    modalImg.style.background = img.gradient;
-    modalImg.style.display = 'flex';
-
-    // Temporarily replace with a div showing the gradient
-    const previewArea = document.querySelector('.image-modal-preview');
-    if (previewArea) {
-      previewArea.innerHTML = `
-        <div style="width:400px;height:533px;background:${img.gradient};border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
-          <span style="font-size:80px;">${img.icon}</span>
-          <span style="color:rgba(255,255,255,0.8);font-size:16px;font-weight:700;">AI 생성 피팅컷 #${idx + 1}</span>
-        </div>
-      `;
-    }
+function downloadSingleImage(url, num) {
+  if (!url) {
+    showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success');
+    return;
   }
-
-  if (modalTitle) modalTitle.textContent = img.title;
-  openModal('imageModal');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `lookbook_ai_fitting_${num}.png`;
+  a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success');
 }
 
 function downloadSingle(num) {
@@ -891,11 +1185,35 @@ function downloadSingle(num) {
 }
 
 function downloadAll() {
-  showToast(`${AppState.generatedImages.length}장을 ZIP으로 다운로드합니다.`, 'success');
+  const count = AppState.generatedImages.length;
+  // 실제 이미지가 있는 경우 순차 다운로드 시도
+  const realImages = AppState.generatedImages.filter(img => img.url);
+  if (realImages.length > 0) {
+    realImages.forEach((img, idx) => {
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = img.url;
+        a.download = `lookbook_ai_fitting_${idx + 1}.png`;
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }, idx * 500);
+    });
+  }
+  showToast(`${count}장 다운로드를 시작합니다.`, 'success');
 }
 
 function downloadImage() {
-  showToast('이미지를 다운로드합니다.', 'success');
+  const modal = document.getElementById('imageModal');
+  const idx = parseInt(modal?.dataset.currentIdx || '0');
+  const img = AppState.generatedImages[idx];
+
+  if (img?.url) {
+    downloadSingleImage(img.url, idx + 1);
+  } else {
+    showToast('이미지를 다운로드합니다.', 'success');
+  }
   closeModal('imageModal');
 }
 
@@ -908,7 +1226,36 @@ function toggleFavorite() {
 }
 
 // ─────────────────────────────────────────────────────────
-// SMOOTH SCROLL for anchor links
+// PROGRESS HELPERS
+// ─────────────────────────────────────────────────────────
+function updateProgress(percent, text) {
+  const fill = document.getElementById('genProgressFill');
+  if (fill) fill.style.width = Math.min(percent, 100) + '%';
+  const statusText = document.getElementById('genStatusText');
+  if (statusText) statusText.textContent = text;
+}
+
+function setMsgState(msgId, state) {
+  const msg = document.getElementById(msgId);
+  if (!msg) return;
+  msg.classList.remove('current', 'done');
+  if (state === 'current') {
+    msg.classList.add('current');
+    const dot = msg.querySelector('.dot');
+    if (dot) dot.style.background = 'var(--primary)';
+  } else if (state === 'done') {
+    msg.classList.add('done');
+    const dot = msg.querySelector('.dot');
+    if (dot) dot.style.background = 'var(--success)';
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ─────────────────────────────────────────────────────────
+// SMOOTH SCROLL
 // ─────────────────────────────────────────────────────────
 document.addEventListener('click', (e) => {
   const link = e.target.closest('a[href^="#"]');
@@ -916,9 +1263,7 @@ document.addEventListener('click', (e) => {
     e.preventDefault();
     const targetId = link.getAttribute('href').slice(1);
     const target = document.getElementById(targetId);
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 });
 
@@ -928,21 +1273,14 @@ document.addEventListener('click', (e) => {
 (function loadUser() {
   try {
     const stored = localStorage.getItem('lookbook_user');
-    if (stored) {
-      AppState.user = JSON.parse(stored);
-    }
+    if (stored) AppState.user = JSON.parse(stored);
   } catch (e) {}
 })();
 
 // ─────────────────────────────────────────────────────────
-// MISC UI EFFECTS
+// SCROLL ANIMATION
 // ─────────────────────────────────────────────────────────
-
-// Animate stats on scroll (landing page)
-function initIntersectionObserver() {
-  const statNums = document.querySelectorAll('.hero-stat-num');
-  if (!statNums.length) return;
-
+window.addEventListener('load', () => {
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
@@ -958,9 +1296,4 @@ function initIntersectionObserver() {
     el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
     observer.observe(el);
   });
-}
-
-// Call on load
-window.addEventListener('load', () => {
-  initIntersectionObserver();
 });

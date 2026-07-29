@@ -8,42 +8,204 @@ app.use('/api/*', cors())
 app.use('/static/*', serveStatic({ root: './public' }))
 
 // ────────────────────────────────────────────────────
-// API Routes
+// Constants
+// ────────────────────────────────────────────────────
+const ATLAS_API_BASE = 'https://api.atlascloud.ai'
+const ATLAS_API_KEY = 'apikey-768c01fdea4c405f972d93ae16f0b9e3'
+const AIFASHION_BASE = 'https://www.aifashion.co.kr'
+
+// Atlas Cloud 헤더 생성
+const atlasHeaders = () => ({
+  'Authorization': `Bearer ${ATLAS_API_KEY}`,
+  'Content-Type': 'application/json',
+})
+
+// ────────────────────────────────────────────────────
+// Photorealistic Prompt Builder
+// ────────────────────────────────────────────────────
+function buildPhotorealisticPrompt(params: {
+  direction: string
+  modelName: string
+  modelDesc: string
+  bgName: string
+  bgDesc: string
+  poseType: string
+  pose: string
+  face: string
+  clothingImageUrl?: string
+}): string {
+  const { direction, modelName, modelDesc, bgName, bgDesc, poseType, pose, face } = params
+
+  const directionText = direction === 'front' ? 'front view' : 'back view'
+
+  const poseMap: Record<string, string> = {
+    '전신': 'full body shot',
+    '반신': 'half body shot',
+    '상반신': 'upper body shot',
+  }
+  const poseTypeText = poseMap[poseType] || 'full body shot'
+
+  const poseStyleMap: Record<string, string> = {
+    '정면': 'facing camera directly, natural standing pose',
+    '측면': '3/4 angle pose, slight turn',
+    '워킹': 'dynamic walking pose, in motion',
+    '정적': 'elegant static pose, hands relaxed',
+  }
+  const poseStyleText = poseStyleMap[pose] || 'natural standing pose'
+
+  const faceText = face === '얼굴 없음'
+    ? 'model facing away from camera, no face visible'
+    : 'model facing camera with confident expression'
+
+  return [
+    `Ultra-photorealistic professional fashion photography,`,
+    `8K resolution, shot on Canon EOS R5 with 85mm f/1.4 lens,`,
+    `professional studio lighting with softbox,`,
+    `${poseTypeText} of a ${modelDesc} fashion model`,
+    `wearing the clothing item shown (${directionText}),`,
+    `${poseStyleText},`,
+    `${faceText},`,
+    `background: ${bgDesc} (${bgName}),`,
+    `hyperrealistic skin texture, perfect fabric detail,`,
+    `commercial fashion photography style,`,
+    `RAW photo, sharp focus, high dynamic range,`,
+    `professional retouching, magazine quality,`,
+    `no artifacts, photorealistic, cinematic lighting`,
+  ].join(' ')
+}
+
+// ────────────────────────────────────────────────────
+// aifashion.co.kr API Proxies
 // ────────────────────────────────────────────────────
 
-// Mock data for presets
-const modelPresets = [
-  { id: 'm1', name: '소피아', gender: '여성', age: '20대', body: '표준', mood: '시크', skin: '밝은', color: '#FFB3C6' },
-  { id: 'm2', name: '지아', gender: '여성', age: '20대', body: '슬림', mood: '내추럴', skin: '중간', color: '#C8A882' },
-  { id: 'm3', name: '레이첼', gender: '여성', age: '30대', body: '커브', mood: '럭셔리', skin: '어두운', color: '#8B6B45' },
-  { id: 'm4', name: '민지', gender: '여성', age: '20대', body: '표준', mood: '큐트', skin: '밝은', color: '#FFD6E7' },
-  { id: 'm5', name: '에마', gender: '여성', age: '30대', body: '슬림', mood: '시크', skin: '중간', color: '#D4A5A5' },
-  { id: 'm6', name: '유나', gender: '여성', age: '20대', body: '표준', mood: '캐주얼', skin: '밝은', color: '#A8D8EA' },
-  { id: 'm7', name: '다니엘', gender: '남성', age: '20대', body: '표준', mood: '캐주얼', skin: '중간', color: '#B5D5C5' },
-  { id: 'm8', name: '제이크', gender: '남성', age: '30대', body: '근육', mood: '시크', skin: '어두운', color: '#7C9885' },
-  { id: 'm9', name: '리암', gender: '남성', age: '20대', body: '슬림', mood: '스트릿', skin: '밝은', color: '#C5D5EA' },
-  { id: 'm10', name: '마야', gender: '여성', age: '10대', body: '슬림', mood: '청순', skin: '밝은', color: '#FFF0D4' },
-  { id: 'm11', name: '비앙카', gender: '여성', age: '40대', body: '표준', mood: '럭셔리', skin: '중간', color: '#D4C5A9' },
-  { id: 'm12', name: '카오리', gender: '여성', age: '20대', body: '표준', mood: '내추럴', skin: '밝은', color: '#E8D5C0' },
-]
+// 모델 목록 프록시
+app.get('/api/presets/models', async (c) => {
+  try {
+    const res = await fetch(`${AIFASHION_BASE}/api/models`, {
+      headers: { 'Accept': 'application/json' },
+    })
+    if (!res.ok) {
+      throw new Error(`aifashion models API error: ${res.status}`)
+    }
+    const data: any = await res.json()
 
-const backgroundPresets = [
-  { id: 'b1', name: '화이트 스튜디오', category: '스튜디오', mood: '미니멀', color: '#F5F5F5' },
-  { id: 'b2', name: '그레이 스튜디오', category: '스튜디오', mood: '뉴트럴', color: '#E0E0E0' },
-  { id: 'b3', name: '블랙 스튜디오', category: '스튜디오', mood: '하이엔드', color: '#2A2A2A' },
-  { id: 'b4', name: '핑크 스튜디오', category: '스튜디오', mood: '웜', color: '#FFE0EB' },
-  { id: 'b5', name: '카페 인테리어', category: '카페', mood: '웜', color: '#C8A882' },
-  { id: 'b6', name: '루프탑', category: '실내', mood: '뉴트럴', color: '#87CEEB' },
-  { id: 'b7', name: '스트리트 도쿄', category: '스트리트', mood: '뉴트럴', color: '#708090' },
-  { id: 'b8', name: '봄 공원', category: '자연', mood: '웜', color: '#90EE90' },
-  { id: 'b9', name: '럭셔리 호텔 로비', category: '럭셔리', mood: '하이엔드', color: '#D4AF87' },
-  { id: 'b10', name: '미니멀 화이트룸', category: '실내', mood: '미니멀', color: '#FAFAFA' },
-  { id: 'b11', name: '빈티지 벽돌벽', category: '스트리트', mood: '빈티지', color: '#CC7722' },
-  { id: 'b12', name: '블루 오션', category: '자연', mood: '쿨', color: '#4169E1' },
-  { id: 'b13', name: '모던 갤러리', category: '실내', mood: '미니멀', color: '#E8E8E8' },
-  { id: 'b14', name: '파리 골목', category: '스트리트', mood: '빈티지', color: '#8B7355' },
-]
+    // aifashion 응답 형식을 앱 내부 형식으로 변환
+    const models = (data.models || []).map((m: any) => ({
+      id: m.id,
+      name: m.name || `모델 ${m.id}`,
+      description: m.description || '',
+      image_type: m.image_type || 'image/png',
+      // 프론트엔드 필터링용 메타데이터 (aifashion API에서 제공하지 않으면 기본값)
+      gender: m.gender || '여성',
+      age: m.age || '20대',
+      body: m.body || '표준',
+      mood: m.mood || '내추럴',
+      skin: m.skin || '중간',
+    }))
 
+    return c.json({ models })
+  } catch (err: any) {
+    console.error('Models API error:', err)
+    return c.json({ error: 'Failed to fetch models', message: err.message }, 500)
+  }
+})
+
+// 배경 목록 프록시
+app.get('/api/presets/backgrounds', async (c) => {
+  try {
+    const res = await fetch(`${AIFASHION_BASE}/api/backgrounds`, {
+      headers: { 'Accept': 'application/json' },
+    })
+    if (!res.ok) {
+      throw new Error(`aifashion backgrounds API error: ${res.status}`)
+    }
+    const data: any = await res.json()
+
+    // aifashion 배경 이름 기반 카테고리/무드 매핑
+    const categoryMap: Record<string, { category: string; mood: string; bgDesc: string }> = {
+      '전차내부':   { category: '실내',     mood: '빈티지',   bgDesc: 'vintage train interior with retro seats' },
+      '지하복도':   { category: '실내',     mood: '어반',     bgDesc: 'underground corridor with dramatic lighting' },
+      '네온 식당':  { category: '실내',     mood: '트렌디',   bgDesc: 'neon-lit restaurant with vibrant atmosphere' },
+      '파스텔 모텔':{ category: '실내',     mood: '큐트',     bgDesc: 'pastel-colored motel room with retro vibe' },
+      '캔디왕국':   { category: '판타지',   mood: '큐트',     bgDesc: 'candy kingdom fantasy background, colorful and whimsical' },
+      '해변도로':   { category: '야외',     mood: '서머',     bgDesc: 'coastal road by the beach, golden hour light' },
+      '북촌 오르막':{ category: '스트리트', mood: '전통',     bgDesc: 'traditional Korean hanok village hillside street' },
+      '해변 카페':  { category: '카페',     mood: '웜',       bgDesc: 'beachside cafe with ocean view, warm ambiance' },
+      '모래사막':   { category: '야외',     mood: '익조틱',   bgDesc: 'golden sand desert dunes, dramatic sky' },
+      '실내 테니스코트': { category: '스포츠', mood: '스포티', bgDesc: 'indoor tennis court with clean lines' },
+      '팜시티 거리':{ category: '스트리트', mood: '트로피컬', bgDesc: 'palm tree lined city street, tropical urban' },
+      '에스컬레이터':{ category: '실내',    mood: '모던',     bgDesc: 'modern escalator in a mall, dynamic geometry' },
+      '극장 로비':  { category: '럭셔리',   mood: '하이엔드', bgDesc: 'grand theater lobby with elegant chandelier' },
+      '빈티지 관제실': { category: '실내',  mood: '빈티지',   bgDesc: 'vintage control room with retro equipment' },
+      '컨테이너 항구': { category: '야외',  mood: '어반',     bgDesc: 'industrial container port with colorful shipping containers' },
+    }
+
+    const backgrounds = (data.backgrounds || []).map((b: any) => {
+      const meta = categoryMap[b.name] || { category: '기타', mood: '뉴트럴', bgDesc: b.name }
+      return {
+        id: b.id,
+        name: b.name || `배경 ${b.id}`,
+        category: meta.category,
+        mood: meta.mood,
+        bgDesc: meta.bgDesc,
+        image_type: 'image/jpeg',
+      }
+    })
+
+    return c.json({ backgrounds })
+  } catch (err: any) {
+    console.error('Backgrounds API error:', err)
+    return c.json({ error: 'Failed to fetch backgrounds', message: err.message }, 500)
+  }
+})
+
+// 모델 이미지 프록시
+app.get('/api/proxy/model-image/:id', async (c) => {
+  const id = c.req.param('id')
+  try {
+    const res = await fetch(`${AIFASHION_BASE}/api/models/${id}/image`)
+    if (!res.ok) {
+      return c.notFound()
+    }
+    const buffer = await res.arrayBuffer()
+    const contentType = res.headers.get('Content-Type') || 'image/png'
+    return new Response(buffer, {
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+  } catch (err) {
+    return c.notFound()
+  }
+})
+
+// 배경 이미지 프록시
+app.get('/api/proxy/bg-image/:id', async (c) => {
+  const id = c.req.param('id')
+  try {
+    const res = await fetch(`${AIFASHION_BASE}/api/backgrounds/${id}/image`)
+    if (!res.ok) {
+      return c.notFound()
+    }
+    const buffer = await res.arrayBuffer()
+    const contentType = res.headers.get('Content-Type') || 'image/jpeg'
+    return new Response(buffer, {
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=86400',
+        'Access-Control-Allow-Origin': '*',
+      },
+    })
+  } catch (err) {
+    return c.notFound()
+  }
+})
+
+// ────────────────────────────────────────────────────
+// Projects API (샘플 데이터)
+// ────────────────────────────────────────────────────
 const sampleProjects = [
   { id: 'p1', name: '2024 S/S 룩북', status: 'done', images: 8, created: '2024-03-15', thumb_color: '#FF6B9D' },
   { id: 'p2', name: '캐주얼 티셔츠 컷', status: 'done', images: 4, created: '2024-03-12', thumb_color: '#6C47FF' },
@@ -51,30 +213,13 @@ const sampleProjects = [
   { id: 'p4', name: '원피스 봄 컬렉션', status: 'draft', images: 0, created: '2024-03-08', thumb_color: '#00D4AA' },
 ]
 
-app.get('/api/presets/models', (c) => {
-  const gender = c.req.query('gender')
-  const age = c.req.query('age')
-  const body = c.req.query('body')
-  let filtered = modelPresets
-  if (gender) filtered = filtered.filter(m => m.gender === gender)
-  if (age) filtered = filtered.filter(m => m.age === age)
-  if (body) filtered = filtered.filter(m => m.body === body)
-  return c.json({ models: filtered })
-})
-
-app.get('/api/presets/backgrounds', (c) => {
-  const category = c.req.query('category')
-  const mood = c.req.query('mood')
-  let filtered = backgroundPresets
-  if (category) filtered = filtered.filter(b => b.category === category)
-  if (mood) filtered = filtered.filter(b => b.mood === mood)
-  return c.json({ backgrounds: filtered })
-})
-
 app.get('/api/projects', (c) => {
   return c.json({ projects: sampleProjects })
 })
 
+// ────────────────────────────────────────────────────
+// Auth API (Mock)
+// ────────────────────────────────────────────────────
 app.post('/api/auth/login', async (c) => {
   const body = await c.req.json()
   if (body.email && body.password) {
@@ -99,24 +244,262 @@ app.post('/api/auth/signup', async (c) => {
   return c.json({ success: false, message: '입력값을 확인해주세요.' }, 400)
 })
 
-app.post('/api/generation/start', async (c) => {
-  const body = await c.req.json()
-  const jobId = 'job_' + Math.random().toString(36).substr(2, 9)
-  return c.json({ jobId, estimatedSeconds: 45, status: 'queued' })
-})
-
-app.get('/api/generation/:jobId/status', (c) => {
-  return c.json({ status: 'completed', progress: 100, images: [] })
-})
-
+// ────────────────────────────────────────────────────
+// Image Upload API
+// ────────────────────────────────────────────────────
 app.post('/api/uploads/image', async (c) => {
-  return c.json({ success: true, imageId: 'img_' + Math.random().toString(36).substr(2, 9), url: '' })
+  try {
+    const formData = await c.req.formData()
+    const file = formData.get('file') as File | null
+
+    if (!file) {
+      return c.json({ success: false, message: '파일이 없습니다.' }, 400)
+    }
+
+    // 파일을 base64로 변환하여 클라이언트에 반환
+    const arrayBuffer = await file.arrayBuffer()
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+    const mimeType = file.type || 'image/jpeg'
+    const dataUrl = `data:${mimeType};base64,${base64}`
+
+    return c.json({
+      success: true,
+      imageId: 'img_' + Math.random().toString(36).substr(2, 9),
+      url: dataUrl,
+      dataUrl,
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
 })
 
 // ────────────────────────────────────────────────────
-// Pages
+// Generation API - Atlas Cloud 연동
 // ────────────────────────────────────────────────────
+app.post('/api/generation/start', async (c) => {
+  try {
+    const body: any = await c.req.json()
 
+    const {
+      direction = 'front',
+      modelId,
+      modelName = '패션 모델',
+      modelDesc = 'young Asian female fashion model, slim figure, natural look',
+      bgName = '스튜디오',
+      bgDesc = 'clean white studio background with professional lighting',
+      poseType = '전신',
+      pose = '정면',
+      face = '얼굴 있음',
+      count = 4,
+      clothingImageUrl,
+    } = body
+
+    // Photorealistic 프롬프트 빌드
+    const prompt = buildPhotorealisticPrompt({
+      direction,
+      modelName,
+      modelDesc,
+      bgName,
+      bgDesc,
+      poseType,
+      pose,
+      face,
+      clothingImageUrl,
+    })
+
+    console.log('Generation prompt:', prompt)
+    console.log('Clothing image URL:', clothingImageUrl ? clothingImageUrl.substring(0, 50) + '...' : 'none')
+
+    // Atlas Cloud API 요청
+    let requestBody: any = {
+      model: 'bytedance/seedream-v4',
+      prompt,
+      negative_prompt: 'cartoon, anime, illustration, painting, drawing, low quality, blurry, deformed, ugly, unrealistic, fake, CGI, 3d render',
+      width: 832,
+      height: 1216,
+      num_outputs: Math.min(count, 4), // 한 번에 최대 4장
+    }
+
+    // 의류 이미지가 있는 경우 image-to-image 모드 사용
+    if (clothingImageUrl && clothingImageUrl.startsWith('data:')) {
+      // base64 데이터 URL에서 base64 문자열만 추출
+      const base64Data = clothingImageUrl.split(',')[1]
+      if (base64Data) {
+        requestBody = {
+          model: 'black-forest-labs/flux-kontext-pro',
+          prompt: `${prompt}. The model is wearing the exact clothing from the reference image.`,
+          input_image: clothingImageUrl,
+          width: 832,
+          height: 1216,
+        }
+      }
+    }
+
+    console.log('Atlas Cloud request model:', requestBody.model)
+
+    const atlasRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
+      method: 'POST',
+      headers: atlasHeaders(),
+      body: JSON.stringify(requestBody),
+    })
+
+    const atlasData: any = await atlasRes.json()
+    console.log('Atlas Cloud response:', JSON.stringify(atlasData).substring(0, 200))
+
+    if (!atlasRes.ok || atlasData.code !== 200) {
+      console.error('Atlas API error:', atlasData)
+      // 폴백: 플레이스홀더 반환
+      const fallbackJobId = 'fallback_' + Math.random().toString(36).substr(2, 9)
+      return c.json({
+        jobId: fallbackJobId,
+        estimatedSeconds: 5,
+        status: 'queued',
+        isFallback: true,
+        error: atlasData.msg || 'Atlas API error',
+      })
+    }
+
+    const jobId = atlasData.data?.id || atlasData.data?.prediction_id
+    if (!jobId) {
+      throw new Error('No job ID in Atlas response')
+    }
+
+    return c.json({
+      jobId,
+      estimatedSeconds: 60,
+      status: 'queued',
+      isFallback: false,
+    })
+
+  } catch (err: any) {
+    console.error('Generation start error:', err)
+    // 에러 시 fallback으로 처리
+    const fallbackJobId = 'fallback_' + Math.random().toString(36).substr(2, 9)
+    return c.json({
+      jobId: fallbackJobId,
+      estimatedSeconds: 5,
+      status: 'queued',
+      isFallback: true,
+      error: err.message,
+    })
+  }
+})
+
+// Generation 상태 폴링
+app.get('/api/generation/:jobId/status', async (c) => {
+  const jobId = c.req.param('jobId')
+
+  // Fallback 처리 (Atlas API 오류 시 플레이스홀더 이미지 반환)
+  if (jobId.startsWith('fallback_')) {
+    const placeholderImages = generatePlaceholderImages(4)
+    return c.json({
+      status: 'completed',
+      progress: 100,
+      images: placeholderImages,
+      isFallback: true,
+    })
+  }
+
+  try {
+    const res = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
+      headers: {
+        'Authorization': `Bearer ${ATLAS_API_KEY}`,
+      },
+    })
+
+    const data: any = await res.json()
+    console.log('Atlas poll response status:', data.data?.status, 'jobId:', jobId)
+
+    if (!res.ok || data.code !== 200) {
+      return c.json({
+        status: 'failed',
+        progress: 0,
+        images: [],
+        error: data.msg || 'Poll error',
+      })
+    }
+
+    const predData = data.data
+    const predStatus = predData?.status
+
+    // Atlas Cloud 상태 매핑
+    // starting, processing, succeeded, failed, canceled
+    if (predStatus === 'succeeded' || predStatus === 'completed') {
+      // Atlas Cloud uses 'outputs' (plural), fallback to 'output' (singular)
+      const outputUrls: string[] = predData?.outputs || predData?.output || []
+      const images = outputUrls.map((url: string, idx: number) => ({
+        id: `result_${idx + 1}`,
+        url,
+        title: `AI 피팅컷 #${idx + 1}`,
+        width: 832,
+        height: 1216,
+      }))
+
+      return c.json({
+        status: 'completed',
+        progress: 100,
+        images,
+        isFallback: false,
+      })
+    } else if (predStatus === 'failed' || predStatus === 'canceled' || predStatus === 'error') {
+      // 실패 시 플레이스홀더로 폴백
+      const placeholderImages = generatePlaceholderImages(4)
+      return c.json({
+        status: 'completed',
+        progress: 100,
+        images: placeholderImages,
+        isFallback: true,
+        error: `Generation ${predStatus}`,
+      })
+    } else {
+      // processing, starting
+      const progressMap: Record<string, number> = {
+        'starting': 15,
+        'processing': 55,
+      }
+      return c.json({
+        status: 'processing',
+        progress: progressMap[predStatus] || 30,
+        images: [],
+      })
+    }
+
+  } catch (err: any) {
+    console.error('Poll error:', err)
+    // 폴링 에러 시 플레이스홀더 반환
+    const placeholderImages = generatePlaceholderImages(4)
+    return c.json({
+      status: 'completed',
+      progress: 100,
+      images: placeholderImages,
+      isFallback: true,
+      error: err.message,
+    })
+  }
+})
+
+// 플레이스홀더 이미지 생성 헬퍼 (Atlas API 실패 시)
+function generatePlaceholderImages(count: number) {
+  const colors = [
+    ['#FF6B9D', '#FF8C42'],
+    ['#6C47FF', '#00D4AA'],
+    ['#FF6B9D', '#6C47FF'],
+    ['#F59E0B', '#EF4444'],
+  ]
+  return Array.from({ length: count }, (_, i) => ({
+    id: `placeholder_${i + 1}`,
+    url: null,
+    placeholder: true,
+    gradient: `linear-gradient(135deg, ${colors[i % colors.length][0]}, ${colors[i % colors.length][1]})`,
+    title: `AI 피팅컷 #${i + 1}`,
+    width: 832,
+    height: 1216,
+  }))
+}
+
+// ────────────────────────────────────────────────────
+// Pages (HTML Shell)
+// ────────────────────────────────────────────────────
 const htmlShell = (title: string, bodyContent: string) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -248,7 +631,7 @@ app.get('/', (c) => {
         <div class="feature-card">
           <div class="feature-icon teal"><i class="fas fa-image"></i></div>
           <h3 class="feature-title">다양한 배경 프리셋</h3>
-          <p class="feature-desc">스튜디오, 스트리트, 카페, 자연 등 14가지+ 배경을 제공합니다. 무드에 맞는 배경으로 분위기를 완성하세요.</p>
+          <p class="feature-desc">스튜디오, 스트리트, 카페, 자연 등 15가지+ 배경을 제공합니다. 무드에 맞는 배경으로 분위기를 완성하세요.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon amber"><i class="fas fa-bolt"></i></div>
@@ -620,8 +1003,6 @@ app.get('/dashboard', (c) => {
               <div class="new-project-text">새 프로젝트 생성</div>
               <div style="font-size:13px;color:var(--text-muted);">의류 이미지를 업로드하고<br />AI 룩북을 만들어보세요</div>
             </div>
-
-            <!-- Project Cards (will be populated by JS) -->
           </div>
         </div>
 
@@ -852,7 +1233,6 @@ app.get('/generator', (c) => {
           <p class="step-sub">배경이 흰색이거나 투명한 이미지를 사용하면 가장 좋은 결과를 얻을 수 있어요.</p>
         </div>
 
-        <!-- Upload Area -->
         <div id="uploadArea" class="upload-area"
           ondragover="handleDragOver(event)"
           ondragleave="handleDragLeave(event)"
@@ -866,7 +1246,6 @@ app.get('/generator', (c) => {
           <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(event)" />
         </div>
 
-        <!-- Upload Preview (hidden until file selected) -->
         <div id="uploadPreview" class="upload-preview hidden">
           <div class="upload-preview-inner">
             <div class="upload-preview-img">
@@ -906,24 +1285,23 @@ app.get('/generator', (c) => {
         <div class="step-title-area">
           <div class="step-num-badge">Step 3 / 6 · 모델 선택</div>
           <h2 class="step-heading">AI 모델을 선택하세요</h2>
-          <p class="step-sub">의류에 가장 잘 어울리는 AI 모델을 선택하세요. 필터로 빠르게 찾을 수 있어요.</p>
+          <p class="step-sub">의류에 가장 잘 어울리는 AI 모델을 선택하세요.</p>
         </div>
 
         <div class="model-filters" id="modelFilters">
           <button class="filter-tag active" onclick="filterModels('all', this)">전체</button>
           <button class="filter-tag" onclick="filterModels('여성', this)">여성</button>
           <button class="filter-tag" onclick="filterModels('남성', this)">남성</button>
-          <button class="filter-tag" onclick="filterModels('20대', this, 'age')">20대</button>
-          <button class="filter-tag" onclick="filterModels('30대', this, 'age')">30대</button>
-          <button class="filter-tag" onclick="filterModels('슬림', this, 'body')">슬림</button>
-          <button class="filter-tag" onclick="filterModels('표준', this, 'body')">표준</button>
-          <button class="filter-tag" onclick="filterModels('시크', this, 'mood')">시크</button>
-          <button class="filter-tag" onclick="filterModels('내추럴', this, 'mood')">내추럴</button>
-          <button class="filter-tag" onclick="filterModels('럭셔리', this, 'mood')">럭셔리</button>
         </div>
 
-        <div class="models-grid" id="modelsGrid">
-          <!-- Populated by JS -->
+        <!-- Loading state -->
+        <div id="modelsLoading" style="text-align:center;padding:60px;color:var(--text-muted);">
+          <div style="font-size:36px;margin-bottom:12px;">⏳</div>
+          <p>모델 목록을 불러오는 중...</p>
+        </div>
+
+        <div class="models-grid" id="modelsGrid" style="display:none;">
+          <!-- Populated by JS from API -->
         </div>
 
         <div class="step-nav">
@@ -946,16 +1324,22 @@ app.get('/generator', (c) => {
 
         <div class="bg-categories" id="bgCategories">
           <button class="bg-cat active" onclick="filterBg('전체', this)">전체</button>
-          <button class="bg-cat" onclick="filterBg('스튜디오', this)">스튜디오</button>
           <button class="bg-cat" onclick="filterBg('실내', this)">실내</button>
+          <button class="bg-cat" onclick="filterBg('야외', this)">야외</button>
           <button class="bg-cat" onclick="filterBg('스트리트', this)">스트리트</button>
           <button class="bg-cat" onclick="filterBg('카페', this)">카페</button>
-          <button class="bg-cat" onclick="filterBg('자연', this)">자연</button>
           <button class="bg-cat" onclick="filterBg('럭셔리', this)">럭셔리</button>
+          <button class="bg-cat" onclick="filterBg('판타지', this)">판타지</button>
         </div>
 
-        <div class="backgrounds-grid" id="backgroundsGrid">
-          <!-- Populated by JS -->
+        <!-- Loading state -->
+        <div id="bgsLoading" style="text-align:center;padding:60px;color:var(--text-muted);">
+          <div style="font-size:36px;margin-bottom:12px;">⏳</div>
+          <p>배경 목록을 불러오는 중...</p>
+        </div>
+
+        <div class="backgrounds-grid" id="backgroundsGrid" style="display:none;">
+          <!-- Populated by JS from API -->
         </div>
 
         <div class="step-nav">
@@ -976,7 +1360,6 @@ app.get('/generator', (c) => {
           <p class="step-sub">생성할 이미지 수량, 구도, 포즈를 선택하세요. 크레딧이 차감됩니다.</p>
         </div>
 
-        <!-- Options -->
         <div id="genOptionsView">
           <div class="gen-options-grid">
             <div class="gen-option-group">
@@ -1012,7 +1395,6 @@ app.get('/generator', (c) => {
             </div>
           </div>
 
-          <!-- Summary -->
           <div class="gen-summary" id="genSummary">
             <div class="gen-summary-title">생성 요약</div>
             <div class="gen-summary-grid">
@@ -1044,7 +1426,7 @@ app.get('/generator', (c) => {
         <div class="generating-view" id="generatingView">
           <div class="gen-spinner"></div>
           <h2 style="font-size:24px;font-weight:800;margin-bottom:12px;">AI가 이미지를 생성 중입니다...</h2>
-          <p style="color:var(--text-muted);margin-bottom:0;">잠시만 기다려주세요. 평균 30~90초 내에 완료됩니다.</p>
+          <p style="color:var(--text-muted);margin-bottom:0;">Atlas Cloud AI가 실사 패션 이미지를 생성하고 있습니다. 잠시만 기다려주세요.</p>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="genStatusText">시작 중...</div>
           <div class="gen-status-msgs">
@@ -1071,12 +1453,12 @@ app.get('/generator', (c) => {
         <div class="step-title-area">
           <div class="step-num-badge">Step 6 / 6 · 생성 완료 ✅</div>
           <h2 class="step-heading">이미지가 생성되었습니다!</h2>
-          <p class="step-sub">AI가 생성한 피팅컷을 확인하고 다운로드하세요.</p>
+          <p class="step-sub">AI가 생성한 실사 피팅컷을 확인하고 다운로드하세요.</p>
         </div>
 
         <div class="results-toolbar">
           <div class="results-tabs">
-            <button class="results-tab active" onclick="switchResultsTab('fitting', this)">피팅컷 (4)</button>
+            <button class="results-tab active" onclick="switchResultsTab('fitting', this)">피팅컷</button>
             <button class="results-tab" onclick="switchResultsTab('styleset', this)">스타일샷 세트</button>
           </div>
           <div style="display:flex;gap:8px;">
@@ -1126,7 +1508,7 @@ app.get('/generator', (c) => {
         </div>
         <div class="image-modal-sidebar">
           <div class="image-modal-title" id="modalImageTitle">생성된 피팅컷</div>
-          <div class="image-modal-meta" id="modalImageMeta">1024 × 1360px · PNG</div>
+          <div class="image-modal-meta" id="modalImageMeta">832 × 1216px · PNG</div>
           <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:16px 0;" />
           <div class="image-modal-actions">
             <button class="btn btn-primary btn-full" onclick="downloadImage()">
@@ -1137,10 +1519,10 @@ app.get('/generator', (c) => {
             </button>
           </div>
           <div style="margin-top:auto;">
-            <div style="font-size:11px;color:var(--gray-4);line-height:1.6;">
-              생성일: 2024-03-15<br />
-              해상도: 1024 × 1360px<br />
-              형식: PNG (투명 배경 없음)
+            <div style="font-size:11px;color:var(--gray-4);line-height:1.6;" id="modalImageDetail">
+              생성 모델: Atlas Cloud AI<br />
+              해상도: 832 × 1216px<br />
+              형식: PNG
             </div>
           </div>
         </div>
