@@ -1056,7 +1056,8 @@ footer {
   display: none;
 }
 .step-panel.active {
-  display: block;
+  display: flex;
+  flex-direction: column;
   animation: fadeIn 0.3s ease;
 }
 
