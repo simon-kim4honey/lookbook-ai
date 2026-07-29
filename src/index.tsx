@@ -65,6 +65,32 @@ function buildPhotorealisticPrompt(params: {
 }
 
 // ────────────────────────────────────────────────────
+// URL → base64 data URL 변환 헬퍼 (서버사이드)
+// ────────────────────────────────────────────────────
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; LookbookAI/1.0)',
+        'Accept': 'image/jpeg,image/png,image/*',
+      },
+    })
+    if (!res.ok) return null
+    const buffer = await res.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    const base64 = btoa(binary)
+    const contentType = res.headers.get('Content-Type') || 'image/jpeg'
+    return `data:${contentType};base64,${base64}`
+  } catch {
+    return null
+  }
+}
+
+// ────────────────────────────────────────────────────
 // aifashion.co.kr API Proxies
 // ────────────────────────────────────────────────────
 
@@ -388,6 +414,7 @@ app.post('/api/generation/start', async (c) => {
       modelId,
       modelName = '패션 모델',
       modelDesc = 'young Asian female fashion model, slim figure, natural look',
+      bgId,
       bgName = '스튜디오',
       bgDesc = 'clean white studio background with professional lighting',
       poseType = '전신',
@@ -415,31 +442,96 @@ app.post('/api/generation/start', async (c) => {
 
     console.log('Generation prompt:', prompt)
     console.log('Clothing image URL:', clothingImageUrl ? clothingImageUrl.substring(0, 50) + '...' : 'none')
+    console.log('Model ID:', modelId, '| BG ID:', bgId)
     console.log('Ratio:', ratio, '→', finalDims, '| Resolution:', resolution)
 
-    // Atlas Cloud API 요청 - nano-banana-2 image-to-image (기본)
+    // ── 서버사이드에서 모델/배경 이미지를 base64로 변환 ──
+    let modelImageBase64: string | null = null
+    let bgImageBase64: string | null = null
+
+    if (modelId) {
+      // 서버 내부 호출: /api/proxy/model-image/:id → Unsplash CDN fetch
+      const unsplashId = MODEL_UNSPLASH_MAP[String(modelId)]
+      if (unsplashId) {
+        const modelImgUrl = `https://images.unsplash.com/${unsplashId}?w=400&h=500&fit=crop&crop=faces,center&q=85&fm=jpg`
+        modelImageBase64 = await fetchImageAsBase64(modelImgUrl)
+        console.log('Model image fetched:', modelImageBase64 ? 'OK' : 'FAILED')
+      }
+    }
+
+    if (bgId) {
+      const bgUnsplashId = BG_UNSPLASH_MAP[String(bgId)]
+      if (bgUnsplashId) {
+        const bgImgUrl = `https://images.unsplash.com/${bgUnsplashId}?w=800&h=600&fit=crop&q=85&fm=jpg`
+        bgImageBase64 = await fetchImageAsBase64(bgImgUrl)
+        console.log('BG image fetched:', bgImageBase64 ? 'OK' : 'FAILED')
+      }
+    }
+
+    // Atlas Cloud API 요청 - Atlas Cloud image-to-image
     let requestBody: any
 
     if (clothingImageUrl && clothingImageUrl.startsWith('data:')) {
-      // 의류 이미지 있음 → bytedance/seedream-v4 image-to-image 모드
-      // image_urls 파라미터로 의류 참조 이미지 전달
+      // ── 의류 이미지 있음 → 다중 참조 image-to-image ──
+      // image_urls 순서: [1] 의류(최우선), [2] 모델 외모, [3] 배경
+      const imageUrls: string[] = [clothingImageUrl]
+      if (modelImageBase64) imageUrls.push(modelImageBase64)
+      if (bgImageBase64) imageUrls.push(bgImageBase64)
+
+      const strictPrompt = [
+        `[STRICT FASHION FITTING - DO NOT DEVIATE]`,
+        `Reference Image 1 is the CLOTHING ITEM. You MUST reproduce this garment EXACTLY:`,
+        `  - Preserve every design detail: collar shape, sleeve length, hem line, pockets, buttons, zippers, prints`,
+        `  - Preserve exact color palette: do NOT alter any colors or patterns`,
+        `  - Preserve exact fabric texture and material appearance`,
+        `  - DO NOT substitute, simplify, or creatively interpret the garment in any way`,
+        `Reference Image 2 is the MODEL. Use this person's face, skin tone, hair, and body proportions.`,
+        `Reference Image 3 is the BACKGROUND. Place the model in this EXACT background scene.`,
+        ``,
+        `Compose: ${prompt}`,
+        ``,
+        `CRITICAL CONSTRAINTS (violations are unacceptable):`,
+        `- The model MUST be wearing the clothing from Reference Image 1 without ANY changes`,
+        `- Background MUST match Reference Image 3 exactly`,
+        `- Result must look like a real professional fashion lookbook photograph`,
+        `- No cartoon, no illustration, no 3D render - strictly photorealistic`,
+      ].join(' ')
+
       requestBody = {
         model: 'bytedance/seedream-v4',
-        prompt: `Ultra-photorealistic professional fashion photography. ${prompt} The model is wearing EXACTLY the clothing item from the reference image - preserve all design details, colors, patterns, and textures of the garment perfectly.`,
-        image_urls: [clothingImageUrl],
+        prompt: strictPrompt,
+        image_urls: imageUrls,
         width: finalDims.width,
         height: finalDims.height,
         num_outputs: Math.min(count, 4),
       }
+
+      console.log('i2i mode: image_urls count =', imageUrls.length, '(clothing + model + bg)')
+
     } else {
-      // 의류 이미지 없음 → bytedance/seedream-v4 text-to-image
-      requestBody = {
-        model: 'bytedance/seedream-v4',
-        prompt,
-        negative_prompt: 'cartoon, anime, illustration, painting, drawing, low quality, blurry, deformed, ugly, unrealistic, CGI, 3d render',
-        width: finalDims.width,
-        height: finalDims.height,
-        num_outputs: Math.min(count, 4),
+      // 의류 이미지 없음 → text-to-image (모델/배경 참조는 프롬프트로만)
+      const imageUrls: string[] = []
+      if (modelImageBase64) imageUrls.push(modelImageBase64)
+      if (bgImageBase64) imageUrls.push(bgImageBase64)
+
+      if (imageUrls.length > 0) {
+        requestBody = {
+          model: 'bytedance/seedream-v4',
+          prompt: `${prompt} Match the model appearance from Reference Image 1. Use the background from Reference Image 2 exactly.`,
+          image_urls: imageUrls,
+          width: finalDims.width,
+          height: finalDims.height,
+          num_outputs: Math.min(count, 4),
+        }
+      } else {
+        requestBody = {
+          model: 'bytedance/seedream-v4',
+          prompt,
+          negative_prompt: 'cartoon, anime, illustration, painting, drawing, low quality, blurry, deformed, ugly, unrealistic, CGI, 3d render',
+          width: finalDims.width,
+          height: finalDims.height,
+          num_outputs: Math.min(count, 4),
+        }
       }
     }
 
@@ -1364,7 +1456,7 @@ app.get('/generator', (c) => {
           <p>모델 목록을 불러오는 중...</p>
         </div>
 
-        <div class="models-grid" id="modelsGrid" style="display:none;flex:1;overflow-y:auto;padding:4px 0 8px;">
+        <div class="models-grid" id="modelsGrid" style="flex:1;overflow-y:auto;padding:4px 0 8px;" hidden>
           <!-- Populated by JS from API -->
         </div>
 
@@ -1402,7 +1494,7 @@ app.get('/generator', (c) => {
           <p>배경 목록을 불러오는 중...</p>
         </div>
 
-        <div class="backgrounds-grid" id="backgroundsGrid" style="display:none;flex:1;overflow-y:auto;padding:4px 0 8px;">
+        <div class="backgrounds-grid" id="backgroundsGrid" style="flex:1;overflow-y:auto;padding:4px 0 8px;" hidden>
           <!-- Populated by JS from API -->
         </div>
 

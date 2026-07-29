@@ -1215,8 +1215,14 @@ footer {
 
 .models-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-auto-rows: auto;
+  align-items: start;
+  align-content: start;
   gap: 16px;
+  width: 100%;
+  /* flex 컨텍스트에서 grid 레이아웃 붕괴 방지 */
+  flex-shrink: 0;
 }
 
 .model-card {
@@ -1227,6 +1233,11 @@ footer {
   transition: var(--transition);
   background: var(--white);
   position: relative;
+  /* 카드 높이 자동 (thumb aspect-ratio가 결정) */
+  height: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .model-card:hover {
   border-color: var(--primary);
@@ -1236,9 +1247,13 @@ footer {
 .model-card.selected { border-color: var(--primary); }
 .model-thumb {
   aspect-ratio: 3/4;
+  width: 100%;
   background: var(--gray-2);
   overflow: hidden;
   position: relative;
+  flex-shrink: 0;
+  /* 최소 높이 보장 */
+  min-height: 180px;
 }
 .model-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
 .model-card:hover .model-thumb img { transform: scale(1.05); }
@@ -1285,8 +1300,13 @@ footer {
 
 .backgrounds-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-auto-rows: auto;
+  align-items: start;
+  align-content: start;
   gap: 16px;
+  width: 100%;
+  flex-shrink: 0;
 }
 
 .bg-card {
@@ -1297,6 +1317,10 @@ footer {
   transition: var(--transition);
   background: var(--white);
   position: relative;
+  height: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .bg-card:hover {
   border-color: var(--primary);
@@ -1306,8 +1330,12 @@ footer {
 .bg-card.selected { border-color: var(--primary); }
 .bg-thumb {
   aspect-ratio: 4/3;
+  width: 100%;
   background: var(--gray-2);
   overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+  min-height: 120px;
 }
 .bg-thumb img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s; }
 .bg-card:hover .bg-thumb img { transform: scale(1.05); }

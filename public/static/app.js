@@ -320,26 +320,24 @@ async function loadModelsFromAPI() {
     AppState.allModels = data.models || [];
     AppState.filteredModels = [...AppState.allModels];
 
-    // 이미 step 3가 활성화된 경우 렌더링
     const grid = document.getElementById('modelsGrid');
     const loading = document.getElementById('modelsLoading');
     if (grid) {
-      if (loading) loading.style.display = 'none';
-      grid.style.display = '';
+      if (loading) loading.setAttribute('hidden', '');
+      grid.removeAttribute('hidden');
       renderModels(AppState.allModels);
     }
   } catch (err) {
     console.error('Models load error:', err);
     showToast('모델 목록 로딩 실패. 기본 목록을 사용합니다.', 'warning');
 
-    // 폴백: 기본 모델 목록
     AppState.allModels = getFallbackModels();
     AppState.filteredModels = [...AppState.allModels];
     const grid = document.getElementById('modelsGrid');
     const loading = document.getElementById('modelsLoading');
     if (grid) {
-      if (loading) loading.style.display = 'none';
-      grid.style.display = '';
+      if (loading) loading.setAttribute('hidden', '');
+      grid.removeAttribute('hidden');
       renderModels(AppState.allModels);
     }
   }
@@ -357,12 +355,11 @@ async function loadBackgroundsFromAPI() {
     AppState.allBackgrounds = data.backgrounds || [];
     AppState.filteredBackgrounds = [...AppState.allBackgrounds];
 
-    // 이미 step 4가 활성화된 경우 렌더링
     const grid = document.getElementById('backgroundsGrid');
     const loading = document.getElementById('bgsLoading');
     if (grid) {
-      if (loading) loading.style.display = 'none';
-      grid.style.display = '';
+      if (loading) loading.setAttribute('hidden', '');
+      grid.removeAttribute('hidden');
       renderBackgrounds(AppState.allBackgrounds);
     }
   } catch (err) {
@@ -374,8 +371,8 @@ async function loadBackgroundsFromAPI() {
     const grid = document.getElementById('backgroundsGrid');
     const loading = document.getElementById('bgsLoading');
     if (grid) {
-      if (loading) loading.style.display = 'none';
-      grid.style.display = '';
+      if (loading) loading.setAttribute('hidden', '');
+      grid.removeAttribute('hidden');
       renderBackgrounds(AppState.allBackgrounds);
     }
   }
@@ -476,8 +473,8 @@ function changeStep(newStep) {
     const grid = document.getElementById('modelsGrid');
     const loading = document.getElementById('modelsLoading');
     if (AppState.allModels.length > 0) {
-      if (loading) loading.style.display = 'none';
-      if (grid) { grid.style.display = ''; renderModels(AppState.allModels); }
+      if (loading) loading.setAttribute('hidden', '');
+      if (grid) { grid.removeAttribute('hidden'); renderModels(AppState.allModels); }
     } else {
       loadModelsFromAPI();
     }
@@ -488,8 +485,8 @@ function changeStep(newStep) {
     const grid = document.getElementById('backgroundsGrid');
     const loading = document.getElementById('bgsLoading');
     if (AppState.allBackgrounds.length > 0) {
-      if (loading) loading.style.display = 'none';
-      if (grid) { grid.style.display = ''; renderBackgrounds(AppState.allBackgrounds); }
+      if (loading) loading.setAttribute('hidden', '');
+      if (grid) { grid.removeAttribute('hidden'); renderBackgrounds(AppState.allBackgrounds); }
     } else {
       loadBackgroundsFromAPI();
     }
@@ -873,6 +870,7 @@ async function startGeneration() {
         modelId: model?.id,
         modelName: model?.name || '패션 모델',
         modelDesc,
+        bgId: bg?.id,
         bgName: bg?.name || '스튜디오',
         bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
         poseType: AppState.genOptions.pose_type,
