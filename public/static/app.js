@@ -331,7 +331,7 @@ async function loadModelsFromAPI() {
       if (wrap) {
         if (loading) loading.style.display = 'none';
         wrap.style.display = 'flex';
-        renderModelSwipe(AppState.allModels);
+        requestAnimationFrame(() => requestAnimationFrame(() => renderModelSwipe(AppState.allModels)));
       }
     }
   } catch (err) {
@@ -368,7 +368,7 @@ async function loadBackgroundsFromAPI() {
       if (wrap) {
         if (loading) loading.style.display = 'none';
         wrap.style.display = 'flex';
-        renderBgSwipe(AppState.allBackgrounds);
+        requestAnimationFrame(() => requestAnimationFrame(() => renderBgSwipe(AppState.allBackgrounds)));
       }
     }
   } catch (err) {
@@ -471,7 +471,7 @@ function changeStep(newStep) {
     const wrap = document.getElementById('modelSwipeWrap');
     if (AppState.allModels.length > 0) {
       if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'flex'; renderModelSwipe(AppState.allModels); }
+      if (wrap) { wrap.style.display = 'flex'; requestAnimationFrame(() => requestAnimationFrame(() => renderModelSwipe(AppState.allModels))); }
     } else {
       loadModelsFromAPI();
     }
@@ -483,7 +483,7 @@ function changeStep(newStep) {
     const wrap = document.getElementById('bgSwipeWrap');
     if (AppState.allBackgrounds.length > 0) {
       if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'flex'; renderBgSwipe(AppState.allBackgrounds); }
+      if (wrap) { wrap.style.display = 'flex'; requestAnimationFrame(() => requestAnimationFrame(() => renderBgSwipe(AppState.allBackgrounds))); }
     } else {
       loadBackgroundsFromAPI();
     }
@@ -582,6 +582,11 @@ const SwipeState = {
 function renderModelSwipe(models) {
   const track = document.getElementById('modelTrack');
   if (!track) return;
+  // 높이 강제 설정 (CSS 캐시/상속 문제 방지)
+  track.style.height = '380px';
+  track.style.position = 'relative';
+  const outer = document.getElementById('modelSwipeOuter');
+  if (outer) { outer.style.height = '420px'; outer.style.position = 'relative'; outer.style.display = 'flex'; }
 
   // "선택 없음(랜덤)" 스킵 카드를 맨 앞에
   const skipItem = { __skip: true };
@@ -706,6 +711,11 @@ function filterModels(value, btn) {
 // STEP 3: Background Selection — 스와이프 카드 UI
 // ─────────────────────────────────────────────────────────
 function renderBgSwipe(bgs) {
+  // 높이 강제 설정 (CSS 캐시/상속 문제 방지)
+  const bgTrack = document.getElementById('bgTrack');
+  if (bgTrack) { bgTrack.style.height = '380px'; bgTrack.style.position = 'relative'; }
+  const bgOuter = document.getElementById('bgSwipeOuter');
+  if (bgOuter) { bgOuter.style.height = '420px'; bgOuter.style.position = 'relative'; bgOuter.style.display = 'flex'; }
   const track = document.getElementById('bgTrack');
   if (!track) return;
 

@@ -1621,7 +1621,7 @@ app.get('/generator', (c) => {
           <p>모델 목록을 불러오는 중...</p>
         </div>
 
-        <div id="modelSwipeWrap" style="flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0;">
+        <div id="modelSwipeWrap" style="display:none;flex-direction:column;overflow:visible;">
           <!-- 카드 스와이프 영역 -->
           <div class="swipe-outer" id="modelSwipeOuter">
             <button class="swipe-arrow swipe-arrow-left" id="modelPrev" onclick="swipeCard('model',-1)"><i class="fas fa-chevron-left"></i></button>
@@ -1673,7 +1673,7 @@ app.get('/generator', (c) => {
           <p>배경 목록을 불러오는 중...</p>
         </div>
 
-        <div id="bgSwipeWrap" style="flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0;">
+        <div id="bgSwipeWrap" style="display:none;flex-direction:column;overflow:visible;">
           <div class="swipe-outer" id="bgSwipeOuter">
             <button class="swipe-arrow swipe-arrow-left" id="bgPrev" onclick="swipeCard('bg',-1)"><i class="fas fa-chevron-left"></i></button>
             <div class="swipe-track" id="bgTrack">

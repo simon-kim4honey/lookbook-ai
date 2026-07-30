@@ -1809,10 +1809,11 @@ button, a { touch-action: manipulation; }
 
 .swipe-track {
   width: 100%;
-  height: 100%;
+  height: 380px;
   position: relative;
   overflow: hidden;
   border-radius: 16px;
+  flex-shrink: 0;
 }
 
 /* 개별 카드 */
