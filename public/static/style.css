@@ -1798,13 +1798,13 @@ button, a { touch-action: manipulation; }
 /* ── 스와이프 카드 공통 ── */
 .swipe-outer {
   position: relative;
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  min-height: 0;
   padding: 0 44px;
+  height: 420px;
+  flex-shrink: 0;
 }
 
 .swipe-track {
