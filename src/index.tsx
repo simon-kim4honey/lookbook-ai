@@ -385,193 +385,37 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
 // aifashion.co.kr API Proxies
 // ────────────────────────────────────────────────────
 
-// 모델 목록 - Unsplash 패션 모델 큐레이션 (21개, 성별/무드/체형 다양)
+// 모델 목록 — 관리자 업로드 커스텀 모델만 반환
 app.get('/api/presets/models', async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
-  const customRaw: CustomModel[] = kv ? await kvGetModels(kv) : _memModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
-  const models = [
-    // ── 여성 / 20대 ──
-    { id: 1,  name: '소피아',   gender: '여성', age: '20대', body: '슬림',  mood: '시크',    skin: '밝은', desc: 'young Asian female, slim figure, chic sophisticated look',    unsplashId: 'photo-1529626455594-4ff0802cfb7e' },
-    { id: 2,  name: '지유',     gender: '여성', age: '20대', body: '슬림',  mood: '내추럴',  skin: '중간', desc: 'young Korean female, slim figure, natural casual style',       unsplashId: 'photo-1488716820095-cbe80883c496' },
-    { id: 3,  name: '하나',     gender: '여성', age: '20대', body: '표준',  mood: '큐트',    skin: '밝은', desc: 'young Asian female, average build, cute fresh look',          unsplashId: 'photo-1494790108377-be9c29b29330' },
-    { id: 4,  name: '레이',     gender: '여성', age: '20대', body: '슬림',  mood: '럭셔리',  skin: '중간', desc: 'young female model, slim figure, luxurious elegant style',    unsplashId: 'photo-1517841905240-472988babdf9' },
-    { id: 5,  name: '에이미',   gender: '여성', age: '20대', body: '표준',  mood: '캐주얼',  skin: '밝은', desc: 'young female, average build, casual relaxed style',          unsplashId: 'photo-1531746020798-e6953c6e8e04' },
-    { id: 6,  name: '나오미',   gender: '여성', age: '20대', body: '커브',  mood: '시크',    skin: '어두운', desc: 'young female, curvy figure, chic sophisticated look',       unsplashId: 'photo-1524504388940-b1c1722653e1' },
-    { id: 7,  name: '루나',     gender: '여성', age: '20대', body: '슬림',  mood: '스트릿',  skin: '중간', desc: 'young female, slim figure, street style edgy look',          unsplashId: 'photo-1526080652727-5b77f74eacd2' },
-    // ── 여성 / 30대 ──
-    { id: 8,  name: '비앙카',   gender: '여성', age: '30대', body: '표준',  mood: '럭셔리',  skin: '밝은', desc: 'female model in 30s, average build, luxurious elegant look',  unsplashId: 'photo-1508214751196-bcfd4ca60f91' },
-    { id: 9,  name: '사라',     gender: '여성', age: '30대', body: '슬림',  mood: '시크',    skin: '중간', desc: 'female in her 30s, slim figure, chic sophisticated style',    unsplashId: 'photo-1546961342-ea5f62d5a27b' },
-    { id: 10, name: '이사벨',   gender: '여성', age: '30대', body: '커브',  mood: '캐주얼',  skin: '밝은', desc: 'female in her 30s, curvy figure, casual comfortable style',  unsplashId: 'photo-1487412720507-e7ab37603c6f' },
-    { id: 11, name: '클로에',   gender: '여성', age: '30대', body: '표준',  mood: '내추럴',  skin: '어두운', desc: 'female in her 30s, average build, natural fresh look',     unsplashId: 'photo-1544005313-94ddf0286df2' },
-    // ── 여성 / 플러스사이즈 ──
-    { id: 12, name: '베라',     gender: '여성', age: '20대', body: '플러스', mood: '캐주얼', skin: '중간', desc: 'young plus size female model, casual confident look',          unsplashId: 'photo-1558618666-fcd25c85cd64' },
-    { id: 13, name: '줄리아',   gender: '여성', age: '30대', body: '플러스', mood: '시크',   skin: '밝은', desc: 'plus size female in 30s, chic sophisticated look',            unsplashId: 'photo-1509631179647-0177331693ae' },
-    // ── 남성 / 20대 ──
-    { id: 14, name: '카이',     gender: '남성', age: '20대', body: '슬림',  mood: '시크',    skin: '중간', desc: 'young Asian male, slim fit figure, chic sophisticated look',  unsplashId: 'photo-1500648767791-00dcc994a43e' },
-    { id: 15, name: '에단',     gender: '남성', age: '20대', body: '근육',  mood: '스트릿',  skin: '밝은', desc: 'young male, athletic muscular build, street style look',     unsplashId: 'photo-1570295999919-56ceb5ecca61' },
-    { id: 16, name: '리오',     gender: '남성', age: '20대', body: '표준',  mood: '캐주얼',  skin: '중간', desc: 'young male model, average build, casual relaxed style',      unsplashId: 'photo-1506794778202-cad84cf45f1d' },
-    { id: 17, name: '제이든',   gender: '남성', age: '20대', body: '슬림',  mood: '내추럴',  skin: '어두운', desc: 'young male, slim figure, natural casual style',            unsplashId: 'photo-1531427186611-ecfd6d936c79' },
-    // ── 남성 / 30대 ──
-    { id: 18, name: '마르코',   gender: '남성', age: '30대', body: '근육',  mood: '럭셔리',  skin: '밝은', desc: 'male in 30s, athletic build, luxurious sophisticated look',  unsplashId: 'photo-1507003211169-0a1dd7228f2d' },
-    { id: 19, name: '루카스',   gender: '남성', age: '30대', body: '표준',  mood: '시크',    skin: '중간', desc: 'male in his 30s, average build, chic professional look',     unsplashId: 'photo-1472099645785-5658abf4ff4e' },
-    { id: 20, name: '올리버',   gender: '남성', age: '30대', body: '슬림',  mood: '캐주얼',  skin: '밝은', desc: 'male in 30s, slim fit, casual smart look',                  unsplashId: 'photo-1560250097-0b93528c311a' },
-    // ── 특수/유니크 ──
-    { id: 21, name: '제네시스',  gender: '여성', age: '20대', body: '슬림', mood: '청순',    skin: '밝은', desc: 'young female, slim figure, pure innocent fresh style',        unsplashId: 'photo-1521146764736-56c929d59c83' },
-  ]
-  // 커스텀 모델 합산 (KV 또는 메모리)
+  const customRaw: CustomModel[] = kv
+    ? await kvGetModels(kv)
+    : _memModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
   const customList = customRaw.map(m => ({
     id: Number(m.id), name: m.name, gender: '커스텀', age: '-', body: '-', mood: '-', skin: '-',
     desc: m.desc, unsplashId: null, isCustom: true, customId: m.id,
   }))
-  return c.json({ models: [...customList, ...models] })
+  return c.json({ models: customList })
 })
 
-// 배경 목록 - 패션 룩북 특화 큐레이션 (Unsplash 고해상도, 내용-이름 정확히 일치)
+// 배경 목록 — 관리자 업로드 커스텀 배경만 반환
 app.get('/api/presets/backgrounds', async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
-  const customBgRaw: CustomBg[] = kv ? await kvGetBgs(kv) : _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
-  const backgrounds = [
-    // ── 스튜디오 ──
-    { id: 1,  name: '화이트 스튜디오',    category: '스튜디오', mood: '클린',       bgDesc: 'clean white studio background with professional soft lighting', unsplashId: 'photo-1558618666-fcd25c85cd64' },
-    { id: 2,  name: '베이지 스튜디오',    category: '스튜디오', mood: '웜',         bgDesc: 'warm beige minimalist studio backdrop, soft neutral tones',     unsplashId: 'photo-1515886657613-9f3515b0c78f' },
-    { id: 3,  name: '그레이 시멘트',      category: '스튜디오', mood: '모던',       bgDesc: 'concrete gray textured studio wall, industrial minimalist',     unsplashId: 'photo-1604502488982-f33babd19e3f' },
-    // ── 럭셔리 ──
-    { id: 4,  name: '럭셔리 인테리어',    category: '럭셔리',   mood: '하이엔드',   bgDesc: 'luxury interior with marble floors and elegant sophisticated decor', unsplashId: 'photo-1613977257592-4871e5fcd7c4' },
-    { id: 5,  name: '호텔 로비',          category: '럭셔리',   mood: '엘레강스',   bgDesc: 'grand hotel lobby with chandeliers and opulent architecture',   unsplashId: 'photo-1560184897-ae75f418493e' },
-    { id: 6,  name: '갤러리 화이트',      category: '럭셔리',   mood: '미니멀',     bgDesc: 'modern white art gallery with clean walls and natural light',   unsplashId: 'photo-1536924940846-227afb31e2a5' },
-    // ── 스트리트 ──
-    { id: 7,  name: '도심 스트리트',      category: '스트리트', mood: '어반',       bgDesc: 'urban city street with bokeh lights, fashion editorial backdrop', unsplashId: 'photo-1477959858617-67f85cf4f1df' },
-    { id: 8,  name: '벽돌 골목',          category: '스트리트', mood: '빈티지',     bgDesc: 'vintage brick alley wall, urban industrial street backdrop',   unsplashId: 'photo-1558618666-fcd25c85cd64' },
-    { id: 9,  name: '야간 네온',          category: '스트리트', mood: '시크',       bgDesc: 'neon lights night street, moody urban city fashion backdrop',  unsplashId: 'photo-1483985988355-763728e1935b' },
-    // ── 자연/야외 ──
-    { id: 10, name: '해변 골든아워',      category: '야외',     mood: '서머',       bgDesc: 'golden hour beach with soft sand and gentle ocean waves',       unsplashId: 'photo-1507525428034-b723cf961d3e' },
-    { id: 11, name: '꽃밭 초원',          category: '야외',     mood: '로맨틱',     bgDesc: 'blooming flower meadow with soft bokeh, dreamy outdoor light',  unsplashId: 'photo-1490750967868-88df5691cc19' },
-    { id: 12, name: '초록 숲',            category: '야외',     mood: '내추럴',     bgDesc: 'lush green forest path with dappled sunlight through trees',    unsplashId: 'photo-1448375240586-882707db888b' },
-    // ── 카페/실내 ──
-    { id: 13, name: '빈티지 카페',        category: '카페',     mood: '코지',       bgDesc: 'cozy vintage cafe interior with warm lighting and wooden decor', unsplashId: 'photo-1445116572257-6cd5ada70793' },
-    { id: 14, name: '모던 인테리어',      category: '실내',     mood: '프로페셔널', bgDesc: 'modern minimalist interior with large windows and city view',   unsplashId: 'photo-1555041469-a586c61ea9bc' },
-    // ── 럭셔리/해외 ──
-    { id: 15, name: '파리지앵 거리',      category: '럭셔리',   mood: '로맨틱',     bgDesc: 'Parisian city street with Haussmann architecture and warm light', unsplashId: 'photo-1502602898657-3e91760cbb34' },
-    { id: 16, name: '도쿄 스트리트',      category: '스트리트', mood: '트렌디',     bgDesc: 'Tokyo street fashion district with colorful urban scenery',     unsplashId: 'photo-1540959733332-eab4deabeeaf' },
-  ]
-  // 커스텀 배경 합산 (KV 또는 메모리)
+  const customBgRaw: CustomBg[] = kv
+    ? await kvGetBgs(kv)
+    : _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
   const customBgList = customBgRaw.map(b => ({
     id: Number(b.id), name: b.name, category: b.category, mood: '-',
     bgDesc: b.bgDesc, unsplashId: null, isCustom: true, customId: b.id,
   }))
-  return c.json({ backgrounds: [...customBgList, ...backgrounds] })
+  return c.json({ backgrounds: customBgList })
 })
 
-// 모델 이미지 프록시 (Unsplash 패션 모델 큐레이션)
-const MODEL_UNSPLASH_MAP: Record<string, string> = {
-  '1':  'photo-1529626455594-4ff0802cfb7e',
-  '2':  'photo-1488716820095-cbe80883c496',
-  '3':  'photo-1494790108377-be9c29b29330',
-  '4':  'photo-1517841905240-472988babdf9',
-  '5':  'photo-1531746020798-e6953c6e8e04',
-  '6':  'photo-1524504388940-b1c1722653e1',
-  '7':  'photo-1526080652727-5b77f74eacd2',
-  '8':  'photo-1508214751196-bcfd4ca60f91',
-  '9':  'photo-1546961342-ea5f62d5a27b',
-  '10': 'photo-1487412720507-e7ab37603c6f',
-  '11': 'photo-1544005313-94ddf0286df2',
-  '12': 'photo-1558618666-fcd25c85cd64',
-  '13': 'photo-1509631179647-0177331693ae',
-  '14': 'photo-1500648767791-00dcc994a43e',
-  '15': 'photo-1570295999919-56ceb5ecca61',
-  '16': 'photo-1506794778202-cad84cf45f1d',
-  '17': 'photo-1531427186611-ecfd6d936c79',
-  '18': 'photo-1507003211169-0a1dd7228f2d',
-  '19': 'photo-1472099645785-5658abf4ff4e',
-  '20': 'photo-1560250097-0b93528c311a',
-  '21': 'photo-1521146764736-56c929d59c83',
-}
+// /api/proxy/model-image/:id — 기본 Unsplash 모델 제거로 404 반환
+app.get('/api/proxy/model-image/:id', (c) => c.notFound())
 
-app.get('/api/proxy/model-image/:id', async (c) => {
-  const id = c.req.param('id')
-  const unsplashId = MODEL_UNSPLASH_MAP[id]
-
-  if (!unsplashId) {
-    return c.notFound()
-  }
-
-  try {
-    // 모델 이미지: 세로형 (4:5 비율), 고해상도
-    const unsplashUrl = `https://images.unsplash.com/${unsplashId}?w=400&h=500&fit=crop&crop=faces,center&q=85&fm=jpg`
-    const res = await fetch(unsplashUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; LookbookAI/1.0)',
-        'Accept': 'image/jpeg,image/*',
-      },
-    })
-    if (!res.ok) {
-      return c.notFound()
-    }
-    const buffer = await res.arrayBuffer()
-    return new Response(buffer, {
-      headers: {
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'public, max-age=86400',
-        'Access-Control-Allow-Origin': '*',
-      },
-    })
-  } catch (err) {
-    return c.notFound()
-  }
-})
-
-// 배경 이미지 프록시 (Unsplash 패션 룩북 특화 - backgrounds 데이터와 동일한 ID 매핑)
-const BG_UNSPLASH_MAP: Record<string, string> = {
-  '1':  'photo-1558618666-fcd25c85cd64',  // 화이트 스튜디오
-  '2':  'photo-1515886657613-9f3515b0c78f', // 베이지 스튜디오
-  '3':  'photo-1604502488982-f33babd19e3f', // 그레이 시멘트
-  '4':  'photo-1613977257592-4871e5fcd7c4', // 럭셔리 인테리어
-  '5':  'photo-1560184897-ae75f418493e',    // 호텔 로비
-  '6':  'photo-1536924940846-227afb31e2a5', // 갤러리 화이트
-  '7':  'photo-1477959858617-67f85cf4f1df', // 도심 스트리트
-  '8':  'photo-1558618666-fcd25c85cd64',    // 벽돌 골목 (스튜디오 폴백)
-  '9':  'photo-1483985988355-763728e1935b', // 야간 네온
-  '10': 'photo-1507525428034-b723cf961d3e', // 해변 골든아워
-  '11': 'photo-1490750967868-88df5691cc19', // 꽃밭 초원
-  '12': 'photo-1448375240586-882707db888b', // 초록 숲
-  '13': 'photo-1445116572257-6cd5ada70793', // 빈티지 카페
-  '14': 'photo-1555041469-a586c61ea9bc',    // 모던 인테리어
-  '15': 'photo-1502602898657-3e91760cbb34', // 파리지앵 거리
-  '16': 'photo-1540959733332-eab4deabeeaf', // 도쿄 스트리트
-}
-
-app.get('/api/proxy/bg-image/:id', async (c) => {
-  const id = c.req.param('id')
-  const unsplashId = BG_UNSPLASH_MAP[id]
-
-  if (!unsplashId) {
-    return c.notFound()
-  }
-
-  try {
-    // Unsplash CDN - 고해상도 패션 배경 이미지 (800×600)
-    const unsplashUrl = `https://images.unsplash.com/${unsplashId}?w=800&h=600&fit=crop&q=85&fm=jpg`
-    const res = await fetch(unsplashUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; LookbookAI/1.0)',
-        'Accept': 'image/jpeg,image/*',
-      },
-    })
-    if (!res.ok) {
-      return c.notFound()
-    }
-    const buffer = await res.arrayBuffer()
-    return new Response(buffer, {
-      headers: {
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'public, max-age=86400',
-        'Access-Control-Allow-Origin': '*',
-      },
-    })
-  } catch (err) {
-    return c.notFound()
-  }
-})
+// /api/proxy/bg-image/:id — 기본 Unsplash 배경 제거로 404 반환
+app.get('/api/proxy/bg-image/:id', (c) => c.notFound())
 
 // 생성 결과 이미지 프록시 (Atlas Cloud CDN CORS 우회)
 app.get('/api/proxy/gen-image', async (c) => {
@@ -765,7 +609,7 @@ app.post('/api/generation/start', async (c) => {
     const poseTypeText  = poseTypeMap[poseType]  || 'full body shot'
     const poseStyleText = poseStyleMap[pose]      || 'natural standing pose'
 
-    // ── 서버사이드: 모델·배경 이미지 base64 취득 (커스텀 우선, 없으면 Unsplash) ──
+    // ── 서버사이드: 커스텀 모델·배경 이미지 base64 취득 (관리자 업로드 전용) ──
     let modelImageBase64: string | null = null
     let bgImageBase64: string | null = null
 
@@ -773,7 +617,7 @@ app.post('/api/generation/start', async (c) => {
 
     if (modelId) {
       const mid = String(modelId)
-      // 커스텀 모델 우선: KV 또는 메모리에서 이미지 취득
+      // 커스텀 모델: KV 또는 메모리에서만 이미지 취득 (기본 Unsplash 없음)
       if (kv) {
         const stored = await kv.get(`model_img:${mid}`)
         if (stored) { modelImageBase64 = stored; console.log('KV custom model: OK') }
@@ -781,19 +625,11 @@ app.post('/api/generation/start', async (c) => {
         const m = _memModels.find(m => m.id === mid)
         if (m?.imageBase64) { modelImageBase64 = m.imageBase64; console.log('Mem custom model: OK') }
       }
-      // 커스텀 없으면 Unsplash 기본 모델
-      if (!modelImageBase64) {
-        const unsplashId = MODEL_UNSPLASH_MAP[mid]
-        if (unsplashId) {
-          const url = `https://images.unsplash.com/${unsplashId}?w=512&h=640&fit=crop&crop=faces,center&q=90&fm=jpg`
-          modelImageBase64 = await fetchImageAsBase64(url)
-          console.log('Unsplash model image:', modelImageBase64 ? 'OK' : 'FAILED')
-        }
-      }
+      if (!modelImageBase64) console.log('Custom model image not found for id:', mid)
     }
     if (bgId) {
       const bid = String(bgId)
-      // 커스텀 배경 우선
+      // 커스텀 배경: KV 또는 메모리에서만 이미지 취득 (기본 Unsplash 없음)
       if (kv) {
         const stored = await kv.get(`bg_img:${bid}`)
         if (stored) { bgImageBase64 = stored; console.log('KV custom bg: OK') }
@@ -801,15 +637,7 @@ app.post('/api/generation/start', async (c) => {
         const b = _memBgs.find(b => b.id === bid)
         if (b?.imageBase64) { bgImageBase64 = b.imageBase64; console.log('Mem custom bg: OK') }
       }
-      // 커스텀 없으면 Unsplash 기본 배경
-      if (!bgImageBase64) {
-        const bgUnsplashId = BG_UNSPLASH_MAP[bid]
-        if (bgUnsplashId) {
-          const url = `https://images.unsplash.com/${bgUnsplashId}?w=800&h=600&fit=crop&q=90&fm=jpg`
-          bgImageBase64 = await fetchImageAsBase64(url)
-          console.log('Unsplash BG image:', bgImageBase64 ? 'OK' : 'FAILED')
-        }
-      }
+      if (!bgImageBase64) console.log('Custom bg image not found for id:', bid)
     }
 
     // ── Nano Banana 2 Edit: images 배열 구성 ──
@@ -1713,48 +1541,6 @@ app.get('/generator', (c) => {
   </nav>
 
   <div id="generator-page" style="height:100vh;overflow:hidden;display:flex;flex-direction:column;">
-    <!-- Step Progress Header -->
-    <div class="generator-header" style="flex-shrink:0;">
-      <div class="generator-header-inner">
-        <div style="font-size:14px;font-weight:700;color:var(--text-primary);white-space:nowrap;">새 프로젝트</div>
-        <div class="step-progress" id="stepProgress">
-          <div class="step-item">
-            <div class="step-dot active" id="dot-1" onclick="goToStep(1)">
-              1
-              <div class="step-label">업로드</div>
-            </div>
-            <div class="step-line" id="line-1"></div>
-          </div>
-          <div class="step-item">
-            <div class="step-dot" id="dot-2" onclick="goToStep(2)">
-              2
-              <div class="step-label">모델</div>
-            </div>
-            <div class="step-line" id="line-2"></div>
-          </div>
-          <div class="step-item">
-            <div class="step-dot" id="dot-3" onclick="goToStep(3)">
-              3
-              <div class="step-label">배경</div>
-            </div>
-            <div class="step-line" id="line-3"></div>
-          </div>
-          <div class="step-item">
-            <div class="step-dot" id="dot-4" onclick="goToStep(4)">
-              4
-              <div class="step-label">생성</div>
-            </div>
-            <div class="step-line" id="line-4"></div>
-          </div>
-          <div class="step-item">
-            <div class="step-dot" id="dot-5">
-              5
-              <div class="step-label">결과</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Generator Body -->
     <div class="generator-body" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;">

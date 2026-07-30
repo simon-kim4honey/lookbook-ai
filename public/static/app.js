@@ -321,23 +321,25 @@ async function loadModelsFromAPI() {
 
     const wrap = document.getElementById('modelSwipeWrap');
     const loading = document.getElementById('modelsLoading');
-    if (wrap) {
-      if (loading) loading.setAttribute('hidden', '');
-      wrap.style.display = 'flex';
-      renderModelSwipe(AppState.allModels);
+    if (AppState.allModels.length === 0) {
+      // 등록된 모델 없음 안내
+      if (loading) {
+        loading.removeAttribute('hidden');
+        loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">👤</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 모델이 없습니다</p><p style="font-size:13px">관리자 페이지에서 모델을 먼저 등록해주세요</p></div>';
+      }
+    } else {
+      if (wrap) {
+        if (loading) loading.setAttribute('hidden', '');
+        wrap.style.display = 'flex';
+        renderModelSwipe(AppState.allModels);
+      }
     }
   } catch (err) {
     console.error('Models load error:', err);
-    showToast('모델 목록 로딩 실패. 기본 목록을 사용합니다.', 'warning');
-
-    AppState.allModels = getFallbackModels();
-    AppState.filteredModels = [...AppState.allModels];
-    const wrap = document.getElementById('modelSwipeWrap');
     const loading = document.getElementById('modelsLoading');
-    if (wrap) {
-      if (loading) loading.setAttribute('hidden', '');
-      wrap.style.display = 'flex';
-      renderModelSwipe(AppState.allModels);
+    if (loading) {
+      loading.removeAttribute('hidden');
+      loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">모델 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>';
     }
   }
 }
@@ -356,23 +358,25 @@ async function loadBackgroundsFromAPI() {
 
     const wrap = document.getElementById('bgSwipeWrap');
     const loading = document.getElementById('bgsLoading');
-    if (wrap) {
-      if (loading) loading.setAttribute('hidden', '');
-      wrap.style.display = 'flex';
-      renderBgSwipe(AppState.allBackgrounds);
+    if (AppState.allBackgrounds.length === 0) {
+      // 등록된 배경 없음 안내
+      if (loading) {
+        loading.removeAttribute('hidden');
+        loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 배경이 없습니다</p><p style="font-size:13px">관리자 페이지에서 배경을 먼저 등록해주세요</p></div>';
+      }
+    } else {
+      if (wrap) {
+        if (loading) loading.setAttribute('hidden', '');
+        wrap.style.display = 'flex';
+        renderBgSwipe(AppState.allBackgrounds);
+      }
     }
   } catch (err) {
     console.error('Backgrounds load error:', err);
-    showToast('배경 목록 로딩 실패. 기본 목록을 사용합니다.', 'warning');
-
-    AppState.allBackgrounds = getFallbackBackgrounds();
-    AppState.filteredBackgrounds = [...AppState.allBackgrounds];
-    const wrap = document.getElementById('bgSwipeWrap');
     const loading = document.getElementById('bgsLoading');
-    if (wrap) {
-      if (loading) loading.setAttribute('hidden', '');
-      wrap.style.display = 'flex';
-      renderBgSwipe(AppState.allBackgrounds);
+    if (loading) {
+      loading.removeAttribute('hidden');
+      loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">배경 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>';
     }
   }
 }
@@ -381,29 +385,13 @@ async function loadBackgroundsFromAPI() {
 // FALLBACK DATA (API 실패 시)
 // ─────────────────────────────────────────────────────────
 function getFallbackModels() {
-  return Array.from({ length: 10 }, (_, i) => ({
-    id: i + 2,
-    name: String(i + 1).padStart(2, '0'),
-    description: '',
-    gender: i < 7 ? '여성' : '남성',
-    age: '20대',
-    body: '표준',
-    mood: '내추럴',
-    skin: '중간',
-  }));
+  // 관리자 업로드 커스텀 모델만 사용 — 기본 폴백 없음
+  return [];
 }
 
 function getFallbackBackgrounds() {
-  const names = ['컨테이너 항구', '빈티지 관제실', '극장 로비', '에스컬레이터', '팜시티 거리', '실내 테니스코트', '모래사막', '해변 카페', '북촌 오르막', '해변도로', '캔디왕국', '파스텔 모텔', '네온 식당', '지하복도', '전차내부'];
-  const ids = [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-  const cats = ['야외', '실내', '럭셔리', '실내', '스트리트', '스포츠', '야외', '카페', '스트리트', '야외', '판타지', '실내', '실내', '실내', '실내'];
-  return names.map((name, i) => ({
-    id: ids[i],
-    name,
-    category: cats[i],
-    mood: '뉴트럴',
-    bgDesc: name,
-  }));
+  // 관리자 업로드 커스텀 배경만 사용 — 기본 폴백 없음
+  return [];
 }
 
 // ─────────────────────────────────────────────────────────
