@@ -94,16 +94,24 @@ let customBgs: CustomBg[] = []
 let customIdCounter = 1000  // Unsplash ID(1~21)와 충돌 방지
 
 // ── 커스텀 모델 API ──
-// POST /api/admin/models — 모델 업로드
+// POST /api/admin/models — 모델 업로드 (단일 or 배열 일괄)
 app.post('/api/admin/models', adminAuth, async (c) => {
   try {
     const body: any = await c.req.json()
-    const { name, desc, imageBase64 } = body
-    if (!name || !imageBase64) return c.json({ success: false, message: '이름과 이미지가 필요합니다.' }, 400)
-    const id = String(customIdCounter++)
-    const model: CustomModel = { id, name, desc: desc || name, imageBase64, createdAt: new Date().toISOString() }
-    customModels.push(model)
-    return c.json({ success: true, model: { id, name, desc: model.desc, createdAt: model.createdAt } })
+    // 배열 일괄 업로드: [{ name, desc, imageBase64 }, ...]
+    const items: Array<{ name: string; desc?: string; imageBase64: string }> =
+      Array.isArray(body) ? body : [body]
+    if (items.length === 0) return c.json({ success: false, message: '업로드할 항목이 없습니다.' }, 400)
+    const results: any[] = []
+    for (const item of items) {
+      const { name, desc, imageBase64 } = item
+      if (!name || !imageBase64) continue
+      const id = String(customIdCounter++)
+      const model: CustomModel = { id, name, desc: desc || name, imageBase64, createdAt: new Date().toISOString() }
+      customModels.push(model)
+      results.push({ id, name, desc: model.desc, createdAt: model.createdAt })
+    }
+    return c.json({ success: true, models: results, count: results.length })
   } catch (e: any) {
     return c.json({ success: false, message: e.message }, 500)
   }
@@ -139,12 +147,20 @@ app.get('/api/proxy/custom-model/:id', (c) => {
 app.post('/api/admin/backgrounds', adminAuth, async (c) => {
   try {
     const body: any = await c.req.json()
-    const { name, bgDesc, category, imageBase64 } = body
-    if (!name || !imageBase64) return c.json({ success: false, message: '이름과 이미지가 필요합니다.' }, 400)
-    const id = String(customIdCounter++)
-    const bg: CustomBg = { id, name, bgDesc: bgDesc || name, category: category || '커스텀', imageBase64, createdAt: new Date().toISOString() }
-    customBgs.push(bg)
-    return c.json({ success: true, bg: { id, name, bgDesc: bg.bgDesc, category: bg.category, createdAt: bg.createdAt } })
+    // 배열 일괄 업로드: [{ name, bgDesc, category, imageBase64 }, ...]
+    const items: Array<{ name: string; bgDesc?: string; category?: string; imageBase64: string }> =
+      Array.isArray(body) ? body : [body]
+    if (items.length === 0) return c.json({ success: false, message: '업로드할 항목이 없습니다.' }, 400)
+    const results: any[] = []
+    for (const item of items) {
+      const { name, bgDesc, category, imageBase64 } = item
+      if (!name || !imageBase64) continue
+      const id = String(customIdCounter++)
+      const bg: CustomBg = { id, name, bgDesc: bgDesc || name, category: category || '커스텀', imageBase64, createdAt: new Date().toISOString() }
+      customBgs.push(bg)
+      results.push({ id, name, bgDesc: bg.bgDesc, category: bg.category, createdAt: bg.createdAt })
+    }
+    return c.json({ success: true, backgrounds: results, count: results.length })
   } catch (e: any) {
     return c.json({ success: false, message: e.message }, 500)
   }
@@ -1996,6 +2012,8 @@ app.get('/admin', (c) => {
     .btn-save{padding:11px 28px;background:#6c47ff;color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
     .btn-save:hover{background:#7c5bff;}
     .btn-save:disabled{background:#3a3a60;color:#8b8ba0;cursor:not-allowed;}
+    .btn-cancel{padding:11px 20px;background:transparent;color:#8b8ba0;border:1.5px solid #3a3a60;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
+    .btn-cancel:hover{border-color:#6c47ff;color:#9b7cff;}
     .save-status{font-size:13px;color:#8b8ba0;}
     .save-status.ok{color:#22c55e;}
     .save-status.err{color:#ef4444;}
@@ -2145,33 +2163,28 @@ app.get('/admin', (c) => {
       <div class="page-title">👤 모델 관리</div>
       <div class="page-sub">업로드한 모델은 사용자 화면에서 기본 제공 모델보다 먼저 표시됩니다.</div>
 
-      <!-- 업로드 폼 -->
+      <!-- 다중 업로드 폼 -->
       <div class="upload-form">
-        <h3><i class="fas fa-plus-circle" style="color:#6c47ff;"></i> 새 모델 추가</h3>
-        <div class="form-row">
-          <div>
-            <label class="form-label">모델 이름 *</label>
-            <input class="form-input" id="modelName" placeholder="예: 지수, 모델A"/>
-          </div>
-          <div>
-            <label class="form-label">프롬프트 설명 (선택)</label>
-            <input class="form-input" id="modelDesc" placeholder="예: 슬림한 체형의 20대 여성 모델"/>
-          </div>
+        <h3><i class="fas fa-plus-circle" style="color:#6c47ff;"></i> 모델 추가 <span style="font-size:13px;font-weight:400;color:#888;">(여러 장 동시 업로드 가능)</span></h3>
+
+        <!-- 드롭존 -->
+        <div class="upload-zone multi-zone" id="modelUploadZone" onclick="document.getElementById('modelFileInput').click()">
+          <div class="icon"><i class="fas fa-images"></i></div>
+          <p>클릭하거나 이미지를 드래그하세요<br/><span>여러 파일 선택 가능</span> (JPG, PNG, WEBP)</p>
         </div>
-        <div class="form-row single">
-          <div>
-            <label class="form-label">모델 이미지 *</label>
-            <div class="upload-zone" id="modelUploadZone" onclick="document.getElementById('modelFileInput').click()">
-              <div class="icon"><i class="fas fa-user-circle"></i></div>
-              <p>클릭하거나 이미지를 드래그하세요<br/><span>파일 선택</span> (JPG, PNG, WEBP)</p>
-            </div>
-            <input type="file" id="modelFileInput" accept="image/*" style="display:none" onchange="onModelFileSelect(event)"/>
-            <img id="modelPreview" class="upload-preview"/>
+        <input type="file" id="modelFileInput" accept="image/*" multiple style="display:none" onchange="onModelFilesSelect(event)"/>
+
+        <!-- 선택된 파일 미리보기 그리드 -->
+        <div id="modelStagingGrid" style="display:none;margin-top:16px;">
+          <div style="font-size:13px;font-weight:600;color:#444;margin-bottom:10px;">
+            선택된 이미지 — 이름을 입력 후 등록하세요
           </div>
-        </div>
-        <div style="display:flex;gap:10px;align-items:center;margin-top:4px;">
-          <button class="btn-save" onclick="uploadModel()"><i class="fas fa-upload"></i> 모델 등록</button>
-          <span class="save-status" id="modelUploadStatus"></span>
+          <div id="modelStagingItems" style="display:flex;flex-wrap:wrap;gap:14px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+            <button class="btn-save" onclick="uploadModels()"><i class="fas fa-upload"></i> 전체 등록</button>
+            <button class="btn-cancel" onclick="clearModelStaging()"><i class="fas fa-times"></i> 초기화</button>
+            <span class="save-status" id="modelUploadStatus"></span>
+          </div>
         </div>
       </div>
 
@@ -2186,38 +2199,36 @@ app.get('/admin', (c) => {
       <div class="page-title">🖼️ 배경 관리</div>
       <div class="page-sub">업로드한 배경은 사용자 화면에서 기본 배경보다 먼저 표시됩니다.</div>
 
+      <!-- 다중 업로드 폼 -->
       <div class="upload-form">
-        <h3><i class="fas fa-plus-circle" style="color:#6c47ff;"></i> 새 배경 추가</h3>
-        <div class="form-row">
+        <h3><i class="fas fa-plus-circle" style="color:#6c47ff;"></i> 배경 추가 <span style="font-size:13px;font-weight:400;color:#888;">(여러 장 동시 업로드 가능)</span></h3>
+
+        <!-- 기본 카테고리 (공통 적용) -->
+        <div class="form-row single" style="margin-bottom:10px;">
           <div>
-            <label class="form-label">배경 이름 *</label>
-            <input class="form-input" id="bgName" placeholder="예: 서울 스튜디오, 제주 해변"/>
-          </div>
-          <div>
-            <label class="form-label">카테고리</label>
-            <input class="form-input" id="bgCategory" placeholder="예: 스튜디오, 야외, 럭셔리"/>
+            <label class="form-label">기본 카테고리 <span style="color:#888;font-weight:400;">(공통 적용, 개별 변경 가능)</span></label>
+            <input class="form-input" id="bgDefaultCategory" placeholder="예: 스튜디오, 야외, 럭셔리" style="max-width:320px;"/>
           </div>
         </div>
-        <div class="form-row single">
-          <div>
-            <label class="form-label">배경 설명 (AI 생성 힌트)</label>
-            <input class="form-input" id="bgDesc" placeholder="예: 밝은 화이트 스튜디오, 소프트박스 조명"/>
-          </div>
+
+        <!-- 드롭존 -->
+        <div class="upload-zone multi-zone" id="bgUploadZone" onclick="document.getElementById('bgFileInput').click()">
+          <div class="icon"><i class="fas fa-images"></i></div>
+          <p>클릭하거나 이미지를 드래그하세요<br/><span>여러 파일 선택 가능</span> (JPG, PNG, WEBP)</p>
         </div>
-        <div class="form-row single">
-          <div>
-            <label class="form-label">배경 이미지 *</label>
-            <div class="upload-zone" id="bgUploadZone" onclick="document.getElementById('bgFileInput').click()">
-              <div class="icon"><i class="fas fa-image"></i></div>
-              <p>클릭하거나 이미지를 드래그하세요<br/><span>파일 선택</span> (JPG, PNG, WEBP)</p>
-            </div>
-            <input type="file" id="bgFileInput" accept="image/*" style="display:none" onchange="onBgFileSelect(event)"/>
-            <img id="bgPreview" class="upload-preview"/>
+        <input type="file" id="bgFileInput" accept="image/*" multiple style="display:none" onchange="onBgFilesSelect(event)"/>
+
+        <!-- 선택된 파일 미리보기 그리드 -->
+        <div id="bgStagingGrid" style="display:none;margin-top:16px;">
+          <div style="font-size:13px;font-weight:600;color:#444;margin-bottom:10px;">
+            선택된 이미지 — 이름을 입력 후 등록하세요
           </div>
-        </div>
-        <div style="display:flex;gap:10px;align-items:center;margin-top:4px;">
-          <button class="btn-save" onclick="uploadBg()"><i class="fas fa-upload"></i> 배경 등록</button>
-          <span class="save-status" id="bgUploadStatus"></span>
+          <div id="bgStagingItems" style="display:flex;flex-wrap:wrap;gap:14px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+            <button class="btn-save" onclick="uploadBgs()"><i class="fas fa-upload"></i> 전체 등록</button>
+            <button class="btn-cancel" onclick="clearBgStaging()"><i class="fas fa-times"></i> 초기화</button>
+            <span class="save-status" id="bgUploadStatus"></span>
+          </div>
         </div>
       </div>
 
@@ -2356,44 +2367,86 @@ function updatePreview() {
   document.getElementById('previewBox').textContent = preview
 }
 
-// ─── 모델 관리 ───
-let modelFileBase64 = null
-function onModelFileSelect(e) {
-  const file = e.target.files[0]; if (!file) return
-  const reader = new FileReader()
-  reader.onload = ev => {
-    modelFileBase64 = ev.target.result
-    const img = document.getElementById('modelPreview')
-    img.src = modelFileBase64; img.style.display = 'block'
-    document.getElementById('modelUploadZone').style.borderColor = '#6c47ff'
-  }
-  reader.readAsDataURL(file)
+// ─── 공통: FileReader → base64 ───
+function readFileAsBase64(file) {
+  return new Promise(resolve => {
+    const r = new FileReader()
+    r.onload = e => resolve(e.target.result)
+    r.readAsDataURL(file)
+  })
 }
-async function uploadModel() {
-  const name = document.getElementById('modelName').value.trim()
-  const desc = document.getElementById('modelDesc').value.trim()
+
+// ══════════════════════════════════════════════
+//  모델 관리 — 다중 업로드
+// ══════════════════════════════════════════════
+let modelStagingList = []  // [{ file, base64, name }]
+
+async function onModelFilesSelect(e) {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  for (const file of files) {
+    const base64 = await readFileAsBase64(file)
+    const defaultName = file.name.replace(/\.[^.]+$/, '')
+    modelStagingList.push({ file, base64, name: defaultName })
+  }
+  // input 초기화(같은 파일 재선택 허용)
+  e.target.value = ''
+  renderModelStaging()
+}
+
+function renderModelStaging() {
+  const grid = document.getElementById('modelStagingGrid')
+  const container = document.getElementById('modelStagingItems')
+  if (!modelStagingList.length) { grid.style.display = 'none'; return }
+  grid.style.display = 'block'
+  document.getElementById('modelUploadZone').style.borderColor = '#6c47ff'
+  container.innerHTML = modelStagingList.map((item, i) =>
+    '<div style="width:160px;flex-shrink:0;">' +
+    '<div style="position:relative;width:160px;height:160px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
+    '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
+    '<button onclick="removeModelStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:22px;text-align:center;padding:0;">✕</button>' +
+    '</div>' +
+    '<input class="form-input" value="' + escHtml(item.name) + '" oninput="modelStagingList[' + i + '].name=this.value" placeholder="이름 입력" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 8px;"/>' +
+    '</div>'
+  ).join('')
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') }
+
+function removeModelStaging(idx) {
+  modelStagingList.splice(idx, 1)
+  renderModelStaging()
+}
+
+function clearModelStaging() {
+  modelStagingList = []
+  document.getElementById('modelUploadZone').style.borderColor = ''
+  document.getElementById('modelStagingGrid').style.display = 'none'
+  document.getElementById('modelUploadStatus').textContent = ''
+}
+
+async function uploadModels() {
   const status = document.getElementById('modelUploadStatus')
-  if (!name) { status.textContent = '이름을 입력하세요'; status.className = 'save-status err'; return }
-  if (!modelFileBase64) { status.textContent = '이미지를 선택하세요'; status.className = 'save-status err'; return }
+  if (!modelStagingList.length) { status.textContent = '이미지를 선택하세요'; status.className = 'save-status err'; return }
+  const missing = modelStagingList.filter(i => !i.name.trim())
+  if (missing.length) { status.textContent = '이름이 비어있는 항목이 있습니다'; status.className = 'save-status err'; return }
   status.textContent = '등록 중...'; status.className = 'save-status'
   try {
+    const payload = modelStagingList.map(i => ({ name: i.name.trim(), desc: i.name.trim(), imageBase64: i.base64 }))
     const res = await fetch('/api/admin/models', {
       method: 'POST',
       headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
-      body: JSON.stringify({name, desc: desc || name, imageBase64: modelFileBase64}),
+      body: JSON.stringify(payload),
     })
     const data = await res.json()
     if (data.success) {
-      status.textContent = '등록 완료!'; status.className = 'save-status ok'
-      document.getElementById('modelName').value = ''
-      document.getElementById('modelDesc').value = ''
-      document.getElementById('modelPreview').style.display = 'none'
-      document.getElementById('modelUploadZone').style.borderColor = ''
-      modelFileBase64 = null
+      status.textContent = data.count + '개 등록 완료!'; status.className = 'save-status ok'
+      clearModelStaging()
       loadCustomModels()
     } else { status.textContent = data.message || '등록 실패'; status.className = 'save-status err' }
   } catch(e) { status.textContent = '오류: ' + e.message; status.className = 'save-status err' }
 }
+
 async function deleteModel(id) {
   if (!confirm('이 모델을 삭제하시겠습니까?')) return
   await fetch('/api/admin/models/' + id, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
@@ -2420,46 +2473,81 @@ async function loadCustomModels() {
   } catch(e) { grid.innerHTML = '<div class="empty-state"><p>불러오기 실패</p></div>' }
 }
 
-// ─── 배경 관리 ───
-let bgFileBase64 = null
-function onBgFileSelect(e) {
-  const file = e.target.files[0]; if (!file) return
-  const reader = new FileReader()
-  reader.onload = ev => {
-    bgFileBase64 = ev.target.result
-    const img = document.getElementById('bgPreview')
-    img.src = bgFileBase64; img.style.display = 'block'
-    document.getElementById('bgUploadZone').style.borderColor = '#6c47ff'
+// ══════════════════════════════════════════════
+//  배경 관리 — 다중 업로드
+// ══════════════════════════════════════════════
+let bgStagingList = []  // [{ file, base64, name, category }]
+
+async function onBgFilesSelect(e) {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  const defaultCat = (document.getElementById('bgDefaultCategory').value || '커스텀').trim()
+  for (const file of files) {
+    const base64 = await readFileAsBase64(file)
+    const defaultName = file.name.replace(/\.[^.]+$/, '')
+    bgStagingList.push({ file, base64, name: defaultName, category: defaultCat })
   }
-  reader.readAsDataURL(file)
+  e.target.value = ''
+  renderBgStaging()
 }
-async function uploadBg() {
-  const name = document.getElementById('bgName').value.trim()
-  const bgDesc = document.getElementById('bgDesc').value.trim()
-  const category = document.getElementById('bgCategory').value.trim() || '커스텀'
+
+function renderBgStaging() {
+  const grid = document.getElementById('bgStagingGrid')
+  const container = document.getElementById('bgStagingItems')
+  if (!bgStagingList.length) { grid.style.display = 'none'; return }
+  grid.style.display = 'block'
+  document.getElementById('bgUploadZone').style.borderColor = '#6c47ff'
+  container.innerHTML = bgStagingList.map((item, i) =>
+    '<div style="width:160px;flex-shrink:0;">' +
+    '<div style="position:relative;width:160px;height:120px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
+    '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
+    '<button onclick="removeBgStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:22px;text-align:center;padding:0;">✕</button>' +
+    '</div>' +
+    '<input class="form-input" value="' + escHtml(item.name) + '" oninput="bgStagingList[' + i + '].name=this.value" placeholder="배경 이름" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 8px;"/>' +
+    '<input class="form-input" value="' + escHtml(item.category) + '" oninput="bgStagingList[' + i + '].category=this.value" placeholder="카테고리" style="margin-top:4px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 8px;color:#888;"/>' +
+    '</div>'
+  ).join('')
+}
+
+function removeBgStaging(idx) {
+  bgStagingList.splice(idx, 1)
+  renderBgStaging()
+}
+
+function clearBgStaging() {
+  bgStagingList = []
+  document.getElementById('bgUploadZone').style.borderColor = ''
+  document.getElementById('bgStagingGrid').style.display = 'none'
+  document.getElementById('bgUploadStatus').textContent = ''
+}
+
+async function uploadBgs() {
   const status = document.getElementById('bgUploadStatus')
-  if (!name) { status.textContent = '이름을 입력하세요'; status.className = 'save-status err'; return }
-  if (!bgFileBase64) { status.textContent = '이미지를 선택하세요'; status.className = 'save-status err'; return }
+  if (!bgStagingList.length) { status.textContent = '이미지를 선택하세요'; status.className = 'save-status err'; return }
+  const missing = bgStagingList.filter(i => !i.name.trim())
+  if (missing.length) { status.textContent = '이름이 비어있는 항목이 있습니다'; status.className = 'save-status err'; return }
   status.textContent = '등록 중...'; status.className = 'save-status'
   try {
+    const payload = bgStagingList.map(i => ({
+      name: i.name.trim(),
+      bgDesc: i.name.trim(),
+      category: (i.category || '커스텀').trim(),
+      imageBase64: i.base64,
+    }))
     const res = await fetch('/api/admin/backgrounds', {
       method: 'POST',
       headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
-      body: JSON.stringify({name, bgDesc: bgDesc || name, category, imageBase64: bgFileBase64}),
+      body: JSON.stringify(payload),
     })
     const data = await res.json()
     if (data.success) {
-      status.textContent = '등록 완료!'; status.className = 'save-status ok'
-      document.getElementById('bgName').value = ''
-      document.getElementById('bgDesc').value = ''
-      document.getElementById('bgCategory').value = ''
-      document.getElementById('bgPreview').style.display = 'none'
-      document.getElementById('bgUploadZone').style.borderColor = ''
-      bgFileBase64 = null
+      status.textContent = data.count + '개 등록 완료!'; status.className = 'save-status ok'
+      clearBgStaging()
       loadCustomBgs()
     } else { status.textContent = data.message || '등록 실패'; status.className = 'save-status err' }
   } catch(e) { status.textContent = '오류: ' + e.message; status.className = 'save-status err' }
 }
+
 async function deleteBg(id) {
   if (!confirm('이 배경을 삭제하시겠습니까?')) return
   await fetch('/api/admin/backgrounds/' + id, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
@@ -2486,16 +2574,16 @@ async function loadCustomBgs() {
   } catch(e) { grid.innerHTML = '<div class="empty-state"><p>불러오기 실패</p></div>' }
 }
 
-// ─── 드래그앤드롭 ───
-function setupDrop(zoneId, onFile) {
+// ─── 드래그앤드롭 (다중) ───
+function setupDrop(zoneId, onFiles) {
   const zone = document.getElementById(zoneId)
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag') })
   zone.addEventListener('dragleave', () => zone.classList.remove('drag'))
   zone.addEventListener('drop', e => {
     e.preventDefault(); zone.classList.remove('drag')
-    const file = e.dataTransfer.files[0]; if (!file) return
-    const fake = { target: { files: [file] } }
-    onFile(fake)
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))
+    if (!files.length) return
+    onFiles({ target: { files, value: '' } })
   })
 }
 
@@ -2508,8 +2596,8 @@ document.addEventListener('DOMContentLoaded', () => {
   })
   document.getElementById('toggleEnabled').addEventListener('change', updatePreview)
   document.getElementById('pwInput').focus()
-  setupDrop('modelUploadZone', onModelFileSelect)
-  setupDrop('bgUploadZone', onBgFileSelect)
+  setupDrop('modelUploadZone', onModelFilesSelect)
+  setupDrop('bgUploadZone', onBgFilesSelect)
 })
 </script>
 </body>
