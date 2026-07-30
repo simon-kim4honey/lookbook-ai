@@ -676,34 +676,39 @@ app.post('/api/generation/start', async (c) => {
     // ── 프롬프트 구성 ──
     // images 배열의 인덱스를 명시적으로 언급해 역할을 분명히 지정
     let prompt: string
+    // 모델 이미지가 있는지 여부 (이미지가 있으면 텍스트 설명 불필요)
+    const hasModelImage = !!modelImageBase64
+
     if (images.length >= 3) {
-      // 의류 + 모델 + 배경 모두 있는 풀 모드
+      // 의류 + 모델 이미지 + 배경 모두 있는 풀 모드
+      // → 모델 이미지가 있으므로 modelDesc 텍스트 설명 제거
       prompt = [
         `Create a professional fashion lookbook photograph.`,
         `Image 1 is the CLOTHING ITEM — reproduce every detail of this garment EXACTLY:`,
         `color, pattern, texture, collar shape, sleeve length, hem, buttons, zippers, prints.`,
         `DO NOT alter or substitute the clothing in any way.`,
         `Image 2 is the MODEL — use this person's exact face, hair, skin tone, and body build.`,
+        `DO NOT change the model's appearance.`,
         `Image 3 is the BACKGROUND — place the model in this exact scene.`,
         `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
-        `The model is a ${modelDesc}.`,
         `Ultra-photorealistic, 8K quality, professional studio lighting,`,
         `sharp fabric detail, magazine-quality fashion editorial.`,
         `No changes to the garment. No cartoon. No illustration. Strictly photorealistic.`,
       ].join(' ')
     } else if (images.length === 2 && clothingImageUrl) {
-      // 의류 + 모델 (배경 없음)
+      // 의류 + 모델 이미지 (배경 없음)
+      // → 모델 이미지가 있으므로 modelDesc 텍스트 설명 제거
       prompt = [
         `Create a professional fashion lookbook photograph.`,
         `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY with all its design details.`,
-        `Image 2 is the MODEL — use this person's exact appearance.`,
+        `Image 2 is the MODEL — use this person's exact appearance. DO NOT change the model's look.`,
         `Show the model in a ${poseTypeText}, ${poseStyleText},`,
         `against a clean ${bgDesc} background.`,
         `Ultra-photorealistic, magazine-quality fashion editorial.`,
         `DO NOT change the clothing design. Strictly photorealistic.`,
       ].join(' ')
     } else if (images.length === 1 && clothingImageUrl) {
-      // 의류만 있음
+      // 의류만 있음 (모델 이미지 없음) → modelDesc로 모델 외모를 텍스트로 지정
       prompt = [
         `Create a professional fashion lookbook photograph.`,
         `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY.`,
@@ -713,7 +718,7 @@ app.post('/api/generation/start', async (c) => {
         `DO NOT change the clothing. Strictly photorealistic.`,
       ].join(' ')
     } else {
-      // 이미지 없음 → 순수 텍스트 기반
+      // 이미지 없음 → 순수 텍스트 기반, modelDesc로 모델 외모 지정
       prompt = [
         `Ultra-photorealistic professional fashion photography.`,
         `A ${modelDesc} fashion model, ${poseTypeText}, ${poseStyleText}.`,
