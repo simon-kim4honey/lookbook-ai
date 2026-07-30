@@ -1726,4 +1726,281 @@ footer {
 .flex { display: flex; }
 .items-center { align-items: center; }
 .gap-8 { gap: 8px; }
+
+/* ══════════════════════════════════════
+   모바일 최적화 + 스와이프 카드 UI
+══════════════════════════════════════ */
+
+/* 기본 touch 개선 */
+* { -webkit-tap-highlight-color: transparent; }
+button, a { touch-action: manipulation; }
+
+/* Navbar 모바일 */
+@media (max-width: 480px) {
+  .navbar-inner { padding: 0 16px; }
+  .navbar-logo span { font-size: 15px; }
+  .logo-icon { width: 28px; height: 28px; font-size: 14px; }
+}
+
+/* Step 헤더 모바일 */
+@media (max-width: 480px) {
+  .generator-header { padding: 10px 16px; }
+  .step-progress { gap: 4px; }
+  .step-dot { width: 28px; height: 28px; font-size: 11px; }
+  .step-label { font-size: 9px; }
+  .step-line { width: 16px; }
+}
+
+/* Step 타이틀 모바일 */
+@media (max-width: 480px) {
+  .step-title-area { padding: 14px 16px 10px; }
+  .step-num-badge { font-size: 11px; padding: 3px 10px; }
+  .step-heading { font-size: 18px; }
+  .step-sub { font-size: 12px; }
+}
+
+/* 필터 태그 모바일 */
+@media (max-width: 480px) {
+  .model-filters, .bg-categories { padding: 8px 12px; gap: 6px; }
+  .filter-tag, .bg-cat { font-size: 12px; padding: 5px 12px; }
+}
+
+/* Step Nav 버튼 모바일 */
+@media (max-width: 480px) {
+  .step-nav { padding: 10px 16px; gap: 10px; }
+  .step-nav-back, .step-nav-next { padding: 12px 16px; font-size: 13px; }
+}
+
+/* 업로드 영역 모바일 */
+@media (max-width: 480px) {
+  .upload-area { padding: 24px 16px; }
+  .upload-icon { font-size: 36px; }
+  .upload-title { font-size: 15px; }
+  .upload-desc { font-size: 12px; }
+  .upload-preview-inner { flex-direction: column; gap: 16px; }
+  .upload-preview-img { width: 100%; max-width: 240px; margin: 0 auto; }
+}
+
+/* 옵션 칩 모바일 */
+@media (max-width: 480px) {
+  .gen-options-grid { padding: 12px 16px; gap: 14px; }
+  .option-chip { padding: 8px 14px; font-size: 13px; }
+  .gen-summary { padding: 14px 16px; }
+}
+
+/* 결과 그리드 모바일 */
+@media (max-width: 480px) {
+  .results-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 12px 16px; }
+  .results-toolbar { padding: 10px 16px; flex-wrap: wrap; gap: 8px; }
+  .results-tab { font-size: 12px; padding: 6px 12px; }
+}
+
+/* ── 스와이프 카드 공통 ── */
+.swipe-outer {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  min-height: 0;
+  padding: 0 44px;
+}
+
+.swipe-track {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+/* 개별 카드 */
+.swipe-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  transition: transform 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.2s;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.swipe-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+.swipe-card .card-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  border: 3px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.swipe-card.selected .card-overlay {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(108,71,255,0.25);
+}
+.swipe-card .card-check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(108,71,255,0.5);
+}
+.swipe-card.selected .card-check { display: flex; }
+.swipe-card .card-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  font-size: 10px;
+  background: rgba(108,71,255,0.85);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+/* 슬라이드 상태 */
+.swipe-card.prev  { transform: translateX(-110%); opacity: 0; pointer-events: none; }
+.swipe-card.active{ transform: translateX(0);      opacity: 1; }
+.swipe-card.next  { transform: translateX(110%);   opacity: 0; pointer-events: none; }
+.swipe-card.far   { transform: translateX(200%);   opacity: 0; pointer-events: none; }
+
+/* 카드 하단 정보 */
+.swipe-card-foot {
+  flex-shrink: 0;
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--surface);
+  border-radius: 0 0 16px 16px;
+  border-top: 1px solid var(--gray-2);
+}
+
+/* 선택됨 배지 */
+.swipe-selected-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: var(--primary);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(108,71,255,0.5);
+  pointer-events: none;
+}
+
+/* 화살표 버튼 */
+.swipe-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  transition: background 0.2s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.swipe-arrow:active { transform: translateY(-50%) scale(0.9); }
+.swipe-arrow:hover { background: rgba(108,71,255,0.5); }
+.swipe-arrow-left { left: 4px; }
+.swipe-arrow-right { right: 4px; }
+.swipe-arrow:disabled { opacity: 0.2; cursor: not-allowed; }
+
+/* 정보 영역 */
+.swipe-info {
+  flex-shrink: 0;
+  text-align: center;
+  padding: 10px 20px 4px;
+}
+.swipe-counter {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.swipe-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.swipe-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* 점 인디케이터 */
+.swipe-dots {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 0 10px;
+  flex-wrap: wrap;
+  max-width: 280px;
+  margin: 0 auto;
+}
+.swipe-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gray-3);
+  transition: all 0.2s;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  flex-shrink: 0;
+}
+.swipe-dot.active {
+  background: var(--primary);
+  width: 18px;
+  border-radius: 3px;
+}
+
+/* "선택 없음" 스킵 카드 */
+.skip-card {
+  border: 2px dashed var(--gray-3);
+  background: var(--gray-1);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  gap: 10px;
+  color: var(--text-muted);
+  transition: border-color 0.2s;
+}
+.skip-card.selected { border-color: var(--primary); background: var(--primary-bg); }
+.skip-card .skip-icon { font-size: 36px; }
+.skip-card .skip-label { font-size: 14px; font-weight: 600; }
+.skip-card .skip-sub { font-size: 12px; }
 .gap-12 { gap: 12px; }

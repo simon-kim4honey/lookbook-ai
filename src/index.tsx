@@ -1096,6 +1096,10 @@ ${bodyContent}
 
 // ─── Landing Page ───
 app.get('/', (c) => {
+  return c.redirect('/generator', 302)
+})
+
+app.get('/_home', (c) => {
   return c.html(htmlShell('홈', `
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
@@ -1693,19 +1697,11 @@ app.get('/generator', (c) => {
   <!-- Navbar -->
   <nav id="navbar">
     <div class="navbar-inner">
-      <a href="/" class="navbar-logo">
+      <a href="/generator" class="navbar-logo">
         <div class="logo-icon">✨</div>
         <span>LookbookAI</span>
       </a>
       <div style="flex:1;"></div>
-      <div class="navbar-actions">
-        <a href="/dashboard" class="btn btn-ghost btn-sm">
-          <i class="fas fa-arrow-left"></i> 대시보드
-        </a>
-        <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--primary-bg);border-radius:var(--radius-full);">
-          <span style="font-size:13px;font-weight:700;color:var(--primary);">✨ 24 크레딧</span>
-        </div>
-      </div>
     </div>
   </nav>
 
@@ -1812,12 +1808,12 @@ app.get('/generator', (c) => {
         </div>
       </div>
 
-      <!-- ─── Step 2: Model ─── -->
+      <!-- ─── Step 2: Model (스와이프 카드) ─── -->
       <div class="step-panel" id="step-2" style="height:100%;flex-direction:column;overflow:hidden;">
         <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 2 / 5 · 모델 선택</div>
           <h2 class="step-heading">AI 모델을 선택하세요</h2>
-          <p class="step-sub">의류에 가장 잘 어울리는 AI 모델을 선택하세요.</p>
+          <p class="step-sub">← 스와이프하여 모델을 확인하세요</p>
         </div>
 
         <div class="model-filters" id="modelFilters" style="flex-shrink:0;">
@@ -1826,32 +1822,47 @@ app.get('/generator', (c) => {
           <button class="filter-tag" onclick="filterModels('남성', this)">남성</button>
         </div>
 
-        <!-- Loading state -->
+        <!-- 스와이프 카드 뷰어 -->
         <div id="modelsLoading" style="text-align:center;padding:60px;color:var(--text-muted);flex:1;">
           <div style="font-size:36px;margin-bottom:12px;">⏳</div>
           <p>모델 목록을 불러오는 중...</p>
         </div>
 
-        <div class="models-grid" id="modelsGrid" style="flex:1;overflow-y:auto;padding:4px 0 8px;" hidden>
-          <!-- Populated by JS from API -->
+        <div id="modelSwipeWrap" style="flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0;">
+          <!-- 카드 스와이프 영역 -->
+          <div class="swipe-outer" id="modelSwipeOuter">
+            <button class="swipe-arrow swipe-arrow-left" id="modelPrev" onclick="swipeCard('model',-1)"><i class="fas fa-chevron-left"></i></button>
+            <div class="swipe-track" id="modelTrack">
+              <!-- JS가 채움 -->
+            </div>
+            <button class="swipe-arrow swipe-arrow-right" id="modelNext" onclick="swipeCard('model',1)"><i class="fas fa-chevron-right"></i></button>
+          </div>
+          <!-- 카운터 + 이름 -->
+          <div class="swipe-info">
+            <div class="swipe-counter" id="modelCounter">1 / 1</div>
+            <div class="swipe-name" id="modelCardName">-</div>
+            <div class="swipe-desc" id="modelCardDesc"></div>
+          </div>
+          <!-- 점 인디케이터 -->
+          <div class="swipe-dots" id="modelDots"></div>
         </div>
 
         <div class="step-nav" style="flex-shrink:0;">
           <button class="step-nav-back" onclick="prevStep(2)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
-          <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)" disabled>
+          <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)">
             다음 단계 <i class="fas fa-arrow-right"></i>
           </button>
         </div>
       </div>
 
-      <!-- ─── Step 3: Background ─── -->
+      <!-- ─── Step 3: Background (스와이프 카드) ─── -->
       <div class="step-panel" id="step-3" style="height:100%;flex-direction:column;overflow:hidden;">
         <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 3 / 5 · 배경 선택</div>
           <h2 class="step-heading">배경을 선택하세요</h2>
-          <p class="step-sub">브랜드 분위기에 맞는 배경을 선택해 완성도 높은 이미지를 만드세요.</p>
+          <p class="step-sub">← 스와이프하여 배경을 확인하세요</p>
         </div>
 
         <div class="bg-categories" id="bgCategories" style="flex-shrink:0;">
@@ -1864,21 +1875,32 @@ app.get('/generator', (c) => {
           <button class="bg-cat" onclick="filterBg('럭셔리', this)">럭셔리</button>
         </div>
 
-        <!-- Loading state -->
         <div id="bgsLoading" style="text-align:center;padding:60px;color:var(--text-muted);flex:1;">
           <div style="font-size:36px;margin-bottom:12px;">⏳</div>
           <p>배경 목록을 불러오는 중...</p>
         </div>
 
-        <div class="backgrounds-grid" id="backgroundsGrid" style="flex:1;overflow-y:auto;padding:4px 0 8px;" hidden>
-          <!-- Populated by JS from API -->
+        <div id="bgSwipeWrap" style="flex:1;display:none;flex-direction:column;overflow:hidden;min-height:0;">
+          <div class="swipe-outer" id="bgSwipeOuter">
+            <button class="swipe-arrow swipe-arrow-left" id="bgPrev" onclick="swipeCard('bg',-1)"><i class="fas fa-chevron-left"></i></button>
+            <div class="swipe-track" id="bgTrack">
+              <!-- JS가 채움 -->
+            </div>
+            <button class="swipe-arrow swipe-arrow-right" id="bgNext" onclick="swipeCard('bg',1)"><i class="fas fa-chevron-right"></i></button>
+          </div>
+          <div class="swipe-info">
+            <div class="swipe-counter" id="bgCounter">1 / 1</div>
+            <div class="swipe-name" id="bgCardName">-</div>
+            <div class="swipe-desc" id="bgCardDesc"></div>
+          </div>
+          <div class="swipe-dots" id="bgDots"></div>
         </div>
 
         <div class="step-nav" style="flex-shrink:0;">
           <button class="step-nav-back" onclick="prevStep(3)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
-          <button class="step-nav-next" id="nextBtn3" onclick="nextStep(3)" disabled>
+          <button class="step-nav-next" id="nextBtn3" onclick="nextStep(3)">
             다음 단계 <i class="fas fa-arrow-right"></i>
           </button>
         </div>
