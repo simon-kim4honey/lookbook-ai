@@ -54,6 +54,9 @@ let adminPromptConfig: AdminPromptConfig = {
     '패션 에디토리얼 무드: 우아하고 세련된 매거진 커버 퀄리티.',
     '모델과 배경이 자연스럽게 어우러지도록 조명, 그림자, 색온도 완벽 일치.',
     '모델이 실제 해당 장소에 있는 것처럼 현실감 있게 합성.',
+    '배경의 모든 요소(사람, 차량, 나무, 건물)가 약 170cm 신장의 모델을 기준으로 현실적인 비율로 표현되어야 함.',
+    '배경 카메라 앵글과 초점 거리를 모델 사진 촬영 앵글에 맞게 가상 조정하여 동일한 카메라로 현장 촬영한 것처럼 합성.',
+    '배경 지평선(소실점)이 모델의 눈높이와 일치하도록 원근감 교정.',
   ].join(' '),
   technicalSpec: [
     '초사실적 표현, 직물 질감과 피부 디테일 극사실 재현.',
@@ -664,6 +667,14 @@ app.post('/api/generation/start', async (c) => {
       `3. DO NOT change, redesign, or substitute ANY detail of the clothing: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown.`,
       `4. The model and the background must be composited naturally and seamlessly — realistic lighting match, consistent shadows, natural depth-of-field, no visible seams or compositing artifacts.`,
       `5. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by the AI.`,
+      `BACKGROUND PERSPECTIVE & SCALE RULES — CRITICAL:`,
+      `6. The background MUST be adapted so that ALL elements (people, vehicles, trees, buildings, objects) appear at PHYSICALLY CORRECT scale relative to the model's height (~170cm tall person).`,
+      `7. Background pedestrians or people must appear proportionally SMALLER than the model if they are further away — strict real-world perspective must be enforced.`,
+      `8. Vehicles (cars, motorcycles) must appear at realistic size relative to the model — a standard sedan should be roughly the same height as the model's torso, NOT shorter than the model's knee.`,
+      `9. The background virtual camera angle, focal length, and zoom MUST match the model's camera perspective — use the SAME eye-level, shooting angle, and lens compression as the model photograph.`,
+      `10. Apply correct vanishing-point perspective: the background's horizon line must align with the model's eye level. Background elements must diminish naturally in size with distance.`,
+      `11. DO NOT change the background location, environment, mood, or atmosphere — ONLY adjust the framing, zoom level, and perspective to match the model's scale.`,
+      `12. The final image must look as if the model was physically present and photographed ON LOCATION at the background scene with the same camera.`,
       `Ultra-photorealistic, 8K quality, professional fashion editorial, magazine cover quality.`,
     ].join(' ')
 
@@ -673,8 +684,11 @@ app.post('/api/generation/start', async (c) => {
         `Create a hyper-realistic professional fashion lookbook photograph.`,
         `Image 1 is the CLOTHING ITEM — reproduce every single detail of this garment EXACTLY: color, pattern, texture, collar shape, sleeve length, hem, buttons, zippers, prints. NEVER alter the clothing.`,
         `Image 2 is the MODEL — preserve this person's exact face, facial features, hair, skin tone, and body build with absolute fidelity. NEVER change the model's appearance.`,
-        `Image 3 is the BACKGROUND SCENE — integrate the model into this environment with photorealistic lighting, matching shadows, and natural depth.`,
-        `The model is wearing the clothing naturally and organically within the background scene. Lighting and atmosphere are fully consistent between model and background.`,
+        `Image 3 is the BACKGROUND SCENE — reframe and adapt this background so it visually matches the model's scale and camera perspective. `,
+        `BACKGROUND ADAPTATION: Virtually adjust the background's camera focal length, zoom level, and shooting angle so the scene elements (people, vehicles, trees, buildings) appear at physically accurate sizes relative to a ~170cm model standing in the foreground. `,
+        `The background horizon line must align with the model's eye level. Background pedestrians must be proportionally smaller (further away), vehicles must be car-sized (not toy-sized), and trees/buildings must follow natural vanishing-point perspective. `,
+        `Do NOT change the background location, mood, weather, or environment — only adjust the virtual framing and perspective so the model appears to have been photographed ON-LOCATION at that exact scene.`,
+        `The model is wearing the clothing naturally and organically within the background scene. Lighting, color temperature, and shadows are fully consistent between model and background.`,
         `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
         HARD_CONSTRAINTS,
       ].join(' ')
