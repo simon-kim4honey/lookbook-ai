@@ -13,7 +13,6 @@ const AppState = {
   selectedModel: null,     // { id, name, description, gender, ... }
   selectedBg: null,        // { id, name, category, mood, bgDesc }
   genOptions: {
-    count: '4장 (1크레딧)',
     ratio: '3:4',
     resolution: 'HD',
     pose_type: '전신',
@@ -950,10 +949,7 @@ function selectOption(chip, type) {
 }
 
 function updateCostDisplay() {
-  const costEl = document.querySelector('.gen-cost-amount');
-  if (!costEl) return;
-  const is8 = AppState.genOptions.count && AppState.genOptions.count.includes('8장');
-  costEl.textContent = is8 ? '2 크레딧' : '1 크레딧';
+  // 수량 고정 — 크레딧 표시 불필요 (공란 처리)
 }
 
 function updateGenSummary() {
@@ -1007,8 +1003,7 @@ async function startGeneration() {
     const modelDesc = buildModelDescription(model);
     const bg = AppState.selectedBg;
 
-    const countStr = AppState.genOptions.count || '4장 (1크레딧)';
-    const count = countStr.includes('8') ? 8 : 4;
+    const count = 3; // 생성 수량 고정
 
     // 의류 이미지 URL (base64 데이터URL)
     const clothingImageUrl = AppState.uploadedImageUrl;

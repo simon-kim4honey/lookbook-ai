@@ -52,6 +52,8 @@ let adminPromptConfig: AdminPromptConfig = {
     '카메라 왼쪽에서 자연 확산광, 보조 반사판 사용.',
     '색 보정: 깨끗하고 중립적인 피부 톤, 약간 따뜻한 하이라이트.',
     '패션 에디토리얼 무드: 우아하고 세련된 매거진 커버 퀄리티.',
+    '모델과 배경이 자연스럽게 어우러지도록 조명, 그림자, 색온도 완벽 일치.',
+    '모델이 실제 해당 장소에 있는 것처럼 현실감 있게 합성.',
   ].join(' '),
   technicalSpec: [
     '초사실적 표현, 직물 질감과 피부 디테일 극사실 재현.',
@@ -59,6 +61,9 @@ let adminPromptConfig: AdminPromptConfig = {
     '의류에 선명한 포커스. 배경은 얕은 심도 처리.',
     '전문 리터칭. 아티팩트 없음, 왜곡 없음.',
     '참조 이미지에 없는 의류, 액세서리, 소품 절대 추가 금지.',
+    'ABSOLUTE PROHIBITION: NO text, NO letters, NO numbers, NO logos, NO watermarks, NO brand marks, NO typographic elements of any kind anywhere in the image.',
+    'ABSOLUTE PROHIBITION: DO NOT modify the model face, facial features, or skin tone in any way.',
+    'ABSOLUTE PROHIBITION: DO NOT modify, redesign, or alter any detail of the uploaded clothing item.',
   ].join(' '),
   updatedAt: new Date().toISOString(),
 }
@@ -823,53 +828,55 @@ app.post('/api/generation/start', async (c) => {
     // 모델 이미지가 있는지 여부 (이미지가 있으면 텍스트 설명 불필요)
     const hasModelImage = !!modelImageBase64
 
+    // ── 공통 불변 제약 파라미터 (모든 모드에 공통 적용) ──
+    const HARD_CONSTRAINTS = [
+      `STRICT RULES — NEVER VIOLATE:`,
+      `1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,
+      `2. DO NOT alter the model's face, facial features, skin tone, or body structure in any way.`,
+      `3. DO NOT change, redesign, or substitute ANY detail of the clothing: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown.`,
+      `4. The model and the background must be composited naturally and seamlessly — realistic lighting match, consistent shadows, natural depth-of-field, no visible seams or compositing artifacts.`,
+      `5. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by the AI.`,
+      `Ultra-photorealistic, 8K quality, professional fashion editorial, magazine cover quality.`,
+    ].join(' ')
+
     if (images.length >= 3) {
       // 의류 + 모델 이미지 + 배경 모두 있는 풀 모드
-      // → 모델 이미지가 있으므로 modelDesc 텍스트 설명 제거
       prompt = [
-        `Create a professional fashion lookbook photograph.`,
-        `Image 1 is the CLOTHING ITEM — reproduce every detail of this garment EXACTLY:`,
-        `color, pattern, texture, collar shape, sleeve length, hem, buttons, zippers, prints.`,
-        `DO NOT alter or substitute the clothing in any way.`,
-        `Image 2 is the MODEL — use this person's exact face, hair, skin tone, and body build.`,
-        `DO NOT change the model's appearance.`,
-        `Image 3 is the BACKGROUND — place the model in this exact scene.`,
+        `Create a hyper-realistic professional fashion lookbook photograph.`,
+        `Image 1 is the CLOTHING ITEM — reproduce every single detail of this garment EXACTLY: color, pattern, texture, collar shape, sleeve length, hem, buttons, zippers, prints. NEVER alter the clothing.`,
+        `Image 2 is the MODEL — preserve this person's exact face, facial features, hair, skin tone, and body build with absolute fidelity. NEVER change the model's appearance.`,
+        `Image 3 is the BACKGROUND SCENE — integrate the model into this environment with photorealistic lighting, matching shadows, and natural depth.`,
+        `The model is wearing the clothing naturally and organically within the background scene. Lighting and atmosphere are fully consistent between model and background.`,
         `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
-        `Ultra-photorealistic, 8K quality, professional studio lighting,`,
-        `sharp fabric detail, magazine-quality fashion editorial.`,
-        `No changes to the garment. No cartoon. No illustration. Strictly photorealistic.`,
+        HARD_CONSTRAINTS,
       ].join(' ')
     } else if (images.length === 2 && clothingImageUrl) {
       // 의류 + 모델 이미지 (배경 없음)
-      // → 모델 이미지가 있으므로 modelDesc 텍스트 설명 제거
       prompt = [
-        `Create a professional fashion lookbook photograph.`,
-        `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY with all its design details.`,
-        `Image 2 is the MODEL — use this person's exact appearance. DO NOT change the model's look.`,
-        `Show the model in a ${poseTypeText}, ${poseStyleText},`,
-        `against a clean ${bgDesc} background.`,
-        `Ultra-photorealistic, magazine-quality fashion editorial.`,
-        `DO NOT change the clothing design. Strictly photorealistic.`,
+        `Create a hyper-realistic professional fashion lookbook photograph.`,
+        `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY with every design detail preserved.`,
+        `Image 2 is the MODEL — preserve this person's exact face, features, hair, skin tone, and body. NEVER change the model's look.`,
+        `Place the model naturally in a ${bgDesc} environment, with photorealistic lighting and seamless integration.`,
+        `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
+        HARD_CONSTRAINTS,
       ].join(' ')
     } else if (images.length === 1 && clothingImageUrl) {
-      // 의류만 있음 (모델 이미지 없음) → modelDesc로 모델 외모를 텍스트로 지정
+      // 의류만 있음 (모델 이미지 없음)
       prompt = [
-        `Create a professional fashion lookbook photograph.`,
-        `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY.`,
-        `Show a ${modelDesc} model wearing it in a ${poseTypeText}, ${poseStyleText}.`,
-        `Background: ${bgDesc}.`,
-        `Ultra-photorealistic, magazine-quality fashion editorial.`,
-        `DO NOT change the clothing. Strictly photorealistic.`,
+        `Create a hyper-realistic professional fashion lookbook photograph.`,
+        `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY with all details.`,
+        `Show a ${modelDesc} model wearing it naturally in a ${poseTypeText}, ${poseStyleText}.`,
+        `Background: ${bgDesc}. Lighting and shadows are fully consistent and photorealistic.`,
+        HARD_CONSTRAINTS,
       ].join(' ')
     } else {
-      // 이미지 없음 → 순수 텍스트 기반, modelDesc로 모델 외모 지정
+      // 이미지 없음 → 순수 텍스트 기반
       prompt = [
         `Ultra-photorealistic professional fashion photography.`,
         `A ${modelDesc} fashion model, ${poseTypeText}, ${poseStyleText}.`,
-        `Background: ${bgDesc} (${bgName}).`,
-        `8K resolution, Canon EOS R5, professional studio lighting,`,
-        `hyperrealistic skin texture, perfect fabric detail,`,
-        `commercial fashion editorial, magazine quality.`,
+        `Background: ${bgDesc} (${bgName}). Natural lighting, seamless integration.`,
+        `8K resolution, Canon EOS R5, professional studio lighting, hyperrealistic skin texture, perfect fabric detail, commercial fashion editorial, magazine quality.`,
+        HARD_CONSTRAINTS,
       ].join(' ')
     }
 
@@ -894,8 +901,8 @@ app.post('/api/generation/start', async (c) => {
     prompt = injectAdminPrompt(prompt)
     console.log('Final prompt (first 300):', prompt.substring(0, 300))
 
-    // nano-banana-2는 1회 요청 = 1장 출력 → count만큼 병렬 요청 (최대 3장 고정)
-    const jobCount = Math.min(count, 3)
+    // 생성 수량 3장 고정 (count 파라미터 무시)
+    const jobCount = 3
     console.log('Atlas request → model:', requestBody.model, '| images:', images.length, '| aspect_ratio:', aspectRatio, '| resolution:', nbResolution, '| jobs:', jobCount)
 
     const jobRequests = Array.from({ length: jobCount }, () =>
@@ -1911,18 +1918,11 @@ app.get('/generator', (c) => {
         <div class="step-title-area" id="step5TitleArea" style="flex-shrink:0;">
           <div class="step-num-badge">Step 4 / 5 · 생성 옵션</div>
           <h2 class="step-heading">생성 옵션을 설정하세요</h2>
-          <p class="step-sub">생성할 이미지 수량, 구도, 포즈를 선택하세요. 크레딧이 차감됩니다.</p>
+          <p class="step-sub">화면 비율, 해상도, 구도, 포즈를 선택하세요.</p>
         </div>
 
         <div id="genOptionsView" style="flex:1;overflow-y:auto;">
           <div class="gen-options-grid">
-            <div class="gen-option-group">
-              <div class="gen-option-title">📸 생성 수량</div>
-              <div class="option-chips">
-                <div class="option-chip selected" onclick="selectOption(this, 'count')">4장 (1크레딧)</div>
-                <div class="option-chip" onclick="selectOption(this, 'count')">8장 (2크레딧)</div>
-              </div>
-            </div>
             <div class="gen-option-group">
               <div class="gen-option-title">🖼️ 화면 비율</div>
               <div class="option-chips">
@@ -1972,12 +1972,8 @@ app.get('/generator', (c) => {
               </div>
               <div class="gen-summary-item">
                 <div class="gen-summary-label">생성 수량</div>
-                <div class="gen-summary-val">4장</div>
+                <div class="gen-summary-val">3장 (고정)</div>
               </div>
-            </div>
-            <div class="gen-cost">
-              <span class="gen-cost-label">✨ 소요 크레딧</span>
-              <span class="gen-cost-amount">1 크레딧</span>
             </div>
           </div>
         </div>
