@@ -15,6 +15,15 @@ const ATLAS_API_KEY = 'apikey-768c01fdea4c405f972d93ae16f0b9e3'
 const AIFASHION_BASE = 'https://www.aifashion.co.kr'
 const ADMIN_PASSWORD = 'lookbook2024!'   // 어드민 접근 비밀번호
 
+// 어드민 인증 미들웨어 (상단 선언 필수 — 스토어/라우트보다 먼저 참조됨)
+const adminAuth = async (c: any, next: any) => {
+  const authHeader = c.req.header('X-Admin-Password')
+  if (authHeader !== ADMIN_PASSWORD) {
+    return c.json({ success: false, message: '인증 실패' }, 401)
+  }
+  await next()
+}
+
 // ────────────────────────────────────────────────────
 // Admin Prompt Store  (Cloudflare Workers 메모리 싱글톤)
 // Workers는 요청마다 재사용되는 isolate를 공유하므로
@@ -34,17 +43,17 @@ let adminPromptConfig: AdminPromptConfig = {
   prefix: '',
   suffix: '',
   styleGuide: [
-    'Shot on Fujifilm GFX 100S medium format camera, 110mm f/2 lens.',
-    'Natural diffused window light from camera left, subtle fill reflector.',
-    'Color grading: clean neutral skin tones, slightly warm highlights.',
-    'Fashion editorial aesthetic: elegant, aspirational, magazine-cover quality.',
+    '후지필름 GFX 100S 중형 카메라, 110mm f/2 렌즈로 촬영.',
+    '카메라 왼쪽에서 자연 확산광, 보조 반사판 사용.',
+    '색 보정: 깨끗하고 중립적인 피부 톤, 약간 따뜻한 하이라이트.',
+    '패션 에디토리얼 무드: 우아하고 세련된 매거진 커버 퀄리티.',
   ].join(' '),
   technicalSpec: [
-    'Ultra-photorealistic, hyperrealistic fabric texture and skin detail.',
-    'Perfect garment drape and fit. No wrinkles unless natural.',
-    'Sharp focus on clothing. Shallow depth of field on background.',
-    'Professional retouching. No artifacts, no distortion.',
-    'Do NOT add any clothing, accessories, or props not present in the reference images.',
+    '초사실적 표현, 직물 질감과 피부 디테일 극사실 재현.',
+    '의류 드레이프와 핏 완벽 재현. 자연스러운 주름 외 구김 없음.',
+    '의류에 선명한 포커스. 배경은 얕은 심도 처리.',
+    '전문 리터칭. 아티팩트 없음, 왜곡 없음.',
+    '참조 이미지에 없는 의류, 액세서리, 소품 절대 추가 금지.',
   ].join(' '),
   updatedAt: new Date().toISOString(),
 }
@@ -60,6 +69,109 @@ function injectAdminPrompt(basePrompt: string): string {
   if (adminPromptConfig.suffix.trim())       parts.push(adminPromptConfig.suffix.trim())
   return parts.join(' ')
 }
+
+// ────────────────────────────────────────────────────
+// 커스텀 모델/배경 메모리 스토어 (어드민 업로드)
+// ────────────────────────────────────────────────────
+interface CustomModel {
+  id: string
+  name: string
+  desc: string           // 프롬프트용 설명 (한글 또는 영문)
+  imageBase64: string    // data:image/...;base64,...
+  createdAt: string
+}
+interface CustomBg {
+  id: string
+  name: string
+  bgDesc: string
+  category: string
+  imageBase64: string
+  createdAt: string
+}
+
+let customModels: CustomModel[] = []
+let customBgs: CustomBg[] = []
+let customIdCounter = 1000  // Unsplash ID(1~21)와 충돌 방지
+
+// ── 커스텀 모델 API ──
+// POST /api/admin/models — 모델 업로드
+app.post('/api/admin/models', adminAuth, async (c) => {
+  try {
+    const body: any = await c.req.json()
+    const { name, desc, imageBase64 } = body
+    if (!name || !imageBase64) return c.json({ success: false, message: '이름과 이미지가 필요합니다.' }, 400)
+    const id = String(customIdCounter++)
+    const model: CustomModel = { id, name, desc: desc || name, imageBase64, createdAt: new Date().toISOString() }
+    customModels.push(model)
+    return c.json({ success: true, model: { id, name, desc: model.desc, createdAt: model.createdAt } })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+// GET /api/admin/models — 목록 조회 (base64 제외 메타만)
+app.get('/api/admin/models', adminAuth, (c) => {
+  const list = customModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
+  return c.json({ success: true, models: list })
+})
+// DELETE /api/admin/models/:id
+app.delete('/api/admin/models/:id', adminAuth, (c) => {
+  const id = c.req.param('id')
+  const before = customModels.length
+  customModels = customModels.filter(m => m.id !== id)
+  return c.json({ success: customModels.length < before })
+})
+// GET /api/proxy/custom-model/:id — 이미지 직접 서빙 (프론트엔드 표시용)
+app.get('/api/proxy/custom-model/:id', (c) => {
+  const id = c.req.param('id')
+  const model = customModels.find(m => m.id === id)
+  if (!model) return c.notFound()
+  const [header, b64] = model.imageBase64.split(',')
+  const mime = (header.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new Response(bytes.buffer, {
+    headers: { 'Content-Type': mime, 'Cache-Control': 'public, max-age=3600' },
+  })
+})
+
+// ── 커스텀 배경 API ──
+app.post('/api/admin/backgrounds', adminAuth, async (c) => {
+  try {
+    const body: any = await c.req.json()
+    const { name, bgDesc, category, imageBase64 } = body
+    if (!name || !imageBase64) return c.json({ success: false, message: '이름과 이미지가 필요합니다.' }, 400)
+    const id = String(customIdCounter++)
+    const bg: CustomBg = { id, name, bgDesc: bgDesc || name, category: category || '커스텀', imageBase64, createdAt: new Date().toISOString() }
+    customBgs.push(bg)
+    return c.json({ success: true, bg: { id, name, bgDesc: bg.bgDesc, category: bg.category, createdAt: bg.createdAt } })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+app.get('/api/admin/backgrounds', adminAuth, (c) => {
+  const list = customBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
+  return c.json({ success: true, backgrounds: list })
+})
+app.delete('/api/admin/backgrounds/:id', adminAuth, (c) => {
+  const id = c.req.param('id')
+  const before = customBgs.length
+  customBgs = customBgs.filter(b => b.id !== id)
+  return c.json({ success: customBgs.length < before })
+})
+app.get('/api/proxy/custom-bg/:id', (c) => {
+  const id = c.req.param('id')
+  const bg = customBgs.find(b => b.id === id)
+  if (!bg) return c.notFound()
+  const [header, b64] = bg.imageBase64.split(',')
+  const mime = (header.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new Response(bytes.buffer, {
+    headers: { 'Content-Type': mime, 'Cache-Control': 'public, max-age=3600' },
+  })
+})
 
 // Atlas Cloud 헤더 생성
 const atlasHeaders = () => ({
@@ -172,7 +284,12 @@ app.get('/api/presets/models', (c) => {
     // ── 특수/유니크 ──
     { id: 21, name: '제네시스',  gender: '여성', age: '20대', body: '슬림', mood: '청순',    skin: '밝은', desc: 'young female, slim figure, pure innocent fresh style',        unsplashId: 'photo-1521146764736-56c929d59c83' },
   ]
-  return c.json({ models })
+  // 커스텀 모델 합산 (어드민 업로드분)
+  const customList = customModels.map(m => ({
+    id: Number(m.id), name: m.name, gender: '커스텀', age: '-', body: '-', mood: '-', skin: '-',
+    desc: m.desc, unsplashId: null, isCustom: true, customId: m.id,
+  }))
+  return c.json({ models: [...customList, ...models] })
 })
 
 // 배경 목록 - 패션 룩북 특화 큐레이션 (Unsplash 고해상도, 내용-이름 정확히 일치)
@@ -201,7 +318,12 @@ app.get('/api/presets/backgrounds', (c) => {
     { id: 15, name: '파리지앵 거리',      category: '럭셔리',   mood: '로맨틱',     bgDesc: 'Parisian city street with Haussmann architecture and warm light', unsplashId: 'photo-1502602898657-3e91760cbb34' },
     { id: 16, name: '도쿄 스트리트',      category: '스트리트', mood: '트렌디',     bgDesc: 'Tokyo street fashion district with colorful urban scenery',     unsplashId: 'photo-1540959733332-eab4deabeeaf' },
   ]
-  return c.json({ backgrounds })
+  // 커스텀 배경 합산
+  const customBgList = customBgs.map(b => ({
+    id: Number(b.id), name: b.name, category: b.category, mood: '-',
+    bgDesc: b.bgDesc, unsplashId: null, isCustom: true, customId: b.id,
+  }))
+  return c.json({ backgrounds: [...customBgList, ...backgrounds] })
 })
 
 // 모델 이미지 프록시 (Unsplash 패션 모델 큐레이션)
@@ -507,24 +629,37 @@ app.post('/api/generation/start', async (c) => {
     const poseTypeText  = poseTypeMap[poseType]  || 'full body shot'
     const poseStyleText = poseStyleMap[pose]      || 'natural standing pose'
 
-    // ── 서버사이드: 모델·배경 이미지를 Unsplash에서 fetch → base64 ──
+    // ── 서버사이드: 모델·배경 이미지 base64 취득 (커스텀 우선, 없으면 Unsplash) ──
     let modelImageBase64: string | null = null
     let bgImageBase64: string | null = null
 
     if (modelId) {
-      const unsplashId = MODEL_UNSPLASH_MAP[String(modelId)]
-      if (unsplashId) {
-        const url = `https://images.unsplash.com/${unsplashId}?w=512&h=640&fit=crop&crop=faces,center&q=90&fm=jpg`
-        modelImageBase64 = await fetchImageAsBase64(url)
-        console.log('Model image:', modelImageBase64 ? 'OK' : 'FAILED')
+      // 커스텀 모델 확인 (id가 문자열 "1000+" 범위)
+      const customModel = customModels.find(m => m.id === String(modelId))
+      if (customModel) {
+        modelImageBase64 = customModel.imageBase64
+        console.log('Custom model image: OK')
+      } else {
+        const unsplashId = MODEL_UNSPLASH_MAP[String(modelId)]
+        if (unsplashId) {
+          const url = `https://images.unsplash.com/${unsplashId}?w=512&h=640&fit=crop&crop=faces,center&q=90&fm=jpg`
+          modelImageBase64 = await fetchImageAsBase64(url)
+          console.log('Unsplash model image:', modelImageBase64 ? 'OK' : 'FAILED')
+        }
       }
     }
     if (bgId) {
-      const bgUnsplashId = BG_UNSPLASH_MAP[String(bgId)]
-      if (bgUnsplashId) {
-        const url = `https://images.unsplash.com/${bgUnsplashId}?w=800&h=600&fit=crop&q=90&fm=jpg`
-        bgImageBase64 = await fetchImageAsBase64(url)
-        console.log('BG image:', bgImageBase64 ? 'OK' : 'FAILED')
+      const customBg = customBgs.find(b => b.id === String(bgId))
+      if (customBg) {
+        bgImageBase64 = customBg.imageBase64
+        console.log('Custom BG image: OK')
+      } else {
+        const bgUnsplashId = BG_UNSPLASH_MAP[String(bgId)]
+        if (bgUnsplashId) {
+          const url = `https://images.unsplash.com/${bgUnsplashId}?w=800&h=600&fit=crop&q=90&fm=jpg`
+          bgImageBase64 = await fetchImageAsBase64(url)
+          console.log('Unsplash BG image:', bgImageBase64 ? 'OK' : 'FAILED')
+        }
       }
     }
 
@@ -755,15 +890,6 @@ function generatePlaceholderImages(count: number) {
 // ────────────────────────────────────────────────────
 // Admin API Routes
 // ────────────────────────────────────────────────────
-
-// 어드민 인증 미들웨어
-const adminAuth = async (c: any, next: any) => {
-  const authHeader = c.req.header('X-Admin-Password')
-  if (authHeader !== ADMIN_PASSWORD) {
-    return c.json({ success: false, message: '인증 실패' }, 401)
-  }
-  await next()
-}
 
 // GET /api/admin/prompt — 현재 설정 조회
 app.get('/api/admin/prompt', adminAuth, (c) => {
@@ -1806,139 +1932,109 @@ app.get('/admin', (c) => {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Admin · 프롬프트 관리 | LookbookAI</title>
+  <title>Admin | LookbookAI</title>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
     body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:#e0e0f0;min-height:100vh;}
-
-    /* ── 로그인 오버레이 ── */
-    #loginOverlay{
-      position:fixed;inset:0;background:#0f0f1a;
-      display:flex;align-items:center;justify-content:center;z-index:100;
-    }
-    .login-card{
-      background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;
-      padding:40px;width:100%;max-width:380px;text-align:center;
-    }
+    /* 로그인 */
+    #loginOverlay{position:fixed;inset:0;background:#0f0f1a;display:flex;align-items:center;justify-content:center;z-index:100;}
+    .login-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center;}
     .login-card .logo{font-size:32px;margin-bottom:8px;}
     .login-card h2{font-size:20px;font-weight:700;margin-bottom:4px;}
     .login-card p{font-size:13px;color:#8b8ba0;margin-bottom:28px;}
-    .login-card input{
-      width:100%;padding:12px 16px;background:#252540;border:1px solid #3a3a60;
-      border-radius:10px;color:#e0e0f0;font-size:15px;outline:none;
-      margin-bottom:12px;transition:border-color .2s;
-    }
+    .login-card input{width:100%;padding:12px 16px;background:#252540;border:1px solid #3a3a60;border-radius:10px;color:#e0e0f0;font-size:15px;outline:none;margin-bottom:12px;transition:border-color .2s;}
     .login-card input:focus{border-color:#6c47ff;}
     .login-card .err{font-size:13px;color:#ef4444;margin-bottom:10px;min-height:18px;}
-
-    /* ── 어드민 메인 ── */
+    /* 헤더 */
     #adminMain{display:none;}
-    .admin-header{
-      background:#1a1a2e;border-bottom:1px solid #2e2e50;
-      padding:16px 32px;display:flex;align-items:center;gap:16px;
-    }
-    .admin-header .logo{font-size:20px;font-weight:700;color:#6c47ff;}
-    .admin-header .badge{
-      font-size:11px;background:#6c47ff22;color:#9b7cff;
-      padding:3px 10px;border-radius:20px;border:1px solid #6c47ff44;
-    }
-    .admin-header .logout{
-      margin-left:auto;font-size:13px;color:#8b8ba0;cursor:pointer;
-      padding:6px 14px;border:1px solid #3a3a60;border-radius:8px;background:none;
-      color:#e0e0f0;transition:all .2s;
-    }
+    .admin-header{background:#1a1a2e;border-bottom:1px solid #2e2e50;padding:14px 28px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50;}
+    .admin-header .logo{font-size:18px;font-weight:700;color:#6c47ff;}
+    .admin-header .badge{font-size:11px;background:#6c47ff22;color:#9b7cff;padding:3px 10px;border-radius:20px;border:1px solid #6c47ff44;}
+    .admin-header .logout{margin-left:auto;font-size:13px;cursor:pointer;padding:6px 14px;border:1px solid #3a3a60;border-radius:8px;background:none;color:#e0e0f0;transition:all .2s;}
     .admin-header .logout:hover{border-color:#6c47ff;color:#9b7cff;}
-
-    .admin-body{max-width:900px;margin:0 auto;padding:32px 24px;}
-    .page-title{font-size:22px;font-weight:700;margin-bottom:6px;}
-    .page-sub{font-size:14px;color:#8b8ba0;margin-bottom:32px;}
-
-    /* ── 토글 카드 ── */
-    .toggle-card{
-      background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;
-      padding:20px 24px;margin-bottom:24px;
-      display:flex;align-items:center;gap:16px;
-    }
+    /* 탭 */
+    .tab-bar{display:flex;gap:4px;background:#1a1a2e;border-bottom:1px solid #2e2e50;padding:0 28px;}
+    .tab-btn{padding:14px 20px;font-size:14px;font-weight:500;cursor:pointer;border:none;background:none;color:#8b8ba0;border-bottom:2px solid transparent;transition:all .2s;}
+    .tab-btn.active{color:#9b7cff;border-bottom-color:#6c47ff;}
+    .tab-btn:hover{color:#e0e0f0;}
+    .tab-panel{display:none;}
+    .tab-panel.active{display:block;}
+    /* 바디 */
+    .admin-body{max-width:960px;margin:0 auto;padding:28px 24px;}
+    .page-title{font-size:20px;font-weight:700;margin-bottom:6px;}
+    .page-sub{font-size:13px;color:#8b8ba0;margin-bottom:28px;}
+    /* 토글 */
+    .toggle-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;padding:18px 22px;margin-bottom:20px;display:flex;align-items:center;gap:16px;}
     .toggle-card .info{flex:1;}
-    .toggle-card .info h3{font-size:15px;font-weight:600;margin-bottom:4px;}
-    .toggle-card .info p{font-size:13px;color:#8b8ba0;}
+    .toggle-card .info h3{font-size:14px;font-weight:600;margin-bottom:3px;}
+    .toggle-card .info p{font-size:12px;color:#8b8ba0;}
     .toggle-switch{position:relative;width:48px;height:26px;flex-shrink:0;}
     .toggle-switch input{opacity:0;width:0;height:0;}
-    .slider{
-      position:absolute;inset:0;cursor:pointer;
-      background:#3a3a60;border-radius:26px;transition:.3s;
-    }
-    .slider:before{
-      content:"";position:absolute;height:20px;width:20px;
-      left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;
-    }
+    .slider{position:absolute;inset:0;cursor:pointer;background:#3a3a60;border-radius:26px;transition:.3s;}
+    .slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;}
     input:checked+.slider{background:#6c47ff;}
     input:checked+.slider:before{transform:translateX(22px);}
-
-    /* ── 섹션 카드 ── */
-    .section-card{
-      background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;
-      padding:24px;margin-bottom:20px;
-    }
-    .section-card h3{
-      font-size:15px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px;
-    }
-    .section-card .section-desc{font-size:13px;color:#8b8ba0;margin-bottom:16px;}
-    .section-card textarea{
-      width:100%;background:#0f0f1a;border:1px solid #3a3a60;border-radius:10px;
-      color:#e0e0f0;font-size:13px;font-family:inherit;line-height:1.6;
-      padding:14px;resize:vertical;outline:none;transition:border-color .2s;
-    }
+    /* 섹션 카드 */
+    .section-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;padding:22px;margin-bottom:18px;}
+    .section-card h3{font-size:14px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+    .section-card .section-desc{font-size:12px;color:#8b8ba0;margin-bottom:14px;}
+    .section-card textarea{width:100%;background:#0f0f1a;border:1px solid #3a3a60;border-radius:10px;color:#e0e0f0;font-size:13px;font-family:inherit;line-height:1.6;padding:12px;resize:vertical;outline:none;transition:border-color .2s;}
     .section-card textarea:focus{border-color:#6c47ff;}
-    .char-count{font-size:12px;color:#8b8ba0;text-align:right;margin-top:6px;}
-
-    /* ── 프리셋 버튼 ── */
-    .preset-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
-    .preset-btn{
-      font-size:12px;padding:5px 12px;border:1px solid #3a3a60;border-radius:20px;
-      background:none;color:#a0a0c0;cursor:pointer;transition:all .2s;white-space:nowrap;
-    }
+    .char-count{font-size:12px;color:#8b8ba0;text-align:right;margin-top:5px;}
+    .preset-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+    .preset-btn{font-size:12px;padding:4px 11px;border:1px solid #3a3a60;border-radius:20px;background:none;color:#a0a0c0;cursor:pointer;transition:all .2s;white-space:nowrap;}
     .preset-btn:hover{border-color:#6c47ff;color:#9b7cff;background:#6c47ff11;}
-
-    /* ── 저장 버튼 ── */
-    .save-bar{
-      position:sticky;bottom:0;background:#0f0f1a;border-top:1px solid #2e2e50;
-      padding:16px 0;display:flex;align-items:center;gap:16px;margin-top:8px;
-    }
-    .btn-save{
-      padding:12px 32px;background:#6c47ff;color:white;border:none;
-      border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;
-    }
-    .btn-save:hover{background:#7c5bff;transform:translateY(-1px);}
-    .btn-save:disabled{background:#3a3a60;color:#8b8ba0;cursor:not-allowed;transform:none;}
+    /* 저장바 */
+    .save-bar{position:sticky;bottom:0;background:#0f0f1a;border-top:1px solid #2e2e50;padding:14px 0;display:flex;align-items:center;gap:14px;margin-top:6px;}
+    .btn-save{padding:11px 28px;background:#6c47ff;color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
+    .btn-save:hover{background:#7c5bff;}
+    .btn-save:disabled{background:#3a3a60;color:#8b8ba0;cursor:not-allowed;}
     .save-status{font-size:13px;color:#8b8ba0;}
     .save-status.ok{color:#22c55e;}
     .save-status.err{color:#ef4444;}
-
-    /* ── 미리보기 ── */
-    .preview-box{
-      background:#0f0f1a;border:1px solid #3a3a60;border-radius:10px;
-      padding:14px;font-size:12px;color:#a0c0a0;line-height:1.7;
-      max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;
-      margin-top:8px;
-    }
-    .preview-label{font-size:12px;color:#8b8ba0;margin-top:16px;margin-bottom:6px;font-weight:600;}
-
-    /* ── 공통 버튼 ── */
-    .btn-sm{
-      padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
-      border:1px solid #3a3a60;background:none;color:#e0e0f0;transition:all .2s;
-    }
+    .preview-box{background:#0f0f1a;border:1px solid #3a3a60;border-radius:10px;padding:14px;font-size:12px;color:#a0c0a0;line-height:1.7;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin-top:6px;}
+    /* 공통 버튼 */
+    .btn-sm{padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #3a3a60;background:none;color:#e0e0f0;transition:all .2s;}
     .btn-sm:hover{border-color:#6c47ff;color:#9b7cff;}
+    .btn-danger-sm{border-color:#ef4444;color:#ef4444;}
+    .btn-danger-sm:hover{background:#ef444420;}
     .btn-primary-sm{background:#6c47ff;border-color:#6c47ff;color:white;}
-    .btn-primary-sm:hover{background:#7c5bff;border-color:#7c5bff;}
+    .btn-primary-sm:hover{background:#7c5bff;}
+    /* 미디어 업로드 */
+    .upload-zone{border:2px dashed #3a3a60;border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:#0f0f1a;}
+    .upload-zone:hover,.upload-zone.drag{border-color:#6c47ff;background:#6c47ff0a;}
+    .upload-zone .icon{font-size:28px;margin-bottom:10px;color:#8b8ba0;}
+    .upload-zone p{font-size:13px;color:#8b8ba0;}
+    .upload-zone p span{color:#9b7cff;text-decoration:underline;cursor:pointer;}
+    /* 미디어 그리드 */
+    .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:20px;}
+    .media-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:12px;overflow:hidden;position:relative;}
+    .media-card img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;}
+    .media-card.bg-card-item img{aspect-ratio:16/9;}
+    .media-card .meta{padding:10px 12px;}
+    .media-card .meta .name{font-size:13px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .media-card .meta .desc{font-size:11px;color:#8b8ba0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .media-card .del-btn{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:#ef44449e;border:none;color:white;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+    .media-card .del-btn:hover{background:#ef4444;}
+    .media-card .custom-badge{position:absolute;top:6px;left:6px;font-size:10px;background:#6c47ffcc;color:white;padding:2px 8px;border-radius:10px;}
+    /* 업로드 폼 */
+    .upload-form{background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;padding:22px;margin-top:20px;}
+    .upload-form h3{font-size:14px;font-weight:600;margin-bottom:16px;}
+    .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+    .form-row.single{grid-template-columns:1fr;}
+    .form-label{font-size:12px;color:#8b8ba0;margin-bottom:5px;display:block;}
+    .form-input{width:100%;background:#0f0f1a;border:1px solid #3a3a60;border-radius:8px;color:#e0e0f0;font-size:13px;padding:10px 12px;outline:none;transition:border-color .2s;}
+    .form-input:focus{border-color:#6c47ff;}
+    .upload-preview{width:100%;max-height:180px;object-fit:contain;border-radius:8px;margin-top:8px;display:none;}
+    .empty-state{text-align:center;padding:48px 20px;color:#8b8ba0;font-size:13px;}
+    .empty-state .icon{font-size:32px;margin-bottom:12px;opacity:.4;}
   </style>
 </head>
 <body>
 
-<!-- ── 로그인 오버레이 ── -->
+<!-- 로그인 -->
 <div id="loginOverlay">
   <div class="login-card">
     <div class="logo">🛡️</div>
@@ -1950,143 +2046,232 @@ app.get('/admin', (c) => {
   </div>
 </div>
 
-<!-- ── 어드민 메인 ── -->
+<!-- 어드민 메인 -->
 <div id="adminMain">
   <header class="admin-header">
     <span class="logo">✨ LookbookAI</span>
     <span class="badge">Admin</span>
-    <span style="font-size:13px;color:#8b8ba0;">프롬프트 관리</span>
     <button class="logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> 로그아웃</button>
   </header>
 
-  <div class="admin-body">
-    <div class="page-title">🎨 AI 생성 프롬프트 관리</div>
-    <div class="page-sub">아래 설정은 사용자에게 노출되지 않으며, 이미지 생성 시 자동으로 적용됩니다.</div>
+  <!-- 탭 바 -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('prompt')"><i class="fas fa-magic"></i> 프롬프트</button>
+    <button class="tab-btn" onclick="switchTab('models')"><i class="fas fa-user-circle"></i> 모델 관리</button>
+    <button class="tab-btn" onclick="switchTab('bgs')"><i class="fas fa-image"></i> 배경 관리</button>
+  </div>
 
-    <!-- 적용 ON/OFF -->
-    <div class="toggle-card">
-      <div class="info">
-        <h3>어드민 프롬프트 적용</h3>
-        <p>OFF 시 아래 모든 설정이 무시되고 기본 프롬프트만 사용됩니다.</p>
+  <!-- ▼ 탭: 프롬프트 -->
+  <div class="tab-panel active" id="tabPrompt">
+    <div class="admin-body">
+      <div class="page-title">🎨 AI 생성 프롬프트 관리</div>
+      <div class="page-sub">아래 설정은 사용자에게 노출되지 않으며, 이미지 생성 시 자동으로 적용됩니다. 프롬프트는 한글로 작성하세요.</div>
+
+      <div class="toggle-card">
+        <div class="info">
+          <h3>어드민 프롬프트 적용</h3>
+          <p>OFF 시 기본 프롬프트만 사용됩니다.</p>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggleEnabled" checked/>
+          <span class="slider"></span>
+        </label>
       </div>
-      <label class="toggle-switch">
-        <input type="checkbox" id="toggleEnabled" checked/>
-        <span class="slider"></span>
-      </label>
-    </div>
 
-    <!-- 프리픽스 -->
-    <div class="section-card">
-      <h3><i class="fas fa-arrow-right" style="color:#6c47ff;font-size:12px;"></i> 프롬프트 앞에 추가 (Prefix)</h3>
-      <div class="section-desc">기본 프롬프트 앞에 삽입됩니다. 전체 생성 방향을 잡는 최우선 지시에 활용하세요.</div>
-      <textarea id="fieldPrefix" rows="3" placeholder="예: [PREMIUM FASHION BRAND LOOKBOOK] Create a high-end editorial image."></textarea>
-      <div class="char-count"><span id="cntPrefix">0</span>자</div>
-    </div>
-
-    <!-- 스타일 가이드 -->
-    <div class="section-card">
-      <h3><i class="fas fa-camera" style="color:#ff6b9d;font-size:12px;"></i> 스타일 가이드</h3>
-      <div class="section-desc">카메라, 조명, 색감, 분위기 등 촬영 스타일을 고정합니다.</div>
-      <div class="preset-row">
-        <button class="preset-btn" onclick="applyPreset('styleGuide','studio')">🏢 스튜디오</button>
-        <button class="preset-btn" onclick="applyPreset('styleGuide','editorial')">📸 에디토리얼</button>
-        <button class="preset-btn" onclick="applyPreset('styleGuide','outdoor')">🌿 아웃도어</button>
-        <button class="preset-btn" onclick="applyPreset('styleGuide','luxury')">💎 럭셔리</button>
-        <button class="preset-btn" onclick="applyPreset('styleGuide','minimal')">⬜ 미니멀</button>
-        <button class="preset-btn" onclick="applyPreset('styleGuide','streetwear')">🏙️ 스트릿</button>
+      <div class="section-card">
+        <h3><i class="fas fa-arrow-right" style="color:#6c47ff;font-size:12px;"></i> 앞에 추가 (Prefix)</h3>
+        <div class="section-desc">기본 프롬프트 앞에 삽입. 예: [프리미엄 패션 브랜드 룩북] 고급 에디토리얼 이미지 생성.</div>
+        <textarea id="fieldPrefix" rows="3" placeholder="예: [프리미엄 패션 브랜드] 고급 에디토리얼 룩북 이미지를 생성하세요."></textarea>
+        <div class="char-count"><span id="cntPrefix">0</span>자</div>
       </div>
-      <textarea id="fieldStyleGuide" rows="5" placeholder="예: Shot on Fujifilm GFX 100S, natural diffused light..."></textarea>
-      <div class="char-count"><span id="cntStyleGuide">0</span>자</div>
-    </div>
 
-    <!-- 기술 스펙 -->
-    <div class="section-card">
-      <h3><i class="fas fa-sliders-h" style="color:#00d4aa;font-size:12px;"></i> 기술 스펙 (Technical Spec)</h3>
-      <div class="section-desc">해상도, 선명도, 의상 묘사 방식 등 기술적 제약을 고정합니다.</div>
-      <div class="preset-row">
-        <button class="preset-btn" onclick="applyPreset('technicalSpec','standard')">📐 스탠다드</button>
-        <button class="preset-btn" onclick="applyPreset('technicalSpec','highres')">🔬 초고해상도</button>
-        <button class="preset-btn" onclick="applyPreset('technicalSpec','fabric')">🧵 원단 강조</button>
-        <button class="preset-btn" onclick="applyPreset('technicalSpec','strict')">🔒 의상 엄격 고정</button>
+      <div class="section-card">
+        <h3><i class="fas fa-camera" style="color:#ff6b9d;font-size:12px;"></i> 스타일 가이드</h3>
+        <div class="section-desc">카메라, 조명, 색감, 분위기 등 촬영 스타일을 고정합니다.</div>
+        <div class="preset-row">
+          <button class="preset-btn" onclick="applyPreset('styleGuide','studio')">🏢 스튜디오</button>
+          <button class="preset-btn" onclick="applyPreset('styleGuide','editorial')">📸 에디토리얼</button>
+          <button class="preset-btn" onclick="applyPreset('styleGuide','outdoor')">🌿 아웃도어</button>
+          <button class="preset-btn" onclick="applyPreset('styleGuide','luxury')">💎 럭셔리</button>
+          <button class="preset-btn" onclick="applyPreset('styleGuide','minimal')">⬜ 미니멀</button>
+          <button class="preset-btn" onclick="applyPreset('styleGuide','streetwear')">🏙️ 스트릿</button>
+        </div>
+        <textarea id="fieldStyleGuide" rows="5" placeholder="예: 후지필름 GFX 100S 중형 카메라, 자연광 확산, 따뜻한 하이라이트, 패션 에디토리얼 무드..."></textarea>
+        <div class="char-count"><span id="cntStyleGuide">0</span>자</div>
       </div>
-      <textarea id="fieldTechnicalSpec" rows="5" placeholder="예: Ultra-photorealistic, hyperrealistic fabric texture..."></textarea>
-      <div class="char-count"><span id="cntTechnicalSpec">0</span>자</div>
-    </div>
 
-    <!-- 서픽스 -->
-    <div class="section-card">
-      <h3><i class="fas fa-arrow-left" style="color:#6c47ff;font-size:12px;"></i> 프롬프트 뒤에 추가 (Suffix)</h3>
-      <div class="section-desc">기술 스펙 뒤에 마지막으로 삽입됩니다. 네거티브 지시나 최종 강조에 활용하세요.</div>
-      <textarea id="fieldSuffix" rows="3" placeholder="예: No watermark. No text overlay. Final output must be print-ready."></textarea>
-      <div class="char-count"><span id="cntSuffix">0</span>자</div>
-    </div>
+      <div class="section-card">
+        <h3><i class="fas fa-sliders-h" style="color:#00d4aa;font-size:12px;"></i> 기술 스펙</h3>
+        <div class="section-desc">해상도, 선명도, 의상 묘사 방식 등 기술적 제약을 고정합니다.</div>
+        <div class="preset-row">
+          <button class="preset-btn" onclick="applyPreset('technicalSpec','standard')">📐 스탠다드</button>
+          <button class="preset-btn" onclick="applyPreset('technicalSpec','highres')">🔬 초고해상도</button>
+          <button class="preset-btn" onclick="applyPreset('technicalSpec','fabric')">🧵 원단 강조</button>
+          <button class="preset-btn" onclick="applyPreset('technicalSpec','strict')">🔒 의상 엄격 고정</button>
+        </div>
+        <textarea id="fieldTechnicalSpec" rows="5" placeholder="예: 초사실적 표현, 직물 질감 극사실 재현, 의류 드레이프 완벽 재현, 아티팩트 없음..."></textarea>
+        <div class="char-count"><span id="cntTechnicalSpec">0</span>자</div>
+      </div>
 
-    <!-- 최종 프롬프트 미리보기 -->
-    <div class="section-card">
-      <h3><i class="fas fa-eye" style="color:#f59e0b;font-size:12px;"></i> 최종 프롬프트 미리보기</h3>
-      <div class="section-desc">실제 이미지 생성 시 조합되는 프롬프트 구조입니다. [기본 프롬프트] 부분은 사용자 입력 + 모델/배경 정보로 채워집니다.</div>
-      <div class="preview-box" id="previewBox">미리보기 로딩 중...</div>
-    </div>
+      <div class="section-card">
+        <h3><i class="fas fa-arrow-left" style="color:#6c47ff;font-size:12px;"></i> 뒤에 추가 (Suffix)</h3>
+        <div class="section-desc">마지막에 삽입. 네거티브 지시나 최종 강조에 활용하세요.</div>
+        <textarea id="fieldSuffix" rows="3" placeholder="예: 워터마크 없음. 텍스트 오버레이 없음. 인쇄 가능 품질."></textarea>
+        <div class="char-count"><span id="cntSuffix">0</span>자</div>
+      </div>
 
-    <!-- 저장 바 -->
-    <div class="save-bar">
-      <button class="btn-save" id="saveBtn" onclick="saveConfig()">
-        <i class="fas fa-save"></i> 저장하기
-      </button>
-      <button class="btn-sm" onclick="loadConfig()">
-        <i class="fas fa-redo"></i> 초기화
-      </button>
-      <span class="save-status" id="saveStatus"></span>
+      <div class="section-card">
+        <h3><i class="fas fa-eye" style="color:#f59e0b;font-size:12px;"></i> 최종 프롬프트 미리보기</h3>
+        <div class="section-desc">실제 생성 시 조합되는 프롬프트 구조입니다.</div>
+        <div class="preview-box" id="previewBox">미리보기 로딩 중...</div>
+      </div>
+
+      <div class="save-bar">
+        <button class="btn-save" id="saveBtn" onclick="saveConfig()"><i class="fas fa-save"></i> 저장하기</button>
+        <button class="btn-sm" onclick="loadConfig()"><i class="fas fa-redo"></i> 초기화</button>
+        <span class="save-status" id="saveStatus"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ▼ 탭: 모델 관리 -->
+  <div class="tab-panel" id="tabModels">
+    <div class="admin-body">
+      <div class="page-title">👤 모델 관리</div>
+      <div class="page-sub">업로드한 모델은 사용자 화면에서 기본 제공 모델보다 먼저 표시됩니다.</div>
+
+      <!-- 업로드 폼 -->
+      <div class="upload-form">
+        <h3><i class="fas fa-plus-circle" style="color:#6c47ff;"></i> 새 모델 추가</h3>
+        <div class="form-row">
+          <div>
+            <label class="form-label">모델 이름 *</label>
+            <input class="form-input" id="modelName" placeholder="예: 지수, 모델A"/>
+          </div>
+          <div>
+            <label class="form-label">프롬프트 설명 (선택)</label>
+            <input class="form-input" id="modelDesc" placeholder="예: 슬림한 체형의 20대 여성 모델"/>
+          </div>
+        </div>
+        <div class="form-row single">
+          <div>
+            <label class="form-label">모델 이미지 *</label>
+            <div class="upload-zone" id="modelUploadZone" onclick="document.getElementById('modelFileInput').click()">
+              <div class="icon"><i class="fas fa-user-circle"></i></div>
+              <p>클릭하거나 이미지를 드래그하세요<br/><span>파일 선택</span> (JPG, PNG, WEBP)</p>
+            </div>
+            <input type="file" id="modelFileInput" accept="image/*" style="display:none" onchange="onModelFileSelect(event)"/>
+            <img id="modelPreview" class="upload-preview"/>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:4px;">
+          <button class="btn-save" onclick="uploadModel()"><i class="fas fa-upload"></i> 모델 등록</button>
+          <span class="save-status" id="modelUploadStatus"></span>
+        </div>
+      </div>
+
+      <!-- 커스텀 모델 목록 -->
+      <div id="customModelGrid"></div>
+    </div>
+  </div>
+
+  <!-- ▼ 탭: 배경 관리 -->
+  <div class="tab-panel" id="tabBgs">
+    <div class="admin-body">
+      <div class="page-title">🖼️ 배경 관리</div>
+      <div class="page-sub">업로드한 배경은 사용자 화면에서 기본 배경보다 먼저 표시됩니다.</div>
+
+      <div class="upload-form">
+        <h3><i class="fas fa-plus-circle" style="color:#6c47ff;"></i> 새 배경 추가</h3>
+        <div class="form-row">
+          <div>
+            <label class="form-label">배경 이름 *</label>
+            <input class="form-input" id="bgName" placeholder="예: 서울 스튜디오, 제주 해변"/>
+          </div>
+          <div>
+            <label class="form-label">카테고리</label>
+            <input class="form-input" id="bgCategory" placeholder="예: 스튜디오, 야외, 럭셔리"/>
+          </div>
+        </div>
+        <div class="form-row single">
+          <div>
+            <label class="form-label">배경 설명 (AI 생성 힌트)</label>
+            <input class="form-input" id="bgDesc" placeholder="예: 밝은 화이트 스튜디오, 소프트박스 조명"/>
+          </div>
+        </div>
+        <div class="form-row single">
+          <div>
+            <label class="form-label">배경 이미지 *</label>
+            <div class="upload-zone" id="bgUploadZone" onclick="document.getElementById('bgFileInput').click()">
+              <div class="icon"><i class="fas fa-image"></i></div>
+              <p>클릭하거나 이미지를 드래그하세요<br/><span>파일 선택</span> (JPG, PNG, WEBP)</p>
+            </div>
+            <input type="file" id="bgFileInput" accept="image/*" style="display:none" onchange="onBgFileSelect(event)"/>
+            <img id="bgPreview" class="upload-preview"/>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-top:4px;">
+          <button class="btn-save" onclick="uploadBg()"><i class="fas fa-upload"></i> 배경 등록</button>
+          <span class="save-status" id="bgUploadStatus"></span>
+        </div>
+      </div>
+
+      <div id="customBgGrid"></div>
     </div>
   </div>
 </div>
 
 <script>
-// ── 프리셋 데이터 ──
+const NL = String.fromCharCode(10)
+let adminPassword = ''
+
+// ── 프리셋 데이터 (한글) ──
 const PRESETS = {
   styleGuide: {
-    studio:     'Shot on Sony A7R V with 85mm f/1.4 lens. Professional studio setup: large softbox main light, fill reflector, subtle rim light. Clean white cyclorama background. Color grading: neutral-to-warm tones, perfect skin reproduction.',
-    editorial:  'Shot on Fujifilm GFX 100S medium format, 110mm f/2 lens. Natural diffused window light from camera left, subtle fill reflector. Color grading: clean neutral skin tones, slightly warm highlights. Fashion editorial aesthetic: elegant, aspirational, magazine-cover quality.',
-    outdoor:    'Shot on Canon EOS R5, 50mm f/1.8. Golden hour outdoor lighting, soft natural bokeh background. Warm cinematic color grade. Airy and fresh fashion lifestyle photography feel.',
-    luxury:     'Shot on Hasselblad X2D 100C, 90mm f/2.2. Dramatic chiaroscuro studio lighting with subtle fill. Deep shadows, rich contrast. High-fashion luxury brand aesthetic: opulent, sophisticated, editorial excellence.',
-    minimal:    'Shot on Sony A7R V, 55mm f/1.8. Clean minimalist aesthetic: flat lay or simple backdrop, even diffused lighting, no shadows. Scandinavian-inspired, restrained and elegant.',
-    streetwear: 'Shot on Leica Q3, 28mm f/1.7. Urban environment, natural available light, slight grain for authenticity. Street-style editorial: dynamic, candid feel, youth culture energy.',
+    studio:     '소니 A7R V, 85mm f/1.4 렌즈로 촬영. 대형 소프트박스 주조명, 보조 반사판, 미묘한 림라이트의 전문 스튜디오 세팅. 깨끗한 화이트 사이클로라마 배경. 색 보정: 중립~따뜻한 톤, 완벽한 피부 재현.',
+    editorial:  '후지필름 GFX 100S 중형 카메라, 110mm f/2 렌즈 촬영. 카메라 왼쪽의 자연 확산 창문광, 보조 반사판. 색 보정: 깨끗한 중립 피부 톤, 약간 따뜻한 하이라이트. 패션 에디토리얼 무드: 우아하고 세련된 매거진 커버 품질.',
+    outdoor:    '캐논 EOS R5, 50mm f/1.8 촬영. 황금 시간대 야외 조명, 부드러운 자연 보케 배경. 따뜻한 시네마틱 색 보정. 상쾌하고 생동감 있는 패션 라이프스타일 사진 느낌.',
+    luxury:     '핫셀블라드 X2D 100C, 90mm f/2.2 촬영. 극적인 명암 대비 스튜디오 조명에 미묘한 보조 조명. 깊은 그림자, 풍부한 대비. 하이패션 럭셔리 브랜드 미학: 고급스럽고 세련되며 에디토리얼 최고 수준.',
+    minimal:    '소니 A7R V, 55mm f/1.8 촬영. 깨끗한 미니멀 미학: 플랫 레이 또는 단순 배경, 균일한 확산 조명, 그림자 없음. 스칸디나비아 인스파이어드, 절제되고 우아한 스타일.',
+    streetwear: '라이카 Q3, 28mm f/1.7 촬영. 도시 환경, 자연 가용 조명, 진정성을 위한 약간의 그레인. 스트릿 스타일 에디토리얼: 역동적이고 자연스러운 느낌, 청년 문화 에너지.',
   },
   technicalSpec: {
-    standard:   'Ultra-photorealistic output. Sharp focus on clothing, natural shallow depth of field on background. Professional color grading. No artifacts, no distortion. Print-ready quality.',
-    highres:    'Ultra-photorealistic 8K quality. Hyperrealistic skin texture and fabric microdetail. Sub-pixel sharp edges. HDR dynamic range. Perfect for large-format print and billboard use.',
-    fabric:     'Extreme fabric detail reproduction: thread count visible, weave pattern accurate, material weight conveyed visually. Clothing must appear wearable and three-dimensional. Drape and silhouette must be natural and gravity-correct.',
-    strict:     'ABSOLUTE CONSTRAINT: Reproduce the clothing from the reference image with zero creative deviation. Every seam, stitch, button, zipper, print, embroidery, and color must match exactly. Do NOT simplify, stylize, or reinterpret any garment element. Violations are unacceptable.',
+    standard:   '초사실적 표현. 의류에 선명한 포커스, 배경의 자연스러운 얕은 심도. 전문 색 보정. 아티팩트 없음, 왜곡 없음. 인쇄 가능 품질.',
+    highres:    '초사실적 8K 품질. 피부 질감과 직물 미세 디테일의 극사실 재현. 서브픽셀 선명한 엣지. HDR 다이나믹 레인지. 대형 인쇄 및 빌보드 사용에 완벽.',
+    fabric:     '극한의 직물 디테일 재현: 실 수가 보이고, 직조 패턴 정확하며, 소재 무게감이 시각적으로 전달됨. 의류는 착용 가능하고 입체적으로 표현. 드레이프와 실루엣은 자연스럽고 중력에 맞게 표현.',
+    strict:     '절대 제약: 참조 이미지의 의류를 창의적 변형 없이 그대로 재현. 모든 솔기, 스티치, 단추, 지퍼, 프린트, 자수, 색상이 정확히 일치해야 함. 어떤 의류 요소도 단순화, 양식화 또는 재해석 금지. 위반은 허용되지 않음.',
   },
 }
 
-let adminPassword = ''
+// ─── 탭 전환 ───
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    const names = ['prompt','models','bgs']
+    b.classList.toggle('active', names[i] === name)
+  })
+  document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
+  document.getElementById('tabModels').classList.toggle('active', name === 'models')
+  document.getElementById('tabBgs').classList.toggle('active', name === 'bgs')
+  if (name === 'models') loadCustomModels()
+  if (name === 'bgs')    loadCustomBgs()
+}
 
-// ── 로그인 ──
+// ─── 로그인 ───
 async function doLogin() {
   const pw = document.getElementById('pwInput').value
   const err = document.getElementById('loginErr')
   err.textContent = ''
   try {
-    const res = await fetch('/api/admin/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw }),
-    })
+    const res = await fetch('/api/admin/auth', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: pw}) })
     const data = await res.json()
     if (data.success) {
       adminPassword = pw
       document.getElementById('loginOverlay').style.display = 'none'
       document.getElementById('adminMain').style.display = 'block'
       loadConfig()
-    } else {
-      err.textContent = '비밀번호가 올바르지 않습니다.'
-    }
-  } catch (e) {
-    err.textContent = '서버 오류가 발생했습니다.'
-  }
+    } else { err.textContent = '비밀번호가 올바르지 않습니다.' }
+  } catch(e) { err.textContent = '서버 오류가 발생했습니다.' }
 }
-
 function doLogout() {
   adminPassword = ''
   document.getElementById('loginOverlay').style.display = 'flex'
@@ -2094,120 +2279,232 @@ function doLogout() {
   document.getElementById('pwInput').value = ''
 }
 
-// ── 설정 로드 ──
+// ─── 프롬프트 로드/저장 ───
 async function loadConfig() {
   try {
-    const res = await fetch('/api/admin/prompt', {
-      headers: { 'X-Admin-Password': adminPassword },
-    })
+    const res = await fetch('/api/admin/prompt', {headers:{'X-Admin-Password':adminPassword}})
     const data = await res.json()
     if (!data.success) return
     const cfg = data.config
     document.getElementById('toggleEnabled').checked = cfg.enabled
-    document.getElementById('fieldPrefix').value       = cfg.prefix       || ''
-    document.getElementById('fieldStyleGuide').value   = cfg.styleGuide   || ''
+    document.getElementById('fieldPrefix').value = cfg.prefix || ''
+    document.getElementById('fieldStyleGuide').value = cfg.styleGuide || ''
     document.getElementById('fieldTechnicalSpec').value = cfg.technicalSpec || ''
-    document.getElementById('fieldSuffix').value       = cfg.suffix       || ''
-    updateAllCounts()
-    updatePreview()
+    document.getElementById('fieldSuffix').value = cfg.suffix || ''
+    updateAllCounts(); updatePreview()
   } catch(e) { console.error(e) }
 }
-
-// ── 설정 저장 ──
 async function saveConfig() {
-  const btn    = document.getElementById('saveBtn')
+  const btn = document.getElementById('saveBtn')
   const status = document.getElementById('saveStatus')
-  btn.disabled = true
-  status.textContent = '저장 중...'
-  status.className = 'save-status'
+  btn.disabled = true; status.textContent = '저장 중...'; status.className = 'save-status'
   try {
     const res = await fetch('/api/admin/prompt', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
       body: JSON.stringify({
-        enabled:      document.getElementById('toggleEnabled').checked,
-        prefix:       document.getElementById('fieldPrefix').value,
-        styleGuide:   document.getElementById('fieldStyleGuide').value,
+        enabled: document.getElementById('toggleEnabled').checked,
+        prefix: document.getElementById('fieldPrefix').value,
+        styleGuide: document.getElementById('fieldStyleGuide').value,
         technicalSpec: document.getElementById('fieldTechnicalSpec').value,
-        suffix:       document.getElementById('fieldSuffix').value,
+        suffix: document.getElementById('fieldSuffix').value,
       }),
     })
     const data = await res.json()
-    if (data.success) {
-      status.textContent = '✅ 저장 완료 · ' + new Date().toLocaleTimeString('ko-KR')
-      status.className = 'save-status ok'
-    } else {
-      status.textContent = '❌ 저장 실패'
-      status.className = 'save-status err'
-    }
-  } catch(e) {
-    status.textContent = '❌ 네트워크 오류'
-    status.className = 'save-status err'
-  } finally {
-    btn.disabled = false
-  }
+    if (data.success) { status.textContent = '저장 완료 ' + new Date().toLocaleTimeString('ko-KR'); status.className = 'save-status ok' }
+    else { status.textContent = '저장 실패'; status.className = 'save-status err' }
+  } catch(e) { status.textContent = '네트워크 오류'; status.className = 'save-status err' }
+  finally { btn.disabled = false }
 }
-
-// ── 프리셋 적용 ──
 function applyPreset(field, key) {
-  const fieldMap = { styleGuide: 'fieldStyleGuide', technicalSpec: 'fieldTechnicalSpec' }
-  const el = document.getElementById(fieldMap[field])
-  if (!el) return
+  const m = {styleGuide:'fieldStyleGuide', technicalSpec:'fieldTechnicalSpec'}
+  const el = document.getElementById(m[field]); if (!el) return
   el.value = PRESETS[field][key] || ''
-  updateCharCount(field === 'styleGuide' ? 'cntStyleGuide' : 'cntTechnicalSpec', el.value)
-  updatePreview()
+  updateCharCount(field==='styleGuide'?'cntStyleGuide':'cntTechnicalSpec', el.value); updatePreview()
 }
-
-// ── 글자 수 카운트 ──
-function updateCharCount(counterId, text) {
-  const el = document.getElementById(counterId)
-  if (el) el.textContent = text.length
-}
+function updateCharCount(id, text) { const el=document.getElementById(id); if(el) el.textContent=text.length }
 function updateAllCounts() {
-  updateCharCount('cntPrefix', document.getElementById('fieldPrefix').value)
-  updateCharCount('cntStyleGuide', document.getElementById('fieldStyleGuide').value)
-  updateCharCount('cntTechnicalSpec', document.getElementById('fieldTechnicalSpec').value)
-  updateCharCount('cntSuffix', document.getElementById('fieldSuffix').value)
+  ['fieldPrefix','fieldStyleGuide','fieldTechnicalSpec','fieldSuffix'].forEach(id => {
+    const cntId = {fieldPrefix:'cntPrefix',fieldStyleGuide:'cntStyleGuide',fieldTechnicalSpec:'cntTechnicalSpec',fieldSuffix:'cntSuffix'}[id]
+    updateCharCount(cntId, document.getElementById(id).value)
+  })
 }
-
-// ── 실시간 미리보기 ──
 function updatePreview() {
   const enabled = document.getElementById('toggleEnabled').checked
-  const prefix  = document.getElementById('fieldPrefix').value.trim()
-  const styleGuide   = document.getElementById('fieldStyleGuide').value.trim()
+  const prefix = document.getElementById('fieldPrefix').value.trim()
+  const styleGuide = document.getElementById('fieldStyleGuide').value.trim()
   const technicalSpec = document.getElementById('fieldTechnicalSpec').value.trim()
-  const suffix  = document.getElementById('fieldSuffix').value.trim()
-
-  const BASE_SAMPLE = '[기본 프롬프트: Create a professional fashion lookbook photograph. Image 1 is the CLOTHING ITEM... Image 2 is the MODEL... Image 3 is the BACKGROUND...]'
-
-  const NL = String.fromCharCode(10)
+  const suffix = document.getElementById('fieldSuffix').value.trim()
+  const BASE = '[기본 프롬프트: 전문 패션 룩북 사진 생성. 이미지1=의류, 이미지2=모델, 이미지3=배경...]'
   let preview = ''
   if (!enabled) {
-    preview = '⚠️ 어드민 프롬프트 OFF — 기본 프롬프트만 사용됩니다.' + NL + NL + BASE_SAMPLE
+    preview = '어드민 프롬프트 OFF - 기본 프롬프트만 사용됩니다.' + NL + NL + BASE
   } else {
     const parts = []
-    if (prefix)        parts.push('🔵 [PREFIX]' + NL + prefix)
-    parts.push('⚫ [BASE PROMPT]' + NL + BASE_SAMPLE)
-    if (styleGuide)    parts.push('🟣 [STYLE GUIDE]' + NL + styleGuide)
-    if (technicalSpec) parts.push('🟢 [TECHNICAL SPEC]' + NL + technicalSpec)
-    if (suffix)        parts.push('🔵 [SUFFIX]' + NL + suffix)
+    if (prefix) parts.push('[PREFIX]' + NL + prefix)
+    parts.push('[BASE PROMPT]' + NL + BASE)
+    if (styleGuide) parts.push('[STYLE GUIDE]' + NL + styleGuide)
+    if (technicalSpec) parts.push('[TECHNICAL SPEC]' + NL + technicalSpec)
+    if (suffix) parts.push('[SUFFIX]' + NL + suffix)
     preview = parts.join(NL + NL)
   }
   document.getElementById('previewBox').textContent = preview
 }
 
-// ── 이벤트 바인딩 ──
+// ─── 모델 관리 ───
+let modelFileBase64 = null
+function onModelFileSelect(e) {
+  const file = e.target.files[0]; if (!file) return
+  const reader = new FileReader()
+  reader.onload = ev => {
+    modelFileBase64 = ev.target.result
+    const img = document.getElementById('modelPreview')
+    img.src = modelFileBase64; img.style.display = 'block'
+    document.getElementById('modelUploadZone').style.borderColor = '#6c47ff'
+  }
+  reader.readAsDataURL(file)
+}
+async function uploadModel() {
+  const name = document.getElementById('modelName').value.trim()
+  const desc = document.getElementById('modelDesc').value.trim()
+  const status = document.getElementById('modelUploadStatus')
+  if (!name) { status.textContent = '이름을 입력하세요'; status.className = 'save-status err'; return }
+  if (!modelFileBase64) { status.textContent = '이미지를 선택하세요'; status.className = 'save-status err'; return }
+  status.textContent = '등록 중...'; status.className = 'save-status'
+  try {
+    const res = await fetch('/api/admin/models', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({name, desc: desc || name, imageBase64: modelFileBase64}),
+    })
+    const data = await res.json()
+    if (data.success) {
+      status.textContent = '등록 완료!'; status.className = 'save-status ok'
+      document.getElementById('modelName').value = ''
+      document.getElementById('modelDesc').value = ''
+      document.getElementById('modelPreview').style.display = 'none'
+      document.getElementById('modelUploadZone').style.borderColor = ''
+      modelFileBase64 = null
+      loadCustomModels()
+    } else { status.textContent = data.message || '등록 실패'; status.className = 'save-status err' }
+  } catch(e) { status.textContent = '오류: ' + e.message; status.className = 'save-status err' }
+}
+async function deleteModel(id) {
+  if (!confirm('이 모델을 삭제하시겠습니까?')) return
+  await fetch('/api/admin/models/' + id, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+  loadCustomModels()
+}
+async function loadCustomModels() {
+  const grid = document.getElementById('customModelGrid')
+  try {
+    const res = await fetch('/api/admin/models', {headers:{'X-Admin-Password':adminPassword}})
+    const data = await res.json()
+    if (!data.models || data.models.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><div class="icon"><i class="fas fa-user-slash"></i></div><p>등록된 커스텀 모델이 없습니다.</p></div>'
+      return
+    }
+    grid.innerHTML = '<div style="font-size:14px;font-weight:600;margin:20px 0 12px;">커스텀 모델 (' + data.models.length + '개)</div><div class="media-grid">' +
+      data.models.map(m =>
+        '<div class="media-card">' +
+        '<img src="/api/proxy/custom-model/' + m.id + '" alt="' + m.name + '" loading="lazy"/>' +
+        '<span class="custom-badge">커스텀</span>' +
+        '<button class="del-btn" onclick="deleteModel(' + "'" + m.id + "'" + ')"><i class="fas fa-times"></i></button>' +
+        '<div class="meta"><div class="name">' + m.name + '</div><div class="desc">' + (m.desc || '-') + '</div></div>' +
+        '</div>'
+      ).join('') + '</div>'
+  } catch(e) { grid.innerHTML = '<div class="empty-state"><p>불러오기 실패</p></div>' }
+}
+
+// ─── 배경 관리 ───
+let bgFileBase64 = null
+function onBgFileSelect(e) {
+  const file = e.target.files[0]; if (!file) return
+  const reader = new FileReader()
+  reader.onload = ev => {
+    bgFileBase64 = ev.target.result
+    const img = document.getElementById('bgPreview')
+    img.src = bgFileBase64; img.style.display = 'block'
+    document.getElementById('bgUploadZone').style.borderColor = '#6c47ff'
+  }
+  reader.readAsDataURL(file)
+}
+async function uploadBg() {
+  const name = document.getElementById('bgName').value.trim()
+  const bgDesc = document.getElementById('bgDesc').value.trim()
+  const category = document.getElementById('bgCategory').value.trim() || '커스텀'
+  const status = document.getElementById('bgUploadStatus')
+  if (!name) { status.textContent = '이름을 입력하세요'; status.className = 'save-status err'; return }
+  if (!bgFileBase64) { status.textContent = '이미지를 선택하세요'; status.className = 'save-status err'; return }
+  status.textContent = '등록 중...'; status.className = 'save-status'
+  try {
+    const res = await fetch('/api/admin/backgrounds', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({name, bgDesc: bgDesc || name, category, imageBase64: bgFileBase64}),
+    })
+    const data = await res.json()
+    if (data.success) {
+      status.textContent = '등록 완료!'; status.className = 'save-status ok'
+      document.getElementById('bgName').value = ''
+      document.getElementById('bgDesc').value = ''
+      document.getElementById('bgCategory').value = ''
+      document.getElementById('bgPreview').style.display = 'none'
+      document.getElementById('bgUploadZone').style.borderColor = ''
+      bgFileBase64 = null
+      loadCustomBgs()
+    } else { status.textContent = data.message || '등록 실패'; status.className = 'save-status err' }
+  } catch(e) { status.textContent = '오류: ' + e.message; status.className = 'save-status err' }
+}
+async function deleteBg(id) {
+  if (!confirm('이 배경을 삭제하시겠습니까?')) return
+  await fetch('/api/admin/backgrounds/' + id, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+  loadCustomBgs()
+}
+async function loadCustomBgs() {
+  const grid = document.getElementById('customBgGrid')
+  try {
+    const res = await fetch('/api/admin/backgrounds', {headers:{'X-Admin-Password':adminPassword}})
+    const data = await res.json()
+    if (!data.backgrounds || data.backgrounds.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><div class="icon"><i class="fas fa-image"></i></div><p>등록된 커스텀 배경이 없습니다.</p></div>'
+      return
+    }
+    grid.innerHTML = '<div style="font-size:14px;font-weight:600;margin:20px 0 12px;">커스텀 배경 (' + data.backgrounds.length + '개)</div><div class="media-grid">' +
+      data.backgrounds.map(b =>
+        '<div class="media-card bg-card-item">' +
+        '<img src="/api/proxy/custom-bg/' + b.id + '" alt="' + b.name + '" loading="lazy"/>' +
+        '<span class="custom-badge">커스텀</span>' +
+        '<button class="del-btn" onclick="deleteBg(' + "'" + b.id + "'" + ')"><i class="fas fa-times"></i></button>' +
+        '<div class="meta"><div class="name">' + b.name + '</div><div class="desc">' + b.category + ' · ' + (b.bgDesc || '-') + '</div></div>' +
+        '</div>'
+      ).join('') + '</div>'
+  } catch(e) { grid.innerHTML = '<div class="empty-state"><p>불러오기 실패</p></div>' }
+}
+
+// ─── 드래그앤드롭 ───
+function setupDrop(zoneId, onFile) {
+  const zone = document.getElementById(zoneId)
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag') })
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'))
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.classList.remove('drag')
+    const file = e.dataTransfer.files[0]; if (!file) return
+    const fake = { target: { files: [file] } }
+    onFile(fake)
+  })
+}
+
+// ─── 이벤트 바인딩 ───
 document.addEventListener('DOMContentLoaded', () => {
   ['fieldPrefix','fieldStyleGuide','fieldTechnicalSpec','fieldSuffix'].forEach(id => {
     const el = document.getElementById(id)
-    const cntMap = { fieldPrefix:'cntPrefix', fieldStyleGuide:'cntStyleGuide', fieldTechnicalSpec:'cntTechnicalSpec', fieldSuffix:'cntSuffix' }
-    el.addEventListener('input', () => {
-      updateCharCount(cntMap[id], el.value)
-      updatePreview()
-    })
+    const cntId = {fieldPrefix:'cntPrefix',fieldStyleGuide:'cntStyleGuide',fieldTechnicalSpec:'cntTechnicalSpec',fieldSuffix:'cntSuffix'}[id]
+    el.addEventListener('input', () => { updateCharCount(cntId, el.value); updatePreview() })
   })
   document.getElementById('toggleEnabled').addEventListener('change', updatePreview)
   document.getElementById('pwInput').focus()
+  setupDrop('modelUploadZone', onModelFileSelect)
+  setupDrop('bgUploadZone', onBgFileSelect)
 })
 </script>
 </body>

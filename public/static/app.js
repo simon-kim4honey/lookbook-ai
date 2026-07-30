@@ -603,7 +603,10 @@ function renderModels(models) {
     thumb.style.cssText = 'overflow:hidden;background:#f0f0f0;position:relative;';
 
     const img = document.createElement('img');
-    img.src = `/api/proxy/model-image/${model.id}`;
+    // 커스텀 모델(어드민 업로드)은 customId 기준 별도 프록시 사용
+    img.src = model.isCustom
+      ? `/api/proxy/custom-model/${model.customId}`
+      : `/api/proxy/model-image/${model.id}`;
     img.alt = displayName;
     img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;';
     img.addEventListener('mouseover', () => { img.style.transform = 'scale(1.05)'; });
@@ -619,7 +622,9 @@ function renderModels(models) {
 
     const badge = document.createElement('div');
     badge.style.cssText = 'position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;';
-    badge.textContent = `#${model.id}`;
+    // 커스텀 모델은 "커스텀" 뱃지, 기본은 번호
+    badge.textContent = model.isCustom ? '✦ 커스텀' : `#${model.id}`;
+    if (model.isCustom) badge.style.background = 'rgba(108,71,255,0.85)';
     thumb.appendChild(badge);
 
     const info = document.createElement('div');
@@ -718,7 +723,10 @@ function renderBackgrounds(bgs) {
     thumb.style.cssText = 'overflow:hidden;background:#f0f0f0;position:relative;';
 
     const img = document.createElement('img');
-    img.src = `/api/proxy/bg-image/${bg.id}`;
+    // 커스텀 배경은 별도 프록시
+    img.src = bg.isCustom
+      ? `/api/proxy/custom-bg/${bg.customId}`
+      : `/api/proxy/bg-image/${bg.id}`;
     img.alt = bg.name;
     img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.3s ease;';
     img.addEventListener('mouseover', () => { img.style.transform = 'scale(1.05)'; });
@@ -735,7 +743,8 @@ function renderBackgrounds(bgs) {
 
     const catBadge = document.createElement('div');
     catBadge.style.cssText = 'position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.6);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600;';
-    catBadge.textContent = bg.category || '기타';
+    catBadge.textContent = bg.isCustom ? '✦ 커스텀' : (bg.category || '기타');
+    if (bg.isCustom) catBadge.style.background = 'rgba(108,71,255,0.85)';
     thumb.appendChild(catBadge);
 
     const info = document.createElement('div');
