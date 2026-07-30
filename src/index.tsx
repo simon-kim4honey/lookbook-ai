@@ -2180,17 +2180,18 @@ function updatePreview() {
 
   const BASE_SAMPLE = '[기본 프롬프트: Create a professional fashion lookbook photograph. Image 1 is the CLOTHING ITEM... Image 2 is the MODEL... Image 3 is the BACKGROUND...]'
 
+  const NL = String.fromCharCode(10)
   let preview = ''
   if (!enabled) {
-    preview = '⚠️ 어드민 프롬프트 OFF — 기본 프롬프트만 사용됩니다.\n\n' + BASE_SAMPLE
+    preview = '⚠️ 어드민 프롬프트 OFF — 기본 프롬프트만 사용됩니다.' + NL + NL + BASE_SAMPLE
   } else {
     const parts = []
-    if (prefix)        parts.push('🔵 [PREFIX]\n' + prefix)
-    parts.push('⚫ [BASE PROMPT]\n' + BASE_SAMPLE)
-    if (styleGuide)    parts.push('🟣 [STYLE GUIDE]\n' + styleGuide)
-    if (technicalSpec) parts.push('🟢 [TECHNICAL SPEC]\n' + technicalSpec)
-    if (suffix)        parts.push('🔵 [SUFFIX]\n' + suffix)
-    preview = parts.join('\n\n')
+    if (prefix)        parts.push('🔵 [PREFIX]' + NL + prefix)
+    parts.push('⚫ [BASE PROMPT]' + NL + BASE_SAMPLE)
+    if (styleGuide)    parts.push('🟣 [STYLE GUIDE]' + NL + styleGuide)
+    if (technicalSpec) parts.push('🟢 [TECHNICAL SPEC]' + NL + technicalSpec)
+    if (suffix)        parts.push('🔵 [SUFFIX]' + NL + suffix)
+    preview = parts.join(NL + NL)
   }
   document.getElementById('previewBox').textContent = preview
 }
