@@ -18,7 +18,7 @@ app.use('/static/*', serveStatic({ root: './public' }))
 const ATLAS_API_BASE = 'https://api.atlascloud.ai'
 const ATLAS_API_KEY = 'apikey-768c01fdea4c405f972d93ae16f0b9e3'
 const AIFASHION_BASE = 'https://www.aifashion.co.kr'
-const ADMIN_PASSWORD = 'lookbook2024!'   // 어드민 접근 비밀번호
+const ADMIN_PASSWORD = 'sa3325'   // 어드민 접근 비밀번호
 
 // 어드민 인증 미들웨어 (상단 선언 필수 — 스토어/라우트보다 먼저 참조됨)
 const adminAuth = async (c: any, next: any) => {
