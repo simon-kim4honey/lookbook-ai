@@ -13,6 +13,53 @@ app.use('/static/*', serveStatic({ root: './public' }))
 const ATLAS_API_BASE = 'https://api.atlascloud.ai'
 const ATLAS_API_KEY = 'apikey-768c01fdea4c405f972d93ae16f0b9e3'
 const AIFASHION_BASE = 'https://www.aifashion.co.kr'
+const ADMIN_PASSWORD = 'lookbook2024!'   // 어드민 접근 비밀번호
+
+// ────────────────────────────────────────────────────
+// Admin Prompt Store  (Cloudflare Workers 메모리 싱글톤)
+// Workers는 요청마다 재사용되는 isolate를 공유하므로
+// 모듈 스코프 변수가 인스턴스 내에서 유지됩니다.
+// ────────────────────────────────────────────────────
+interface AdminPromptConfig {
+  enabled: boolean          // 프롬프트 적용 ON/OFF
+  prefix: string            // 시스템 프롬프트 앞에 붙일 내용
+  suffix: string            // 시스템 프롬프트 뒤에 붙일 내용
+  styleGuide: string        // 스타일 가이드 (촬영 방향, 분위기 등)
+  technicalSpec: string     // 기술 스펙 (조명, 해상도 등 고정 지시)
+  updatedAt: string
+}
+
+let adminPromptConfig: AdminPromptConfig = {
+  enabled: true,
+  prefix: '',
+  suffix: '',
+  styleGuide: [
+    'Shot on Fujifilm GFX 100S medium format camera, 110mm f/2 lens.',
+    'Natural diffused window light from camera left, subtle fill reflector.',
+    'Color grading: clean neutral skin tones, slightly warm highlights.',
+    'Fashion editorial aesthetic: elegant, aspirational, magazine-cover quality.',
+  ].join(' '),
+  technicalSpec: [
+    'Ultra-photorealistic, hyperrealistic fabric texture and skin detail.',
+    'Perfect garment drape and fit. No wrinkles unless natural.',
+    'Sharp focus on clothing. Shallow depth of field on background.',
+    'Professional retouching. No artifacts, no distortion.',
+    'Do NOT add any clothing, accessories, or props not present in the reference images.',
+  ].join(' '),
+  updatedAt: new Date().toISOString(),
+}
+
+// 어드민 프롬프트를 generation 프롬프트에 주입하는 헬퍼
+function injectAdminPrompt(basePrompt: string): string {
+  if (!adminPromptConfig.enabled) return basePrompt
+  const parts: string[] = []
+  if (adminPromptConfig.prefix.trim())       parts.push(adminPromptConfig.prefix.trim())
+  parts.push(basePrompt)
+  if (adminPromptConfig.styleGuide.trim())   parts.push(adminPromptConfig.styleGuide.trim())
+  if (adminPromptConfig.technicalSpec.trim()) parts.push(adminPromptConfig.technicalSpec.trim())
+  if (adminPromptConfig.suffix.trim())       parts.push(adminPromptConfig.suffix.trim())
+  return parts.join(' ')
+}
 
 // Atlas Cloud 헤더 생성
 const atlasHeaders = () => ({
@@ -559,8 +606,12 @@ app.post('/api/generation/start', async (c) => {
       requestBody.images = images
     }
 
-    // nano-banana-2는 1회 요청 = 1장 출력 → count만큼 병렬 요청
-    const jobCount = Math.min(count, 4)
+    // 어드민 프롬프트 주입
+    prompt = injectAdminPrompt(prompt)
+    console.log('Final prompt (first 300):', prompt.substring(0, 300))
+
+    // nano-banana-2는 1회 요청 = 1장 출력 → count만큼 병렬 요청 (최대 3장 고정)
+    const jobCount = Math.min(count, 3)
     console.log('Atlas request → model:', requestBody.model, '| images:', images.length, '| aspect_ratio:', aspectRatio, '| resolution:', nbResolution, '| jobs:', jobCount)
 
     const jobRequests = Array.from({ length: jobCount }, () =>
@@ -699,6 +750,53 @@ function generatePlaceholderImages(count: number) {
     height: 1216,
   }))
 }
+
+// ────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────
+// Admin API Routes
+// ────────────────────────────────────────────────────
+
+// 어드민 인증 미들웨어
+const adminAuth = async (c: any, next: any) => {
+  const authHeader = c.req.header('X-Admin-Password')
+  if (authHeader !== ADMIN_PASSWORD) {
+    return c.json({ success: false, message: '인증 실패' }, 401)
+  }
+  await next()
+}
+
+// GET /api/admin/prompt — 현재 설정 조회
+app.get('/api/admin/prompt', adminAuth, (c) => {
+  return c.json({ success: true, config: adminPromptConfig })
+})
+
+// PUT /api/admin/prompt — 설정 업데이트
+app.put('/api/admin/prompt', adminAuth, async (c) => {
+  try {
+    const body: any = await c.req.json()
+    adminPromptConfig = {
+      enabled:      typeof body.enabled === 'boolean' ? body.enabled : adminPromptConfig.enabled,
+      prefix:       typeof body.prefix === 'string'   ? body.prefix  : adminPromptConfig.prefix,
+      suffix:       typeof body.suffix === 'string'   ? body.suffix  : adminPromptConfig.suffix,
+      styleGuide:   typeof body.styleGuide === 'string'    ? body.styleGuide    : adminPromptConfig.styleGuide,
+      technicalSpec: typeof body.technicalSpec === 'string' ? body.technicalSpec : adminPromptConfig.technicalSpec,
+      updatedAt: new Date().toISOString(),
+    }
+    console.log('Admin prompt config updated:', adminPromptConfig.updatedAt)
+    return c.json({ success: true, config: adminPromptConfig })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 400)
+  }
+})
+
+// POST /api/admin/auth — 비밀번호 확인
+app.post('/api/admin/auth', async (c) => {
+  const body: any = await c.req.json()
+  if (body.password === ADMIN_PASSWORD) {
+    return c.json({ success: true })
+  }
+  return c.json({ success: false, message: '비밀번호가 올바르지 않습니다.' }, 401)
+})
 
 // ────────────────────────────────────────────────────
 // Pages (HTML Shell)
@@ -1697,6 +1795,422 @@ app.get('/generator', (c) => {
     </div>
   </div>
   `))
+})
+
+// ────────────────────────────────────────────────────
+// Admin Page  GET /admin
+// ────────────────────────────────────────────────────
+app.get('/admin', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Admin · 프롬프트 관리 | LookbookAI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:#e0e0f0;min-height:100vh;}
+
+    /* ── 로그인 오버레이 ── */
+    #loginOverlay{
+      position:fixed;inset:0;background:#0f0f1a;
+      display:flex;align-items:center;justify-content:center;z-index:100;
+    }
+    .login-card{
+      background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;
+      padding:40px;width:100%;max-width:380px;text-align:center;
+    }
+    .login-card .logo{font-size:32px;margin-bottom:8px;}
+    .login-card h2{font-size:20px;font-weight:700;margin-bottom:4px;}
+    .login-card p{font-size:13px;color:#8b8ba0;margin-bottom:28px;}
+    .login-card input{
+      width:100%;padding:12px 16px;background:#252540;border:1px solid #3a3a60;
+      border-radius:10px;color:#e0e0f0;font-size:15px;outline:none;
+      margin-bottom:12px;transition:border-color .2s;
+    }
+    .login-card input:focus{border-color:#6c47ff;}
+    .login-card .err{font-size:13px;color:#ef4444;margin-bottom:10px;min-height:18px;}
+
+    /* ── 어드민 메인 ── */
+    #adminMain{display:none;}
+    .admin-header{
+      background:#1a1a2e;border-bottom:1px solid #2e2e50;
+      padding:16px 32px;display:flex;align-items:center;gap:16px;
+    }
+    .admin-header .logo{font-size:20px;font-weight:700;color:#6c47ff;}
+    .admin-header .badge{
+      font-size:11px;background:#6c47ff22;color:#9b7cff;
+      padding:3px 10px;border-radius:20px;border:1px solid #6c47ff44;
+    }
+    .admin-header .logout{
+      margin-left:auto;font-size:13px;color:#8b8ba0;cursor:pointer;
+      padding:6px 14px;border:1px solid #3a3a60;border-radius:8px;background:none;
+      color:#e0e0f0;transition:all .2s;
+    }
+    .admin-header .logout:hover{border-color:#6c47ff;color:#9b7cff;}
+
+    .admin-body{max-width:900px;margin:0 auto;padding:32px 24px;}
+    .page-title{font-size:22px;font-weight:700;margin-bottom:6px;}
+    .page-sub{font-size:14px;color:#8b8ba0;margin-bottom:32px;}
+
+    /* ── 토글 카드 ── */
+    .toggle-card{
+      background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;
+      padding:20px 24px;margin-bottom:24px;
+      display:flex;align-items:center;gap:16px;
+    }
+    .toggle-card .info{flex:1;}
+    .toggle-card .info h3{font-size:15px;font-weight:600;margin-bottom:4px;}
+    .toggle-card .info p{font-size:13px;color:#8b8ba0;}
+    .toggle-switch{position:relative;width:48px;height:26px;flex-shrink:0;}
+    .toggle-switch input{opacity:0;width:0;height:0;}
+    .slider{
+      position:absolute;inset:0;cursor:pointer;
+      background:#3a3a60;border-radius:26px;transition:.3s;
+    }
+    .slider:before{
+      content:"";position:absolute;height:20px;width:20px;
+      left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;
+    }
+    input:checked+.slider{background:#6c47ff;}
+    input:checked+.slider:before{transform:translateX(22px);}
+
+    /* ── 섹션 카드 ── */
+    .section-card{
+      background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;
+      padding:24px;margin-bottom:20px;
+    }
+    .section-card h3{
+      font-size:15px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px;
+    }
+    .section-card .section-desc{font-size:13px;color:#8b8ba0;margin-bottom:16px;}
+    .section-card textarea{
+      width:100%;background:#0f0f1a;border:1px solid #3a3a60;border-radius:10px;
+      color:#e0e0f0;font-size:13px;font-family:inherit;line-height:1.6;
+      padding:14px;resize:vertical;outline:none;transition:border-color .2s;
+    }
+    .section-card textarea:focus{border-color:#6c47ff;}
+    .char-count{font-size:12px;color:#8b8ba0;text-align:right;margin-top:6px;}
+
+    /* ── 프리셋 버튼 ── */
+    .preset-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+    .preset-btn{
+      font-size:12px;padding:5px 12px;border:1px solid #3a3a60;border-radius:20px;
+      background:none;color:#a0a0c0;cursor:pointer;transition:all .2s;white-space:nowrap;
+    }
+    .preset-btn:hover{border-color:#6c47ff;color:#9b7cff;background:#6c47ff11;}
+
+    /* ── 저장 버튼 ── */
+    .save-bar{
+      position:sticky;bottom:0;background:#0f0f1a;border-top:1px solid #2e2e50;
+      padding:16px 0;display:flex;align-items:center;gap:16px;margin-top:8px;
+    }
+    .btn-save{
+      padding:12px 32px;background:#6c47ff;color:white;border:none;
+      border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;
+    }
+    .btn-save:hover{background:#7c5bff;transform:translateY(-1px);}
+    .btn-save:disabled{background:#3a3a60;color:#8b8ba0;cursor:not-allowed;transform:none;}
+    .save-status{font-size:13px;color:#8b8ba0;}
+    .save-status.ok{color:#22c55e;}
+    .save-status.err{color:#ef4444;}
+
+    /* ── 미리보기 ── */
+    .preview-box{
+      background:#0f0f1a;border:1px solid #3a3a60;border-radius:10px;
+      padding:14px;font-size:12px;color:#a0c0a0;line-height:1.7;
+      max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;
+      margin-top:8px;
+    }
+    .preview-label{font-size:12px;color:#8b8ba0;margin-top:16px;margin-bottom:6px;font-weight:600;}
+
+    /* ── 공통 버튼 ── */
+    .btn-sm{
+      padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;
+      border:1px solid #3a3a60;background:none;color:#e0e0f0;transition:all .2s;
+    }
+    .btn-sm:hover{border-color:#6c47ff;color:#9b7cff;}
+    .btn-primary-sm{background:#6c47ff;border-color:#6c47ff;color:white;}
+    .btn-primary-sm:hover{background:#7c5bff;border-color:#7c5bff;}
+  </style>
+</head>
+<body>
+
+<!-- ── 로그인 오버레이 ── -->
+<div id="loginOverlay">
+  <div class="login-card">
+    <div class="logo">🛡️</div>
+    <h2>Admin 로그인</h2>
+    <p>LookbookAI 관리자 페이지</p>
+    <input type="password" id="pwInput" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <div class="err" id="loginErr"></div>
+    <button class="btn-save" style="width:100%" onclick="doLogin()">로그인</button>
+  </div>
+</div>
+
+<!-- ── 어드민 메인 ── -->
+<div id="adminMain">
+  <header class="admin-header">
+    <span class="logo">✨ LookbookAI</span>
+    <span class="badge">Admin</span>
+    <span style="font-size:13px;color:#8b8ba0;">프롬프트 관리</span>
+    <button class="logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> 로그아웃</button>
+  </header>
+
+  <div class="admin-body">
+    <div class="page-title">🎨 AI 생성 프롬프트 관리</div>
+    <div class="page-sub">아래 설정은 사용자에게 노출되지 않으며, 이미지 생성 시 자동으로 적용됩니다.</div>
+
+    <!-- 적용 ON/OFF -->
+    <div class="toggle-card">
+      <div class="info">
+        <h3>어드민 프롬프트 적용</h3>
+        <p>OFF 시 아래 모든 설정이 무시되고 기본 프롬프트만 사용됩니다.</p>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="toggleEnabled" checked/>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <!-- 프리픽스 -->
+    <div class="section-card">
+      <h3><i class="fas fa-arrow-right" style="color:#6c47ff;font-size:12px;"></i> 프롬프트 앞에 추가 (Prefix)</h3>
+      <div class="section-desc">기본 프롬프트 앞에 삽입됩니다. 전체 생성 방향을 잡는 최우선 지시에 활용하세요.</div>
+      <textarea id="fieldPrefix" rows="3" placeholder="예: [PREMIUM FASHION BRAND LOOKBOOK] Create a high-end editorial image."></textarea>
+      <div class="char-count"><span id="cntPrefix">0</span>자</div>
+    </div>
+
+    <!-- 스타일 가이드 -->
+    <div class="section-card">
+      <h3><i class="fas fa-camera" style="color:#ff6b9d;font-size:12px;"></i> 스타일 가이드</h3>
+      <div class="section-desc">카메라, 조명, 색감, 분위기 등 촬영 스타일을 고정합니다.</div>
+      <div class="preset-row">
+        <button class="preset-btn" onclick="applyPreset('styleGuide','studio')">🏢 스튜디오</button>
+        <button class="preset-btn" onclick="applyPreset('styleGuide','editorial')">📸 에디토리얼</button>
+        <button class="preset-btn" onclick="applyPreset('styleGuide','outdoor')">🌿 아웃도어</button>
+        <button class="preset-btn" onclick="applyPreset('styleGuide','luxury')">💎 럭셔리</button>
+        <button class="preset-btn" onclick="applyPreset('styleGuide','minimal')">⬜ 미니멀</button>
+        <button class="preset-btn" onclick="applyPreset('styleGuide','streetwear')">🏙️ 스트릿</button>
+      </div>
+      <textarea id="fieldStyleGuide" rows="5" placeholder="예: Shot on Fujifilm GFX 100S, natural diffused light..."></textarea>
+      <div class="char-count"><span id="cntStyleGuide">0</span>자</div>
+    </div>
+
+    <!-- 기술 스펙 -->
+    <div class="section-card">
+      <h3><i class="fas fa-sliders-h" style="color:#00d4aa;font-size:12px;"></i> 기술 스펙 (Technical Spec)</h3>
+      <div class="section-desc">해상도, 선명도, 의상 묘사 방식 등 기술적 제약을 고정합니다.</div>
+      <div class="preset-row">
+        <button class="preset-btn" onclick="applyPreset('technicalSpec','standard')">📐 스탠다드</button>
+        <button class="preset-btn" onclick="applyPreset('technicalSpec','highres')">🔬 초고해상도</button>
+        <button class="preset-btn" onclick="applyPreset('technicalSpec','fabric')">🧵 원단 강조</button>
+        <button class="preset-btn" onclick="applyPreset('technicalSpec','strict')">🔒 의상 엄격 고정</button>
+      </div>
+      <textarea id="fieldTechnicalSpec" rows="5" placeholder="예: Ultra-photorealistic, hyperrealistic fabric texture..."></textarea>
+      <div class="char-count"><span id="cntTechnicalSpec">0</span>자</div>
+    </div>
+
+    <!-- 서픽스 -->
+    <div class="section-card">
+      <h3><i class="fas fa-arrow-left" style="color:#6c47ff;font-size:12px;"></i> 프롬프트 뒤에 추가 (Suffix)</h3>
+      <div class="section-desc">기술 스펙 뒤에 마지막으로 삽입됩니다. 네거티브 지시나 최종 강조에 활용하세요.</div>
+      <textarea id="fieldSuffix" rows="3" placeholder="예: No watermark. No text overlay. Final output must be print-ready."></textarea>
+      <div class="char-count"><span id="cntSuffix">0</span>자</div>
+    </div>
+
+    <!-- 최종 프롬프트 미리보기 -->
+    <div class="section-card">
+      <h3><i class="fas fa-eye" style="color:#f59e0b;font-size:12px;"></i> 최종 프롬프트 미리보기</h3>
+      <div class="section-desc">실제 이미지 생성 시 조합되는 프롬프트 구조입니다. [기본 프롬프트] 부분은 사용자 입력 + 모델/배경 정보로 채워집니다.</div>
+      <div class="preview-box" id="previewBox">미리보기 로딩 중...</div>
+    </div>
+
+    <!-- 저장 바 -->
+    <div class="save-bar">
+      <button class="btn-save" id="saveBtn" onclick="saveConfig()">
+        <i class="fas fa-save"></i> 저장하기
+      </button>
+      <button class="btn-sm" onclick="loadConfig()">
+        <i class="fas fa-redo"></i> 초기화
+      </button>
+      <span class="save-status" id="saveStatus"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 프리셋 데이터 ──
+const PRESETS = {
+  styleGuide: {
+    studio:     'Shot on Sony A7R V with 85mm f/1.4 lens. Professional studio setup: large softbox main light, fill reflector, subtle rim light. Clean white cyclorama background. Color grading: neutral-to-warm tones, perfect skin reproduction.',
+    editorial:  'Shot on Fujifilm GFX 100S medium format, 110mm f/2 lens. Natural diffused window light from camera left, subtle fill reflector. Color grading: clean neutral skin tones, slightly warm highlights. Fashion editorial aesthetic: elegant, aspirational, magazine-cover quality.',
+    outdoor:    'Shot on Canon EOS R5, 50mm f/1.8. Golden hour outdoor lighting, soft natural bokeh background. Warm cinematic color grade. Airy and fresh fashion lifestyle photography feel.',
+    luxury:     'Shot on Hasselblad X2D 100C, 90mm f/2.2. Dramatic chiaroscuro studio lighting with subtle fill. Deep shadows, rich contrast. High-fashion luxury brand aesthetic: opulent, sophisticated, editorial excellence.',
+    minimal:    'Shot on Sony A7R V, 55mm f/1.8. Clean minimalist aesthetic: flat lay or simple backdrop, even diffused lighting, no shadows. Scandinavian-inspired, restrained and elegant.',
+    streetwear: 'Shot on Leica Q3, 28mm f/1.7. Urban environment, natural available light, slight grain for authenticity. Street-style editorial: dynamic, candid feel, youth culture energy.',
+  },
+  technicalSpec: {
+    standard:   'Ultra-photorealistic output. Sharp focus on clothing, natural shallow depth of field on background. Professional color grading. No artifacts, no distortion. Print-ready quality.',
+    highres:    'Ultra-photorealistic 8K quality. Hyperrealistic skin texture and fabric microdetail. Sub-pixel sharp edges. HDR dynamic range. Perfect for large-format print and billboard use.',
+    fabric:     'Extreme fabric detail reproduction: thread count visible, weave pattern accurate, material weight conveyed visually. Clothing must appear wearable and three-dimensional. Drape and silhouette must be natural and gravity-correct.',
+    strict:     'ABSOLUTE CONSTRAINT: Reproduce the clothing from the reference image with zero creative deviation. Every seam, stitch, button, zipper, print, embroidery, and color must match exactly. Do NOT simplify, stylize, or reinterpret any garment element. Violations are unacceptable.',
+  },
+}
+
+let adminPassword = ''
+
+// ── 로그인 ──
+async function doLogin() {
+  const pw = document.getElementById('pwInput').value
+  const err = document.getElementById('loginErr')
+  err.textContent = ''
+  try {
+    const res = await fetch('/api/admin/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    })
+    const data = await res.json()
+    if (data.success) {
+      adminPassword = pw
+      document.getElementById('loginOverlay').style.display = 'none'
+      document.getElementById('adminMain').style.display = 'block'
+      loadConfig()
+    } else {
+      err.textContent = '비밀번호가 올바르지 않습니다.'
+    }
+  } catch (e) {
+    err.textContent = '서버 오류가 발생했습니다.'
+  }
+}
+
+function doLogout() {
+  adminPassword = ''
+  document.getElementById('loginOverlay').style.display = 'flex'
+  document.getElementById('adminMain').style.display = 'none'
+  document.getElementById('pwInput').value = ''
+}
+
+// ── 설정 로드 ──
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/admin/prompt', {
+      headers: { 'X-Admin-Password': adminPassword },
+    })
+    const data = await res.json()
+    if (!data.success) return
+    const cfg = data.config
+    document.getElementById('toggleEnabled').checked = cfg.enabled
+    document.getElementById('fieldPrefix').value       = cfg.prefix       || ''
+    document.getElementById('fieldStyleGuide').value   = cfg.styleGuide   || ''
+    document.getElementById('fieldTechnicalSpec').value = cfg.technicalSpec || ''
+    document.getElementById('fieldSuffix').value       = cfg.suffix       || ''
+    updateAllCounts()
+    updatePreview()
+  } catch(e) { console.error(e) }
+}
+
+// ── 설정 저장 ──
+async function saveConfig() {
+  const btn    = document.getElementById('saveBtn')
+  const status = document.getElementById('saveStatus')
+  btn.disabled = true
+  status.textContent = '저장 중...'
+  status.className = 'save-status'
+  try {
+    const res = await fetch('/api/admin/prompt', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+      body: JSON.stringify({
+        enabled:      document.getElementById('toggleEnabled').checked,
+        prefix:       document.getElementById('fieldPrefix').value,
+        styleGuide:   document.getElementById('fieldStyleGuide').value,
+        technicalSpec: document.getElementById('fieldTechnicalSpec').value,
+        suffix:       document.getElementById('fieldSuffix').value,
+      }),
+    })
+    const data = await res.json()
+    if (data.success) {
+      status.textContent = '✅ 저장 완료 · ' + new Date().toLocaleTimeString('ko-KR')
+      status.className = 'save-status ok'
+    } else {
+      status.textContent = '❌ 저장 실패'
+      status.className = 'save-status err'
+    }
+  } catch(e) {
+    status.textContent = '❌ 네트워크 오류'
+    status.className = 'save-status err'
+  } finally {
+    btn.disabled = false
+  }
+}
+
+// ── 프리셋 적용 ──
+function applyPreset(field, key) {
+  const fieldMap = { styleGuide: 'fieldStyleGuide', technicalSpec: 'fieldTechnicalSpec' }
+  const el = document.getElementById(fieldMap[field])
+  if (!el) return
+  el.value = PRESETS[field][key] || ''
+  updateCharCount(field === 'styleGuide' ? 'cntStyleGuide' : 'cntTechnicalSpec', el.value)
+  updatePreview()
+}
+
+// ── 글자 수 카운트 ──
+function updateCharCount(counterId, text) {
+  const el = document.getElementById(counterId)
+  if (el) el.textContent = text.length
+}
+function updateAllCounts() {
+  updateCharCount('cntPrefix', document.getElementById('fieldPrefix').value)
+  updateCharCount('cntStyleGuide', document.getElementById('fieldStyleGuide').value)
+  updateCharCount('cntTechnicalSpec', document.getElementById('fieldTechnicalSpec').value)
+  updateCharCount('cntSuffix', document.getElementById('fieldSuffix').value)
+}
+
+// ── 실시간 미리보기 ──
+function updatePreview() {
+  const enabled = document.getElementById('toggleEnabled').checked
+  const prefix  = document.getElementById('fieldPrefix').value.trim()
+  const styleGuide   = document.getElementById('fieldStyleGuide').value.trim()
+  const technicalSpec = document.getElementById('fieldTechnicalSpec').value.trim()
+  const suffix  = document.getElementById('fieldSuffix').value.trim()
+
+  const BASE_SAMPLE = '[기본 프롬프트: Create a professional fashion lookbook photograph. Image 1 is the CLOTHING ITEM... Image 2 is the MODEL... Image 3 is the BACKGROUND...]'
+
+  let preview = ''
+  if (!enabled) {
+    preview = '⚠️ 어드민 프롬프트 OFF — 기본 프롬프트만 사용됩니다.\n\n' + BASE_SAMPLE
+  } else {
+    const parts = []
+    if (prefix)        parts.push('🔵 [PREFIX]\n' + prefix)
+    parts.push('⚫ [BASE PROMPT]\n' + BASE_SAMPLE)
+    if (styleGuide)    parts.push('🟣 [STYLE GUIDE]\n' + styleGuide)
+    if (technicalSpec) parts.push('🟢 [TECHNICAL SPEC]\n' + technicalSpec)
+    if (suffix)        parts.push('🔵 [SUFFIX]\n' + suffix)
+    preview = parts.join('\n\n')
+  }
+  document.getElementById('previewBox').textContent = preview
+}
+
+// ── 이벤트 바인딩 ──
+document.addEventListener('DOMContentLoaded', () => {
+  ['fieldPrefix','fieldStyleGuide','fieldTechnicalSpec','fieldSuffix'].forEach(id => {
+    const el = document.getElementById(id)
+    const cntMap = { fieldPrefix:'cntPrefix', fieldStyleGuide:'cntStyleGuide', fieldTechnicalSpec:'cntTechnicalSpec', fieldSuffix:'cntSuffix' }
+    el.addEventListener('input', () => {
+      updateCharCount(cntMap[id], el.value)
+      updatePreview()
+    })
+  })
+  document.getElementById('toggleEnabled').addEventListener('change', updatePreview)
+  document.getElementById('pwInput').focus()
+})
+</script>
+</body>
+</html>`)
 })
 
 export default app
