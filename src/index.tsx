@@ -406,6 +406,21 @@ function applyResolution(dims: { width: number; height: number }, resolution: st
   return dims  // 표준
 }
 
+// ratio → nano-banana-2 aspect_ratio 문자열 변환
+function toAspectRatio(ratio: string): string {
+  const map: Record<string, string> = {
+    '1:1': '1:1', '4:5': '4:5', '3:4': '3:4', '9:16': '9:16',
+  }
+  return map[ratio] || '3:4'
+}
+
+// resolution → nano-banana-2 resolution 문자열 변환
+function toNBResolution(resolution: string): string {
+  if (resolution === '4K') return '4k'
+  if (resolution === 'HD') return '2k'
+  return '1k'  // 표준
+}
+
 app.post('/api/generation/start', async (c) => {
   try {
     const body: any = await c.req.json()
@@ -425,155 +440,167 @@ app.post('/api/generation/start', async (c) => {
       clothingImageUrl,
     } = body
 
-    // Photorealistic 프롬프트 빌드
-    const prompt = buildPhotorealisticPrompt({
-      modelName,
-      modelDesc,
-      bgName,
-      bgDesc,
-      poseType,
-      pose,
-      clothingImageUrl,
-    })
+    const aspectRatio = toAspectRatio(ratio)
+    const nbResolution = toNBResolution(resolution)
 
-    // 해상도/비율 계산
-    const baseDims = getRatioDimensions(ratio)
-    const finalDims = applyResolution(baseDims, resolution)
-
-    console.log('Generation prompt:', prompt)
-    console.log('Clothing image URL:', clothingImageUrl ? clothingImageUrl.substring(0, 50) + '...' : 'none')
     console.log('Model ID:', modelId, '| BG ID:', bgId)
-    console.log('Ratio:', ratio, '→', finalDims, '| Resolution:', resolution)
+    console.log('Ratio:', aspectRatio, '| Resolution:', nbResolution)
+    console.log('Clothing:', clothingImageUrl ? clothingImageUrl.substring(0, 60) + '...' : 'none')
 
-    // ── 서버사이드에서 모델/배경 이미지를 base64로 변환 ──
+    // ── 포즈 텍스트 변환 ──
+    const poseTypeMap: Record<string, string> = {
+      '전신': 'full body shot', '반신': 'half body shot', '상반신': 'upper body shot',
+    }
+    const poseStyleMap: Record<string, string> = {
+      '정면': 'facing camera, natural standing pose',
+      '측면': '3/4 angle, elegant slight turn',
+      '워킹': 'dynamic walking pose, confident stride',
+      '정적': 'elegant static pose, hands relaxed at sides',
+    }
+    const poseTypeText  = poseTypeMap[poseType]  || 'full body shot'
+    const poseStyleText = poseStyleMap[pose]      || 'natural standing pose'
+
+    // ── 서버사이드: 모델·배경 이미지를 Unsplash에서 fetch → base64 ──
     let modelImageBase64: string | null = null
     let bgImageBase64: string | null = null
 
     if (modelId) {
-      // 서버 내부 호출: /api/proxy/model-image/:id → Unsplash CDN fetch
       const unsplashId = MODEL_UNSPLASH_MAP[String(modelId)]
       if (unsplashId) {
-        const modelImgUrl = `https://images.unsplash.com/${unsplashId}?w=400&h=500&fit=crop&crop=faces,center&q=85&fm=jpg`
-        modelImageBase64 = await fetchImageAsBase64(modelImgUrl)
-        console.log('Model image fetched:', modelImageBase64 ? 'OK' : 'FAILED')
+        const url = `https://images.unsplash.com/${unsplashId}?w=512&h=640&fit=crop&crop=faces,center&q=90&fm=jpg`
+        modelImageBase64 = await fetchImageAsBase64(url)
+        console.log('Model image:', modelImageBase64 ? 'OK' : 'FAILED')
       }
     }
-
     if (bgId) {
       const bgUnsplashId = BG_UNSPLASH_MAP[String(bgId)]
       if (bgUnsplashId) {
-        const bgImgUrl = `https://images.unsplash.com/${bgUnsplashId}?w=800&h=600&fit=crop&q=85&fm=jpg`
-        bgImageBase64 = await fetchImageAsBase64(bgImgUrl)
-        console.log('BG image fetched:', bgImageBase64 ? 'OK' : 'FAILED')
+        const url = `https://images.unsplash.com/${bgUnsplashId}?w=800&h=600&fit=crop&q=90&fm=jpg`
+        bgImageBase64 = await fetchImageAsBase64(url)
+        console.log('BG image:', bgImageBase64 ? 'OK' : 'FAILED')
       }
     }
 
-    // Atlas Cloud API 요청 - Atlas Cloud image-to-image
-    let requestBody: any
-
+    // ── Nano Banana 2 Edit: images 배열 구성 ──
+    // 순서: [의류(필수), 모델, 배경]
+    // Nano Banana 2는 images 배열 순서와 프롬프트 내 언급으로 역할을 구분
+    const images: string[] = []
     if (clothingImageUrl && clothingImageUrl.startsWith('data:')) {
-      // ── 의류 이미지 있음 → 다중 참조 image-to-image ──
-      // image_urls 순서: [1] 의류(최우선), [2] 모델 외모, [3] 배경
-      const imageUrls: string[] = [clothingImageUrl]
-      if (modelImageBase64) imageUrls.push(modelImageBase64)
-      if (bgImageBase64) imageUrls.push(bgImageBase64)
+      images.push(clothingImageUrl)
+    }
+    if (modelImageBase64) images.push(modelImageBase64)
+    if (bgImageBase64)    images.push(bgImageBase64)
 
-      const strictPrompt = [
-        `[STRICT FASHION FITTING - DO NOT DEVIATE]`,
-        `Reference Image 1 is the CLOTHING ITEM. You MUST reproduce this garment EXACTLY:`,
-        `  - Preserve every design detail: collar shape, sleeve length, hem line, pockets, buttons, zippers, prints`,
-        `  - Preserve exact color palette: do NOT alter any colors or patterns`,
-        `  - Preserve exact fabric texture and material appearance`,
-        `  - DO NOT substitute, simplify, or creatively interpret the garment in any way`,
-        `Reference Image 2 is the MODEL. Use this person's face, skin tone, hair, and body proportions.`,
-        `Reference Image 3 is the BACKGROUND. Place the model in this EXACT background scene.`,
-        ``,
-        `Compose: ${prompt}`,
-        ``,
-        `CRITICAL CONSTRAINTS (violations are unacceptable):`,
-        `- The model MUST be wearing the clothing from Reference Image 1 without ANY changes`,
-        `- Background MUST match Reference Image 3 exactly`,
-        `- Result must look like a real professional fashion lookbook photograph`,
-        `- No cartoon, no illustration, no 3D render - strictly photorealistic`,
+    // ── 프롬프트 구성 ──
+    // images 배열의 인덱스를 명시적으로 언급해 역할을 분명히 지정
+    let prompt: string
+    if (images.length >= 3) {
+      // 의류 + 모델 + 배경 모두 있는 풀 모드
+      prompt = [
+        `Create a professional fashion lookbook photograph.`,
+        `Image 1 is the CLOTHING ITEM — reproduce every detail of this garment EXACTLY:`,
+        `color, pattern, texture, collar shape, sleeve length, hem, buttons, zippers, prints.`,
+        `DO NOT alter or substitute the clothing in any way.`,
+        `Image 2 is the MODEL — use this person's exact face, hair, skin tone, and body build.`,
+        `Image 3 is the BACKGROUND — place the model in this exact scene.`,
+        `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
+        `The model is a ${modelDesc}.`,
+        `Ultra-photorealistic, 8K quality, professional studio lighting,`,
+        `sharp fabric detail, magazine-quality fashion editorial.`,
+        `No changes to the garment. No cartoon. No illustration. Strictly photorealistic.`,
       ].join(' ')
-
-      requestBody = {
-        model: 'bytedance/seedream-v4',
-        prompt: strictPrompt,
-        image_urls: imageUrls,
-        width: finalDims.width,
-        height: finalDims.height,
-        num_outputs: Math.min(count, 4),
-      }
-
-      console.log('i2i mode: image_urls count =', imageUrls.length, '(clothing + model + bg)')
-
+    } else if (images.length === 2 && clothingImageUrl) {
+      // 의류 + 모델 (배경 없음)
+      prompt = [
+        `Create a professional fashion lookbook photograph.`,
+        `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY with all its design details.`,
+        `Image 2 is the MODEL — use this person's exact appearance.`,
+        `Show the model in a ${poseTypeText}, ${poseStyleText},`,
+        `against a clean ${bgDesc} background.`,
+        `Ultra-photorealistic, magazine-quality fashion editorial.`,
+        `DO NOT change the clothing design. Strictly photorealistic.`,
+      ].join(' ')
+    } else if (images.length === 1 && clothingImageUrl) {
+      // 의류만 있음
+      prompt = [
+        `Create a professional fashion lookbook photograph.`,
+        `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY.`,
+        `Show a ${modelDesc} model wearing it in a ${poseTypeText}, ${poseStyleText}.`,
+        `Background: ${bgDesc}.`,
+        `Ultra-photorealistic, magazine-quality fashion editorial.`,
+        `DO NOT change the clothing. Strictly photorealistic.`,
+      ].join(' ')
     } else {
-      // 의류 이미지 없음 → text-to-image (모델/배경 참조는 프롬프트로만)
-      const imageUrls: string[] = []
-      if (modelImageBase64) imageUrls.push(modelImageBase64)
-      if (bgImageBase64) imageUrls.push(bgImageBase64)
-
-      if (imageUrls.length > 0) {
-        requestBody = {
-          model: 'bytedance/seedream-v4',
-          prompt: `${prompt} Match the model appearance from Reference Image 1. Use the background from Reference Image 2 exactly.`,
-          image_urls: imageUrls,
-          width: finalDims.width,
-          height: finalDims.height,
-          num_outputs: Math.min(count, 4),
-        }
-      } else {
-        requestBody = {
-          model: 'bytedance/seedream-v4',
-          prompt,
-          negative_prompt: 'cartoon, anime, illustration, painting, drawing, low quality, blurry, deformed, ugly, unrealistic, CGI, 3d render',
-          width: finalDims.width,
-          height: finalDims.height,
-          num_outputs: Math.min(count, 4),
-        }
-      }
+      // 이미지 없음 → 순수 텍스트 기반
+      prompt = [
+        `Ultra-photorealistic professional fashion photography.`,
+        `A ${modelDesc} fashion model, ${poseTypeText}, ${poseStyleText}.`,
+        `Background: ${bgDesc} (${bgName}).`,
+        `8K resolution, Canon EOS R5, professional studio lighting,`,
+        `hyperrealistic skin texture, perfect fabric detail,`,
+        `commercial fashion editorial, magazine quality.`,
+      ].join(' ')
     }
 
-    console.log('Atlas Cloud request model:', requestBody.model)
+    console.log('Prompt (first 200):', prompt.substring(0, 200))
+    console.log('images count:', images.length)
 
-    const atlasRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
-      method: 'POST',
-      headers: atlasHeaders(),
-      body: JSON.stringify(requestBody),
-    })
+    // ── Atlas Cloud API 요청: google/nano-banana-2/edit ──
+    const requestBody: any = {
+      model: 'google/nano-banana-2/edit',
+      prompt,
+      aspect_ratio: aspectRatio,
+      resolution: nbResolution,
+      thinking_level: 'default',
+      output_format: 'jpeg',
+    }
+    // images가 있을 때만 포함 (없으면 text-to-image 모드로 동작)
+    if (images.length > 0) {
+      requestBody.images = images
+    }
 
-    const atlasData: any = await atlasRes.json()
-    console.log('Atlas Cloud response:', JSON.stringify(atlasData).substring(0, 200))
+    // nano-banana-2는 1회 요청 = 1장 출력 → count만큼 병렬 요청
+    const jobCount = Math.min(count, 4)
+    console.log('Atlas request → model:', requestBody.model, '| images:', images.length, '| aspect_ratio:', aspectRatio, '| resolution:', nbResolution, '| jobs:', jobCount)
 
-    if (!atlasRes.ok || atlasData.code !== 200) {
-      console.error('Atlas API error:', atlasData)
-      // 폴백: 플레이스홀더 반환
+    const jobRequests = Array.from({ length: jobCount }, () =>
+      fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
+        method: 'POST',
+        headers: atlasHeaders(),
+        body: JSON.stringify(requestBody),
+      }).then(r => r.json())
+    )
+
+    const results: any[] = await Promise.all(jobRequests)
+    console.log('Atlas responses:', results.map(r => `${r.code}:${r.data?.id}`).join(', '))
+
+    const jobIds: string[] = results
+      .filter(r => r.code === 200 && r.data?.id)
+      .map(r => r.data.id)
+
+    if (jobIds.length === 0) {
+      const firstErr = results[0]
+      console.error('All Atlas requests failed:', firstErr)
       const fallbackJobId = 'fallback_' + Math.random().toString(36).substr(2, 9)
       return c.json({
         jobId: fallbackJobId,
         estimatedSeconds: 5,
         status: 'queued',
         isFallback: true,
-        error: atlasData.msg || 'Atlas API error',
+        error: firstErr?.msg || firstErr?.message || 'Atlas API error',
       })
     }
 
-    const jobId = atlasData.data?.id || atlasData.data?.prediction_id
-    if (!jobId) {
-      throw new Error('No job ID in Atlas response')
-    }
-
+    // jobIds를 콤마로 묶어 단일 jobId처럼 전달 (폴링에서 분리)
     return c.json({
-      jobId,
-      estimatedSeconds: 60,
+      jobId: jobIds.join(','),
+      estimatedSeconds: 30,
       status: 'queued',
       isFallback: false,
     })
 
   } catch (err: any) {
     console.error('Generation start error:', err)
-    // 에러 시 fallback으로 처리
     const fallbackJobId = 'fallback_' + Math.random().toString(36).substr(2, 9)
     return c.json({
       jobId: fallbackJobId,
@@ -585,96 +612,72 @@ app.post('/api/generation/start', async (c) => {
   }
 })
 
-// Generation 상태 폴링
+// Generation 상태 폴링 (nano-banana-2: 단건 jobId 또는 콤마 구분 복수 jobId)
 app.get('/api/generation/:jobId/status', async (c) => {
-  const jobId = c.req.param('jobId')
+  const rawJobId = c.req.param('jobId')
 
-  // Fallback 처리 (Atlas API 오류 시 플레이스홀더 이미지 반환)
-  if (jobId.startsWith('fallback_')) {
+  // Fallback 처리
+  if (rawJobId.startsWith('fallback_')) {
     const placeholderImages = generatePlaceholderImages(4)
-    return c.json({
-      status: 'completed',
-      progress: 100,
-      images: placeholderImages,
-      isFallback: true,
-    })
+    return c.json({ status: 'completed', progress: 100, images: placeholderImages, isFallback: true })
   }
 
+  // 콤마로 묶인 복수 jobId 분리
+  const jobIds = rawJobId.split(',').filter(Boolean)
+
   try {
-    const res = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
-      headers: {
-        'Authorization': `Bearer ${ATLAS_API_KEY}`,
-      },
+    // 모든 jobId를 병렬 폴링
+    const pollResults = await Promise.all(
+      jobIds.map(id =>
+        fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${id}`, {
+          headers: { 'Authorization': `Bearer ${ATLAS_API_KEY}` },
+        }).then(r => r.json())
+      )
+    )
+
+    console.log('Poll statuses:', pollResults.map(r => `${r.data?.id?.substring(0,8)}:${r.data?.status}`).join(', '))
+
+    const terminalStatuses = new Set(['completed', 'succeeded', 'failed', 'timeout', 'canceled', 'error'])
+    const allDone = pollResults.every(r => terminalStatuses.has(r.data?.status))
+    const anyProcessing = pollResults.some(r => !terminalStatuses.has(r.data?.status))
+
+    if (!allDone) {
+      // 아직 처리 중인 작업이 있음
+      const doneCount  = pollResults.filter(r => terminalStatuses.has(r.data?.status)).length
+      const totalCount = pollResults.length
+      const progress   = Math.round(20 + (doneCount / totalCount) * 60)
+      return c.json({ status: 'processing', progress, images: [] })
+    }
+
+    // 모두 완료 → 성공한 것만 수집
+    const resultImages: any[] = []
+    pollResults.forEach((r, idx) => {
+      const st  = r.data?.status
+      const urls: string[] = r.data?.outputs || r.data?.output || []
+      if ((st === 'completed' || st === 'succeeded') && urls.length > 0) {
+        urls.forEach((url, i) => {
+          resultImages.push({
+            id: `result_${resultImages.length + 1}`,
+            url,
+            title: `AI 피팅컷 #${resultImages.length + 1}`,
+          })
+        })
+      }
     })
 
-    const data: any = await res.json()
-    console.log('Atlas poll response status:', data.data?.status, 'jobId:', jobId)
-
-    if (!res.ok || data.code !== 200) {
-      return c.json({
-        status: 'failed',
-        progress: 0,
-        images: [],
-        error: data.msg || 'Poll error',
-      })
-    }
-
-    const predData = data.data
-    const predStatus = predData?.status
-
-    // Atlas Cloud 상태 매핑
-    // starting, processing, succeeded, failed, canceled
-    if (predStatus === 'succeeded' || predStatus === 'completed') {
-      // Atlas Cloud uses 'outputs' (plural), fallback to 'output' (singular)
-      const outputUrls: string[] = predData?.outputs || predData?.output || []
-      const images = outputUrls.map((url: string, idx: number) => ({
-        id: `result_${idx + 1}`,
-        url,
-        title: `AI 피팅컷 #${idx + 1}`,
-        width: 832,
-        height: 1216,
-      }))
-
-      return c.json({
-        status: 'completed',
-        progress: 100,
-        images,
-        isFallback: false,
-      })
-    } else if (predStatus === 'failed' || predStatus === 'canceled' || predStatus === 'error') {
-      // 실패 시 플레이스홀더로 폴백
+    if (resultImages.length === 0) {
+      // 전부 실패 → fallback placeholder
+      console.error('All jobs failed:', pollResults.map(r => r.data?.status).join(', '))
       const placeholderImages = generatePlaceholderImages(4)
-      return c.json({
-        status: 'completed',
-        progress: 100,
-        images: placeholderImages,
-        isFallback: true,
-        error: `Generation ${predStatus}`,
-      })
-    } else {
-      // processing, starting
-      const progressMap: Record<string, number> = {
-        'starting': 15,
-        'processing': 55,
-      }
-      return c.json({
-        status: 'processing',
-        progress: progressMap[predStatus] || 30,
-        images: [],
-      })
+      return c.json({ status: 'completed', progress: 100, images: placeholderImages, isFallback: true, error: 'All jobs failed' })
     }
+
+    return c.json({ status: 'completed', progress: 100, images: resultImages, isFallback: false })
 
   } catch (err: any) {
     console.error('Poll error:', err)
-    // 폴링 에러 시 플레이스홀더 반환
     const placeholderImages = generatePlaceholderImages(4)
-    return c.json({
-      status: 'completed',
-      progress: 100,
-      images: placeholderImages,
-      isFallback: true,
-      error: err.message,
-    })
+    return c.json({ status: 'completed', progress: 100, images: placeholderImages, isFallback: true, error: err.message })
   }
 })
 
