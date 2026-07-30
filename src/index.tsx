@@ -2,7 +2,12 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
 
-const app = new Hono()
+// Cloudflare KV 바인딩 타입
+type Bindings = {
+  LOOKBOOK_KV: KVNamespace
+}
+
+const app = new Hono<{ Bindings: Bindings }>()
 
 app.use('/api/*', cors())
 app.use('/static/*', serveStatic({ root: './public' }))
@@ -71,13 +76,18 @@ function injectAdminPrompt(basePrompt: string): string {
 }
 
 // ────────────────────────────────────────────────────
-// 커스텀 모델/배경 메모리 스토어 (어드민 업로드)
+// 커스텀 모델/배경 — Cloudflare KV 영구 저장
+// KV 키 구조:
+//   model_index          → JSON 배열 (메타만, base64 제외)
+//   model_img:{id}       → base64 이미지 문자열
+//   bg_index             → JSON 배열 (메타만, base64 제외)
+//   bg_img:{id}          → base64 이미지 문자열
+//   id_counter           → 숫자 문자열 (1000~)
 // ────────────────────────────────────────────────────
 interface CustomModel {
   id: string
   name: string
-  desc: string           // 프롬프트용 설명 (한글 또는 영문)
-  imageBase64: string    // data:image/...;base64,...
+  desc: string
   createdAt: string
 }
 interface CustomBg {
@@ -85,55 +95,118 @@ interface CustomBg {
   name: string
   bgDesc: string
   category: string
-  imageBase64: string
   createdAt: string
 }
 
-let customModels: CustomModel[] = []
-let customBgs: CustomBg[] = []
-let customIdCounter = 1000  // Unsplash ID(1~21)와 충돌 방지
+// KV 헬퍼
+async function kvGetModels(kv: KVNamespace): Promise<CustomModel[]> {
+  const raw = await kv.get('model_index')
+  return raw ? JSON.parse(raw) : []
+}
+async function kvSaveModels(kv: KVNamespace, list: CustomModel[]) {
+  await kv.put('model_index', JSON.stringify(list))
+}
+async function kvGetBgs(kv: KVNamespace): Promise<CustomBg[]> {
+  const raw = await kv.get('bg_index')
+  return raw ? JSON.parse(raw) : []
+}
+async function kvSaveBgs(kv: KVNamespace, list: CustomBg[]) {
+  await kv.put('bg_index', JSON.stringify(list))
+}
+async function kvNextId(kv: KVNamespace): Promise<string> {
+  const raw = await kv.get('id_counter')
+  const next = raw ? parseInt(raw) + 1 : 1001
+  await kv.put('id_counter', String(next))
+  return String(next - 1 === 0 ? 1000 : next - 1)
+}
+
+// KV 없는 환경(로컬 개발)용 메모리 폴백
+let _memModels: (CustomModel & { imageBase64?: string })[] = []
+let _memBgs: (CustomBg & { imageBase64?: string })[] = []
+let _memIdCounter = 1000
 
 // ── 커스텀 모델 API ──
 // POST /api/admin/models — 모델 업로드 (단일 or 배열 일괄)
 app.post('/api/admin/models', adminAuth, async (c) => {
   try {
     const body: any = await c.req.json()
-    // 배열 일괄 업로드: [{ name, desc, imageBase64 }, ...]
     const items: Array<{ name: string; desc?: string; imageBase64: string }> =
       Array.isArray(body) ? body : [body]
     if (items.length === 0) return c.json({ success: false, message: '업로드할 항목이 없습니다.' }, 400)
-    const results: any[] = []
-    for (const item of items) {
-      const { name, desc, imageBase64 } = item
-      if (!name || !imageBase64) continue
-      const id = String(customIdCounter++)
-      const model: CustomModel = { id, name, desc: desc || name, imageBase64, createdAt: new Date().toISOString() }
-      customModels.push(model)
-      results.push({ id, name, desc: model.desc, createdAt: model.createdAt })
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    const results: CustomModel[] = []
+
+    if (kv) {
+      // ── KV 모드 (프로덕션) ──
+      const list = await kvGetModels(kv)
+      for (const item of items) {
+        const { name, desc, imageBase64 } = item
+        if (!name || !imageBase64) continue
+        const id = await kvNextId(kv)
+        const meta: CustomModel = { id, name, desc: desc || name, createdAt: new Date().toISOString() }
+        list.push(meta)
+        // 이미지는 별도 키에 저장 (인덱스와 분리)
+        await kv.put(`model_img:${id}`, imageBase64)
+        results.push(meta)
+      }
+      await kvSaveModels(kv, list)
+    } else {
+      // ── 메모리 폴백 (로컬 개발) ──
+      for (const item of items) {
+        const { name, desc, imageBase64 } = item
+        if (!name || !imageBase64) continue
+        const id = String(_memIdCounter++)
+        const meta = { id, name, desc: desc || name, imageBase64, createdAt: new Date().toISOString() }
+        _memModels.push(meta)
+        results.push({ id, name, desc: meta.desc, createdAt: meta.createdAt })
+      }
     }
     return c.json({ success: true, models: results, count: results.length })
   } catch (e: any) {
     return c.json({ success: false, message: e.message }, 500)
   }
 })
-// GET /api/admin/models — 목록 조회 (base64 제외 메타만)
-app.get('/api/admin/models', adminAuth, (c) => {
-  const list = customModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
+
+// GET /api/admin/models — 목록 조회 (메타만)
+app.get('/api/admin/models', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (kv) {
+    const list = await kvGetModels(kv)
+    return c.json({ success: true, models: list })
+  }
+  const list = _memModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
   return c.json({ success: true, models: list })
 })
+
 // DELETE /api/admin/models/:id
-app.delete('/api/admin/models/:id', adminAuth, (c) => {
+app.delete('/api/admin/models/:id', adminAuth, async (c) => {
   const id = c.req.param('id')
-  const before = customModels.length
-  customModels = customModels.filter(m => m.id !== id)
-  return c.json({ success: customModels.length < before })
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (kv) {
+    const list = await kvGetModels(kv)
+    const newList = list.filter(m => m.id !== id)
+    await kvSaveModels(kv, newList)
+    await kv.delete(`model_img:${id}`)
+    return c.json({ success: list.length > newList.length })
+  }
+  const before = _memModels.length
+  _memModels = _memModels.filter(m => m.id !== id)
+  return c.json({ success: _memModels.length < before })
 })
-// GET /api/proxy/custom-model/:id — 이미지 직접 서빙 (프론트엔드 표시용)
-app.get('/api/proxy/custom-model/:id', (c) => {
+
+// GET /api/proxy/custom-model/:id — 이미지 바이너리 서빙
+app.get('/api/proxy/custom-model/:id', async (c) => {
   const id = c.req.param('id')
-  const model = customModels.find(m => m.id === id)
-  if (!model) return c.notFound()
-  const [header, b64] = model.imageBase64.split(',')
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  let imageBase64: string | null = null
+  if (kv) {
+    imageBase64 = await kv.get(`model_img:${id}`)
+  } else {
+    const m = _memModels.find(m => m.id === id)
+    imageBase64 = m?.imageBase64 || null
+  }
+  if (!imageBase64) return c.notFound()
+  const [header, b64] = imageBase64.split(',')
   const mime = (header.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)
@@ -147,39 +220,77 @@ app.get('/api/proxy/custom-model/:id', (c) => {
 app.post('/api/admin/backgrounds', adminAuth, async (c) => {
   try {
     const body: any = await c.req.json()
-    // 배열 일괄 업로드: [{ name, bgDesc, category, imageBase64 }, ...]
     const items: Array<{ name: string; bgDesc?: string; category?: string; imageBase64: string }> =
       Array.isArray(body) ? body : [body]
     if (items.length === 0) return c.json({ success: false, message: '업로드할 항목이 없습니다.' }, 400)
-    const results: any[] = []
-    for (const item of items) {
-      const { name, bgDesc, category, imageBase64 } = item
-      if (!name || !imageBase64) continue
-      const id = String(customIdCounter++)
-      const bg: CustomBg = { id, name, bgDesc: bgDesc || name, category: category || '커스텀', imageBase64, createdAt: new Date().toISOString() }
-      customBgs.push(bg)
-      results.push({ id, name, bgDesc: bg.bgDesc, category: bg.category, createdAt: bg.createdAt })
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    const results: CustomBg[] = []
+
+    if (kv) {
+      const list = await kvGetBgs(kv)
+      for (const item of items) {
+        const { name, bgDesc, category, imageBase64 } = item
+        if (!name || !imageBase64) continue
+        const id = await kvNextId(kv)
+        const meta: CustomBg = { id, name, bgDesc: bgDesc || name, category: category || '커스텀', createdAt: new Date().toISOString() }
+        list.push(meta)
+        await kv.put(`bg_img:${id}`, imageBase64)
+        results.push(meta)
+      }
+      await kvSaveBgs(kv, list)
+    } else {
+      for (const item of items) {
+        const { name, bgDesc, category, imageBase64 } = item
+        if (!name || !imageBase64) continue
+        const id = String(_memIdCounter++)
+        const meta = { id, name, bgDesc: bgDesc || name, category: category || '커스텀', imageBase64, createdAt: new Date().toISOString() }
+        _memBgs.push(meta)
+        results.push({ id, name, bgDesc: meta.bgDesc, category: meta.category, createdAt: meta.createdAt })
+      }
     }
     return c.json({ success: true, backgrounds: results, count: results.length })
   } catch (e: any) {
     return c.json({ success: false, message: e.message }, 500)
   }
 })
-app.get('/api/admin/backgrounds', adminAuth, (c) => {
-  const list = customBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
+
+app.get('/api/admin/backgrounds', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (kv) {
+    const list = await kvGetBgs(kv)
+    return c.json({ success: true, backgrounds: list })
+  }
+  const list = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
   return c.json({ success: true, backgrounds: list })
 })
-app.delete('/api/admin/backgrounds/:id', adminAuth, (c) => {
+
+app.delete('/api/admin/backgrounds/:id', adminAuth, async (c) => {
   const id = c.req.param('id')
-  const before = customBgs.length
-  customBgs = customBgs.filter(b => b.id !== id)
-  return c.json({ success: customBgs.length < before })
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (kv) {
+    const list = await kvGetBgs(kv)
+    const newList = list.filter(b => b.id !== id)
+    await kvSaveBgs(kv, newList)
+    await kv.delete(`bg_img:${id}`)
+    return c.json({ success: list.length > newList.length })
+  }
+  const before = _memBgs.length
+  _memBgs = _memBgs.filter(b => b.id !== id)
+  return c.json({ success: _memBgs.length < before })
 })
-app.get('/api/proxy/custom-bg/:id', (c) => {
+
+app.get('/api/proxy/custom-bg/:id', async (c) => {
   const id = c.req.param('id')
-  const bg = customBgs.find(b => b.id === id)
-  if (!bg) return c.notFound()
-  const [header, b64] = bg.imageBase64.split(',')
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  let imageBase64: string | null = null
+  if (kv) {
+    imageBase64 = await kv.get(`bg_img:${id}`)
+  } else {
+    const b = _memBgs.find(b => b.id === id)
+    imageBase64 = b?.imageBase64 || null
+  }
+  if (!imageBase64) return c.notFound()
+  const [header, b64] = imageBase64.split(',')
   const mime = (header.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
   const binary = atob(b64)
   const bytes = new Uint8Array(binary.length)
@@ -270,7 +381,9 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
 // ────────────────────────────────────────────────────
 
 // 모델 목록 - Unsplash 패션 모델 큐레이션 (21개, 성별/무드/체형 다양)
-app.get('/api/presets/models', (c) => {
+app.get('/api/presets/models', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const customRaw: CustomModel[] = kv ? await kvGetModels(kv) : _memModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
   const models = [
     // ── 여성 / 20대 ──
     { id: 1,  name: '소피아',   gender: '여성', age: '20대', body: '슬림',  mood: '시크',    skin: '밝은', desc: 'young Asian female, slim figure, chic sophisticated look',    unsplashId: 'photo-1529626455594-4ff0802cfb7e' },
@@ -300,8 +413,8 @@ app.get('/api/presets/models', (c) => {
     // ── 특수/유니크 ──
     { id: 21, name: '제네시스',  gender: '여성', age: '20대', body: '슬림', mood: '청순',    skin: '밝은', desc: 'young female, slim figure, pure innocent fresh style',        unsplashId: 'photo-1521146764736-56c929d59c83' },
   ]
-  // 커스텀 모델 합산 (어드민 업로드분)
-  const customList = customModels.map(m => ({
+  // 커스텀 모델 합산 (KV 또는 메모리)
+  const customList = customRaw.map(m => ({
     id: Number(m.id), name: m.name, gender: '커스텀', age: '-', body: '-', mood: '-', skin: '-',
     desc: m.desc, unsplashId: null, isCustom: true, customId: m.id,
   }))
@@ -309,7 +422,9 @@ app.get('/api/presets/models', (c) => {
 })
 
 // 배경 목록 - 패션 룩북 특화 큐레이션 (Unsplash 고해상도, 내용-이름 정확히 일치)
-app.get('/api/presets/backgrounds', (c) => {
+app.get('/api/presets/backgrounds', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const customBgRaw: CustomBg[] = kv ? await kvGetBgs(kv) : _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
   const backgrounds = [
     // ── 스튜디오 ──
     { id: 1,  name: '화이트 스튜디오',    category: '스튜디오', mood: '클린',       bgDesc: 'clean white studio background with professional soft lighting', unsplashId: 'photo-1558618666-fcd25c85cd64' },
@@ -334,8 +449,8 @@ app.get('/api/presets/backgrounds', (c) => {
     { id: 15, name: '파리지앵 거리',      category: '럭셔리',   mood: '로맨틱',     bgDesc: 'Parisian city street with Haussmann architecture and warm light', unsplashId: 'photo-1502602898657-3e91760cbb34' },
     { id: 16, name: '도쿄 스트리트',      category: '스트리트', mood: '트렌디',     bgDesc: 'Tokyo street fashion district with colorful urban scenery',     unsplashId: 'photo-1540959733332-eab4deabeeaf' },
   ]
-  // 커스텀 배경 합산
-  const customBgList = customBgs.map(b => ({
+  // 커스텀 배경 합산 (KV 또는 메모리)
+  const customBgList = customBgRaw.map(b => ({
     id: Number(b.id), name: b.name, category: b.category, mood: '-',
     bgDesc: b.bgDesc, unsplashId: null, isCustom: true, customId: b.id,
   }))
@@ -649,14 +764,21 @@ app.post('/api/generation/start', async (c) => {
     let modelImageBase64: string | null = null
     let bgImageBase64: string | null = null
 
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+
     if (modelId) {
-      // 커스텀 모델 확인 (id가 문자열 "1000+" 범위)
-      const customModel = customModels.find(m => m.id === String(modelId))
-      if (customModel) {
-        modelImageBase64 = customModel.imageBase64
-        console.log('Custom model image: OK')
+      const mid = String(modelId)
+      // 커스텀 모델 우선: KV 또는 메모리에서 이미지 취득
+      if (kv) {
+        const stored = await kv.get(`model_img:${mid}`)
+        if (stored) { modelImageBase64 = stored; console.log('KV custom model: OK') }
       } else {
-        const unsplashId = MODEL_UNSPLASH_MAP[String(modelId)]
+        const m = _memModels.find(m => m.id === mid)
+        if (m?.imageBase64) { modelImageBase64 = m.imageBase64; console.log('Mem custom model: OK') }
+      }
+      // 커스텀 없으면 Unsplash 기본 모델
+      if (!modelImageBase64) {
+        const unsplashId = MODEL_UNSPLASH_MAP[mid]
         if (unsplashId) {
           const url = `https://images.unsplash.com/${unsplashId}?w=512&h=640&fit=crop&crop=faces,center&q=90&fm=jpg`
           modelImageBase64 = await fetchImageAsBase64(url)
@@ -665,12 +787,18 @@ app.post('/api/generation/start', async (c) => {
       }
     }
     if (bgId) {
-      const customBg = customBgs.find(b => b.id === String(bgId))
-      if (customBg) {
-        bgImageBase64 = customBg.imageBase64
-        console.log('Custom BG image: OK')
+      const bid = String(bgId)
+      // 커스텀 배경 우선
+      if (kv) {
+        const stored = await kv.get(`bg_img:${bid}`)
+        if (stored) { bgImageBase64 = stored; console.log('KV custom bg: OK') }
       } else {
-        const bgUnsplashId = BG_UNSPLASH_MAP[String(bgId)]
+        const b = _memBgs.find(b => b.id === bid)
+        if (b?.imageBase64) { bgImageBase64 = b.imageBase64; console.log('Mem custom bg: OK') }
+      }
+      // 커스텀 없으면 Unsplash 기본 배경
+      if (!bgImageBase64) {
+        const bgUnsplashId = BG_UNSPLASH_MAP[bid]
         if (bgUnsplashId) {
           const url = `https://images.unsplash.com/${bgUnsplashId}?w=800&h=600&fit=crop&q=90&fm=jpg`
           bgImageBase64 = await fetchImageAsBase64(url)
@@ -2602,6 +2730,14 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>`)
+})
+
+// ── /studio-b 경로: 메인 앱 그대로 서빙 ──
+// www.aifashion.co.kr/studio-b → 이 서비스
+app.get('/studio-b', (c) => c.redirect('/'))
+app.get('/studio-b/*', (c) => {
+  const path = c.req.path.replace('/studio-b', '') || '/'
+  return c.redirect(path)
 })
 
 export default app
