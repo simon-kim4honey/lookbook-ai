@@ -1602,7 +1602,7 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 2: Model (스와이프 카드) ─── -->
-      <div class="step-panel" id="step-2" style="height:100%;flex-direction:column;overflow:hidden;">
+      <div class="step-panel" id="step-2" style="flex-direction:column;overflow-y:auto;overflow-x:hidden;padding-bottom:16px;">
         <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 2 / 5 · 모델 선택</div>
           <h2 class="step-heading">AI 모델을 선택하세요</h2>
@@ -1651,7 +1651,7 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 3: Background (스와이프 카드) ─── -->
-      <div class="step-panel" id="step-3" style="height:100%;flex-direction:column;overflow:hidden;">
+      <div class="step-panel" id="step-3" style="flex-direction:column;overflow-y:auto;overflow-x:hidden;padding-bottom:16px;">
         <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 3 / 5 · 배경 선택</div>
           <h2 class="step-heading">배경을 선택하세요</h2>

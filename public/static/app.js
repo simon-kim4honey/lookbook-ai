@@ -583,10 +583,10 @@ function renderModelSwipe(models) {
   const track = document.getElementById('modelTrack');
   if (!track) return;
   // 높이 강제 설정 (CSS 캐시/상속 문제 방지)
-  track.style.height = '380px';
+  track.style.height = '320px';
   track.style.position = 'relative';
   const outer = document.getElementById('modelSwipeOuter');
-  if (outer) { outer.style.height = '420px'; outer.style.position = 'relative'; outer.style.display = 'flex'; }
+  if (outer) { outer.style.height = '360px'; outer.style.position = 'relative'; outer.style.display = 'flex'; }
 
   // "선택 없음(랜덤)" 스킵 카드를 맨 앞에
   const skipItem = { __skip: true };
@@ -713,9 +713,9 @@ function filterModels(value, btn) {
 function renderBgSwipe(bgs) {
   // 높이 강제 설정 (CSS 캐시/상속 문제 방지)
   const bgTrack = document.getElementById('bgTrack');
-  if (bgTrack) { bgTrack.style.height = '380px'; bgTrack.style.position = 'relative'; }
+  if (bgTrack) { bgTrack.style.height = '320px'; bgTrack.style.position = 'relative'; }
   const bgOuter = document.getElementById('bgSwipeOuter');
-  if (bgOuter) { bgOuter.style.height = '420px'; bgOuter.style.position = 'relative'; bgOuter.style.display = 'flex'; }
+  if (bgOuter) { bgOuter.style.height = '360px'; bgOuter.style.position = 'relative'; bgOuter.style.display = 'flex'; }
   const track = document.getElementById('bgTrack');
   if (!track) return;
 
