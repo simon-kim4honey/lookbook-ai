@@ -324,12 +324,12 @@ async function loadModelsFromAPI() {
     if (AppState.allModels.length === 0) {
       // 등록된 모델 없음 안내
       if (loading) {
-        loading.removeAttribute('hidden');
+        loading.style.display = '';
         loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">👤</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 모델이 없습니다</p><p style="font-size:13px">관리자 페이지에서 모델을 먼저 등록해주세요</p></div>';
       }
     } else {
       if (wrap) {
-        if (loading) loading.setAttribute('hidden', '');
+        if (loading) loading.style.display = 'none';
         wrap.style.display = 'flex';
         renderModelSwipe(AppState.allModels);
       }
@@ -338,7 +338,7 @@ async function loadModelsFromAPI() {
     console.error('Models load error:', err);
     const loading = document.getElementById('modelsLoading');
     if (loading) {
-      loading.removeAttribute('hidden');
+      loading.style.display = '';
       loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">모델 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>';
     }
   }
@@ -361,12 +361,12 @@ async function loadBackgroundsFromAPI() {
     if (AppState.allBackgrounds.length === 0) {
       // 등록된 배경 없음 안내
       if (loading) {
-        loading.removeAttribute('hidden');
+        loading.style.display = '';
         loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 배경이 없습니다</p><p style="font-size:13px">관리자 페이지에서 배경을 먼저 등록해주세요</p></div>';
       }
     } else {
       if (wrap) {
-        if (loading) loading.setAttribute('hidden', '');
+        if (loading) loading.style.display = 'none';
         wrap.style.display = 'flex';
         renderBgSwipe(AppState.allBackgrounds);
       }
@@ -375,7 +375,7 @@ async function loadBackgroundsFromAPI() {
     console.error('Backgrounds load error:', err);
     const loading = document.getElementById('bgsLoading');
     if (loading) {
-      loading.removeAttribute('hidden');
+      loading.style.display = '';
       loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">배경 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>';
     }
   }
@@ -470,7 +470,7 @@ function changeStep(newStep) {
     const loading = document.getElementById('modelsLoading');
     const wrap = document.getElementById('modelSwipeWrap');
     if (AppState.allModels.length > 0) {
-      if (loading) loading.setAttribute('hidden', '');
+      if (loading) loading.style.display = 'none';
       if (wrap) { wrap.style.display = 'flex'; renderModelSwipe(AppState.allModels); }
     } else {
       loadModelsFromAPI();
@@ -482,7 +482,7 @@ function changeStep(newStep) {
     const loading = document.getElementById('bgsLoading');
     const wrap = document.getElementById('bgSwipeWrap');
     if (AppState.allBackgrounds.length > 0) {
-      if (loading) loading.setAttribute('hidden', '');
+      if (loading) loading.style.display = 'none';
       if (wrap) { wrap.style.display = 'flex'; renderBgSwipe(AppState.allBackgrounds); }
     } else {
       loadBackgroundsFromAPI();
