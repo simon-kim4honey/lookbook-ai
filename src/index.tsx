@@ -1567,10 +1567,6 @@ app.get('/generator', (c) => {
         <span class="gstep" id="gs2">2</span>
         <span class="gstep-line" id="gl2"></span>
         <span class="gstep" id="gs3">3</span>
-        <span class="gstep-line" id="gl3"></span>
-        <span class="gstep" id="gs4">4</span>
-        <span class="gstep-line" id="gl4"></span>
-        <span class="gstep" id="gs5">5</span>
       </div>
     </header>
 
@@ -1580,7 +1576,7 @@ app.get('/generator', (c) => {
       <!-- STEP 1 · 의류 업로드 -->
       <div class="gslide active" id="step-1">
         <div class="gslide-body">
-          <div class="gstep-label">Step 1 / 5 · 의류 업로드</div>
+          <div class="gstep-label">Step 1 / 3 · 의류 업로드</div>
           <h2 class="gstep-title">의류 이미지를 업로드하세요</h2>
 
           <div id="uploadArea" class="upload-area"
@@ -1618,7 +1614,7 @@ app.get('/generator', (c) => {
       <!-- STEP 2 · 모델 선택 -->
       <div class="gslide" id="step-2">
         <div class="gslide-header">
-          <div class="gstep-label">Step 2 / 5 · 모델 선택</div>
+          <div class="gstep-label">Step 2 / 3 · 모델 선택</div>
           <h2 class="gstep-title">AI 모델을 선택하세요</h2>
           <div class="gfilter-bar model-filters" id="modelFilters">
             <button class="filter-tag active" onclick="filterModels('all',this)">전체</button>
@@ -1643,7 +1639,7 @@ app.get('/generator', (c) => {
       <!-- STEP 3 · 배경 선택 -->
       <div class="gslide" id="step-3">
         <div class="gslide-header">
-          <div class="gstep-label">Step 3 / 5 · 배경 선택</div>
+          <div class="gstep-label">Step 3 / 3 · 배경 선택</div>
           <h2 class="gstep-title">배경을 선택하세요</h2>
           <div class="gfilter-bar bg-categories" id="bgCategories">
             <button class="bg-cat active" onclick="filterBg('전체',this)">전체</button>
@@ -1661,92 +1657,33 @@ app.get('/generator', (c) => {
           </div>
           <div class="select-grid" id="bgGrid"></div>
         </div>
-        <div class="gslide-nav">
+        <!-- 생성 중 오버레이 (step-3 내부) -->
+        <div class="generating-view" id="generatingView">
+          <div class="gen-spinner"></div>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;">AI가 이미지를 생성 중입니다...</h2>
+          <p style="color:var(--text-muted);font-size:13px;">Atlas Cloud AI가 실사 패션 이미지를 생성하고 있습니다.</p>
+          <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
+          <div class="gen-status-text" id="genStatusText">시작 중...</div>
+          <div class="gen-status-msgs">
+            <div class="gen-msg current" id="msg1"><div class="dot"></div> 의류 이미지 분석 중...</div>
+            <div class="gen-msg" id="msg2"><div class="dot"></div> AI 모델 피팅 적용 중...</div>
+            <div class="gen-msg" id="msg3"><div class="dot"></div> 배경 합성 중...</div>
+            <div class="gen-msg" id="msg4"><div class="dot"></div> 이미지 품질 향상 중...</div>
+            <div class="gen-msg" id="msg5"><div class="dot"></div> 최종 렌더링 중...</div>
+          </div>
+        </div>
+        <div class="gslide-nav" id="step3Nav">
           <div class="gslide-nav-inner">
             <button class="step-nav-back" onclick="prevStep(3)"><i class="fas fa-arrow-left"></i> 이전</button>
-            <button class="step-nav-next" id="nextBtn3" onclick="nextStep(3)">다음 단계 <i class="fas fa-arrow-right"></i></button>
+            <button class="step-nav-next" id="nextBtn3" onclick="startGeneration()"><i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작</button>
           </div>
         </div>
       </div>
 
-      <!-- STEP 4 · 생성 옵션 -->
+      <!-- STEP 4 (구 Step5) · 결과 -->
       <div class="gslide" id="step-4">
-        <div class="gslide-body">
-          <div class="gstep-label">Step 4 / 5 · 생성 옵션</div>
-          <h2 class="gstep-title">생성 옵션을 설정하세요</h2>
-          <div id="genOptionsView">
-            <div class="gen-options-grid">
-              <div class="gen-option-group">
-                <div class="gen-option-title">🖼️ 화면 비율</div>
-                <div class="option-chips">
-                  <div class="option-chip" onclick="selectOption(this,'ratio')">1:1</div>
-                  <div class="option-chip" onclick="selectOption(this,'ratio')">4:5</div>
-                  <div class="option-chip selected" onclick="selectOption(this,'ratio')">3:4</div>
-                  <div class="option-chip" onclick="selectOption(this,'ratio')">9:16</div>
-                </div>
-              </div>
-              <div class="gen-option-group">
-                <div class="gen-option-title">✨ 해상도</div>
-                <div class="option-chips">
-                  <div class="option-chip" onclick="selectOption(this,'resolution')">표준</div>
-                  <div class="option-chip selected" onclick="selectOption(this,'resolution')">HD</div>
-                  <div class="option-chip" onclick="selectOption(this,'resolution')">4K</div>
-                </div>
-              </div>
-              <div class="gen-option-group">
-                <div class="gen-option-title">🎯 구도</div>
-                <div class="option-chips">
-                  <div class="option-chip selected" onclick="selectOption(this,'pose_type')">전신</div>
-                  <div class="option-chip" onclick="selectOption(this,'pose_type')">반신</div>
-                  <div class="option-chip" onclick="selectOption(this,'pose_type')">상반신</div>
-                </div>
-              </div>
-              <div class="gen-option-group">
-                <div class="gen-option-title">🧍 포즈</div>
-                <div class="option-chips">
-                  <div class="option-chip selected" onclick="selectOption(this,'pose')">정면</div>
-                  <div class="option-chip" onclick="selectOption(this,'pose')">측면</div>
-                  <div class="option-chip" onclick="selectOption(this,'pose')">워킹</div>
-                  <div class="option-chip" onclick="selectOption(this,'pose')">정적</div>
-                </div>
-              </div>
-            </div>
-            <div class="gen-summary" id="genSummary">
-              <div class="gen-summary-title">생성 요약</div>
-              <div class="gen-summary-grid">
-                <div class="gen-summary-item"><div class="gen-summary-label">선택된 모델</div><div class="gen-summary-val" id="sumModel">-</div></div>
-                <div class="gen-summary-item"><div class="gen-summary-label">선택된 배경</div><div class="gen-summary-val" id="sumBg">-</div></div>
-                <div class="gen-summary-item"><div class="gen-summary-label">생성 수량</div><div class="gen-summary-val">3장 (고정)</div></div>
-              </div>
-            </div>
-          </div>
-          <div class="generating-view" id="generatingView">
-            <div class="gen-spinner"></div>
-            <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;">AI가 이미지를 생성 중입니다...</h2>
-            <p style="color:var(--text-muted);font-size:13px;">Atlas Cloud AI가 실사 패션 이미지를 생성하고 있습니다.</p>
-            <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
-            <div class="gen-status-text" id="genStatusText">시작 중...</div>
-            <div class="gen-status-msgs">
-              <div class="gen-msg current" id="msg1"><div class="dot"></div> 의류 이미지 분석 중...</div>
-              <div class="gen-msg" id="msg2"><div class="dot"></div> AI 모델 피팅 적용 중...</div>
-              <div class="gen-msg" id="msg3"><div class="dot"></div> 배경 합성 중...</div>
-              <div class="gen-msg" id="msg4"><div class="dot"></div> 이미지 품질 향상 중...</div>
-              <div class="gen-msg" id="msg5"><div class="dot"></div> 최종 렌더링 중...</div>
-            </div>
-          </div>
-        </div>
-        <div class="gslide-nav" id="step5Nav">
-          <div class="gslide-nav-inner">
-            <button class="step-nav-back" onclick="prevStep(4)"><i class="fas fa-arrow-left"></i> 이전</button>
-            <button class="step-nav-next" onclick="startGeneration()"><i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- STEP 5 · 결과 -->
-      <div class="gslide" id="step-5">
         <div class="gslide-header">
-          <div class="gstep-label">Step 5 / 5 · 생성 완료 ✅</div>
+          <div class="gstep-label">생성 완료 ✅</div>
           <h2 class="gstep-title">이미지가 생성되었습니다!</h2>
           <div class="results-toolbar" style="padding:0;border:none;margin-top:8px;">
             <div class="results-tabs">

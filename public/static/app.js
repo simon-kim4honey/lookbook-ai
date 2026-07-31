@@ -417,10 +417,6 @@ function nextStep(currentStep) {
   }
 
   changeStep(currentStep + 1);
-
-  if (currentStep + 1 === 4) {
-    updateGenSummary();
-  }
 }
 
 function prevStep(currentStep) {
@@ -456,13 +452,13 @@ function changeStep(newStep) {
     }, 300);
   }
 
-  // gstep 인디케이터 업데이트
-  for (let i = 1; i <= 5; i++) {
+  // gstep 인디케이터 업데이트 (3단계)
+  for (let i = 1; i <= 3; i++) {
     const dot  = document.getElementById(`gs${i}`);
     const line = document.getElementById(`gl${i}`);
     if (dot) {
       dot.classList.remove('active','done');
-      if (i < newStep)      dot.classList.add('done');
+      if (i < newStep)        dot.classList.add('done');
       else if (i === newStep) dot.classList.add('active');
     }
     if (line) line.classList.toggle('done', i < newStep);
@@ -767,12 +763,22 @@ function updateGenSummary() {
 // ─────────────────────────────────────────────────────────
 async function startGeneration() {
   if (AppState.isGenerating) return;
+
+  // 배경 미선택 시 랜덤 자동 선택
+  if (!AppState.selectedBg) {
+    const pool = AppState.allBackgrounds.length > 0 ? AppState.allBackgrounds : getFallbackBackgrounds();
+    if (pool.length > 0) {
+      const random = pool[Math.floor(Math.random() * pool.length)];
+      AppState.selectedBg = random;
+      showToast(`랜덤 배경이 선택됐습니다: ${random.name}`, 'info');
+    }
+  }
+
   AppState.isGenerating = true;
 
-  // UI: 옵션 숨기기, 생성 뷰 표시
-  document.getElementById('genOptionsView').style.display = 'none';
-  document.getElementById('step5TitleArea').style.display = 'none';
-  document.getElementById('step5Nav').style.display = 'none';
+  // UI: step-3 nav 숨기기, 생성 뷰 표시 (step-3 내부 오버레이)
+  const step3Nav = document.getElementById('step3Nav');
+  if (step3Nav) step3Nav.style.display = 'none';
 
   const genView = document.getElementById('generatingView');
   if (genView) genView.classList.add('active');
@@ -863,9 +869,8 @@ async function startGeneration() {
     AppState.isGenerating = false;
 
     // UI 복원
-    document.getElementById('genOptionsView').style.display = '';
-    document.getElementById('step5TitleArea').style.display = '';
-    document.getElementById('step5Nav').style.display = '';
+    const step3Nav = document.getElementById('step3Nav');
+    if (step3Nav) step3Nav.style.display = '';
     const genView = document.getElementById('generatingView');
     if (genView) genView.classList.remove('active');
   }
@@ -946,7 +951,7 @@ function completeGeneration(images, isFallback = false) {
   AppState.generatedImages = proxiedImages;
 
   renderResults(proxiedImages);
-  changeStep(5);
+  changeStep(4);
 
   const count = images.length;
   if (isFallback) {
