@@ -745,13 +745,16 @@ app.post('/api/generation/start', async (c) => {
     let bgImageBase64: string | null = null
 
     const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
 
     if (modelId) {
       const mid = String(modelId)
-      // 커스텀 모델: KV 또는 메모리에서만 이미지 취득 (기본 Unsplash 없음)
       if (kv) {
         const stored = await kv.get(`model_img:${mid}`)
         if (stored) { modelImageBase64 = stored; console.log('KV custom model: OK') }
+      } else if (db) {
+        const stored = await d1GetModelImg(db, mid)
+        if (stored) { modelImageBase64 = stored; console.log('D1 custom model: OK') }
       } else {
         const m = _memModels.find(m => m.id === mid)
         if (m?.imageBase64) { modelImageBase64 = m.imageBase64; console.log('Mem custom model: OK') }
@@ -760,10 +763,12 @@ app.post('/api/generation/start', async (c) => {
     }
     if (bgId) {
       const bid = String(bgId)
-      // 커스텀 배경: KV 또는 메모리에서만 이미지 취득 (기본 Unsplash 없음)
       if (kv) {
         const stored = await kv.get(`bg_img:${bid}`)
         if (stored) { bgImageBase64 = stored; console.log('KV custom bg: OK') }
+      } else if (db) {
+        const stored = await d1GetBgImg(db, bid)
+        if (stored) { bgImageBase64 = stored; console.log('D1 custom bg: OK') }
       } else {
         const b = _memBgs.find(b => b.id === bid)
         if (b?.imageBase64) { bgImageBase64 = b.imageBase64; console.log('Mem custom bg: OK') }
@@ -798,67 +803,72 @@ app.post('/api/generation/start', async (c) => {
     ].join(' ')
 
     if (images.length >= 3) {
-      // 의류 + 모델 이미지 + 배경 모두 있는 풀 모드
-      // 핵심 전략: 배경 이미지는 '장소/분위기 참조'로만 사용.
-      // AI가 모델의 카메라 앵글·눈높이·원근감을 기준으로 배경 장면을 새로 구성.
+      // ── 풀 모드: 의류(Image1) + 모델(Image2) + 배경(Image3) ──
       prompt = [
         `Create a hyper-realistic professional fashion editorial photograph.`,
 
-        // ── 의류 (Image 1) ──
-        `Image 1 is the CLOTHING ITEM. Reproduce EVERY detail of this garment with 100% fidelity: exact color, exact pattern, exact texture, collar shape, sleeve length, hem line, buttons, zippers, prints. This clothing must appear IDENTICAL to the reference.`,
+        // 의류 (Image 1)
+        `Image 1 = CLOTHING ITEM (highest priority). Reproduce EVERY detail with 100% fidelity: exact color, pattern, texture, collar, neckline, sleeve length, hem, buttons, zippers, prints. The clothing must appear IDENTICAL to Image 1 — not similar, IDENTICAL.`,
 
-        // ── 모델 (Image 2) ──
-        `Image 2 is the MODEL. Preserve this exact person: face, facial features, hair style and color, skin tone, body proportions. Make NO changes to the model's appearance.`,
+        // 모델 (Image 2)
+        `Image 2 = MODEL IDENTITY (highest priority). This is a reference portrait. Preserve this exact person's face, facial features, hair style and color, skin tone, and body proportions with zero deviation. NEVER alter the model's appearance.`,
 
-        // ── 배경 전략 핵심 변경 ──
-        `Image 3 is a LOCATION REFERENCE only — it shows the place, atmosphere, lighting mood, and environment style. Use it SOLELY to understand the scene's character (location type, time of day, color palette, overall vibe).`,
+        // 배경 (Image 3) — 핵심 강화
+        `Image 3 = BACKGROUND SCENE. This is the TARGET background environment. You MUST place the model inside this EXACT location shown in Image 3. Replicate the specific place: same architecture, same objects, same environment, same atmosphere, same color palette, same time-of-day lighting. The background must be visually recognizable as the same location from Image 3.`,
 
-        `CRITICAL COMPOSITING TASK: Reconstruct the background scene FROM SCRATCH using Image 3 as a style/location reference, but built entirely around the model's camera perspective and scale:`,
-        `- Determine the model's shooting camera: eye-level (~160-165cm height from ground), straight-on angle, standard portrait focal length (~85-135mm equivalent).`,
-        `- Re-render the background environment matching THAT exact camera position and angle. The background's horizon line MUST sit at the model's eye level.`,
-        `- All background elements must obey real-world scale relative to a ~170cm tall model in the foreground: full-size cars (sedan ~1.4-1.5m tall) must reach roughly the model's shoulder/chest height when nearby; background pedestrians must be proportionally smaller with distance; trees and buildings must tower appropriately ABOVE the model.`,
-        `- Recreate the same location's atmosphere (same street, same beach/city environment, same time of day, same weather, same color palette from Image 3) — but with correct perspective built around the model.`,
-        `- The model must appear to be physically standing ON the ground of that scene, with correct contact shadows and ground-plane integration.`,
+        // 합성 지시
+        `COMPOSITING: The model (from Image 2, wearing clothing from Image 1) must appear to be physically present and standing inside the background scene from Image 3. Camera angle: eye-level (~165cm height), 85-135mm portrait lens. The background horizon line MUST align with the model's eye level. The model must cast a realistic ground shadow and appear naturally integrated into the scene — NOT composited onto it.`,
 
-        // ── 조명/합성 ──
-        `Match the scene's natural lighting direction and color temperature to the model. Cast realistic ground shadow beneath the model's feet. Apply shallow depth-of-field to background elements.`,
-        `The final result must look like a single photograph taken on location — zero compositing artifacts, zero scale mismatch, zero perspective conflict.`,
+        // 조명
+        `Lighting: Match the background scene's natural light direction, color temperature, and intensity onto the model. Realistic shadows, no studio flash artifacts.`,
 
         `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
         HARD_CONSTRAINTS,
       ].join(' ')
-    } else if (images.length === 2 && clothingImageUrl) {
-      // 의류 + 모델 이미지 (배경 없음)
+    } else if (images.length === 2 && clothingImageUrl && modelImageBase64) {
+      // ── 의류 + 모델 (배경 없음) ──
       prompt = [
         `Create a hyper-realistic professional fashion lookbook photograph.`,
-        `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY with every design detail preserved.`,
-        `Image 2 is the MODEL — preserve this person's exact face, features, hair, skin tone, and body. NEVER change the model's look.`,
-        `Place the model naturally in a ${bgDesc} environment, with photorealistic lighting and seamless integration.`,
+        `Image 1 = CLOTHING ITEM — reproduce EXACTLY with 100% fidelity: color, pattern, texture, every design detail.`,
+        `Image 2 = MODEL IDENTITY — preserve this exact person's face, hair, skin tone, body. NEVER alter the model's appearance.`,
+        `Background: ${bgDesc} (${bgName}). Create a photorealistic environment matching this description. Integrate the model naturally into this setting with correct lighting and shadows.`,
         `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
+        HARD_CONSTRAINTS,
+      ].join(' ')
+    } else if (images.length === 2 && clothingImageUrl && bgImageBase64) {
+      // ── 의류 + 배경 (모델 없음) ──
+      prompt = [
+        `Create a hyper-realistic professional fashion editorial photograph.`,
+        `Image 1 = CLOTHING ITEM — reproduce EXACTLY with 100% fidelity.`,
+        `Image 2 = BACKGROUND SCENE — place the model inside this EXACT location. Replicate this specific environment faithfully.`,
+        `Model: ${modelDesc}. Show in a ${poseTypeText}, ${poseStyleText}, naturally integrated into the background with correct lighting and shadows.`,
         HARD_CONSTRAINTS,
       ].join(' ')
     } else if (images.length === 1 && clothingImageUrl) {
-      // 의류만 있음 (모델 이미지 없음)
+      // ── 의류만 ──
       prompt = [
         `Create a hyper-realistic professional fashion lookbook photograph.`,
-        `Image 1 is the CLOTHING ITEM — reproduce this garment EXACTLY with all details.`,
-        `Show a ${modelDesc} model wearing it naturally in a ${poseTypeText}, ${poseStyleText}.`,
-        `Background: ${bgDesc}. Lighting and shadows are fully consistent and photorealistic.`,
+        `Image 1 = CLOTHING ITEM — reproduce EXACTLY with all design details.`,
+        `Model: ${modelDesc}. Show in a ${poseTypeText}, ${poseStyleText}.`,
+        `Background: ${bgDesc} (${bgName}). Photorealistic environment with correct lighting and shadows.`,
         HARD_CONSTRAINTS,
       ].join(' ')
     } else {
-      // 이미지 없음 → 순수 텍스트 기반
+      // ── 이미지 없음 → 텍스트 기반 ──
       prompt = [
         `Ultra-photorealistic professional fashion photography.`,
         `A ${modelDesc} fashion model, ${poseTypeText}, ${poseStyleText}.`,
-        `Background: ${bgDesc} (${bgName}). Natural lighting, seamless integration.`,
-        `8K resolution, Canon EOS R5, professional studio lighting, hyperrealistic skin texture, perfect fabric detail, commercial fashion editorial, magazine quality.`,
+        `Background: ${bgDesc} (${bgName}). Natural lighting, seamless scene integration.`,
+        `8K resolution, Canon EOS R5, professional lighting, hyperrealistic skin texture, perfect fabric detail, commercial fashion editorial, magazine quality.`,
         HARD_CONSTRAINTS,
       ].join(' ')
     }
 
-    console.log('Prompt (first 200):', prompt.substring(0, 200))
-    console.log('images count:', images.length)
+    // 어드민 프롬프트 주입 (requestBody 생성 전에 적용)
+    prompt = injectAdminPrompt(prompt)
+
+    console.log('Prompt (first 300):', prompt.substring(0, 300))
+    console.log('images count:', images.length, '| mode:', images.length >= 3 ? 'FULL(clothing+model+bg)' : images.length === 2 ? 'PARTIAL' : images.length === 1 ? 'CLOTHING_ONLY' : 'TEXT')
 
     // ── Atlas Cloud API 요청: google/nano-banana-2/edit ──
     const requestBody: any = {
@@ -874,8 +884,6 @@ app.post('/api/generation/start', async (c) => {
       requestBody.images = images
     }
 
-    // 어드민 프롬프트 주입
-    prompt = injectAdminPrompt(prompt)
     console.log('Final prompt (first 300):', prompt.substring(0, 300))
 
     // 생성 수량 3장 고정 (count 파라미터 무시)
