@@ -1548,317 +1548,235 @@ app.get('/generator', (c) => {
   return c.html(htmlShell('AI 룩북 생성', `
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Navbar -->
-  <nav id="navbar">
-    <div class="navbar-inner">
-      <a href="/generator" class="navbar-logo">
-        <div class="logo-icon">✨</div>
-        <span>LookbookAI</span>
-      </a>
-      <div style="flex:1;"></div>
-    </div>
-  </nav>
+  <!-- ════════════════════════════════════════
+       GENERATOR APP — position:fixed 전체화면
+       step-panel: position:absolute inset:0
+       translateX 슬라이드 전환
+       높이 계산 JS 완전 제거
+  ════════════════════════════════════════ -->
+  <div id="gapp">
 
-  <div id="generator-page" style="height:calc(100vh - 64px);overflow:hidden;display:flex;flex-direction:column;">
+    <!-- ── 상단 바 (고정) ── -->
+    <header id="gapp-header">
+      <a href="/" class="gapp-logo">✨ LookbookAI</a>
+      <div id="gapp-steps">
+        <span class="gstep" id="gs1">1</span>
+        <span class="gstep-line" id="gl1"></span>
+        <span class="gstep" id="gs2">2</span>
+        <span class="gstep-line" id="gl2"></span>
+        <span class="gstep" id="gs3">3</span>
+        <span class="gstep-line" id="gl3"></span>
+        <span class="gstep" id="gs4">4</span>
+        <span class="gstep-line" id="gl4"></span>
+        <span class="gstep" id="gs5">5</span>
+      </div>
+    </header>
 
-    <!-- Generator Body -->
-    <div class="generator-body" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;padding:0;">
+    <!-- ── 슬라이드 컨테이너 ── -->
+    <div id="gapp-slides">
 
-      <!-- ─── Step 1: Upload ─── -->
-      <div class="step-panel active" id="step-1" style="flex-direction:column;overflow:hidden;padding:20px 20px 0;">
-        <div class="step-title-area" style="flex-shrink:0;">
-          <div class="step-num-badge">Step 1 / 5 · 의류 업로드</div>
-          <h2 class="step-heading">의류 이미지를 업로드하세요</h2>
-          <p class="step-sub">배경이 흰색이거나 투명한 이미지를 사용하면 가장 좋은 결과를 얻을 수 있어요.</p>
-        </div>
+      <!-- STEP 1 · 의류 업로드 -->
+      <div class="gslide active" id="step-1">
+        <div class="gslide-body">
+          <div class="gstep-label">Step 1 / 5 · 의류 업로드</div>
+          <h2 class="gstep-title">의류 이미지를 업로드하세요</h2>
+          <p class="gstep-sub">흰 배경 또는 투명 배경 이미지를 사용하면 가장 좋은 결과를 얻을 수 있어요.</p>
 
-        <div id="uploadArea" class="upload-area" style="flex:1;overflow-y:auto;"
-          ondragover="handleDragOver(event)"
-          ondragleave="handleDragLeave(event)"
-          ondrop="handleDrop(event)"
-          onclick="document.getElementById('fileInput').click()">
-          <div class="upload-icon">📤</div>
-          <h3 class="upload-title">이미지를 드래그하거나 클릭하여 업로드</h3>
-          <p class="upload-desc">PNG, JPG, WEBP 형식 지원 · 최대 10MB</p>
-          <button class="btn btn-primary" type="button">파일 선택</button>
-          <div class="upload-formats" style="margin-top:16px;">권장: 흰 배경, 정면 전신 샷, 고해상도 이미지</div>
-          <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(event)" />
-        </div>
+          <div id="uploadArea" class="upload-area"
+            ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
+            ondrop="handleDrop(event)" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">📤</div>
+            <h3 class="upload-title">이미지를 드래그하거나 클릭하여 업로드</h3>
+            <p class="upload-desc">PNG, JPG, WEBP · 최대 10MB</p>
+            <button class="btn btn-primary" type="button">파일 선택</button>
+            <div class="upload-formats" style="margin-top:12px;">권장: 흰 배경, 정면 전신 샷</div>
+            <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileSelect(event)" />
+          </div>
 
-        <div id="uploadPreview" class="upload-preview hidden" style="flex:1;overflow-y:auto;">
-          <div class="upload-preview-inner">
-            <div class="upload-preview-img">
-              <img id="previewImg" src="" alt="업로드된 의류" />
-            </div>
-            <div class="upload-preview-info">
-              <div class="upload-preview-name" id="previewName">-</div>
-              <div class="upload-preview-meta" id="previewMeta">-</div>
-              <button class="btn btn-ghost btn-sm" style="margin-top:16px;" onclick="resetUpload()">
-                <i class="fas fa-redo"></i> 다시 선택
-              </button>
+          <div id="uploadPreview" class="upload-preview hidden">
+            <div class="upload-preview-inner">
+              <div class="upload-preview-img"><img id="previewImg" src="" alt="업로드된 의류" /></div>
+              <div class="upload-preview-info">
+                <div class="upload-preview-name" id="previewName">-</div>
+                <div class="upload-preview-meta" id="previewMeta">-</div>
+                <button class="btn btn-ghost btn-sm" style="margin-top:12px;" onclick="resetUpload()">
+                  <i class="fas fa-redo"></i> 다시 선택
+                </button>
+              </div>
             </div>
           </div>
         </div>
-
-        <div class="step-nav">
-          <button class="step-nav-back" onclick="prevStep(1)">
-            <i class="fas fa-arrow-left"></i> 이전
-          </button>
-          <button class="step-nav-next" id="nextBtn1" onclick="nextStep(1)" disabled>
-            다음 단계 <i class="fas fa-arrow-right"></i>
-          </button>
+        <div class="gslide-nav">
+          <button class="step-nav-back" onclick="prevStep(1)"><i class="fas fa-arrow-left"></i> 이전</button>
+          <button class="step-nav-next" id="nextBtn1" onclick="nextStep(1)" disabled>다음 단계 <i class="fas fa-arrow-right"></i></button>
         </div>
       </div>
 
-      <!-- ─── Step 2: Model (그리드 선택) ─── -->
-      <div class="step-panel" id="step-2" style="flex-direction:column;overflow:hidden;">
-        <div id="step2Header" style="flex-shrink:0;padding:12px 16px 0;">
-          <div class="step-num-badge">Step 2 / 5 · 모델 선택</div>
-          <h2 style="font-size:18px;font-weight:800;margin:4px 0 8px;">AI 모델을 선택하세요</h2>
-          <div class="model-filters" id="modelFilters">
-            <button class="filter-tag active" onclick="filterModels('all', this)">전체</button>
-            <button class="filter-tag" onclick="filterModels('여성', this)">여성</button>
-            <button class="filter-tag" onclick="filterModels('남성', this)">남성</button>
+      <!-- STEP 2 · 모델 선택 -->
+      <div class="gslide" id="step-2">
+        <div class="gslide-header">
+          <div class="gstep-label">Step 2 / 5 · 모델 선택</div>
+          <h2 class="gstep-title">AI 모델을 선택하세요</h2>
+          <div class="gfilter-bar model-filters" id="modelFilters">
+            <button class="filter-tag active" onclick="filterModels('all',this)">전체</button>
+            <button class="filter-tag" onclick="filterModels('여성',this)">여성</button>
+            <button class="filter-tag" onclick="filterModels('남성',this)">남성</button>
           </div>
         </div>
-
-        <div id="modelsLoading" style="flex:1;text-align:center;padding:60px;color:var(--text-muted);">
-          <div style="font-size:36px;margin-bottom:12px;">⏳</div>
-          <p>모델 목록을 불러오는 중...</p>
-        </div>
-
-        <div id="modelGridWrap" style="display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;">
-          <!-- PC 전용 스크롤 화살표 -->
-          <button class="grid-scroll-btn grid-scroll-left" id="modelScrollLeft" onclick="gridScroll('modelGridWrap','left')" aria-label="위로">
-            <i class="fas fa-chevron-up"></i>
-          </button>
+        <div class="gslide-grid" id="modelGridWrap">
+          <div id="modelsLoading" class="grid-loading">
+            <div style="font-size:32px;">⏳</div><p>모델 불러오는 중...</p>
+          </div>
           <div class="select-grid" id="modelGrid"></div>
-          <button class="grid-scroll-btn grid-scroll-right" id="modelScrollRight" onclick="gridScroll('modelGridWrap','right')" aria-label="아래로">
-            <i class="fas fa-chevron-down"></i>
-          </button>
         </div>
-
-        <div id="step2Nav" class="step-nav" style="flex-shrink:0;">
-          <button class="step-nav-back" onclick="prevStep(2)">
-            <i class="fas fa-arrow-left"></i> 이전
-          </button>
-          <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)">
-            다음 단계 <i class="fas fa-arrow-right"></i>
-          </button>
+        <div class="gslide-nav">
+          <button class="step-nav-back" onclick="prevStep(2)"><i class="fas fa-arrow-left"></i> 이전</button>
+          <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)">다음 단계 <i class="fas fa-arrow-right"></i></button>
         </div>
       </div>
 
-      <!-- ─── Step 3: Background (그리드 선택) ─── -->
-      <div class="step-panel" id="step-3" style="flex-direction:column;overflow:hidden;">
-        <div id="step3Header" style="flex-shrink:0;padding:12px 16px 0;">
-          <div class="step-num-badge">Step 3 / 5 · 배경 선택</div>
-          <h2 style="font-size:18px;font-weight:800;margin:4px 0 8px;">배경을 선택하세요</h2>
-          <div class="bg-categories" id="bgCategories">
-            <button class="bg-cat active" onclick="filterBg('전체', this)">전체</button>
-            <button class="bg-cat" onclick="filterBg('스튜디오', this)">스튜디오</button>
-            <button class="bg-cat" onclick="filterBg('실내', this)">실내</button>
-            <button class="bg-cat" onclick="filterBg('야외', this)">야외</button>
-            <button class="bg-cat" onclick="filterBg('스트리트', this)">스트리트</button>
-            <button class="bg-cat" onclick="filterBg('카페', this)">카페</button>
-            <button class="bg-cat" onclick="filterBg('럭셔리', this)">럭셔리</button>
+      <!-- STEP 3 · 배경 선택 -->
+      <div class="gslide" id="step-3">
+        <div class="gslide-header">
+          <div class="gstep-label">Step 3 / 5 · 배경 선택</div>
+          <h2 class="gstep-title">배경을 선택하세요</h2>
+          <div class="gfilter-bar bg-categories" id="bgCategories">
+            <button class="bg-cat active" onclick="filterBg('전체',this)">전체</button>
+            <button class="bg-cat" onclick="filterBg('스튜디오',this)">스튜디오</button>
+            <button class="bg-cat" onclick="filterBg('실내',this)">실내</button>
+            <button class="bg-cat" onclick="filterBg('야외',this)">야외</button>
+            <button class="bg-cat" onclick="filterBg('스트리트',this)">스트리트</button>
+            <button class="bg-cat" onclick="filterBg('카페',this)">카페</button>
+            <button class="bg-cat" onclick="filterBg('럭셔리',this)">럭셔리</button>
           </div>
         </div>
-
-        <div id="bgsLoading" style="flex:1;text-align:center;padding:60px;color:var(--text-muted);">
-          <div style="font-size:36px;margin-bottom:12px;">⏳</div>
-          <p>배경 목록을 불러오는 중...</p>
-        </div>
-
-        <div id="bgGridWrap" style="display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;">
-          <!-- PC 전용 스크롤 화살표 -->
-          <button class="grid-scroll-btn grid-scroll-left" id="bgScrollLeft" onclick="gridScroll('bgGridWrap','left')" aria-label="위로">
-            <i class="fas fa-chevron-up"></i>
-          </button>
+        <div class="gslide-grid" id="bgGridWrap">
+          <div id="bgsLoading" class="grid-loading">
+            <div style="font-size:32px;">⏳</div><p>배경 불러오는 중...</p>
+          </div>
           <div class="select-grid" id="bgGrid"></div>
-          <button class="grid-scroll-btn grid-scroll-right" id="bgScrollRight" onclick="gridScroll('bgGridWrap','right')" aria-label="아래로">
-            <i class="fas fa-chevron-down"></i>
-          </button>
         </div>
-
-        <div id="step3Nav" class="step-nav" style="flex-shrink:0;">
-          <button class="step-nav-back" onclick="prevStep(3)">
-            <i class="fas fa-arrow-left"></i> 이전
-          </button>
-          <button class="step-nav-next" id="nextBtn3" onclick="nextStep(3)">
-            다음 단계 <i class="fas fa-arrow-right"></i>
-          </button>
+        <div class="gslide-nav">
+          <button class="step-nav-back" onclick="prevStep(3)"><i class="fas fa-arrow-left"></i> 이전</button>
+          <button class="step-nav-next" id="nextBtn3" onclick="nextStep(3)">다음 단계 <i class="fas fa-arrow-right"></i></button>
         </div>
       </div>
 
-      <!-- ─── Step 4: Generate ─── -->
-      <div class="step-panel" id="step-4" style="flex-direction:column;overflow:hidden;padding:20px 20px 0;">
-        <div class="step-title-area" id="step5TitleArea" style="flex-shrink:0;">
-          <div class="step-num-badge">Step 4 / 5 · 생성 옵션</div>
-          <h2 class="step-heading">생성 옵션을 설정하세요</h2>
-          <p class="step-sub">화면 비율, 해상도, 구도, 포즈를 선택하세요.</p>
-        </div>
-
-        <div id="genOptionsView" style="flex:1;overflow-y:auto;">
-          <div class="gen-options-grid">
-            <div class="gen-option-group">
-              <div class="gen-option-title">🖼️ 화면 비율</div>
-              <div class="option-chips">
-                <div class="option-chip" onclick="selectOption(this, 'ratio')">1:1</div>
-                <div class="option-chip" onclick="selectOption(this, 'ratio')">4:5</div>
-                <div class="option-chip selected" onclick="selectOption(this, 'ratio')">3:4</div>
-                <div class="option-chip" onclick="selectOption(this, 'ratio')">9:16</div>
+      <!-- STEP 4 · 생성 옵션 -->
+      <div class="gslide" id="step-4">
+        <div class="gslide-body">
+          <div class="gstep-label">Step 4 / 5 · 생성 옵션</div>
+          <h2 class="gstep-title">생성 옵션을 설정하세요</h2>
+          <div id="genOptionsView">
+            <div class="gen-options-grid">
+              <div class="gen-option-group">
+                <div class="gen-option-title">🖼️ 화면 비율</div>
+                <div class="option-chips">
+                  <div class="option-chip" onclick="selectOption(this,'ratio')">1:1</div>
+                  <div class="option-chip" onclick="selectOption(this,'ratio')">4:5</div>
+                  <div class="option-chip selected" onclick="selectOption(this,'ratio')">3:4</div>
+                  <div class="option-chip" onclick="selectOption(this,'ratio')">9:16</div>
+                </div>
+              </div>
+              <div class="gen-option-group">
+                <div class="gen-option-title">✨ 해상도</div>
+                <div class="option-chips">
+                  <div class="option-chip" onclick="selectOption(this,'resolution')">표준</div>
+                  <div class="option-chip selected" onclick="selectOption(this,'resolution')">HD</div>
+                  <div class="option-chip" onclick="selectOption(this,'resolution')">4K</div>
+                </div>
+              </div>
+              <div class="gen-option-group">
+                <div class="gen-option-title">🎯 구도</div>
+                <div class="option-chips">
+                  <div class="option-chip selected" onclick="selectOption(this,'pose_type')">전신</div>
+                  <div class="option-chip" onclick="selectOption(this,'pose_type')">반신</div>
+                  <div class="option-chip" onclick="selectOption(this,'pose_type')">상반신</div>
+                </div>
+              </div>
+              <div class="gen-option-group">
+                <div class="gen-option-title">🧍 포즈</div>
+                <div class="option-chips">
+                  <div class="option-chip selected" onclick="selectOption(this,'pose')">정면</div>
+                  <div class="option-chip" onclick="selectOption(this,'pose')">측면</div>
+                  <div class="option-chip" onclick="selectOption(this,'pose')">워킹</div>
+                  <div class="option-chip" onclick="selectOption(this,'pose')">정적</div>
+                </div>
               </div>
             </div>
-            <div class="gen-option-group">
-              <div class="gen-option-title">✨ 해상도</div>
-              <div class="option-chips">
-                <div class="option-chip" onclick="selectOption(this, 'resolution')">표준</div>
-                <div class="option-chip selected" onclick="selectOption(this, 'resolution')">HD</div>
-                <div class="option-chip" onclick="selectOption(this, 'resolution')">4K</div>
-              </div>
-            </div>
-            <div class="gen-option-group">
-              <div class="gen-option-title">🎯 구도</div>
-              <div class="option-chips">
-                <div class="option-chip selected" onclick="selectOption(this, 'pose_type')">전신</div>
-                <div class="option-chip" onclick="selectOption(this, 'pose_type')">반신</div>
-                <div class="option-chip" onclick="selectOption(this, 'pose_type')">상반신</div>
-              </div>
-            </div>
-            <div class="gen-option-group">
-              <div class="gen-option-title">🧍 포즈</div>
-              <div class="option-chips">
-                <div class="option-chip selected" onclick="selectOption(this, 'pose')">정면</div>
-                <div class="option-chip" onclick="selectOption(this, 'pose')">측면</div>
-                <div class="option-chip" onclick="selectOption(this, 'pose')">워킹</div>
-                <div class="option-chip" onclick="selectOption(this, 'pose')">정적</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="gen-summary" id="genSummary">
-            <div class="gen-summary-title">생성 요약</div>
-            <div class="gen-summary-grid">
-              <div class="gen-summary-item">
-                <div class="gen-summary-label">선택된 모델</div>
-                <div class="gen-summary-val" id="sumModel">-</div>
-              </div>
-              <div class="gen-summary-item">
-                <div class="gen-summary-label">선택된 배경</div>
-                <div class="gen-summary-val" id="sumBg">-</div>
-              </div>
-              <div class="gen-summary-item">
-                <div class="gen-summary-label">생성 수량</div>
-                <div class="gen-summary-val">3장 (고정)</div>
+            <div class="gen-summary" id="genSummary">
+              <div class="gen-summary-title">생성 요약</div>
+              <div class="gen-summary-grid">
+                <div class="gen-summary-item"><div class="gen-summary-label">선택된 모델</div><div class="gen-summary-val" id="sumModel">-</div></div>
+                <div class="gen-summary-item"><div class="gen-summary-label">선택된 배경</div><div class="gen-summary-val" id="sumBg">-</div></div>
+                <div class="gen-summary-item"><div class="gen-summary-label">생성 수량</div><div class="gen-summary-val">3장 (고정)</div></div>
               </div>
             </div>
           </div>
-        </div>
-
-        <!-- Generating View -->
-        <div class="generating-view" id="generatingView">
-          <div class="gen-spinner"></div>
-          <h2 style="font-size:24px;font-weight:800;margin-bottom:12px;">AI가 이미지를 생성 중입니다...</h2>
-          <p style="color:var(--text-muted);margin-bottom:0;">Atlas Cloud AI가 실사 패션 이미지를 생성하고 있습니다. 잠시만 기다려주세요.</p>
-          <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
-          <div class="gen-status-text" id="genStatusText">시작 중...</div>
-          <div class="gen-status-msgs">
-            <div class="gen-msg current" id="msg1"><div class="dot"></div> 의류 이미지 분석 중...</div>
-            <div class="gen-msg" id="msg2"><div class="dot"></div> AI 모델 피팅 적용 중...</div>
-            <div class="gen-msg" id="msg3"><div class="dot"></div> 배경 합성 중...</div>
-            <div class="gen-msg" id="msg4"><div class="dot"></div> 이미지 품질 향상 중...</div>
-            <div class="gen-msg" id="msg5"><div class="dot"></div> 최종 렌더링 중...</div>
+          <div class="generating-view" id="generatingView">
+            <div class="gen-spinner"></div>
+            <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;">AI가 이미지를 생성 중입니다...</h2>
+            <p style="color:var(--text-muted);font-size:13px;">Atlas Cloud AI가 실사 패션 이미지를 생성하고 있습니다.</p>
+            <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
+            <div class="gen-status-text" id="genStatusText">시작 중...</div>
+            <div class="gen-status-msgs">
+              <div class="gen-msg current" id="msg1"><div class="dot"></div> 의류 이미지 분석 중...</div>
+              <div class="gen-msg" id="msg2"><div class="dot"></div> AI 모델 피팅 적용 중...</div>
+              <div class="gen-msg" id="msg3"><div class="dot"></div> 배경 합성 중...</div>
+              <div class="gen-msg" id="msg4"><div class="dot"></div> 이미지 품질 향상 중...</div>
+              <div class="gen-msg" id="msg5"><div class="dot"></div> 최종 렌더링 중...</div>
+            </div>
           </div>
         </div>
-
-        <div class="step-nav" id="step5Nav" style="flex-shrink:0;">
-          <button class="step-nav-back" onclick="prevStep(4)">
-            <i class="fas fa-arrow-left"></i> 이전
-          </button>
-          <button class="step-nav-next" onclick="startGeneration()">
-            <i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작
-          </button>
+        <div class="gslide-nav" id="step5Nav">
+          <button class="step-nav-back" onclick="prevStep(4)"><i class="fas fa-arrow-left"></i> 이전</button>
+          <button class="step-nav-next" onclick="startGeneration()"><i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작</button>
         </div>
       </div>
 
-      <!-- ─── Step 5: Results ─── -->
-      <div class="step-panel" id="step-5" style="flex-direction:column;overflow:hidden;padding:20px 20px 0;">
-        <div class="step-title-area" style="flex-shrink:0;">
-          <div class="step-num-badge">Step 5 / 5 · 생성 완료 ✅</div>
-          <h2 class="step-heading">이미지가 생성되었습니다!</h2>
-          <p class="step-sub">AI가 생성한 실사 피팅컷을 확인하고 다운로드하세요.</p>
-        </div>
-
-        <div class="results-toolbar" style="flex-shrink:0;">
-          <div class="results-tabs">
-            <button class="results-tab active" onclick="switchResultsTab('fitting', this)">피팅컷</button>
-            <button class="results-tab" onclick="switchResultsTab('styleset', this)">스타일샷 세트</button>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-secondary btn-sm" onclick="showToast('즐겨찾기에 추가되었습니다.', 'success')">
-              <i class="fas fa-heart"></i> 즐겨찾기
-            </button>
-            <button class="btn btn-primary btn-sm" onclick="downloadAll()">
-              <i class="fas fa-download"></i> 일괄 다운로드
-            </button>
-          </div>
-        </div>
-
-        <div style="flex:1;overflow-y:auto;">
-          <div class="results-grid" id="resultsGrid">
-            <!-- Populated by JS -->
-          </div>
-
-          <div style="margin-top:40px;padding:24px;background:linear-gradient(135deg,var(--primary-bg),#F0EDFF);border-radius:var(--radius-xl);border:1px solid rgba(108,71,255,0.2);">
-            <h3 style="font-size:18px;font-weight:700;margin-bottom:8px;">스타일샷 세트로 확장하기</h3>
-            <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px;">피팅컷을 기반으로 상세용, 광고용, SNS용, 룩북용 이미지 세트를 추가 생성할 수 있습니다.</p>
-            <div style="display:flex;gap:12px;flex-wrap:wrap;">
-              <button class="btn btn-primary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">상세페이지용 세트</button>
-              <button class="btn btn-secondary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">광고용 세트</button>
-              <button class="btn btn-secondary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">SNS용 세트</button>
-              <button class="btn btn-secondary btn-sm" onclick="showToast('스타일샷 세트 생성 중...', 'info')">룩북용 세트</button>
+      <!-- STEP 5 · 결과 -->
+      <div class="gslide" id="step-5">
+        <div class="gslide-header">
+          <div class="gstep-label">Step 5 / 5 · 생성 완료 ✅</div>
+          <h2 class="gstep-title">이미지가 생성되었습니다!</h2>
+          <div class="results-toolbar" style="padding:0;border:none;margin-top:8px;">
+            <div class="results-tabs">
+              <button class="results-tab active" onclick="switchResultsTab('fitting',this)">피팅컷</button>
+              <button class="results-tab" onclick="switchResultsTab('styleset',this)">스타일샷</button>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-primary btn-sm" onclick="downloadAll()"><i class="fas fa-download"></i> 다운로드</button>
             </div>
           </div>
         </div>
-
-        <div class="step-nav" style="flex-shrink:0;">
-          <button class="step-nav-back" onclick="window.location.href='/dashboard'">
-            <i class="fas fa-th-large"></i> 대시보드로
-          </button>
-          <button class="step-nav-next" onclick="window.location.href='/generator'">
-            <i class="fas fa-plus"></i> 새 프로젝트
-          </button>
+        <div class="gslide-scroll">
+          <div class="results-grid" id="resultsGrid"></div>
+        </div>
+        <div class="gslide-nav">
+          <button class="step-nav-back" onclick="window.location.href='/generator'"><i class="fas fa-plus"></i> 새 프로젝트</button>
+          <button class="step-nav-next" onclick="window.location.href='/'"><i class="fas fa-home"></i> 홈으로</button>
         </div>
       </div>
-    </div>
-  </div>
+
+    </div><!-- /gapp-slides -->
+  </div><!-- /gapp -->
 
   <!-- Image View Modal -->
   <div class="modal-overlay image-modal" id="imageModal">
     <div class="modal-box" style="max-width:900px;width:95vw;padding:0;overflow:hidden;background:var(--dark);">
       <button class="modal-close" style="background:rgba(255,255,255,0.1);color:white;top:16px;right:16px;z-index:10;" onclick="closeModal('imageModal')">×</button>
       <div class="image-modal-inner">
-        <div class="image-modal-preview">
-          <img id="modalImage" src="" alt="생성된 이미지" />
-        </div>
+        <div class="image-modal-preview"><img id="modalImage" src="" alt="생성된 이미지" /></div>
         <div class="image-modal-sidebar">
           <div class="image-modal-title" id="modalImageTitle">생성된 피팅컷</div>
           <div class="image-modal-meta" id="modalImageMeta">832 × 1216px · PNG</div>
           <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:16px 0;" />
           <div class="image-modal-actions">
-            <button class="btn btn-primary btn-full" onclick="downloadImage()">
-              <i class="fas fa-download"></i> 다운로드
-            </button>
-            <button class="btn btn-full" style="background:rgba(255,255,255,0.1);color:white;" onclick="toggleFavorite()">
-              <i class="fas fa-heart" id="modalFavIcon"></i> 즐겨찾기
-            </button>
+            <button class="btn btn-primary btn-full" onclick="downloadImage()"><i class="fas fa-download"></i> 다운로드</button>
+            <button class="btn btn-full" style="background:rgba(255,255,255,0.1);color:white;" onclick="toggleFavorite()"><i class="fas fa-heart" id="modalFavIcon"></i> 즐겨찾기</button>
           </div>
           <div style="margin-top:auto;">
-            <div style="font-size:11px;color:var(--gray-4);line-height:1.6;" id="modalImageDetail">
-              생성 모델: Atlas Cloud AI<br />
-              해상도: 832 × 1216px<br />
-              형식: PNG
-            </div>
+            <div style="font-size:11px;color:var(--gray-4);line-height:1.6;" id="modalImageDetail">생성 모델: Atlas Cloud AI<br/>해상도: 832 × 1216px<br/>형식: PNG</div>
           </div>
         </div>
       </div>

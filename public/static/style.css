@@ -974,173 +974,206 @@ footer {
 .new-project-text { font-size: 14px; font-weight: 600; color: var(--primary); }
 
 /* ============ GENERATOR ============ */
-#generator-page {
+/* ═══════════════════════════════════════════════════
+   GENERATOR APP — position:fixed 전체화면 구조
+   구 generator-page / step-panel 완전 교체
+═══════════════════════════════════════════════════ */
+
+/* 앱 컨테이너: 전체화면 고정 */
+#gapp {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
   background: var(--gray-1);
-  padding-top: 64px;
-  /* height는 inline style(height:100vh)로 제어 — min-height 제거하여 overflow 방지 */
+  z-index: 200;
 }
 
-.generator-header {
+/* 상단 헤더 */
+#gapp-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 52px;
   background: var(--white);
   border-bottom: 1px solid var(--border);
-  padding: 16px 32px;
 }
-.generator-header-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 24px;
+.gapp-logo {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--primary);
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-/* Step Progress */
-.step-progress {
+/* step 진행 표시 */
+#gapp-steps {
+  flex: 1;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0;
-  flex: 1;
 }
-.step-item {
-  display: flex;
-  align-items: center;
-  flex: 1;
-}
-.step-item:last-child { flex: none; }
-.step-dot {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
+.gstep {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   border: 2px solid var(--border);
   background: var(--white);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-muted);
-  transition: var(--transition);
   flex-shrink: 0;
-  position: relative;
-  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
-.step-dot.active { border-color: var(--primary); background: var(--primary); color: white; }
-.step-dot.done { border-color: var(--success); background: var(--success); color: white; }
-.step-line {
-  flex: 1;
+.gstep.active  { border-color: var(--primary); background: var(--primary); color: #fff; }
+.gstep.done    { border-color: var(--success);  background: var(--success);  color: #fff; }
+.gstep-line {
+  width: 20px;
   height: 2px;
   background: var(--border);
-  transition: var(--transition);
+  transition: background 0.2s;
 }
-.step-line.done { background: var(--success); }
-.step-label {
+.gstep-line.done { background: var(--success); }
+
+/* 슬라이드 영역: 남은 공간 전부 */
+#gapp-slides {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 각 슬라이드: absolute 전체 채우기 */
+.gslide {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-.step-dot.active .step-label { color: var(--primary); }
-.step-dot.done .step-label { color: var(--success); }
-
-/* Generator Body */
-.generator-body {
-  /* flex:1 + overflow:hidden은 inline style로 제어 */
-  /* padding 제거: step-panel 내부에서 개별 처리 */
-}
-
-.step-panel {
-  display: none;
-}
-.step-panel.active {
+  inset: 0;
   display: flex;
   flex-direction: column;
-  flex: 1;          /* generator-body의 남은 높이 전부 차지 */
-  min-height: 0;    /* flex 자식의 overflow 허용 */
-  animation: fadeIn 0.3s ease;
+  background: var(--gray-1);
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  will-change: transform;
+}
+.gslide.active  { transform: translateX(0); }
+.gslide.prev    { transform: translateX(-100%); }
+
+/* 슬라이드 내부 레이아웃 공통 */
+
+/* body형 (step1,4): 내용 스크롤 */
+.gslide-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px 16px 0;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.step-title-area {
-  margin-bottom: 32px;
-}
-/* ─── Step 2/3 그리드 레이아웃 ─── */
-
-/* 헤더 영역 — 고정 높이 */
-#step2Header,
-#step3Header {
+/* header형 (step2,3,5): 고정 헤더 */
+.gslide-header {
   flex-shrink: 0;
   padding: 12px 16px 0;
-}
-#step2Header .step-num-badge,
-#step3Header .step-num-badge {
-  margin-bottom: 4px;
+  background: var(--gray-1);
 }
 
-/* 필터/카테고리 — 가로 스크롤 */
-#step2Header .model-filters,
-#step3Header .bg-categories {
-  padding: 0 0 8px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  white-space: nowrap;
-  display: flex;
-  gap: 6px;
-  flex-wrap: nowrap;
-}
-#step2Header .model-filters::-webkit-scrollbar,
-#step3Header .bg-categories::-webkit-scrollbar { display: none; }
-
-/* 로딩 상태 — flex:1로 중앙 표시 */
-#modelsLoading,
-#bgsLoading {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 그리드 래퍼 — flex:1로 남은 공간 전부 차지 */
-#modelGridWrap,
-#bgGridWrap {
+/* 그리드 영역 (step2,3): 핵심 — flex:1로 남은 공간 */
+.gslide-grid {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative;
 }
 
-/* 하단 네비 — 고정 */
-#step2Nav,
-#step3Nav {
+/* 결과 스크롤 (step5) */
+.gslide-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 16px;
+}
+
+/* 하단 네비: 항상 하단 고정 */
+.gslide-nav {
   flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   padding: 12px 16px;
-  background: rgba(248, 248, 252, 0.95);
+  background: rgba(248,248,252,0.96);
+  border-top: 1px solid rgba(0,0,0,0.07);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border-top: 1px solid rgba(0,0,0,0.06);
 }
-.step-num-badge {
+
+/* step 레이블/타이틀/서브 */
+.gstep-label {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--primary);
   background: var(--primary-bg);
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  margin-bottom: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 6px;
 }
-.step-heading { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
-.step-sub { font-size: 15px; color: var(--text-muted); }
+.gstep-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+  line-height: 1.3;
+}
+.gstep-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+/* 필터바 (가로 스크롤) */
+.gfilter-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 8px;
+  flex-wrap: nowrap;
+}
+.gfilter-bar::-webkit-scrollbar { display: none; }
+
+/* 로딩 */
+.grid-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 200px;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* 구 generator-page/step-panel 호환 (홈 페이지 등에서 참조 시) */
+.step-panel { display: none; }
+.step-panel.active { display: flex; flex-direction: column; }
+.step-num-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: var(--primary);
+  background: var(--primary-bg); padding: 6px 14px;
+  border-radius: var(--radius-full); margin-bottom: 12px;
+}
+.step-heading { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+.step-sub { font-size: 14px; color: var(--text-muted); }
+.step-title-area { margin-bottom: 20px; }
 
 /* Direction Selection (Step 1) */
 .direction-grid {

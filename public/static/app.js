@@ -324,14 +324,10 @@ async function loadModelsFromAPI() {
     if (AppState.allModels.length === 0) {
       if (loading) {
         loading.style.display = '';
-        loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">👤</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 모델이 없습니다</p><p style="font-size:13px">관리자 페이지에서 모델을 먼저 등록해주세요</p></div>';
+        loading.innerHTML = '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">등록된 모델이 없습니다</p><p style="font-size:12px;margin-top:4px">관리자 페이지에서 모델을 등록해주세요</p>';
       }
     } else {
-      if (wrap) {
-        if (loading) loading.style.display = 'none';
-        wrap.style.display = 'block';
-        renderModelGrid(AppState.allModels);
-      }
+      showGrid('modelsLoading', 'modelGrid', () => renderModelGrid(AppState.allModels));
     }
   } catch (err) {
     console.error('Models load error:', err);
@@ -363,11 +359,7 @@ async function loadBackgroundsFromAPI() {
         loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 배경이 없습니다</p><p style="font-size:13px">관리자 페이지에서 배경을 먼저 등록해주세요</p></div>';
       }
     } else {
-      if (wrap) {
-        if (loading) loading.style.display = 'none';
-        wrap.style.display = 'block';
-        renderBgGrid(AppState.allBackgrounds);
-      }
+      showGrid('bgsLoading', 'bgGrid', () => renderBgGrid(AppState.allBackgrounds));
     }
   } catch (err) {
     console.error('Backgrounds load error:', err);
@@ -441,51 +433,69 @@ function prevStep(currentStep) {
 
 
 function changeStep(newStep) {
-  const currentPanel = document.getElementById(`step-${AppState.currentStep}`);
-  if (currentPanel) currentPanel.classList.remove('active');
+  const prev = AppState.currentStep;
 
-  const newPanel = document.getElementById(`step-${newStep}`);
-  if (newPanel) newPanel.classList.add('active');
+  // gslide 전환 (새 구조)
+  const allSlides = document.querySelectorAll('.gslide');
+  allSlides.forEach(s => { s.classList.remove('active','prev'); });
 
+  const newSlide = document.getElementById(`step-${newStep}`);
+  const oldSlide = document.getElementById(`step-${prev}`);
+
+  if (oldSlide) oldSlide.classList.add('prev');
+  if (newSlide) newSlide.classList.add('active');
+
+  // 뒤로 가면 방향 반전
+  if (newStep < prev) {
+    if (oldSlide) { oldSlide.classList.remove('prev'); oldSlide.style.transform='translateX(100%)'; }
+    if (newSlide) { newSlide.style.transform='translateX(0)'; }
+    // 트랜지션 후 인라인 스타일 정리
+    setTimeout(() => {
+      if (oldSlide) oldSlide.style.transform = '';
+      if (newSlide) newSlide.style.transform = '';
+    }, 300);
+  }
+
+  // gstep 인디케이터 업데이트
   for (let i = 1; i <= 5; i++) {
-    const dot = document.getElementById(`dot-${i}`);
-    const line = document.getElementById(`line-${i}`);
+    const dot  = document.getElementById(`gs${i}`);
+    const line = document.getElementById(`gl${i}`);
     if (dot) {
-      dot.classList.remove('active', 'done');
-      if (i < newStep) dot.classList.add('done');
+      dot.classList.remove('active','done');
+      if (i < newStep)      dot.classList.add('done');
       else if (i === newStep) dot.classList.add('active');
     }
-    if (line) {
-      line.classList.toggle('done', i < newStep);
-    }
+    if (line) line.classList.toggle('done', i < newStep);
   }
 
   AppState.currentStep = newStep;
-  window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // Step 2: 모델 그리드 초기화
+  // Step 2: 모델 그리드
   if (newStep === 2) {
-    const loading = document.getElementById('modelsLoading');
-    const wrap = document.getElementById('modelGridWrap');
     if (AppState.allModels.length > 0) {
-      if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'block'; renderModelGrid(AppState.allModels); }
+      showGrid('modelsLoading', 'modelGrid', () => renderModelGrid(AppState.allModels));
     } else {
       loadModelsFromAPI();
     }
   }
 
-  // Step 3: 배경 그리드 초기화
+  // Step 3: 배경 그리드
   if (newStep === 3) {
-    const loading = document.getElementById('bgsLoading');
-    const wrap = document.getElementById('bgGridWrap');
     if (AppState.allBackgrounds.length > 0) {
-      if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'block'; renderBgGrid(AppState.allBackgrounds); }
+      showGrid('bgsLoading', 'bgGrid', () => renderBgGrid(AppState.allBackgrounds));
     } else {
       loadBackgroundsFromAPI();
     }
   }
+}
+
+// 로딩 숨기고 그리드 표시 헬퍼
+function showGrid(loadingId, gridId, renderFn) {
+  const loading = document.getElementById(loadingId);
+  const grid    = document.getElementById(gridId);
+  if (loading) loading.style.display = 'none';
+  if (grid)    grid.style.display    = '';
+  if (renderFn) renderFn();
 }
 
 // ─────────────────────────────────────────────────────────
@@ -597,15 +607,8 @@ function updateGridScrollBtns(wrapId) {
 // STEP 2: Model Selection — 그리드 UI
 // ─────────────────────────────────────────────────────────
 
-// ── 그리드 컨테이너 높이: flex:1로 남은 공간 차지 (CSS 기반) ──
-function fixGridHeight(wrapId) {
-  const wrap = document.getElementById(wrapId);
-  if (!wrap) return;
-  // flex:1 + min-height:0 으로 부모 남은 공간 자동 점유
-  wrap.style.flex = '1';
-  wrap.style.minHeight = '0';
-  wrap.style.overflowY = 'auto';
-}
+// fixGridHeight — 새 구조에서는 CSS flex:1 로 자동처리, 빈 함수 유지
+function fixGridHeight(wrapId) { /* no-op: CSS .gslide-grid { flex:1 } 으로 처리 */ }
 
 function renderModelGrid(models) {
   const grid = document.getElementById('modelGrid');
@@ -647,16 +650,6 @@ function renderModelGrid(models) {
     grid.appendChild(card);
   });
 
-  // 높이 강제 설정 — rAF로 DOM 렌더 후 계산
-  requestAnimationFrame(() => {
-    fixGridHeight('modelGridWrap');
-    const wrap = document.getElementById('modelGridWrap');
-    if (wrap && !wrap._scrollBound) {
-      wrap._scrollBound = true;
-      wrap.addEventListener('scroll', () => updateGridScrollBtns('modelGridWrap'));
-    }
-    updateGridScrollBtns('modelGridWrap');
-  });
 }
 
 let modelFilterState = { gender: null };
@@ -716,16 +709,6 @@ function renderBgGrid(bgs) {
     grid.appendChild(card);
   });
 
-  // 높이 강제 설정 — rAF로 DOM 렌더 후 계산
-  requestAnimationFrame(() => {
-    fixGridHeight('bgGridWrap');
-    const wrap = document.getElementById('bgGridWrap');
-    if (wrap && !wrap._scrollBound) {
-      wrap._scrollBound = true;
-      wrap.addEventListener('scroll', () => updateGridScrollBtns('bgGridWrap'));
-    }
-    updateGridScrollBtns('bgGridWrap');
-  });
 }
 
 function filterBg(category, btn) {
