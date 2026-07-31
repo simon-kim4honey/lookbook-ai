@@ -2009,26 +2009,29 @@ app.get('/generator', (c) => {
         <div class="gslide-body">
           <div class="gstep-label">Step 1 / 3 · 의류 업로드</div>
           <h2 class="gstep-title">의류 이미지를 업로드하세요</h2>
-          <p class="gstep-sub">상의, 하의, 아우터 등 여러 장을 한 번에 업로드하면<br>AI가 자동으로 분류하여 착장합니다 (최대 5장)</p>
+          <p class="gstep-sub">상의·하의·아우터 등 여러 장 동시 업로드 가능 (최대 5장)<br>AI가 자동으로 종류를 분류합니다</p>
 
-          <!-- 드래그 업로드 영역 (아이템 없을 때만 표시) -->
-          <div id="uploadArea" class="upload-area"
+          <!-- 통합 업로드 존: 항상 표시, 드래그&드롭 + 카드 그리드 -->
+          <div id="uploadZone" class="upload-zone"
             ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
-            ondrop="handleDrop(event)" onclick="document.getElementById('fileInput').click()">
-            <div class="upload-icon">📤</div>
-            <h3 class="upload-title">이미지를 드래그하거나 클릭하여 업로드</h3>
-            <p class="upload-desc">PNG, JPG, WEBP · 최대 10MB · 최대 5장</p>
-            <button class="btn btn-primary" type="button">파일 선택</button>
-            <div class="upload-formats" style="margin-top:12px;">예) 상의 1장 + 하의 1장 + 아우터 1장 동시 업로드 가능</div>
+            ondrop="handleDrop(event)">
+
+            <!-- 업로드된 카드 그리드 -->
+            <div id="clothingGrid" class="clothing-grid"></div>
+
+            <!-- 추가 업로드 버튼 (항상 표시, 5장 미만일 때) -->
+            <div id="uploadAddBtn" class="upload-add-btn"
+              onclick="document.getElementById('fileInput').click()">
+              <div class="upload-add-icon">＋</div>
+              <div class="upload-add-title">클릭 또는 드래그</div>
+              <div class="upload-add-desc">PNG · JPG · WEBP</div>
+            </div>
           </div>
 
-          <!-- 업로드된 의류 카드 그리드 (아이템 있을 때 표시) -->
-          <div id="clothingGridWrap" class="clothing-grid-wrap hidden">
-            <div id="clothingGrid" class="clothing-grid"></div>
-            <button class="btn btn-ghost btn-sm clothing-reset-btn" onclick="resetUpload()">
-              <i class="fas fa-trash-alt"></i> 전체 삭제
-            </button>
-          </div>
+          <!-- 전체 삭제 (카드가 1장 이상일 때 표시) -->
+          <button id="clothingResetBtn" class="btn btn-ghost btn-sm clothing-reset-btn hidden" onclick="resetUpload()">
+            <i class="fas fa-trash-alt"></i> 전체 삭제
+          </button>
 
           <!-- 공용 파일 input (multiple 허용) -->
           <input type="file" id="fileInput" accept="image/*" multiple style="display:none;" onchange="handleFileSelect(event)" />

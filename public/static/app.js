@@ -521,11 +521,15 @@ const CATEGORY_META = {
 function handleDragOver(e) {
   e.preventDefault();
   e.stopPropagation();
-  document.getElementById('uploadArea')?.classList.add('drag-over');
+  document.getElementById('uploadZone')?.classList.add('drag-over');
 }
 
 function handleDragLeave(e) {
-  document.getElementById('uploadArea')?.classList.remove('drag-over');
+  // uploadZone 바깥으로 나갈 때만 제거
+  const zone = document.getElementById('uploadZone');
+  if (zone && !zone.contains(e.relatedTarget)) {
+    zone.classList.remove('drag-over');
+  }
 }
 
 function handleDrop(e) {
@@ -617,14 +621,15 @@ async function classifyClothingItem(itemId, dataUrl) {
   }
 }
 
-// 의류 그리드 렌더링
+// 의류 그리드 렌더링 (uploadZone 내부 — 항상 보임)
 function renderClothingGrid() {
-  const grid = document.getElementById('clothingGrid');
-  const uploadArea = document.getElementById('uploadArea');
+  const grid      = document.getElementById('clothingGrid');
+  const addBtn    = document.getElementById('uploadAddBtn');
+  const resetBtn  = document.getElementById('clothingResetBtn');
   if (!grid) return;
 
+  // 카드 렌더링
   grid.innerHTML = '';
-
   AppState.clothingItems.forEach((item, idx) => {
     const meta = CATEGORY_META[item.category] || CATEGORY_META.UNKNOWN;
     const card = document.createElement('div');
@@ -642,32 +647,16 @@ function renderClothingGrid() {
     grid.appendChild(card);
   });
 
-  // "추가" 버튼 카드 (최대 5장 미만일 때)
-  if (AppState.clothingItems.length < 5) {
-    const addCard = document.createElement('div');
-    addCard.className = 'clothing-card clothing-card-add';
-    addCard.innerHTML = `
-      <div class="clothing-card-img clothing-card-add-inner" onclick="document.getElementById('fileInput').click()">
-        <div class="add-icon">＋</div>
-        <div class="add-label">추가 업로드</div>
-      </div>
-    `;
-    grid.appendChild(addCard);
+  // 추가 업로드 버튼: 5장 미만일 때만 표시
+  if (addBtn) {
+    addBtn.style.display = AppState.clothingItems.length < 5 ? '' : 'none';
+    // 아무것도 없을 때는 큰 버튼으로, 있을 때는 카드 크기로
+    addBtn.classList.toggle('upload-add-btn--empty', AppState.clothingItems.length === 0);
   }
 
-  // uploadArea: 아이템이 하나라도 있으면 숨김
-  if (uploadArea) {
-    if (AppState.clothingItems.length > 0) {
-      uploadArea.classList.add('hidden');
-    } else {
-      uploadArea.classList.remove('hidden');
-    }
-  }
-
-  // 그리드 컨테이너 표시
-  const gridWrap = document.getElementById('clothingGridWrap');
-  if (gridWrap) {
-    gridWrap.classList.toggle('hidden', AppState.clothingItems.length === 0);
+  // 전체 삭제 버튼: 1장 이상일 때만 표시
+  if (resetBtn) {
+    resetBtn.classList.toggle('hidden', AppState.clothingItems.length === 0);
   }
 }
 
