@@ -572,6 +572,25 @@ function resetUpload() {
 // STEP 2: Model Selection — 그리드 UI
 // ─────────────────────────────────────────────────────────
 
+// ── 그리드 컨테이너 높이를 window 기준으로 직접 계산해서 강제 설정 ──
+function fixGridHeight(wrapId) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  const panel = wrap.closest('.step-panel');
+  if (!panel) return;
+
+  // 패널 내 다른 요소들(타이틀, 필터) 높이 합산
+  let usedH = 0;
+  panel.querySelectorAll(':scope > *').forEach(el => {
+    if (el === wrap) return;
+    if (el.classList.contains('step-nav')) return; // absolute라 공간 안 차지
+    usedH += el.getBoundingClientRect().height;
+  });
+
+  const availH = window.innerHeight - usedH - 16; // 여유 16px
+  wrap.style.height = Math.max(availH, 200) + 'px';
+}
+
 function renderModelGrid(models) {
   const grid = document.getElementById('modelGrid');
   if (!grid) return;
@@ -611,6 +630,9 @@ function renderModelGrid(models) {
     });
     grid.appendChild(card);
   });
+
+  // 높이 강제 설정 — rAF로 DOM 렌더 후 계산
+  requestAnimationFrame(() => fixGridHeight('modelGridWrap'));
 }
 
 let modelFilterState = { gender: null };
@@ -669,6 +691,9 @@ function renderBgGrid(bgs) {
     });
     grid.appendChild(card);
   });
+
+  // 높이 강제 설정 — rAF로 DOM 렌더 후 계산
+  requestAnimationFrame(() => fixGridHeight('bgGridWrap'));
 }
 
 function filterBg(category, btn) {

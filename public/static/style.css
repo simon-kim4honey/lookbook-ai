@@ -1084,6 +1084,17 @@ footer {
 #step-3 .bg-categories {
   padding: 0 16px 8px;
 }
+/* Step 2/3 플로팅 하단 버튼 */
+#step-2 .step-nav,
+#step-3 .step-nav {
+  margin-top: 0;
+  padding: 12px 16px;
+  border-top: none;
+  background: rgba(248, 248, 252, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
 .step-num-badge {
   display: inline-flex;
   align-items: center;
