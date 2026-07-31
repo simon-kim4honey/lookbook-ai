@@ -2392,8 +2392,10 @@ async function uploadModels() {
 
 async function deleteModel(id) {
   if (!confirm('이 모델을 삭제하시겠습니까?')) return
-  await fetch('/api/admin/models/' + id, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
-  loadCustomModels()
+  const res = await fetch('/api/admin/models/' + id, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+  const data = await res.json()
+  if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
+  await loadCustomModels()
 }
 async function loadCustomModels() {
   const grid = document.getElementById('customModelGrid')
@@ -2409,11 +2411,11 @@ async function loadCustomModels() {
         '<div class="media-card">' +
         '<img src="/api/proxy/custom-model/' + m.id + '" alt="' + m.name + '" loading="lazy"/>' +
         '<span class="custom-badge">커스텀</span>' +
-        '<button class="del-btn" onclick="deleteModel(' + "'" + m.id + "'" + ')"><i class="fas fa-times"></i></button>' +
+        '<button class="del-btn" onclick="event.stopPropagation();deleteModel(' + "'" + m.id + "'" + ')"><i class="fas fa-times"></i></button>' +
         '<div class="meta"><div class="name">' + m.name + '</div><div class="desc">' + (m.desc || '-') + '</div></div>' +
         '</div>'
       ).join('') + '</div>'
-  } catch(e) { grid.innerHTML = '<div class="empty-state"><p>불러오기 실패</p></div>' }
+  } catch(e) { console.error('loadCustomModels error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
 }
 
 // ══════════════════════════════════════════════
@@ -2493,8 +2495,10 @@ async function uploadBgs() {
 
 async function deleteBg(id) {
   if (!confirm('이 배경을 삭제하시겠습니까?')) return
-  await fetch('/api/admin/backgrounds/' + id, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
-  loadCustomBgs()
+  const res = await fetch('/api/admin/backgrounds/' + id, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+  const data = await res.json()
+  if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
+  await loadCustomBgs()
 }
 async function loadCustomBgs() {
   const grid = document.getElementById('customBgGrid')
@@ -2510,11 +2514,11 @@ async function loadCustomBgs() {
         '<div class="media-card bg-card-item">' +
         '<img src="/api/proxy/custom-bg/' + b.id + '" alt="' + b.name + '" loading="lazy"/>' +
         '<span class="custom-badge">커스텀</span>' +
-        '<button class="del-btn" onclick="deleteBg(' + "'" + b.id + "'" + ')"><i class="fas fa-times"></i></button>' +
+        '<button class="del-btn" onclick="event.stopPropagation();deleteBg(' + "'" + b.id + "'" + ')"><i class="fas fa-times"></i></button>' +
         '<div class="meta"><div class="name">' + b.name + '</div><div class="desc">' + b.category + ' · ' + (b.bgDesc || '-') + '</div></div>' +
         '</div>'
       ).join('') + '</div>'
-  } catch(e) { grid.innerHTML = '<div class="empty-state"><p>불러오기 실패</p></div>' }
+  } catch(e) { console.error('loadCustomBgs error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
 }
 
 // ─── 드래그앤드롭 (다중) ───
