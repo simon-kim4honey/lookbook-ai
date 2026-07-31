@@ -977,7 +977,10 @@ app.get('/api/generation/:jobId/status', async (c) => {
     const resultImages: any[] = []
     pollResults.forEach((r, idx) => {
       const st  = r.data?.status
-      const urls: string[] = r.data?.outputs || r.data?.output || []
+      // Atlas API 완료 응답: outputs가 배열(string[]) 또는 단일 string일 수 있음
+      const rawOut = r.data?.outputs ?? r.data?.output ?? r.data?.images ?? r.data?.result ?? null
+      const urls: string[] = Array.isArray(rawOut) ? rawOut.filter((u: any) => typeof u === 'string' && u.startsWith('http')) : (typeof rawOut === 'string' && rawOut.startsWith('http') ? [rawOut] : [])
+      console.log(`Job ${idx} status:${st} urls:`, urls)
       if ((st === 'completed' || st === 'succeeded') && urls.length > 0) {
         urls.forEach((url, i) => {
           resultImages.push({
@@ -1796,7 +1799,6 @@ app.get('/generator', (c) => {
         <div class="generating-view" id="generatingView">
           <div class="gen-spinner"></div>
           <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;">AI가 이미지를 생성 중입니다...</h2>
-          <p style="color:var(--text-muted);font-size:13px;">Atlas Cloud AI가 실사 패션 이미지를 생성하고 있습니다.</p>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="genStatusText">시작 중...</div>
           <div class="gen-status-msgs">

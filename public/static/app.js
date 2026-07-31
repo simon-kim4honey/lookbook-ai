@@ -940,6 +940,8 @@ async function pollGenerationStatus(jobId, count) {
 function completeGeneration(images, isFallback = false) {
   AppState.isGenerating = false;
 
+  console.log('completeGeneration called — isFallback:', isFallback, '| images count:', images.length, '| images:', JSON.stringify(images.map(i => ({id:i.id, url: i.url ? i.url.substring(0,80) : null, placeholder: i.placeholder}))));
+
   // Atlas Cloud 이미지 URL을 서버사이드 프록시로 변환 (CORS 우회)
   const proxiedImages = images.map(img => {
     if (img.url && img.url.startsWith('http')) {
@@ -1045,7 +1047,7 @@ function renderResults(images) {
             src="${img.url}"
             alt="${img.title || `피팅컷 #${idx + 1}`}"
             style="width:100%;height:100%;object-fit:cover;display:block;"
-            onerror="this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}';this.style.display='none';"
+            onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패<br/>프록시 오류</span></div>';"
           />
         </div>
         <button class="result-fav" onclick="toggleResultFav(this, event)" title="즐겨찾기">🤍</button>
