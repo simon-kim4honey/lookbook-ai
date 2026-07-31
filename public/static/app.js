@@ -329,7 +329,7 @@ async function loadModelsFromAPI() {
     } else {
       if (wrap) {
         if (loading) loading.style.display = 'none';
-        wrap.style.display = 'block';
+        wrap.style.display = 'flex';
         renderModelGrid(AppState.allModels);
       }
     }
@@ -365,7 +365,7 @@ async function loadBackgroundsFromAPI() {
     } else {
       if (wrap) {
         if (loading) loading.style.display = 'none';
-        wrap.style.display = 'block';
+        wrap.style.display = 'flex';
         renderBgGrid(AppState.allBackgrounds);
       }
     }
@@ -469,7 +469,7 @@ function changeStep(newStep) {
     const wrap = document.getElementById('modelGridWrap');
     if (AppState.allModels.length > 0) {
       if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'block'; renderModelGrid(AppState.allModels); }
+      if (wrap) { wrap.style.display = 'flex'; renderModelGrid(AppState.allModels); }
     } else {
       loadModelsFromAPI();
     }
@@ -481,7 +481,7 @@ function changeStep(newStep) {
     const wrap = document.getElementById('bgGridWrap');
     if (AppState.allBackgrounds.length > 0) {
       if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'block'; renderBgGrid(AppState.allBackgrounds); }
+      if (wrap) { wrap.style.display = 'flex'; renderBgGrid(AppState.allBackgrounds); }
     } else {
       loadBackgroundsFromAPI();
     }

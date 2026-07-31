@@ -1069,6 +1069,21 @@ footer {
 .step-title-area {
   margin-bottom: 32px;
 }
+/* Step 2/3 그리드 모드: 타이틀 영역 축소 */
+#step-2 .step-title-area,
+#step-3 .step-title-area {
+  margin-bottom: 8px;
+  padding: 16px 16px 0;
+}
+#step-2 .step-heading,
+#step-3 .step-heading {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+#step-2 .model-filters,
+#step-3 .bg-categories {
+  padding: 0 16px 8px;
+}
 .step-num-badge {
   display: inline-flex;
   align-items: center;
@@ -2013,8 +2028,9 @@ button, a { touch-action: manipulation; }
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   padding: 8px 16px 16px;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
+  /* 높이 고정 없이 내용만큼 자연스럽게 늘어남 */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .grid-card {

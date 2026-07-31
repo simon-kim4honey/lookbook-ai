@@ -1621,7 +1621,7 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 2: Model (그리드 선택) ─── -->
-      <div class="step-panel" id="step-2" style="flex-direction:column;overflow-y:auto;overflow-x:hidden;padding-bottom:16px;">
+      <div class="step-panel" id="step-2" style="flex-direction:column;height:100%;overflow:hidden;">
         <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 2 / 5 · 모델 선택</div>
           <h2 class="step-heading">AI 모델을 선택하세요</h2>
@@ -1638,7 +1638,7 @@ app.get('/generator', (c) => {
           <p>모델 목록을 불러오는 중...</p>
         </div>
 
-        <div id="modelGridWrap" style="display:none;flex:1;min-height:0;">
+        <div id="modelGridWrap" style="display:none;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;">
           <div class="select-grid" id="modelGrid">
             <!-- JS가 채움 -->
           </div>
@@ -1655,7 +1655,7 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 3: Background (그리드 선택) ─── -->
-      <div class="step-panel" id="step-3" style="flex-direction:column;overflow-y:auto;overflow-x:hidden;padding-bottom:16px;">
+      <div class="step-panel" id="step-3" style="flex-direction:column;height:100%;overflow:hidden;">
         <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 3 / 5 · 배경 선택</div>
           <h2 class="step-heading">배경을 선택하세요</h2>
@@ -1676,7 +1676,7 @@ app.get('/generator', (c) => {
           <p>배경 목록을 불러오는 중...</p>
         </div>
 
-        <div id="bgGridWrap" style="display:none;flex:1;min-height:0;">
+        <div id="bgGridWrap" style="display:none;flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;">
           <div class="select-grid" id="bgGrid">
             <!-- JS가 채움 -->
           </div>
