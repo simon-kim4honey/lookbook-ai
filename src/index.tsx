@@ -801,25 +801,25 @@ app.post('/api/generation/start', async (c) => {
 
     if (images.length >= 3) {
       // ── 풀 모드: 의류(Image1) + 모델(Image2) + 배경(Image3) ──
+      // 목표: 배경(Image3) 속에 이미 있는 사람을 Image2 모델+Image1 의상으로 교체, 포즈는 배경 원본 유지
       prompt = [
-        `Create a hyper-realistic professional fashion editorial photograph.`,
+        `You are doing a PERSON SWAP on a fashion background scene. Here is the exact task:`,
 
-        // 의류 (Image 1)
-        `Image 1 = CLOTHING ITEM (highest priority). Reproduce EVERY detail with 100% fidelity: exact color, pattern, texture, collar, neckline, sleeve length, hem, buttons, zippers, prints. The clothing must appear IDENTICAL to Image 1 — not similar, IDENTICAL.`,
+        // 배경 (Image 3) — 최우선: 원본 씬 유지
+        `Image 3 = SOURCE BACKGROUND SCENE (the base image). This scene contains a person/model. Keep EVERYTHING in this scene EXACTLY as-is: the location, environment, architecture, objects, lighting, color palette, time of day, and atmosphere. CRITICAL: Preserve the ORIGINAL POSE and BODY POSITION of the person in Image 3 — replicate their exact stance, limb positions, weight distribution, and natural body language. Only the person's identity and clothing will change.`,
 
-        // 모델 (Image 2)
-        `Image 2 = MODEL IDENTITY (highest priority). This is a reference portrait. Preserve this exact person's face, facial features, hair style and color, skin tone, and body proportions with zero deviation. NEVER alter the model's appearance.`,
+        // 모델 교체 (Image 2) — 얼굴/피부/체형 교체
+        `Image 2 = REPLACEMENT MODEL IDENTITY. Replace ONLY the face, facial features, hair style and color, skin tone, and body proportions of the person in Image 3 with this person from Image 2. The replacement must look like Image 2 is naturally standing in the exact same pose that was in Image 3. Preserve Image 2's face with zero deviation — no blending, no averaging.`,
 
-        // 배경 (Image 3) — 핵심 강화
-        `Image 3 = BACKGROUND SCENE. This is the TARGET background environment. You MUST place the model inside this EXACT location shown in Image 3. Replicate the specific place: same architecture, same objects, same environment, same atmosphere, same color palette, same time-of-day lighting. The background must be visually recognizable as the same location from Image 3.`,
+        // 의상 교체 (Image 1) — 옷만 교체
+        `Image 1 = REPLACEMENT CLOTHING. Replace ONLY the clothing worn by the person with this exact garment from Image 1. Reproduce EVERY clothing detail with 100% fidelity: exact color, pattern, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, prints. The clothing drape and fit must follow the pose naturally.`,
 
-        // 합성 지시
-        `COMPOSITING: The model (from Image 2, wearing clothing from Image 1) must appear to be physically present and standing inside the background scene from Image 3. Camera angle: eye-level (~165cm height), 85-135mm portrait lens. The background horizon line MUST align with the model's eye level. The model must cast a realistic ground shadow and appear naturally integrated into the scene — NOT composited onto it.`,
+        // 합성 결과 지시
+        `FINAL RESULT: The output must look like a single seamless photograph where Image 2's person is wearing Image 1's clothing, standing in Image 3's exact location with Image 3's original pose. The model must be physically integrated into the scene with correct lighting, shadows, and perspective — not composited.`,
 
         // 조명
-        `Lighting: Match the background scene's natural light direction, color temperature, and intensity onto the model. Realistic shadows, no studio flash artifacts.`,
+        `Lighting on the model must match Image 3's light direction, color temperature, and intensity exactly. Cast a realistic ground shadow consistent with the scene.`,
 
-        `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
         HARD_CONSTRAINTS,
       ].join(' ')
     } else if (images.length === 2 && clothingImageUrl && modelImageBase64) {
@@ -828,17 +828,17 @@ app.post('/api/generation/start', async (c) => {
         `Create a hyper-realistic professional fashion lookbook photograph.`,
         `Image 1 = CLOTHING ITEM — reproduce EXACTLY with 100% fidelity: color, pattern, texture, every design detail.`,
         `Image 2 = MODEL IDENTITY — preserve this exact person's face, hair, skin tone, body. NEVER alter the model's appearance.`,
+        `The model (Image 2) wears the clothing from Image 1. Show a ${poseTypeText}, ${poseStyleText}.`,
         `Background: ${bgDesc} (${bgName}). Create a photorealistic environment matching this description. Integrate the model naturally into this setting with correct lighting and shadows.`,
-        `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
         HARD_CONSTRAINTS,
       ].join(' ')
     } else if (images.length === 2 && clothingImageUrl && bgImageBase64) {
-      // ── 의류 + 배경 (모델 없음) ──
+      // ── 의류 + 배경 (모델 없음) ── 배경 속 모델을 의상만 교체
       prompt = [
-        `Create a hyper-realistic professional fashion editorial photograph.`,
-        `Image 1 = CLOTHING ITEM — reproduce EXACTLY with 100% fidelity.`,
-        `Image 2 = BACKGROUND SCENE — place the model inside this EXACT location. Replicate this specific environment faithfully.`,
-        `Model: ${modelDesc}. Show in a ${poseTypeText}, ${poseStyleText}, naturally integrated into the background with correct lighting and shadows.`,
+        `You are doing a CLOTHING SWAP on a fashion background scene.`,
+        `Image 2 = SOURCE BACKGROUND SCENE containing a person. Keep the scene and person's pose EXACTLY as-is. Preserve the original pose, stance, and body position.`,
+        `Image 1 = REPLACEMENT CLOTHING. Replace ONLY the clothing of the person in Image 2 with this exact garment from Image 1. Reproduce EVERY clothing detail with 100% fidelity: color, pattern, texture, every design element.`,
+        `FINAL RESULT: Same scene, same person, same pose — only the clothing is replaced with Image 1's garment. Natural lighting, seamless integration.`,
         HARD_CONSTRAINTS,
       ].join(' ')
     } else if (images.length === 1 && clothingImageUrl) {
