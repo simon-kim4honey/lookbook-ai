@@ -5,5 +5,12 @@
   "pages_build_output_dir": "./dist",
   "compatibility_flags": [
     "nodejs_compat"
+  ],
+  "d1_databases": [
+    {
+      "binding": "LOOKBOOK_DB",
+      "database_name": "lookbook-ai-production",
+      "database_id": "placeholder-will-be-replaced-by-gsk"
+    }
   ]
 }

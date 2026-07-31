@@ -2,9 +2,10 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
 
-// Cloudflare KV 바인딩 타입
+// Cloudflare 바인딩 타입
 type Bindings = {
-  LOOKBOOK_KV: KVNamespace
+  LOOKBOOK_KV: KVNamespace   // BYOK(studiob) — Cloudflare KV
+  LOOKBOOK_DB: D1Database    // Genspark Hosted — Cloudflare D1
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -82,13 +83,12 @@ function injectAdminPrompt(basePrompt: string): string {
 }
 
 // ────────────────────────────────────────────────────
-// 커스텀 모델/배경 — Cloudflare KV 영구 저장
-// KV 키 구조:
-//   model_index          → JSON 배열 (메타만, base64 제외)
-//   model_img:{id}       → base64 이미지 문자열
-//   bg_index             → JSON 배열 (메타만, base64 제외)
-//   bg_img:{id}          → base64 이미지 문자열
-//   id_counter           → 숫자 문자열 (1000~)
+// 커스텀 모델/배경 — 통합 스토리지 레이어
+//
+// 우선순위:
+//   1) LOOKBOOK_KV (KVNamespace)  → BYOK studiob 환경
+//   2) LOOKBOOK_DB (D1Database)   → Genspark Hosted 환경
+//   3) 메모리 폴백                → 로컬 개발
 // ────────────────────────────────────────────────────
 interface CustomModel {
   id: string
@@ -104,7 +104,7 @@ interface CustomBg {
   createdAt: string
 }
 
-// KV 헬퍼
+// ── KV 헬퍼 (BYOK) ──
 async function kvGetModels(kv: KVNamespace): Promise<CustomModel[]> {
   const raw = await kv.get('model_index')
   return raw ? JSON.parse(raw) : []
@@ -126,7 +126,90 @@ async function kvNextId(kv: KVNamespace): Promise<string> {
   return String(next - 1 === 0 ? 1000 : next - 1)
 }
 
-// KV 없는 환경(로컬 개발)용 메모리 폴백
+// ── D1 헬퍼 (Genspark Hosted) ──
+async function d1EnsureSchema(db: D1Database) {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS id_counter (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      value INTEGER NOT NULL DEFAULT 1000
+    );
+    INSERT OR IGNORE INTO id_counter (id, value) VALUES (1, 1000);
+    CREATE TABLE IF NOT EXISTS custom_models (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, desc_text TEXT NOT NULL DEFAULT '',
+      image_b64 TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS custom_bgs (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '기타',
+      bg_desc TEXT NOT NULL DEFAULT '', image_b64 TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `)
+}
+async function d1NextId(db: D1Database): Promise<string> {
+  await db.prepare(`UPDATE id_counter SET value = value + 1 WHERE id = 1`).run()
+  const row: any = await db.prepare(`SELECT value FROM id_counter WHERE id = 1`).first()
+  return String(row?.value ?? 1000)
+}
+async function d1GetModels(db: D1Database): Promise<CustomModel[]> {
+  await d1EnsureSchema(db)
+  const { results } = await db.prepare(`SELECT id, name, desc_text, created_at FROM custom_models ORDER BY created_at ASC`).all()
+  return (results as any[]).map(r => ({ id: r.id, name: r.name, desc: r.desc_text, createdAt: r.created_at }))
+}
+async function d1AddModels(db: D1Database, items: Array<{ name: string; desc?: string; imageBase64: string }>): Promise<CustomModel[]> {
+  await d1EnsureSchema(db)
+  const results: CustomModel[] = []
+  for (const item of items) {
+    const { name, desc, imageBase64 } = item
+    if (!name || !imageBase64) continue
+    const id = await d1NextId(db)
+    const createdAt = new Date().toISOString()
+    await db.prepare(`INSERT INTO custom_models (id, name, desc_text, image_b64, created_at) VALUES (?,?,?,?,?)`)
+      .bind(id, name, desc || name, imageBase64, createdAt).run()
+    results.push({ id, name, desc: desc || name, createdAt })
+  }
+  return results
+}
+async function d1DeleteModel(db: D1Database, id: string): Promise<boolean> {
+  await d1EnsureSchema(db)
+  const r = await db.prepare(`DELETE FROM custom_models WHERE id = ?`).bind(id).run()
+  return (r.meta?.changes ?? 0) > 0
+}
+async function d1GetModelImg(db: D1Database, id: string): Promise<string | null> {
+  await d1EnsureSchema(db)
+  const row: any = await db.prepare(`SELECT image_b64 FROM custom_models WHERE id = ?`).bind(id).first()
+  return row?.image_b64 ?? null
+}
+async function d1GetBgs(db: D1Database): Promise<CustomBg[]> {
+  await d1EnsureSchema(db)
+  const { results } = await db.prepare(`SELECT id, name, category, bg_desc, created_at FROM custom_bgs ORDER BY created_at ASC`).all()
+  return (results as any[]).map(r => ({ id: r.id, name: r.name, bgDesc: r.bg_desc, category: r.category, createdAt: r.created_at }))
+}
+async function d1AddBgs(db: D1Database, items: Array<{ name: string; bgDesc?: string; category?: string; imageBase64: string }>): Promise<CustomBg[]> {
+  await d1EnsureSchema(db)
+  const results: CustomBg[] = []
+  for (const item of items) {
+    const { name, bgDesc, category, imageBase64 } = item
+    if (!name || !imageBase64) continue
+    const id = await d1NextId(db)
+    const createdAt = new Date().toISOString()
+    await db.prepare(`INSERT INTO custom_bgs (id, name, category, bg_desc, image_b64, created_at) VALUES (?,?,?,?,?,?)`)
+      .bind(id, name, category || '커스텀', bgDesc || name, imageBase64, createdAt).run()
+    results.push({ id, name, bgDesc: bgDesc || name, category: category || '커스텀', createdAt })
+  }
+  return results
+}
+async function d1DeleteBg(db: D1Database, id: string): Promise<boolean> {
+  await d1EnsureSchema(db)
+  const r = await db.prepare(`DELETE FROM custom_bgs WHERE id = ?`).bind(id).run()
+  return (r.meta?.changes ?? 0) > 0
+}
+async function d1GetBgImg(db: D1Database, id: string): Promise<string | null> {
+  await d1EnsureSchema(db)
+  const row: any = await db.prepare(`SELECT image_b64 FROM custom_bgs WHERE id = ?`).bind(id).first()
+  return row?.image_b64 ?? null
+}
+
+// ── 메모리 폴백 (로컬 개발) ──
 let _memModels: (CustomModel & { imageBase64?: string })[] = []
 let _memBgs: (CustomBg & { imageBase64?: string })[] = []
 let _memIdCounter = 1000
@@ -140,10 +223,11 @@ app.post('/api/admin/models', adminAuth, async (c) => {
       Array.isArray(body) ? body : [body]
     if (items.length === 0) return c.json({ success: false, message: '업로드할 항목이 없습니다.' }, 400)
     const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
-    const results: CustomModel[] = []
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+    let results: CustomModel[] = []
 
     if (kv) {
-      // ── KV 모드 (프로덕션) ──
+      // ── KV 모드 (BYOK studiob) ──
       const list = await kvGetModels(kv)
       for (const item of items) {
         const { name, desc, imageBase64 } = item
@@ -151,11 +235,13 @@ app.post('/api/admin/models', adminAuth, async (c) => {
         const id = await kvNextId(kv)
         const meta: CustomModel = { id, name, desc: desc || name, createdAt: new Date().toISOString() }
         list.push(meta)
-        // 이미지는 별도 키에 저장 (인덱스와 분리)
         await kv.put(`model_img:${id}`, imageBase64)
         results.push(meta)
       }
       await kvSaveModels(kv, list)
+    } else if (db) {
+      // ── D1 모드 (Genspark Hosted) ──
+      results = await d1AddModels(db, items)
     } else {
       // ── 메모리 폴백 (로컬 개발) ──
       for (const item of items) {
@@ -176,8 +262,13 @@ app.post('/api/admin/models', adminAuth, async (c) => {
 // GET /api/admin/models — 목록 조회 (메타만)
 app.get('/api/admin/models', adminAuth, async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
   if (kv) {
     const list = await kvGetModels(kv)
+    return c.json({ success: true, models: list })
+  }
+  if (db) {
+    const list = await d1GetModels(db)
     return c.json({ success: true, models: list })
   }
   const list = _memModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
@@ -188,12 +279,17 @@ app.get('/api/admin/models', adminAuth, async (c) => {
 app.delete('/api/admin/models/:id', adminAuth, async (c) => {
   const id = c.req.param('id')
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
   if (kv) {
     const list = await kvGetModels(kv)
     const newList = list.filter(m => m.id !== id)
     await kvSaveModels(kv, newList)
     await kv.delete(`model_img:${id}`)
     return c.json({ success: list.length > newList.length })
+  }
+  if (db) {
+    const ok = await d1DeleteModel(db, id)
+    return c.json({ success: ok })
   }
   const before = _memModels.length
   _memModels = _memModels.filter(m => m.id !== id)
@@ -204,9 +300,12 @@ app.delete('/api/admin/models/:id', adminAuth, async (c) => {
 app.get('/api/proxy/custom-model/:id', async (c) => {
   const id = c.req.param('id')
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
   let imageBase64: string | null = null
   if (kv) {
     imageBase64 = await kv.get(`model_img:${id}`)
+  } else if (db) {
+    imageBase64 = await d1GetModelImg(db, id)
   } else {
     const m = _memModels.find(m => m.id === id)
     imageBase64 = m?.imageBase64 || null
@@ -230,9 +329,11 @@ app.post('/api/admin/backgrounds', adminAuth, async (c) => {
       Array.isArray(body) ? body : [body]
     if (items.length === 0) return c.json({ success: false, message: '업로드할 항목이 없습니다.' }, 400)
     const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
-    const results: CustomBg[] = []
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+    let results: CustomBg[] = []
 
     if (kv) {
+      // ── KV 모드 (BYOK studiob) ──
       const list = await kvGetBgs(kv)
       for (const item of items) {
         const { name, bgDesc, category, imageBase64 } = item
@@ -244,7 +345,11 @@ app.post('/api/admin/backgrounds', adminAuth, async (c) => {
         results.push(meta)
       }
       await kvSaveBgs(kv, list)
+    } else if (db) {
+      // ── D1 모드 (Genspark Hosted) ──
+      results = await d1AddBgs(db, items)
     } else {
+      // ── 메모리 폴백 (로컬 개발) ──
       for (const item of items) {
         const { name, bgDesc, category, imageBase64 } = item
         if (!name || !imageBase64) continue
@@ -262,8 +367,13 @@ app.post('/api/admin/backgrounds', adminAuth, async (c) => {
 
 app.get('/api/admin/backgrounds', adminAuth, async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
   if (kv) {
     const list = await kvGetBgs(kv)
+    return c.json({ success: true, backgrounds: list })
+  }
+  if (db) {
+    const list = await d1GetBgs(db)
     return c.json({ success: true, backgrounds: list })
   }
   const list = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
@@ -273,12 +383,17 @@ app.get('/api/admin/backgrounds', adminAuth, async (c) => {
 app.delete('/api/admin/backgrounds/:id', adminAuth, async (c) => {
   const id = c.req.param('id')
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
   if (kv) {
     const list = await kvGetBgs(kv)
     const newList = list.filter(b => b.id !== id)
     await kvSaveBgs(kv, newList)
     await kv.delete(`bg_img:${id}`)
     return c.json({ success: list.length > newList.length })
+  }
+  if (db) {
+    const ok = await d1DeleteBg(db, id)
+    return c.json({ success: ok })
   }
   const before = _memBgs.length
   _memBgs = _memBgs.filter(b => b.id !== id)
@@ -288,9 +403,12 @@ app.delete('/api/admin/backgrounds/:id', adminAuth, async (c) => {
 app.get('/api/proxy/custom-bg/:id', async (c) => {
   const id = c.req.param('id')
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
   let imageBase64: string | null = null
   if (kv) {
     imageBase64 = await kv.get(`bg_img:${id}`)
+  } else if (db) {
+    imageBase64 = await d1GetBgImg(db, id)
   } else {
     const b = _memBgs.find(b => b.id === id)
     imageBase64 = b?.imageBase64 || null
@@ -389,9 +507,15 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
 // 모델 목록 — 관리자 업로드 커스텀 모델만 반환
 app.get('/api/presets/models', async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
-  const customRaw: CustomModel[] = kv
-    ? await kvGetModels(kv)
-    : _memModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+  let customRaw: CustomModel[]
+  if (kv) {
+    customRaw = await kvGetModels(kv)
+  } else if (db) {
+    customRaw = await d1GetModels(db)
+  } else {
+    customRaw = _memModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
+  }
   const customList = customRaw.map(m => ({
     id: Number(m.id), name: m.name, gender: '커스텀', age: '-', body: '-', mood: '-', skin: '-',
     desc: m.desc, unsplashId: null, isCustom: true, customId: m.id,
@@ -402,9 +526,15 @@ app.get('/api/presets/models', async (c) => {
 // 배경 목록 — 관리자 업로드 커스텀 배경만 반환
 app.get('/api/presets/backgrounds', async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
-  const customBgRaw: CustomBg[] = kv
-    ? await kvGetBgs(kv)
-    : _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+  let customBgRaw: CustomBg[]
+  if (kv) {
+    customBgRaw = await kvGetBgs(kv)
+  } else if (db) {
+    customBgRaw = await d1GetBgs(db)
+  } else {
+    customBgRaw = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
+  }
   const customBgList = customBgRaw.map(b => ({
     id: Number(b.id), name: b.name, category: b.category, mood: '-',
     bgDesc: b.bgDesc, unsplashId: null, isCustom: true, customId: b.id,
