@@ -49,13 +49,14 @@ let adminPromptConfig: AdminPromptConfig = {
   prefix: '',
   suffix: '',
   styleGuide: [
-    '카메라: 아이레벨(지상 160-165cm 높이) 정면 촬영, 85-135mm 표준 망원 렌즈.',
-    '배경은 참조 이미지의 장소·분위기·색감을 유지하되, 모델의 카메라 앵글과 눈높이에 맞게 원근감을 새로 구성.',
-    '배경 지평선이 반드시 모델의 눈높이와 일치해야 함.',
-    '배경 요소 실제 스케일 기준 — 모델(170cm) 옆의 일반 승용차는 모델 어깨~가슴 높이, 배경 보행자는 거리에 비례해 작게, 나무·건물은 모델보다 훨씬 크게.',
-    '모델 발밑 지면 그림자 자연스럽게 합성, 모델이 실제 그 장소 바닥에 서 있는 것처럼.',
-    '조명 방향·색온도·그림자 방향이 배경과 완벽 일치.',
-    '패션 에디토리얼 무드: 매거진 커버 퀄리티, 배경 얕은 심도 처리.',
+    // ── 새 방식: 배경 씬 속 모델을 교체하는 PERSON SWAP 방식 ──
+    'PERSON SWAP MODE: The background scene image contains an existing person.',
+    'CRITICAL — Preserve the ORIGINAL POSE exactly: replicate the exact stance, limb positions, weight distribution, and body language of the person already in the background scene.',
+    'Replace ONLY the person\'s face and identity with the reference model image, and replace ONLY the clothing with the uploaded clothing item.',
+    'The background scene, environment, lighting, shadows, color palette, and atmosphere must remain 100% unchanged.',
+    'The replaced model must appear naturally integrated into the scene — same camera angle, same perspective, same eye-level as the original person.',
+    'Lighting and shadows on the model must match the background scene\'s existing light direction and color temperature exactly.',
+    'Fashion editorial quality: magazine cover level seamless compositing.',
   ].join(' '),
   technicalSpec: [
     '초사실적 표현, 직물 질감과 피부 디테일 극사실 재현.',
@@ -2171,12 +2172,12 @@ let adminPassword = ''
 // ── 프리셋 데이터 (한글) ──
 const PRESETS = {
   styleGuide: {
-    studio:     '소니 A7R V, 85mm f/1.4 렌즈로 촬영. 대형 소프트박스 주조명, 보조 반사판, 미묘한 림라이트의 전문 스튜디오 세팅. 깨끗한 화이트 사이클로라마 배경. 색 보정: 중립~따뜻한 톤, 완벽한 피부 재현.',
-    editorial:  '후지필름 GFX 100S 중형 카메라, 110mm f/2 렌즈 촬영. 카메라 왼쪽의 자연 확산 창문광, 보조 반사판. 색 보정: 깨끗한 중립 피부 톤, 약간 따뜻한 하이라이트. 패션 에디토리얼 무드: 우아하고 세련된 매거진 커버 품질.',
-    outdoor:    '캐논 EOS R5, 50mm f/1.8 촬영. 황금 시간대 야외 조명, 부드러운 자연 보케 배경. 따뜻한 시네마틱 색 보정. 상쾌하고 생동감 있는 패션 라이프스타일 사진 느낌.',
-    luxury:     '핫셀블라드 X2D 100C, 90mm f/2.2 촬영. 극적인 명암 대비 스튜디오 조명에 미묘한 보조 조명. 깊은 그림자, 풍부한 대비. 하이패션 럭셔리 브랜드 미학: 고급스럽고 세련되며 에디토리얼 최고 수준.',
-    minimal:    '소니 A7R V, 55mm f/1.8 촬영. 깨끗한 미니멀 미학: 플랫 레이 또는 단순 배경, 균일한 확산 조명, 그림자 없음. 스칸디나비아 인스파이어드, 절제되고 우아한 스타일.',
-    streetwear: '라이카 Q3, 28mm f/1.7 촬영. 도시 환경, 자연 가용 조명, 진정성을 위한 약간의 그레인. 스트릿 스타일 에디토리얼: 역동적이고 자연스러운 느낌, 청년 문화 에너지.',
+    studio:     'PERSON SWAP — Studio Scene: Replace person identity and clothing only. Preserve exact original pose, studio lighting direction, white cyclorama background, and all scene elements. The replaced model must match the same camera angle and eye-level. Lighting: neutral-warm softbox, fill reflector, subtle rim light. Magazine cover quality seamless compositing.',
+    editorial:  'PERSON SWAP — Editorial Scene: Replace person identity and clothing only. Preserve exact original pose, natural diffused window light, warm highlights, and all scene elements. The replaced model must appear naturally integrated at the same perspective. Fujifilm GFX aesthetic: elegant, sophisticated magazine editorial quality.',
+    outdoor:    'PERSON SWAP — Outdoor Scene: Replace person identity and clothing only. Preserve exact original pose, golden-hour natural lighting, background bokeh, and all scene elements. The replaced model must cast realistic ground shadows matching the scene lighting. Warm cinematic color grade. Fresh lifestyle fashion feel.',
+    luxury:     'PERSON SWAP — Luxury Scene: Replace person identity and clothing only. Preserve exact original pose, dramatic chiaroscuro lighting, deep shadows, rich contrast, and all scene elements. The replaced model must be seamlessly integrated. High fashion luxury brand aesthetic: opulent, refined, top editorial quality.',
+    minimal:    'PERSON SWAP — Minimal Scene: Replace person identity and clothing only. Preserve exact original pose, flat even diffused lighting, no shadows, clean background, and all scene elements. The replaced model must blend seamlessly. Scandinavian-inspired: restrained, elegant, clean aesthetic.',
+    streetwear: 'PERSON SWAP — Street Scene: Replace person identity and clothing only. Preserve exact original pose, urban environment, natural available light, slight authentic grain, and all scene elements. The replaced model must appear genuinely present in the location. Dynamic, authentic street style editorial energy.',
   },
   technicalSpec: {
     standard:   '초사실적 표현. 의류에 선명한 포커스, 배경의 자연스러운 얕은 심도. 전문 색 보정. 아티팩트 없음, 왜곡 없음. 인쇄 가능 품질.',
