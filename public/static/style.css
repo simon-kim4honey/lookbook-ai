@@ -975,73 +975,106 @@ footer {
 
 /* ============ GENERATOR ============ */
 /* ═══════════════════════════════════════════════════
-   GENERATOR APP — position:fixed 전체화면 구조
-   구 generator-page / step-panel 완전 교체
+   GENERATOR APP v2 — 다크 테마 풀스크린
+   PC: 중앙 480px 패널 + 좌우 다크 배경
+   모바일: 전체화면
 ═══════════════════════════════════════════════════ */
 
-/* 앱 컨테이너: 전체화면 고정 */
+/* 앱 배경 오버레이 (PC 좌우 여백) */
 #gapp {
   position: fixed;
   inset: 0;
   display: flex;
-  flex-direction: column;
-  background: var(--gray-1);
+  align-items: stretch;
+  justify-content: center;
+  background: #0e0e16;
   z-index: 200;
+  overflow: hidden;
 }
 
-/* 상단 헤더 */
+/* 앱 패널: 모바일=전체, PC=중앙 480px */
+#gapp-panel {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  background: #16161f;
+  position: relative;
+  overflow: hidden;
+}
+
+/* PC에서 패널 좌우 구분선 */
+@media (min-width: 520px) {
+  #gapp-panel {
+    border-left: 1px solid rgba(255,255,255,0.07);
+    border-right: 1px solid rgba(255,255,255,0.07);
+  }
+}
+
+/* ── 상단 헤더 ── */
 #gapp-header {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
   padding: 0 16px;
   height: 52px;
-  background: var(--white);
-  border-bottom: 1px solid var(--border);
+  background: #16161f;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  position: relative;
+  z-index: 10;
 }
 .gapp-logo {
   font-size: 15px;
   font-weight: 800;
-  color: var(--primary);
+  color: #a78bfa;
   text-decoration: none;
   white-space: nowrap;
+  letter-spacing: -0.3px;
 }
+.gapp-logo span { color: rgba(255,255,255,0.5); font-weight: 400; }
 
 /* step 진행 표시 */
 #gapp-steps {
-  flex: 1;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 0;
 }
 .gstep {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  border: 2px solid var(--border);
-  background: var(--white);
-  color: var(--text-muted);
-  font-size: 12px;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  background: transparent;
+  color: rgba(255,255,255,0.3);
+  font-size: 11px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  transition: all 0.2s;
 }
-.gstep.active  { border-color: var(--primary); background: var(--primary); color: #fff; }
-.gstep.done    { border-color: var(--success);  background: var(--success);  color: #fff; }
+.gstep.active {
+  border-color: #a78bfa;
+  background: #a78bfa;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(167,139,250,0.5);
+}
+.gstep.done {
+  border-color: #34d399;
+  background: #34d399;
+  color: #fff;
+}
 .gstep-line {
-  width: 20px;
-  height: 2px;
-  background: var(--border);
+  width: 16px;
+  height: 1.5px;
+  background: rgba(255,255,255,0.1);
   transition: background 0.2s;
 }
-.gstep-line.done { background: var(--success); }
+.gstep-line.done { background: #34d399; }
 
-/* 슬라이드 영역: 남은 공간 전부 */
+/* ── 슬라이드 컨테이너 ── */
 #gapp-slides {
   flex: 1;
   position: relative;
@@ -1049,47 +1082,50 @@ footer {
   min-height: 0;
 }
 
-/* 각 슬라이드: absolute 전체 채우기 */
+/* ── 각 슬라이드 ── */
 .gslide {
   position: absolute;
   inset: 0;
   display: flex;
   flex-direction: column;
-  background: var(--gray-1);
+  background: #16161f;
   transform: translateX(100%);
-  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
   will-change: transform;
+  overflow: hidden;
 }
-.gslide.active  { transform: translateX(0); }
-.gslide.prev    { transform: translateX(-100%); }
+.gslide.active { transform: translateX(0); }
+.gslide.prev   { transform: translateX(-30%); } /* iOS 느낌 */
 
-/* 슬라이드 내부 레이아웃 공통 */
-
-/* body형 (step1,4): 내용 스크롤 */
+/* ── body형 (step1,4): 스크롤 컨텐츠 ── */
 .gslide-body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  padding: 20px 20px 0;
+}
+.gslide-body::-webkit-scrollbar { width: 3px; }
+.gslide-body::-webkit-scrollbar-track { background: transparent; }
+.gslide-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
+/* ── header형 (step2,3,5): 고정 헤더 ── */
+.gslide-header {
+  flex-shrink: 0;
   padding: 16px 16px 0;
 }
 
-/* header형 (step2,3,5): 고정 헤더 */
-.gslide-header {
-  flex-shrink: 0;
-  padding: 12px 16px 0;
-  background: var(--gray-1);
-}
-
-/* 그리드 영역 (step2,3): 핵심 — flex:1로 남은 공간 */
+/* ── 그리드 영역: flex:1 = 남은 공간 전부 ── */
 .gslide-grid {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  position: relative;
 }
+.gslide-grid::-webkit-scrollbar { width: 3px; }
+.gslide-grid::-webkit-scrollbar-track { background: transparent; }
+.gslide-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 
-/* 결과 스크롤 (step5) */
+/* ── 결과 스크롤 ── */
 .gslide-scroll {
   flex: 1;
   min-height: 0;
@@ -1098,58 +1134,111 @@ footer {
   padding: 0 16px;
 }
 
-/* 하단 네비: 항상 하단 고정 */
+/* ── 하단 네비 ── */
 .gslide-nav {
   flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 12px 16px;
-  background: rgba(248,248,252,0.96);
-  border-top: 1px solid rgba(0,0,0,0.07);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  background: rgba(22,22,31,0.97);
+  border-top: 1px solid rgba(255,255,255,0.07);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+/* 네비 버튼 다크 테마 오버라이드 */
+.gslide-nav .step-nav-back {
+  background: rgba(255,255,255,0.07) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  color: rgba(255,255,255,0.7) !important;
+}
+.gslide-nav .step-nav-back:hover {
+  background: rgba(255,255,255,0.12) !important;
+  color: #fff !important;
+}
+.gslide-nav .step-nav-next {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa) !important;
+  border: none !important;
+  color: #fff !important;
+  box-shadow: 0 4px 16px rgba(124,58,237,0.4) !important;
+}
+.gslide-nav .step-nav-next:hover {
+  background: linear-gradient(135deg, #6d28d9, #8b5cf6) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124,58,237,0.5) !important;
+}
+.gslide-nav .step-nav-next:disabled {
+  background: rgba(255,255,255,0.08) !important;
+  color: rgba(255,255,255,0.2) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
-/* step 레이블/타이틀/서브 */
+/* ── step 레이블/타이틀 ── */
 .gstep-label {
   display: inline-flex;
   align-items: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--primary);
-  background: var(--primary-bg);
-  padding: 4px 12px;
+  color: #a78bfa;
+  background: rgba(167,139,250,0.12);
+  padding: 3px 10px;
   border-radius: 20px;
   margin-bottom: 6px;
+  letter-spacing: 0.3px;
 }
 .gstep-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 800;
-  color: var(--text-primary);
+  color: #fff;
   margin: 0 0 4px;
   line-height: 1.3;
+  letter-spacing: -0.5px;
 }
 .gstep-sub {
   font-size: 13px;
-  color: var(--text-muted);
+  color: rgba(255,255,255,0.4);
   margin: 0 0 12px;
 }
 
-/* 필터바 (가로 스크롤) */
+/* ── 필터바 ── */
 .gfilter-bar {
   display: flex;
   gap: 6px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding-bottom: 8px;
+  padding-bottom: 10px;
   flex-wrap: nowrap;
 }
 .gfilter-bar::-webkit-scrollbar { display: none; }
+/* 필터 버튼 다크 테마 */
+.gfilter-bar .filter-tag,
+.gfilter-bar .bg-cat {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+  color: rgba(255,255,255,0.55) !important;
+  font-size: 12px !important;
+  padding: 6px 14px !important;
+  border-radius: 20px !important;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.gfilter-bar .filter-tag.active,
+.gfilter-bar .bg-cat.active {
+  background: #7c3aed !important;
+  border-color: #7c3aed !important;
+  color: #fff !important;
+}
+.gfilter-bar .filter-tag:hover,
+.gfilter-bar .bg-cat:hover {
+  background: rgba(255,255,255,0.1) !important;
+  color: #fff !important;
+}
 
-/* 로딩 */
+/* ── 로딩 ── */
 .grid-loading {
   display: flex;
   flex-direction: column;
@@ -1158,11 +1247,78 @@ footer {
   height: 100%;
   min-height: 200px;
   gap: 10px;
-  color: var(--text-muted);
-  font-size: 14px;
+  color: rgba(255,255,255,0.3);
+  font-size: 13px;
 }
 
-/* 구 generator-page/step-panel 호환 (홈 페이지 등에서 참조 시) */
+/* ── 그리드 카드 다크 테마 ── */
+.gslide-grid .select-grid { padding: 8px 12px 16px; }
+.gslide-grid .grid-card { background: #1e1e2a; }
+.gslide-grid .grid-skip-card {
+  background: #1e1e2a !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+.gslide-grid .grid-skip-card p { color: rgba(255,255,255,0.35) !important; }
+.gslide-grid .grid-skip-card.selected {
+  border-color: #7c3aed !important;
+  background: rgba(124,58,237,0.15) !important;
+}
+.gslide-grid .grid-skip-card.selected p { color: #a78bfa !important; }
+.gslide-grid .grid-card.selected { box-shadow: 0 0 0 2.5px #a78bfa; }
+
+/* ── 업로드 영역 다크 테마 ── */
+#gapp .upload-area {
+  background: rgba(255,255,255,0.03) !important;
+  border: 1.5px dashed rgba(255,255,255,0.12) !important;
+  border-radius: 16px !important;
+}
+#gapp .upload-area:hover {
+  border-color: rgba(167,139,250,0.5) !important;
+  background: rgba(167,139,250,0.05) !important;
+}
+#gapp .upload-title { color: rgba(255,255,255,0.8) !important; font-size: 14px !important; }
+#gapp .upload-desc  { color: rgba(255,255,255,0.3) !important; font-size: 12px !important; }
+#gapp .upload-formats { color: rgba(255,255,255,0.25) !important; font-size: 11px !important; }
+#gapp .upload-icon { font-size: 36px !important; margin-bottom: 12px !important; }
+
+/* 업로드 프리뷰 다크 */
+#gapp .upload-preview-name { color: rgba(255,255,255,0.85) !important; font-size: 14px; font-weight: 600; }
+#gapp .upload-preview-meta { color: rgba(255,255,255,0.3) !important; font-size: 12px; }
+#gapp .upload-preview-img img {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
+}
+
+/* gen options 다크 */
+#gapp .gen-options-grid .gen-option-group { background: rgba(255,255,255,0.04); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+#gapp .gen-option-title { color: rgba(255,255,255,0.6) !important; font-size: 12px !important; margin-bottom: 8px !important; font-weight: 600; }
+#gapp .option-chip {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.08) !important;
+  color: rgba(255,255,255,0.5) !important;
+  font-size: 12px !important;
+  padding: 6px 14px !important;
+}
+#gapp .option-chip.selected {
+  background: #7c3aed !important;
+  border-color: #7c3aed !important;
+  color: #fff !important;
+}
+#gapp .option-chip:hover {
+  background: rgba(255,255,255,0.1) !important;
+  color: #fff !important;
+}
+#gapp .gen-summary {
+  background: rgba(255,255,255,0.04) !important;
+  border-color: rgba(255,255,255,0.07) !important;
+  border-radius: 12px !important;
+  margin-top: 12px !important;
+}
+#gapp .gen-summary-title { color: rgba(255,255,255,0.5) !important; font-size: 12px !important; }
+#gapp .gen-summary-label { color: rgba(255,255,255,0.35) !important; font-size: 11px !important; }
+#gapp .gen-summary-val   { color: rgba(255,255,255,0.8) !important; font-size: 13px !important; }
+
+/* 구 generator-page/step-panel 호환 */
 .step-panel { display: none; }
 .step-panel.active { display: flex; flex-direction: column; }
 .step-num-badge {

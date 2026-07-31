@@ -1555,6 +1555,8 @@ app.get('/generator', (c) => {
        높이 계산 JS 완전 제거
   ════════════════════════════════════════ -->
   <div id="gapp">
+    <!-- ── 중앙 패널 (모바일=전체, PC=480px 중앙) ── -->
+    <div id="gapp-panel">
 
     <!-- ── 상단 바 (고정) ── -->
     <header id="gapp-header">
@@ -1580,7 +1582,6 @@ app.get('/generator', (c) => {
         <div class="gslide-body">
           <div class="gstep-label">Step 1 / 5 · 의류 업로드</div>
           <h2 class="gstep-title">의류 이미지를 업로드하세요</h2>
-          <p class="gstep-sub">흰 배경 또는 투명 배경 이미지를 사용하면 가장 좋은 결과를 얻을 수 있어요.</p>
 
           <div id="uploadArea" class="upload-area"
             ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
@@ -1759,6 +1760,7 @@ app.get('/generator', (c) => {
       </div>
 
     </div><!-- /gapp-slides -->
+    </div><!-- /gapp-panel -->
   </div><!-- /gapp -->
 
   <!-- Image View Modal -->
