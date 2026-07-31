@@ -2054,7 +2054,7 @@ app.get('/generator', (c) => {
               ondragleave="handleSlotDragLeave(event,'OUTER')"
               ondrop="handleSlotDrop(event,'OUTER')"
               onclick="triggerSlotInput('OUTER')">
-              <div class="cslot-label">아우터</div>
+              <div class="cslot-label">전체</div>
               <div class="cslot-body" id="slot-body-OUTER">
                 <div class="cslot-empty">
                   <div class="cslot-plus">＋</div>

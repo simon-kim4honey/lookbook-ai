@@ -403,7 +403,7 @@ function nextStep(currentStep) {
   if (currentStep === 1) {
     const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null);
     if (!hasAny) {
-      showToast('상의·하의·아우터 중 하나 이상 업로드해주세요.', 'warning');
+      showToast('상의·하의·전체 중 하나 이상 업로드해주세요.', 'warning');
       return;
     }
   }
@@ -505,7 +505,7 @@ function showGrid(loadingId, gridId, renderFn) {
 }
 
 // ─────────────────────────────────────────────────────────
-// STEP 1: 슬롯 기반 의류 업로드 (상의 / 하의 / 아우터)
+// STEP 1: 슬롯 기반 의류 업로드 (상의 / 하의 / 전체)
 // 사용자가 직접 카테고리를 선택해 업로드 → 분류 오류 없음
 // ─────────────────────────────────────────────────────────
 
@@ -514,7 +514,7 @@ function showGrid(loadingId, gridId, renderFn) {
 // 기존 clothingItems 배열도 generation 요청 시 슬롯 데이터로 채워서 유지
 
 const SLOT_CATS = ['TOP', 'BOTTOM', 'OUTER'];
-const SLOT_LABEL = { TOP: '상의', BOTTOM: '하의', OUTER: '아우터' };
+const SLOT_LABEL = { TOP: '상의', BOTTOM: '하의', OUTER: '전체' };
 
 // 슬롯별 데이터 저장 (null = 비어 있음)
 const slotData = { TOP: null, BOTTOM: null, OUTER: null };
