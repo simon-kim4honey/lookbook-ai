@@ -1622,27 +1622,33 @@ app.get('/generator', (c) => {
 
       <!-- ─── Step 2: Model (그리드 선택) ─── -->
       <div class="step-panel" id="step-2" style="flex-direction:column;height:100%;overflow:hidden;position:relative;">
-        <div class="step-title-area" style="flex-shrink:0;">
+        <div id="step2Header" style="flex-shrink:0;padding:12px 16px 0;">
           <div class="step-num-badge">Step 2 / 5 · 모델 선택</div>
-          <h2 class="step-heading">AI 모델을 선택하세요</h2>
+          <h2 style="font-size:18px;font-weight:800;margin:4px 0 8px;">AI 모델을 선택하세요</h2>
+          <div class="model-filters" id="modelFilters">
+            <button class="filter-tag active" onclick="filterModels('all', this)">전체</button>
+            <button class="filter-tag" onclick="filterModels('여성', this)">여성</button>
+            <button class="filter-tag" onclick="filterModels('남성', this)">남성</button>
+          </div>
         </div>
 
-        <div class="model-filters" id="modelFilters" style="flex-shrink:0;">
-          <button class="filter-tag active" onclick="filterModels('all', this)">전체</button>
-          <button class="filter-tag" onclick="filterModels('여성', this)">여성</button>
-          <button class="filter-tag" onclick="filterModels('남성', this)">남성</button>
-        </div>
-
-        <div id="modelsLoading" style="text-align:center;padding:60px;color:var(--text-muted);flex:1;">
+        <div id="modelsLoading" style="flex:1;text-align:center;padding:60px;color:var(--text-muted);">
           <div style="font-size:36px;margin-bottom:12px;">⏳</div>
           <p>모델 목록을 불러오는 중...</p>
         </div>
 
-        <div id="modelGridWrap" style="display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px;">
+        <div id="modelGridWrap" style="display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;">
+          <!-- PC 전용 스크롤 화살표 -->
+          <button class="grid-scroll-btn grid-scroll-left" id="modelScrollLeft" onclick="gridScroll('modelGridWrap','left')" aria-label="위로">
+            <i class="fas fa-chevron-up"></i>
+          </button>
           <div class="select-grid" id="modelGrid"></div>
+          <button class="grid-scroll-btn grid-scroll-right" id="modelScrollRight" onclick="gridScroll('modelGridWrap','right')" aria-label="아래로">
+            <i class="fas fa-chevron-down"></i>
+          </button>
         </div>
 
-        <div class="step-nav" style="position:absolute;bottom:0;left:0;right:0;z-index:10;">
+        <div id="step2Nav" class="step-nav" style="flex-shrink:0;">
           <button class="step-nav-back" onclick="prevStep(2)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>
@@ -1654,31 +1660,37 @@ app.get('/generator', (c) => {
 
       <!-- ─── Step 3: Background (그리드 선택) ─── -->
       <div class="step-panel" id="step-3" style="flex-direction:column;height:100%;overflow:hidden;position:relative;">
-        <div class="step-title-area" style="flex-shrink:0;">
+        <div id="step3Header" style="flex-shrink:0;padding:12px 16px 0;">
           <div class="step-num-badge">Step 3 / 5 · 배경 선택</div>
-          <h2 class="step-heading">배경을 선택하세요</h2>
+          <h2 style="font-size:18px;font-weight:800;margin:4px 0 8px;">배경을 선택하세요</h2>
+          <div class="bg-categories" id="bgCategories">
+            <button class="bg-cat active" onclick="filterBg('전체', this)">전체</button>
+            <button class="bg-cat" onclick="filterBg('스튜디오', this)">스튜디오</button>
+            <button class="bg-cat" onclick="filterBg('실내', this)">실내</button>
+            <button class="bg-cat" onclick="filterBg('야외', this)">야외</button>
+            <button class="bg-cat" onclick="filterBg('스트리트', this)">스트리트</button>
+            <button class="bg-cat" onclick="filterBg('카페', this)">카페</button>
+            <button class="bg-cat" onclick="filterBg('럭셔리', this)">럭셔리</button>
+          </div>
         </div>
 
-        <div class="bg-categories" id="bgCategories" style="flex-shrink:0;">
-          <button class="bg-cat active" onclick="filterBg('전체', this)">전체</button>
-          <button class="bg-cat" onclick="filterBg('스튜디오', this)">스튜디오</button>
-          <button class="bg-cat" onclick="filterBg('실내', this)">실내</button>
-          <button class="bg-cat" onclick="filterBg('야외', this)">야외</button>
-          <button class="bg-cat" onclick="filterBg('스트리트', this)">스트리트</button>
-          <button class="bg-cat" onclick="filterBg('카페', this)">카페</button>
-          <button class="bg-cat" onclick="filterBg('럭셔리', this)">럭셔리</button>
-        </div>
-
-        <div id="bgsLoading" style="text-align:center;padding:60px;color:var(--text-muted);flex:1;">
+        <div id="bgsLoading" style="flex:1;text-align:center;padding:60px;color:var(--text-muted);">
           <div style="font-size:36px;margin-bottom:12px;">⏳</div>
           <p>배경 목록을 불러오는 중...</p>
         </div>
 
-        <div id="bgGridWrap" style="display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px;">
+        <div id="bgGridWrap" style="display:none;overflow-y:auto;-webkit-overflow-scrolling:touch;position:relative;">
+          <!-- PC 전용 스크롤 화살표 -->
+          <button class="grid-scroll-btn grid-scroll-left" id="bgScrollLeft" onclick="gridScroll('bgGridWrap','left')" aria-label="위로">
+            <i class="fas fa-chevron-up"></i>
+          </button>
           <div class="select-grid" id="bgGrid"></div>
+          <button class="grid-scroll-btn grid-scroll-right" id="bgScrollRight" onclick="gridScroll('bgGridWrap','right')" aria-label="아래로">
+            <i class="fas fa-chevron-down"></i>
+          </button>
         </div>
 
-        <div class="step-nav" style="position:absolute;bottom:0;left:0;right:0;z-index:10;">
+        <div id="step3Nav" class="step-nav" style="flex-shrink:0;">
           <button class="step-nav-back" onclick="prevStep(3)">
             <i class="fas fa-arrow-left"></i> 이전
           </button>

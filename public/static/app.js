@@ -329,7 +329,7 @@ async function loadModelsFromAPI() {
     } else {
       if (wrap) {
         if (loading) loading.style.display = 'none';
-        wrap.style.display = 'flex';
+        wrap.style.display = 'block';
         renderModelGrid(AppState.allModels);
       }
     }
@@ -365,7 +365,7 @@ async function loadBackgroundsFromAPI() {
     } else {
       if (wrap) {
         if (loading) loading.style.display = 'none';
-        wrap.style.display = 'flex';
+        wrap.style.display = 'block';
         renderBgGrid(AppState.allBackgrounds);
       }
     }
@@ -469,7 +469,7 @@ function changeStep(newStep) {
     const wrap = document.getElementById('modelGridWrap');
     if (AppState.allModels.length > 0) {
       if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'flex'; renderModelGrid(AppState.allModels); }
+      if (wrap) { wrap.style.display = 'block'; renderModelGrid(AppState.allModels); }
     } else {
       loadModelsFromAPI();
     }
@@ -481,7 +481,7 @@ function changeStep(newStep) {
     const wrap = document.getElementById('bgGridWrap');
     if (AppState.allBackgrounds.length > 0) {
       if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'flex'; renderBgGrid(AppState.allBackgrounds); }
+      if (wrap) { wrap.style.display = 'block'; renderBgGrid(AppState.allBackgrounds); }
     } else {
       loadBackgroundsFromAPI();
     }
@@ -569,26 +569,60 @@ function resetUpload() {
 }
 
 // ─────────────────────────────────────────────────────────
+// STEP 2/3: PC 스크롤 화살표
+// ─────────────────────────────────────────────────────────
+
+function gridScroll(wrapId, direction) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  const scrollAmt = wrap.clientHeight * 0.7;
+  wrap.scrollBy({ top: direction === 'left' ? -scrollAmt : scrollAmt, behavior: 'smooth' });
+}
+
+// 스크롤 화살표 표시/숨김 업데이트
+function updateGridScrollBtns(wrapId) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  const prefix = wrapId === 'modelGridWrap' ? 'model' : 'bg';
+  const leftBtn = document.getElementById(`${prefix}ScrollLeft`);
+  const rightBtn = document.getElementById(`${prefix}ScrollRight`);
+  if (leftBtn) leftBtn.style.opacity = wrap.scrollTop > 10 ? '1' : '0.3';
+  if (rightBtn) {
+    const atBottom = wrap.scrollTop + wrap.clientHeight >= wrap.scrollHeight - 10;
+    rightBtn.style.opacity = atBottom ? '0.3' : '1';
+  }
+}
+
+// ─────────────────────────────────────────────────────────
 // STEP 2: Model Selection — 그리드 UI
 // ─────────────────────────────────────────────────────────
 
-// ── 그리드 컨테이너 높이를 window 기준으로 직접 계산해서 강제 설정 ──
+// ── 그리드 컨테이너 높이: 패널 실제 높이에서 다른 요소 합산 후 계산 ──
 function fixGridHeight(wrapId) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
   const panel = wrap.closest('.step-panel');
   if (!panel) return;
 
-  // 패널 내 다른 요소들(타이틀, 필터) 높이 합산
+  // 패널의 실제 렌더 높이 기준
+  const panelRect = panel.getBoundingClientRect();
+  const panelH = panelRect.height;
+
+  // 패널 내 다른 요소들(타이틀, 필터, step-nav) 높이 합산
   let usedH = 0;
   panel.querySelectorAll(':scope > *').forEach(el => {
     if (el === wrap) return;
-    if (el.classList.contains('step-nav')) return; // absolute라 공간 안 차지
+    // step-nav는 absolute 포지션이지만 하단 여백으로 확보
     usedH += el.getBoundingClientRect().height;
   });
 
-  const availH = window.innerHeight - usedH - 16; // 여유 16px
+  // step-nav 높이만큼 추가 여백 확보 (padding-bottom 대신 직접 계산)
+  const navEl = panel.querySelector('.step-nav');
+  const navH = navEl ? navEl.getBoundingClientRect().height + 8 : 72;
+
+  const availH = panelH - usedH - navH - 8;
   wrap.style.height = Math.max(availH, 200) + 'px';
+  wrap.style.minHeight = '200px';
 }
 
 function renderModelGrid(models) {
@@ -632,7 +666,15 @@ function renderModelGrid(models) {
   });
 
   // 높이 강제 설정 — rAF로 DOM 렌더 후 계산
-  requestAnimationFrame(() => fixGridHeight('modelGridWrap'));
+  requestAnimationFrame(() => {
+    fixGridHeight('modelGridWrap');
+    const wrap = document.getElementById('modelGridWrap');
+    if (wrap && !wrap._scrollBound) {
+      wrap._scrollBound = true;
+      wrap.addEventListener('scroll', () => updateGridScrollBtns('modelGridWrap'));
+    }
+    updateGridScrollBtns('modelGridWrap');
+  });
 }
 
 let modelFilterState = { gender: null };
@@ -693,7 +735,15 @@ function renderBgGrid(bgs) {
   });
 
   // 높이 강제 설정 — rAF로 DOM 렌더 후 계산
-  requestAnimationFrame(() => fixGridHeight('bgGridWrap'));
+  requestAnimationFrame(() => {
+    fixGridHeight('bgGridWrap');
+    const wrap = document.getElementById('bgGridWrap');
+    if (wrap && !wrap._scrollBound) {
+      wrap._scrollBound = true;
+      wrap.addEventListener('scroll', () => updateGridScrollBtns('bgGridWrap'));
+    }
+    updateGridScrollBtns('bgGridWrap');
+  });
 }
 
 function filterBg(category, btn) {
