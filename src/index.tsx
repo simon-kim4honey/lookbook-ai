@@ -128,22 +128,27 @@ async function kvNextId(kv: KVNamespace): Promise<string> {
 
 // ── D1 헬퍼 (Genspark Hosted) ──
 async function d1EnsureSchema(db: D1Database) {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS id_counter (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
-      value INTEGER NOT NULL DEFAULT 1000
-    );
-    INSERT OR IGNORE INTO id_counter (id, value) VALUES (1, 1000);
-    CREATE TABLE IF NOT EXISTS custom_models (
-      id TEXT PRIMARY KEY, name TEXT NOT NULL, desc_text TEXT NOT NULL DEFAULT '',
-      image_b64 TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS custom_bgs (
-      id TEXT PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT '기타',
-      bg_desc TEXT NOT NULL DEFAULT '', image_b64 TEXT NOT NULL,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-  `)
+  // D1은 db.exec() 멀티스테이트먼트 미지원 → 각각 prepare().run()으로 실행
+  await db.prepare(`CREATE TABLE IF NOT EXISTS id_counter (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    value INTEGER NOT NULL DEFAULT 1000
+  )`).run()
+  await db.prepare(`INSERT OR IGNORE INTO id_counter (id, value) VALUES (1, 1000)`).run()
+  await db.prepare(`CREATE TABLE IF NOT EXISTS custom_models (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    desc_text TEXT NOT NULL DEFAULT '',
+    image_b64 TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`).run()
+  await db.prepare(`CREATE TABLE IF NOT EXISTS custom_bgs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT '기타',
+    bg_desc TEXT NOT NULL DEFAULT '',
+    image_b64 TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`).run()
 }
 async function d1NextId(db: D1Database): Promise<string> {
   await db.prepare(`UPDATE id_counter SET value = value + 1 WHERE id = 1`).run()
@@ -151,12 +156,10 @@ async function d1NextId(db: D1Database): Promise<string> {
   return String(row?.value ?? 1000)
 }
 async function d1GetModels(db: D1Database): Promise<CustomModel[]> {
-  await d1EnsureSchema(db)
   const { results } = await db.prepare(`SELECT id, name, desc_text, created_at FROM custom_models ORDER BY created_at ASC`).all()
   return (results as any[]).map(r => ({ id: r.id, name: r.name, desc: r.desc_text, createdAt: r.created_at }))
 }
 async function d1AddModels(db: D1Database, items: Array<{ name: string; desc?: string; imageBase64: string }>): Promise<CustomModel[]> {
-  await d1EnsureSchema(db)
   const results: CustomModel[] = []
   for (const item of items) {
     const { name, desc, imageBase64 } = item
@@ -170,22 +173,18 @@ async function d1AddModels(db: D1Database, items: Array<{ name: string; desc?: s
   return results
 }
 async function d1DeleteModel(db: D1Database, id: string): Promise<boolean> {
-  await d1EnsureSchema(db)
   const r = await db.prepare(`DELETE FROM custom_models WHERE id = ?`).bind(id).run()
   return (r.meta?.changes ?? 0) > 0
 }
 async function d1GetModelImg(db: D1Database, id: string): Promise<string | null> {
-  await d1EnsureSchema(db)
   const row: any = await db.prepare(`SELECT image_b64 FROM custom_models WHERE id = ?`).bind(id).first()
   return row?.image_b64 ?? null
 }
 async function d1GetBgs(db: D1Database): Promise<CustomBg[]> {
-  await d1EnsureSchema(db)
   const { results } = await db.prepare(`SELECT id, name, category, bg_desc, created_at FROM custom_bgs ORDER BY created_at ASC`).all()
   return (results as any[]).map(r => ({ id: r.id, name: r.name, bgDesc: r.bg_desc, category: r.category, createdAt: r.created_at }))
 }
 async function d1AddBgs(db: D1Database, items: Array<{ name: string; bgDesc?: string; category?: string; imageBase64: string }>): Promise<CustomBg[]> {
-  await d1EnsureSchema(db)
   const results: CustomBg[] = []
   for (const item of items) {
     const { name, bgDesc, category, imageBase64 } = item
@@ -199,12 +198,10 @@ async function d1AddBgs(db: D1Database, items: Array<{ name: string; bgDesc?: st
   return results
 }
 async function d1DeleteBg(db: D1Database, id: string): Promise<boolean> {
-  await d1EnsureSchema(db)
   const r = await db.prepare(`DELETE FROM custom_bgs WHERE id = ?`).bind(id).run()
   return (r.meta?.changes ?? 0) > 0
 }
 async function d1GetBgImg(db: D1Database, id: string): Promise<string | null> {
-  await d1EnsureSchema(db)
   const row: any = await db.prepare(`SELECT image_b64 FROM custom_bgs WHERE id = ?`).bind(id).first()
   return row?.image_b64 ?? null
 }
