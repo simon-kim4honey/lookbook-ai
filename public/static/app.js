@@ -8,8 +8,15 @@
 // ─────────────────────────────────────────────────────────
 const AppState = {
   currentStep: 1,
+
+  // ── 다중 의류 업로드 (신규) ──
+  // clothingItems: [{ file, dataUrl, category, label, classifying }]
+  clothingItems: [],
+
+  // 레거시 단일 필드 (하위 호환 — generation 요청 시 clothingItems로 대체됨)
   uploadedFile: null,
-  uploadedImageUrl: null,  // base64 데이터URL
+  uploadedImageUrl: null,
+
   selectedModel: null,     // { id, name, description, gender, ... }
   selectedBg: null,        // { id, name, category, mood, bgDesc }
   genOptions: {
@@ -393,8 +400,12 @@ function goToStep(step) {
 }
 
 function nextStep(currentStep) {
-  if (currentStep === 1 && !AppState.uploadedImageUrl) {
-    showToast('의류 이미지를 업로드해주세요.', 'warning');
+  if (currentStep === 1 && AppState.clothingItems.length === 0) {
+    showToast('의류 이미지를 1장 이상 업로드해주세요.', 'warning');
+    return;
+  }
+  if (currentStep === 1 && AppState.clothingItems.some(ci => ci.classifying)) {
+    showToast('의류 분류 중입니다. 잠시 기다려주세요.', 'info');
     return;
   }
   // Step 2: 모델 미선택 시 랜덤 자동 선택
@@ -495,8 +506,18 @@ function showGrid(loadingId, gridId, renderFn) {
 }
 
 // ─────────────────────────────────────────────────────────
-// STEP 1: Upload
+// STEP 1: 다중 의류 업로드
 // ─────────────────────────────────────────────────────────
+
+// 카테고리 메타
+const CATEGORY_META = {
+  TOP:     { icon: '👕', label: '상의',   color: '#6366f1' },
+  BOTTOM:  { icon: '👖', label: '하의',   color: '#10b981' },
+  OUTER:   { icon: '🧥', label: '아우터', color: '#f59e0b' },
+  DRESS:   { icon: '👗', label: '원피스', color: '#ec4899' },
+  UNKNOWN: { icon: '👔', label: '의류',   color: '#6b7280' },
+};
+
 function handleDragOver(e) {
   e.preventDefault();
   e.stopPropagation();
@@ -511,67 +532,182 @@ function handleDrop(e) {
   e.preventDefault();
   e.stopPropagation();
   document.getElementById('uploadArea')?.classList.remove('drag-over');
-  const files = e.dataTransfer.files;
-  if (files && files[0]) processFile(files[0]);
+  const files = Array.from(e.dataTransfer.files || []);
+  files.forEach(f => processFile(f));
 }
 
 function handleFileSelect(e) {
-  const file = e.target.files[0];
-  if (file) processFile(file);
+  const files = Array.from(e.target.files || []);
+  files.forEach(f => processFile(f));
+  // input 초기화 (같은 파일 재선택 허용)
+  e.target.value = '';
 }
 
 function processFile(file) {
   const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (!validTypes.includes(file.type)) {
-    showToast('JPG, PNG, WEBP 형식만 지원합니다.', 'error');
+    showToast(`${file.name}: JPG, PNG, WEBP 형식만 지원합니다.`, 'error');
     return;
   }
   if (file.size > 10 * 1024 * 1024) {
-    showToast('파일 크기는 10MB 이하여야 합니다.', 'error');
+    showToast(`${file.name}: 파일 크기는 10MB 이하여야 합니다.`, 'error');
+    return;
+  }
+  if (AppState.clothingItems.length >= 5) {
+    showToast('의류 이미지는 최대 5장까지 업로드 가능합니다.', 'warning');
     return;
   }
 
-  AppState.uploadedFile = file;
+  const itemId = 'ci_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
   const reader = new FileReader();
-  reader.onload = (e) => {
-    AppState.uploadedImageUrl = e.target.result;
-    showUploadPreview(file, e.target.result);
+  reader.onload = (ev) => {
+    const dataUrl = ev.target.result;
+
+    // AppState에 추가 (분류 중 상태)
+    const item = { id: itemId, file, dataUrl, category: 'UNKNOWN', label: '', classifying: true };
+    AppState.clothingItems.push(item);
+
+    // 레거시 호환 (첫 번째 이미지를 uploadedImageUrl로도 유지)
+    if (AppState.clothingItems.length === 1) {
+      AppState.uploadedFile = file;
+      AppState.uploadedImageUrl = dataUrl;
+    }
+
+    renderClothingGrid();
+    updateNextBtn1();
+
+    // 서버 분류 요청
+    classifyClothingItem(itemId, dataUrl);
   };
   reader.readAsDataURL(file);
 }
 
-function showUploadPreview(file, dataUrl) {
-  document.getElementById('uploadArea')?.classList.add('hidden');
-  document.getElementById('uploadPreview')?.classList.remove('hidden');
+// 서버에 단일 이미지 분류 요청
+async function classifyClothingItem(itemId, dataUrl) {
+  try {
+    const res = await fetch('/api/clothing/classify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ images: [{ dataUrl, index: 0 }] }),
+    });
+    const data = await res.json();
 
-  const previewImg = document.getElementById('previewImg');
-  if (previewImg) previewImg.src = dataUrl;
+    const item = AppState.clothingItems.find(ci => ci.id === itemId);
+    if (!item) return;
 
-  const previewName = document.getElementById('previewName');
-  if (previewName) previewName.textContent = file.name;
+    if (data.success && data.items?.[0]) {
+      item.category = data.items[0].category || 'UNKNOWN';
+      item.label    = data.items[0].label    || '';
+    } else {
+      item.category = 'UNKNOWN';
+    }
+    item.classifying = false;
 
-  const previewMeta = document.getElementById('previewMeta');
-  if (previewMeta) previewMeta.textContent = `${(file.size / 1024).toFixed(1)} KB · ${file.type.split('/')[1].toUpperCase()}`;
+    renderClothingGrid();
+    updateNextBtn1();
+    showToast(`의류 분류 완료: ${CATEGORY_META[item.category]?.label || item.category}`, 'success');
 
-  const btn = document.getElementById('nextBtn1');
-  if (btn) btn.disabled = false;
-
-  showToast('이미지가 업로드되었습니다!', 'success');
+  } catch (err) {
+    console.warn('분류 실패, UNKNOWN 처리:', err);
+    const item = AppState.clothingItems.find(ci => ci.id === itemId);
+    if (item) { item.category = 'UNKNOWN'; item.classifying = false; }
+    renderClothingGrid();
+    updateNextBtn1();
+  }
 }
 
+// 의류 그리드 렌더링
+function renderClothingGrid() {
+  const grid = document.getElementById('clothingGrid');
+  const uploadArea = document.getElementById('uploadArea');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+
+  AppState.clothingItems.forEach((item, idx) => {
+    const meta = CATEGORY_META[item.category] || CATEGORY_META.UNKNOWN;
+    const card = document.createElement('div');
+    card.className = 'clothing-card';
+    card.innerHTML = `
+      <div class="clothing-card-img">
+        <img src="${item.dataUrl}" alt="의류 ${idx + 1}" />
+        ${item.classifying
+          ? `<div class="clothing-card-classifying"><span class="classifying-spinner"></span><span>분류 중...</span></div>`
+          : `<div class="clothing-card-badge" style="background:${meta.color}">${meta.icon} ${meta.label}</div>`
+        }
+        <button class="clothing-card-remove" onclick="removeClothingItem('${item.id}')" title="삭제">✕</button>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+
+  // "추가" 버튼 카드 (최대 5장 미만일 때)
+  if (AppState.clothingItems.length < 5) {
+    const addCard = document.createElement('div');
+    addCard.className = 'clothing-card clothing-card-add';
+    addCard.innerHTML = `
+      <div class="clothing-card-img clothing-card-add-inner" onclick="document.getElementById('fileInput').click()">
+        <div class="add-icon">＋</div>
+        <div class="add-label">추가 업로드</div>
+      </div>
+    `;
+    grid.appendChild(addCard);
+  }
+
+  // uploadArea: 아이템이 하나라도 있으면 숨김
+  if (uploadArea) {
+    if (AppState.clothingItems.length > 0) {
+      uploadArea.classList.add('hidden');
+    } else {
+      uploadArea.classList.remove('hidden');
+    }
+  }
+
+  // 그리드 컨테이너 표시
+  const gridWrap = document.getElementById('clothingGridWrap');
+  if (gridWrap) {
+    gridWrap.classList.toggle('hidden', AppState.clothingItems.length === 0);
+  }
+}
+
+// 의류 카드 삭제
+function removeClothingItem(itemId) {
+  AppState.clothingItems = AppState.clothingItems.filter(ci => ci.id !== itemId);
+
+  // 레거시 호환 동기화
+  if (AppState.clothingItems.length > 0) {
+    AppState.uploadedFile     = AppState.clothingItems[0].file;
+    AppState.uploadedImageUrl = AppState.clothingItems[0].dataUrl;
+  } else {
+    AppState.uploadedFile     = null;
+    AppState.uploadedImageUrl = null;
+  }
+
+  renderClothingGrid();
+  updateNextBtn1();
+}
+
+// 다음 버튼 활성화 상태 업데이트
+function updateNextBtn1() {
+  const btn = document.getElementById('nextBtn1');
+  if (!btn) return;
+  const hasItems     = AppState.clothingItems.length > 0;
+  const allClassified = !AppState.clothingItems.some(ci => ci.classifying);
+  btn.disabled = !(hasItems && allClassified);
+}
+
+// 전체 초기화 (레거시 resetUpload 호환)
 function resetUpload() {
-  AppState.uploadedFile = null;
+  AppState.clothingItems    = [];
+  AppState.uploadedFile     = null;
   AppState.uploadedImageUrl = null;
 
-  document.getElementById('uploadArea')?.classList.remove('hidden');
-  document.getElementById('uploadPreview')?.classList.add('hidden');
+  renderClothingGrid();
+  updateNextBtn1();
 
   const fileInput = document.getElementById('fileInput');
   if (fileInput) fileInput.value = '';
-
-  const btn = document.getElementById('nextBtn1');
-  if (btn) btn.disabled = true;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -795,7 +931,14 @@ async function startGeneration() {
 
     const count = 3; // 생성 수량 고정
 
-    // 의류 이미지 URL (base64 데이터URL)
+    // 의류 이미지 배열 구성 (신규 다중 업로드)
+    const clothingImages = AppState.clothingItems.map(ci => ({
+      dataUrl:  ci.dataUrl,
+      category: ci.category,
+      label:    ci.label || '',
+    }));
+
+    // 레거시 단일 필드 (서버에서도 하위 호환 처리)
     const clothingImageUrl = AppState.uploadedImageUrl;
 
     // 생성 요청
@@ -816,7 +959,8 @@ async function startGeneration() {
         ratio: AppState.genOptions.ratio || '3:4',
         resolution: AppState.genOptions.resolution || 'HD',
         count,
-        clothingImageUrl,
+        clothingImages,   // 신규: 다중 의류 배열
+        clothingImageUrl, // 레거시 호환
       })
     });
 

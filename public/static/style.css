@@ -1316,6 +1316,143 @@ footer {
   box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important;
 }
 
+/* ── Step 1 부제목 ── */
+#gapp .gstep-sub {
+  color: rgba(255,255,255,0.4);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: -8px 0 16px;
+  text-align: center;
+}
+
+/* ── 다중 의류 업로드 그리드 ── */
+.clothing-grid-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.clothing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 520px;
+}
+
+/* 의류 카드 */
+.clothing-card {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  aspect-ratio: 3/4;
+  background: rgba(255,255,255,0.04);
+  border: 1.5px solid rgba(255,255,255,0.08);
+  transition: transform 0.2s, border-color 0.2s;
+}
+.clothing-card:hover { transform: translateY(-2px); border-color: rgba(167,139,250,0.4); }
+
+.clothing-card-img {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.clothing-card-img img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 분류 배지 */
+.clothing-card-badge {
+  position: absolute;
+  bottom: 6px; left: 6px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  backdrop-filter: blur(8px);
+  letter-spacing: 0.3px;
+}
+
+/* 분류 중 오버레이 */
+.clothing-card-classifying {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: rgba(255,255,255,0.8);
+  font-size: 11px;
+}
+.classifying-spinner {
+  display: inline-block;
+  width: 20px; height: 20px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-top-color: #a78bfa;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 삭제 버튼 */
+.clothing-card-remove {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  border: none;
+  color: rgba(255,255,255,0.8);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  backdrop-filter: blur(4px);
+}
+.clothing-card:hover .clothing-card-remove { opacity: 1; }
+.clothing-card-remove:hover { background: rgba(239,68,68,0.8); color: #fff; }
+
+/* 추가 카드 */
+.clothing-card-add { cursor: pointer; }
+.clothing-card-add-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.clothing-card-add-inner:hover {
+  background: rgba(167,139,250,0.08);
+}
+.add-icon {
+  font-size: 28px;
+  color: rgba(255,255,255,0.3);
+  line-height: 1;
+}
+.add-label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.3);
+}
+
+/* 전체 삭제 버튼 */
+.clothing-reset-btn {
+  font-size: 12px !important;
+  color: rgba(255,255,255,0.3) !important;
+  padding: 6px 14px !important;
+  margin-top: 4px;
+}
+.clothing-reset-btn:hover { color: #ef4444 !important; }
+
 /* gen options 다크 */
 #gapp .gen-options-grid .gen-option-group { background: rgba(255,255,255,0.04); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
 #gapp .gen-option-title { color: rgba(255,255,255,0.6) !important; font-size: 12px !important; margin-bottom: 8px !important; font-weight: 600; }
