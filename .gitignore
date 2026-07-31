@@ -1,5 +1,6 @@
 # prod
-dist/
+# dist/ — Genspark Hosted 배포 시 SB-Git에서 dist/ 필요하므로 추적 대상으로 변경
+# dist/
 
 # dev
 .yarn/
