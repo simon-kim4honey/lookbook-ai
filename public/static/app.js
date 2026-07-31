@@ -400,13 +400,12 @@ function goToStep(step) {
 }
 
 function nextStep(currentStep) {
-  if (currentStep === 1 && AppState.clothingItems.length === 0) {
-    showToast('의류 이미지를 1장 이상 업로드해주세요.', 'warning');
-    return;
-  }
-  if (currentStep === 1 && AppState.clothingItems.some(ci => ci.classifying)) {
-    showToast('의류 분류 중입니다. 잠시 기다려주세요.', 'info');
-    return;
+  if (currentStep === 1) {
+    const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null);
+    if (!hasAny) {
+      showToast('상의·하의·아우터 중 하나 이상 업로드해주세요.', 'warning');
+      return;
+    }
   }
   // Step 2: 모델 미선택 시 랜덤 자동 선택
   if (currentStep === 2 && !AppState.selectedModel) {
@@ -506,197 +505,149 @@ function showGrid(loadingId, gridId, renderFn) {
 }
 
 // ─────────────────────────────────────────────────────────
-// STEP 1: 다중 의류 업로드
+// STEP 1: 슬롯 기반 의류 업로드 (상의 / 하의 / 아우터)
+// 사용자가 직접 카테고리를 선택해 업로드 → 분류 오류 없음
 // ─────────────────────────────────────────────────────────
 
-// 카테고리 메타
-const CATEGORY_META = {
-  TOP:     { icon: '👕', label: '상의',   color: '#6366f1' },
-  BOTTOM:  { icon: '👖', label: '하의',   color: '#10b981' },
-  OUTER:   { icon: '🧥', label: '아우터', color: '#f59e0b' },
-  DRESS:   { icon: '👗', label: '원피스', color: '#ec4899' },
-  UNKNOWN: { icon: '👔', label: '의류',   color: '#6b7280' },
-};
+// AppState.clothingItems 는 슬롯별로 최대 1장씩, 카테고리가 key
+// { TOP: {dataUrl, file} | null, BOTTOM: ..., OUTER: ... }
+// 기존 clothingItems 배열도 generation 요청 시 슬롯 데이터로 채워서 유지
 
-function handleDragOver(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  document.getElementById('uploadZone')?.classList.add('drag-over');
+const SLOT_CATS = ['TOP', 'BOTTOM', 'OUTER'];
+const SLOT_LABEL = { TOP: '상의', BOTTOM: '하의', OUTER: '아우터' };
+
+// 슬롯별 데이터 저장 (null = 비어 있음)
+const slotData = { TOP: null, BOTTOM: null, OUTER: null };
+
+// ── 슬롯 클릭 → 해당 파일 input 트리거 ──
+function triggerSlotInput(cat) {
+  // 이미 이미지가 있으면 클릭 무시 (✕ 버튼으로만 삭제)
+  if (slotData[cat]) return;
+  const input = document.getElementById(`fileInput-${cat}`);
+  if (input) input.click();
 }
 
-function handleDragLeave(e) {
-  // uploadZone 바깥으로 나갈 때만 제거
-  const zone = document.getElementById('uploadZone');
-  if (zone && !zone.contains(e.relatedTarget)) {
-    zone.classList.remove('drag-over');
+// ── 드래그 이벤트 ──
+function handleSlotDragOver(e, cat) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (slotData[cat]) return; // 이미 채워진 슬롯은 무시
+  document.getElementById(`slot-${cat}`)?.classList.add('drag-over');
+}
+function handleSlotDragLeave(e, cat) {
+  const slot = document.getElementById(`slot-${cat}`);
+  if (slot && !slot.contains(e.relatedTarget)) {
+    slot.classList.remove('drag-over');
   }
 }
-
-function handleDrop(e) {
+function handleSlotDrop(e, cat) {
   e.preventDefault();
   e.stopPropagation();
-  document.getElementById('uploadArea')?.classList.remove('drag-over');
-  const files = Array.from(e.dataTransfer.files || []);
-  files.forEach(f => processFile(f));
+  document.getElementById(`slot-${cat}`)?.classList.remove('drag-over');
+  if (slotData[cat]) return; // 이미 채워진 슬롯 무시
+  const file = e.dataTransfer.files?.[0];
+  if (file) processSlotFile(file, cat);
 }
 
-function handleFileSelect(e) {
-  const files = Array.from(e.target.files || []);
-  files.forEach(f => processFile(f));
-  // input 초기화 (같은 파일 재선택 허용)
-  e.target.value = '';
+// ── 파일 input change ──
+function handleSlotFileSelect(e, cat) {
+  const file = e.target.files?.[0];
+  if (file) processSlotFile(file, cat);
+  e.target.value = ''; // 같은 파일 재선택 허용
 }
 
-function processFile(file) {
+// ── 공통: 파일 유효성 검사 + 슬롯에 저장 ──
+function processSlotFile(file, cat) {
   const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (!validTypes.includes(file.type)) {
-    showToast(`${file.name}: JPG, PNG, WEBP 형식만 지원합니다.`, 'error');
+    showToast('JPG, PNG, WEBP 형식만 지원합니다.', 'error');
     return;
   }
   if (file.size > 10 * 1024 * 1024) {
-    showToast(`${file.name}: 파일 크기는 10MB 이하여야 합니다.`, 'error');
+    showToast('파일 크기는 10MB 이하여야 합니다.', 'error');
     return;
   }
-  if (AppState.clothingItems.length >= 5) {
-    showToast('의류 이미지는 최대 5장까지 업로드 가능합니다.', 'warning');
-    return;
-  }
-
-  const itemId = 'ci_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
   const reader = new FileReader();
   reader.onload = (ev) => {
-    const dataUrl = ev.target.result;
-
-    // AppState에 추가 (분류 중 상태)
-    const item = { id: itemId, file, dataUrl, category: 'UNKNOWN', label: '', classifying: true };
-    AppState.clothingItems.push(item);
-
-    // 레거시 호환 (첫 번째 이미지를 uploadedImageUrl로도 유지)
-    if (AppState.clothingItems.length === 1) {
-      AppState.uploadedFile = file;
-      AppState.uploadedImageUrl = dataUrl;
-    }
-
-    renderClothingGrid();
+    slotData[cat] = { file, dataUrl: ev.target.result };
+    syncClothingItems();
+    renderSlots();
     updateNextBtn1();
-
-    // 서버 분류 요청
-    classifyClothingItem(itemId, dataUrl);
+    showToast(`${SLOT_LABEL[cat]} 업로드 완료`, 'success');
   };
   reader.readAsDataURL(file);
 }
 
-// 서버에 단일 이미지 분류 요청
-async function classifyClothingItem(itemId, dataUrl) {
-  try {
-    const res = await fetch('/api/clothing/classify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ images: [{ dataUrl, index: 0 }] }),
-    });
-    const data = await res.json();
-
-    const item = AppState.clothingItems.find(ci => ci.id === itemId);
-    if (!item) return;
-
-    if (data.success && data.items?.[0]) {
-      item.category = data.items[0].category || 'UNKNOWN';
-      item.label    = data.items[0].label    || '';
-    } else {
-      item.category = 'UNKNOWN';
-    }
-    item.classifying = false;
-
-    renderClothingGrid();
-    updateNextBtn1();
-    showToast(`의류 분류 완료: ${CATEGORY_META[item.category]?.label || item.category}`, 'success');
-
-  } catch (err) {
-    console.warn('분류 실패, UNKNOWN 처리:', err);
-    const item = AppState.clothingItems.find(ci => ci.id === itemId);
-    if (item) { item.category = 'UNKNOWN'; item.classifying = false; }
-    renderClothingGrid();
-    updateNextBtn1();
-  }
-}
-
-// 의류 그리드 렌더링 (uploadZone 내부 — 항상 보임)
-function renderClothingGrid() {
-  const grid      = document.getElementById('clothingGrid');
-  const addBtn    = document.getElementById('uploadAddBtn');
-  const resetBtn  = document.getElementById('clothingResetBtn');
-  if (!grid) return;
-
-  // 카드 렌더링
-  grid.innerHTML = '';
-  AppState.clothingItems.forEach((item, idx) => {
-    const meta = CATEGORY_META[item.category] || CATEGORY_META.UNKNOWN;
-    const card = document.createElement('div');
-    card.className = 'clothing-card';
-    card.innerHTML = `
-      <div class="clothing-card-img">
-        <img src="${item.dataUrl}" alt="의류 ${idx + 1}" />
-        ${item.classifying
-          ? `<div class="clothing-card-classifying"><span class="classifying-spinner"></span><span>분류 중...</span></div>`
-          : `<div class="clothing-card-badge" style="background:${meta.color}">${meta.icon} ${meta.label}</div>`
-        }
-        <button class="clothing-card-remove" onclick="removeClothingItem('${item.id}')" title="삭제">✕</button>
-      </div>
-    `;
-    grid.appendChild(card);
-  });
-
-  // 추가 업로드 버튼: 5장 미만일 때만 표시
-  if (addBtn) {
-    addBtn.style.display = AppState.clothingItems.length < 5 ? '' : 'none';
-    // 아무것도 없을 때는 큰 버튼으로, 있을 때는 카드 크기로
-    addBtn.classList.toggle('upload-add-btn--empty', AppState.clothingItems.length === 0);
-  }
-
-  // 전체 삭제 버튼: 1장 이상일 때만 표시
-  if (resetBtn) {
-    resetBtn.classList.toggle('hidden', AppState.clothingItems.length === 0);
-  }
-}
-
-// 의류 카드 삭제
-function removeClothingItem(itemId) {
-  AppState.clothingItems = AppState.clothingItems.filter(ci => ci.id !== itemId);
-
-  // 레거시 호환 동기화
-  if (AppState.clothingItems.length > 0) {
-    AppState.uploadedFile     = AppState.clothingItems[0].file;
-    AppState.uploadedImageUrl = AppState.clothingItems[0].dataUrl;
-  } else {
-    AppState.uploadedFile     = null;
-    AppState.uploadedImageUrl = null;
-  }
-
-  renderClothingGrid();
+// ── 슬롯 삭제 ──
+function removeSlot(e, cat) {
+  e.stopPropagation(); // 슬롯 클릭 전파 방지
+  slotData[cat] = null;
+  syncClothingItems();
+  renderSlots();
   updateNextBtn1();
 }
 
-// 다음 버튼 활성화 상태 업데이트
+// ── slotData → AppState.clothingItems 동기화 (generation 요청에서 사용) ──
+function syncClothingItems() {
+  AppState.clothingItems = SLOT_CATS
+    .filter(cat => slotData[cat] !== null)
+    .map(cat => ({
+      id:       `slot-${cat}`,
+      file:     slotData[cat].file,
+      dataUrl:  slotData[cat].dataUrl,
+      category: cat,
+      label:    SLOT_LABEL[cat],
+      classifying: false,
+    }));
+
+  // 레거시 호환
+  AppState.uploadedFile     = AppState.clothingItems[0]?.file     || null;
+  AppState.uploadedImageUrl = AppState.clothingItems[0]?.dataUrl  || null;
+}
+
+// ── 슬롯 UI 렌더링 ──
+function renderSlots() {
+  SLOT_CATS.forEach(cat => {
+    const slot       = document.getElementById(`slot-${cat}`);
+    const body       = document.getElementById(`slot-body-${cat}`);
+    const removeBtn  = document.getElementById(`slot-remove-${cat}`);
+    if (!slot || !body) return;
+
+    const data = slotData[cat];
+
+    if (data) {
+      // 이미지 있음 → 썸네일 표시
+      slot.classList.add('cslot--filled');
+      body.innerHTML = `<img src="${data.dataUrl}" alt="${SLOT_LABEL[cat]}" class="cslot-img" />`;
+      if (removeBtn) removeBtn.classList.remove('hidden');
+    } else {
+      // 비어 있음 → 플레이스홀더
+      slot.classList.remove('cslot--filled');
+      body.innerHTML = `
+        <div class="cslot-empty">
+          <div class="cslot-plus">＋</div>
+          <div class="cslot-hint">클릭 또는 드래그</div>
+        </div>`;
+      if (removeBtn) removeBtn.classList.add('hidden');
+    }
+  });
+}
+
+// ── 다음 버튼: 슬롯 1개 이상 채워지면 활성화 ──
 function updateNextBtn1() {
   const btn = document.getElementById('nextBtn1');
   if (!btn) return;
-  const hasItems     = AppState.clothingItems.length > 0;
-  const allClassified = !AppState.clothingItems.some(ci => ci.classifying);
-  btn.disabled = !(hasItems && allClassified);
+  const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null);
+  btn.disabled = !hasAny;
 }
 
-// 전체 초기화 (레거시 resetUpload 호환)
+// ── 전체 초기화 (레거시 resetUpload 호환) ──
 function resetUpload() {
-  AppState.clothingItems    = [];
-  AppState.uploadedFile     = null;
-  AppState.uploadedImageUrl = null;
-
-  renderClothingGrid();
+  SLOT_CATS.forEach(cat => { slotData[cat] = null; });
+  syncClothingItems();
+  renderSlots();
   updateNextBtn1();
-
-  const fileInput = document.getElementById('fileInput');
-  if (fileInput) fileInput.value = '';
 }
 
 // ─────────────────────────────────────────────────────────

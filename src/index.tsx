@@ -2004,37 +2004,73 @@ app.get('/generator', (c) => {
     <!-- ── 슬라이드 컨테이너 ── -->
     <div id="gapp-slides">
 
-      <!-- STEP 1 · 의류 업로드 (다중) -->
+      <!-- STEP 1 · 의류 업로드 -->
       <div class="gslide active" id="step-1">
         <div class="gslide-body">
           <div class="gstep-label">Step 1 / 3 · 의류 업로드</div>
-          <h2 class="gstep-title">의류 이미지를 업로드하세요</h2>
-          <p class="gstep-sub">상의·하의·아우터 등 여러 장 동시 업로드 가능 (최대 5장)<br>AI가 자동으로 종류를 분류합니다</p>
+          <h2 class="gstep-title">의류를 종류별로 업로드하세요</h2>
+          <p class="gstep-sub">각 칸에 해당하는 의류를 업로드하세요 · 원하는 칸만 사용해도 됩니다</p>
 
-          <!-- 통합 업로드 존: 항상 표시, 드래그&드롭 + 카드 그리드 -->
-          <div id="uploadZone" class="upload-zone"
-            ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)"
-            ondrop="handleDrop(event)">
+          <!-- 3칸 슬롯 -->
+          <div class="clothing-slots">
 
-            <!-- 업로드된 카드 그리드 -->
-            <div id="clothingGrid" class="clothing-grid"></div>
-
-            <!-- 추가 업로드 버튼 (항상 표시, 5장 미만일 때) -->
-            <div id="uploadAddBtn" class="upload-add-btn"
-              onclick="document.getElementById('fileInput').click()">
-              <div class="upload-add-icon">＋</div>
-              <div class="upload-add-title">클릭 또는 드래그</div>
-              <div class="upload-add-desc">PNG · JPG · WEBP</div>
+            <!-- 상의 슬롯 -->
+            <div class="cslot" id="slot-TOP"
+              ondragover="handleSlotDragOver(event,'TOP')"
+              ondragleave="handleSlotDragLeave(event,'TOP')"
+              ondrop="handleSlotDrop(event,'TOP')"
+              onclick="triggerSlotInput('TOP')">
+              <div class="cslot-label">상의</div>
+              <div class="cslot-body" id="slot-body-TOP">
+                <div class="cslot-empty">
+                  <div class="cslot-plus">＋</div>
+                  <div class="cslot-hint">클릭 또는 드래그</div>
+                </div>
+              </div>
+              <button class="cslot-remove hidden" id="slot-remove-TOP"
+                onclick="removeSlot(event,'TOP')">✕</button>
             </div>
-          </div>
 
-          <!-- 전체 삭제 (카드가 1장 이상일 때 표시) -->
-          <button id="clothingResetBtn" class="btn btn-ghost btn-sm clothing-reset-btn hidden" onclick="resetUpload()">
-            <i class="fas fa-trash-alt"></i> 전체 삭제
-          </button>
+            <!-- 하의 슬롯 -->
+            <div class="cslot" id="slot-BOTTOM"
+              ondragover="handleSlotDragOver(event,'BOTTOM')"
+              ondragleave="handleSlotDragLeave(event,'BOTTOM')"
+              ondrop="handleSlotDrop(event,'BOTTOM')"
+              onclick="triggerSlotInput('BOTTOM')">
+              <div class="cslot-label">하의</div>
+              <div class="cslot-body" id="slot-body-BOTTOM">
+                <div class="cslot-empty">
+                  <div class="cslot-plus">＋</div>
+                  <div class="cslot-hint">클릭 또는 드래그</div>
+                </div>
+              </div>
+              <button class="cslot-remove hidden" id="slot-remove-BOTTOM"
+                onclick="removeSlot(event,'BOTTOM')">✕</button>
+            </div>
 
-          <!-- 공용 파일 input (multiple 허용) -->
-          <input type="file" id="fileInput" accept="image/*" multiple style="display:none;" onchange="handleFileSelect(event)" />
+            <!-- 전체(원피스/아우터) 슬롯 -->
+            <div class="cslot" id="slot-OUTER"
+              ondragover="handleSlotDragOver(event,'OUTER')"
+              ondragleave="handleSlotDragLeave(event,'OUTER')"
+              ondrop="handleSlotDrop(event,'OUTER')"
+              onclick="triggerSlotInput('OUTER')">
+              <div class="cslot-label">아우터</div>
+              <div class="cslot-body" id="slot-body-OUTER">
+                <div class="cslot-empty">
+                  <div class="cslot-plus">＋</div>
+                  <div class="cslot-hint">클릭 또는 드래그</div>
+                </div>
+              </div>
+              <button class="cslot-remove hidden" id="slot-remove-OUTER"
+                onclick="removeSlot(event,'OUTER')">✕</button>
+            </div>
+
+          </div><!-- /.clothing-slots -->
+
+          <!-- 숨겨진 파일 input (슬롯별 category 속성으로 구분) -->
+          <input type="file" id="fileInput-TOP"    accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'TOP')" />
+          <input type="file" id="fileInput-BOTTOM" accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'BOTTOM')" />
+          <input type="file" id="fileInput-OUTER"  accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'OUTER')" />
         </div>
         <div class="gslide-nav">
           <div class="gslide-nav-inner">
