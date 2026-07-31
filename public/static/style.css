@@ -1103,6 +1103,16 @@ footer {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 20px 20px 0;
+  /* PC: 내부 콘텐츠를 max-width 기준으로 중앙 정렬 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* body 내부 직계 자식은 최대 480px, 왼쪽 기준 정렬 */
+.gslide-body > * {
+  width: 100%;
+  max-width: 480px;
+  text-align: left;
 }
 .gslide-body::-webkit-scrollbar { width: 3px; }
 .gslide-body::-webkit-scrollbar-track { background: transparent; }
@@ -1112,6 +1122,15 @@ footer {
 .gslide-header {
   flex-shrink: 0;
   padding: 16px 16px 0;
+  /* PC: 내부 콘텐츠 max-width 기준 중앙 정렬 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.gslide-header > * {
+  width: 100%;
+  max-width: 480px;
+  text-align: left;
 }
 
 /* ── 그리드 영역: flex:1 = 남은 공간 전부 ── */
@@ -1138,15 +1157,23 @@ footer {
 .gslide-nav {
   flex-shrink: 0;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;  /* PC: 내부 inner를 중앙 정렬 */
   align-items: center;
-  gap: 10px;
   padding: 12px 16px;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
   background: rgba(22,22,31,0.97);
   border-top: 1px solid rgba(255,255,255,0.07);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+}
+/* nav 내부 컨테이너: 최대 480px, 버튼 양쪽 배치 */
+.gslide-nav-inner {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
 }
 /* 네비 버튼 다크 테마 오버라이드 */
 .gslide-nav .step-nav-back {

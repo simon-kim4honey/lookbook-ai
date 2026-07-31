@@ -1608,8 +1608,10 @@ app.get('/generator', (c) => {
           </div>
         </div>
         <div class="gslide-nav">
-          <button class="step-nav-back" onclick="prevStep(1)"><i class="fas fa-arrow-left"></i> 이전</button>
-          <button class="step-nav-next" id="nextBtn1" onclick="nextStep(1)" disabled>다음 단계 <i class="fas fa-arrow-right"></i></button>
+          <div class="gslide-nav-inner">
+            <button class="step-nav-back" onclick="prevStep(1)"><i class="fas fa-arrow-left"></i> 이전</button>
+            <button class="step-nav-next" id="nextBtn1" onclick="nextStep(1)" disabled>다음 단계 <i class="fas fa-arrow-right"></i></button>
+          </div>
         </div>
       </div>
 
@@ -1631,8 +1633,10 @@ app.get('/generator', (c) => {
           <div class="select-grid" id="modelGrid"></div>
         </div>
         <div class="gslide-nav">
-          <button class="step-nav-back" onclick="prevStep(2)"><i class="fas fa-arrow-left"></i> 이전</button>
-          <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)">다음 단계 <i class="fas fa-arrow-right"></i></button>
+          <div class="gslide-nav-inner">
+            <button class="step-nav-back" onclick="prevStep(2)"><i class="fas fa-arrow-left"></i> 이전</button>
+            <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)">다음 단계 <i class="fas fa-arrow-right"></i></button>
+          </div>
         </div>
       </div>
 
@@ -1658,8 +1662,10 @@ app.get('/generator', (c) => {
           <div class="select-grid" id="bgGrid"></div>
         </div>
         <div class="gslide-nav">
-          <button class="step-nav-back" onclick="prevStep(3)"><i class="fas fa-arrow-left"></i> 이전</button>
-          <button class="step-nav-next" id="nextBtn3" onclick="nextStep(3)">다음 단계 <i class="fas fa-arrow-right"></i></button>
+          <div class="gslide-nav-inner">
+            <button class="step-nav-back" onclick="prevStep(3)"><i class="fas fa-arrow-left"></i> 이전</button>
+            <button class="step-nav-next" id="nextBtn3" onclick="nextStep(3)">다음 단계 <i class="fas fa-arrow-right"></i></button>
+          </div>
         </div>
       </div>
 
@@ -1730,8 +1736,10 @@ app.get('/generator', (c) => {
           </div>
         </div>
         <div class="gslide-nav" id="step5Nav">
-          <button class="step-nav-back" onclick="prevStep(4)"><i class="fas fa-arrow-left"></i> 이전</button>
-          <button class="step-nav-next" onclick="startGeneration()"><i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작</button>
+          <div class="gslide-nav-inner">
+            <button class="step-nav-back" onclick="prevStep(4)"><i class="fas fa-arrow-left"></i> 이전</button>
+            <button class="step-nav-next" onclick="startGeneration()"><i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작</button>
+          </div>
         </div>
       </div>
 
@@ -1754,8 +1762,10 @@ app.get('/generator', (c) => {
           <div class="results-grid" id="resultsGrid"></div>
         </div>
         <div class="gslide-nav">
-          <button class="step-nav-back" onclick="window.location.href='/generator'"><i class="fas fa-plus"></i> 새 프로젝트</button>
-          <button class="step-nav-next" onclick="window.location.href='/'"><i class="fas fa-home"></i> 홈으로</button>
+          <div class="gslide-nav-inner">
+            <button class="step-nav-back" onclick="window.location.href='/generator'"><i class="fas fa-plus"></i> 새 프로젝트</button>
+            <button class="step-nav-next" onclick="window.location.href='/'"><i class="fas fa-home"></i> 홈으로</button>
+          </div>
         </div>
       </div>
 
