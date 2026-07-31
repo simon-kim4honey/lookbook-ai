@@ -975,9 +975,9 @@ footer {
 
 /* ============ GENERATOR ============ */
 #generator-page {
-  min-height: 100vh;
   background: var(--gray-1);
   padding-top: 64px;
+  /* height는 inline style(height:100vh)로 제어 — min-height 제거하여 overflow 방지 */
 }
 
 .generator-header {
@@ -1047,9 +1047,8 @@ footer {
 
 /* Generator Body */
 .generator-body {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px;
+  /* flex:1 + overflow:hidden은 inline style로 제어 */
+  /* padding 제거: step-panel 내부에서 개별 처리 */
 }
 
 .step-panel {
@@ -1058,6 +1057,8 @@ footer {
 .step-panel.active {
   display: flex;
   flex-direction: column;
+  flex: 1;          /* generator-body의 남은 높이 전부 차지 */
+  min-height: 0;    /* flex 자식의 overflow 허용 */
   animation: fadeIn 0.3s ease;
 }
 
@@ -1069,7 +1070,9 @@ footer {
 .step-title-area {
   margin-bottom: 32px;
 }
-/* Step 2/3 그리드 모드: 헤더 */
+/* ─── Step 2/3 그리드 레이아웃 ─── */
+
+/* 헤더 영역 — 고정 높이 */
 #step2Header,
 #step3Header {
   flex-shrink: 0;
@@ -1079,7 +1082,8 @@ footer {
 #step3Header .step-num-badge {
   margin-bottom: 4px;
 }
-/* Step 2/3 model-filters / bg-categories */
+
+/* 필터/카테고리 — 가로 스크롤 */
 #step2Header .model-filters,
 #step3Header .bg-categories {
   padding: 0 0 8px;
@@ -1089,15 +1093,34 @@ footer {
   white-space: nowrap;
   display: flex;
   gap: 6px;
+  flex-wrap: nowrap;
 }
 #step2Header .model-filters::-webkit-scrollbar,
 #step3Header .bg-categories::-webkit-scrollbar { display: none; }
 
-/* Step 2/3 하단 네비 */
+/* 로딩 상태 — flex:1로 중앙 표시 */
+#modelsLoading,
+#bgsLoading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 그리드 래퍼 — flex:1로 남은 공간 전부 차지 */
+#modelGridWrap,
+#bgGridWrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 하단 네비 — 고정 */
 #step2Nav,
 #step3Nav {
   flex-shrink: 0;
-  margin-top: 0;
   padding: 12px 16px;
   background: rgba(248, 248, 252, 0.95);
   backdrop-filter: blur(8px);

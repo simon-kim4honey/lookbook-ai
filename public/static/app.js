@@ -597,32 +597,14 @@ function updateGridScrollBtns(wrapId) {
 // STEP 2: Model Selection — 그리드 UI
 // ─────────────────────────────────────────────────────────
 
-// ── 그리드 컨테이너 높이: 패널 실제 높이에서 다른 요소 합산 후 계산 ──
+// ── 그리드 컨테이너 높이: flex:1로 남은 공간 차지 (CSS 기반) ──
 function fixGridHeight(wrapId) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
-  const panel = wrap.closest('.step-panel');
-  if (!panel) return;
-
-  // 패널의 실제 렌더 높이 기준
-  const panelRect = panel.getBoundingClientRect();
-  const panelH = panelRect.height;
-
-  // 패널 내 다른 요소들(타이틀, 필터, step-nav) 높이 합산
-  let usedH = 0;
-  panel.querySelectorAll(':scope > *').forEach(el => {
-    if (el === wrap) return;
-    // step-nav는 absolute 포지션이지만 하단 여백으로 확보
-    usedH += el.getBoundingClientRect().height;
-  });
-
-  // step-nav 높이만큼 추가 여백 확보 (padding-bottom 대신 직접 계산)
-  const navEl = panel.querySelector('.step-nav');
-  const navH = navEl ? navEl.getBoundingClientRect().height + 8 : 72;
-
-  const availH = panelH - usedH - navH - 8;
-  wrap.style.height = Math.max(availH, 200) + 'px';
-  wrap.style.minHeight = '200px';
+  // flex:1 + min-height:0 으로 부모 남은 공간 자동 점유
+  wrap.style.flex = '1';
+  wrap.style.minHeight = '0';
+  wrap.style.overflowY = 'auto';
 }
 
 function renderModelGrid(models) {

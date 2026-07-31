@@ -1559,14 +1559,14 @@ app.get('/generator', (c) => {
     </div>
   </nav>
 
-  <div id="generator-page" style="height:100vh;overflow:hidden;display:flex;flex-direction:column;">
+  <div id="generator-page" style="height:calc(100vh - 64px);overflow:hidden;display:flex;flex-direction:column;">
 
     <!-- Generator Body -->
-    <div class="generator-body" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;">
+    <div class="generator-body" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;padding:0;">
 
       <!-- ─── Step 1: Upload ─── -->
-      <div class="step-panel active" id="step-1" style="height:100%;flex-direction:column;overflow:hidden;">
-        <div class="step-title-area">
+      <div class="step-panel active" id="step-1" style="flex-direction:column;overflow:hidden;padding:20px 20px 0;">
+        <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 1 / 5 · 의류 업로드</div>
           <h2 class="step-heading">의류 이미지를 업로드하세요</h2>
           <p class="step-sub">배경이 흰색이거나 투명한 이미지를 사용하면 가장 좋은 결과를 얻을 수 있어요.</p>
@@ -1593,16 +1593,6 @@ app.get('/generator', (c) => {
             <div class="upload-preview-info">
               <div class="upload-preview-name" id="previewName">-</div>
               <div class="upload-preview-meta" id="previewMeta">-</div>
-              <div class="upload-tips" style="background:linear-gradient(135deg,rgba(108,71,255,0.08),rgba(0,212,170,0.08));border:1px solid rgba(108,71,255,0.2);border-radius:10px;padding:12px 16px;">
-                <p style="margin:0;font-size:13px;color:var(--text-primary);font-weight:600;">📸 이미지가 여러 장일수록 더 좋은 결과를 얻을 수 있어요!</p>
-                <p style="margin:8px 0 0;font-size:12px;color:var(--text-muted);">더 많은 촬영 팁이 필요하다면 →
-                  <a href="https://www.style-room.ai" target="_blank" rel="noopener"
-                    style="color:var(--primary);font-weight:600;text-decoration:none;">
-                    www.style-room.ai
-                  </a>
-                  를 참고하세요
-                </p>
-              </div>
               <button class="btn btn-ghost btn-sm" style="margin-top:16px;" onclick="resetUpload()">
                 <i class="fas fa-redo"></i> 다시 선택
               </button>
@@ -1621,7 +1611,7 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 2: Model (그리드 선택) ─── -->
-      <div class="step-panel" id="step-2" style="flex-direction:column;height:100%;overflow:hidden;position:relative;">
+      <div class="step-panel" id="step-2" style="flex-direction:column;overflow:hidden;">
         <div id="step2Header" style="flex-shrink:0;padding:12px 16px 0;">
           <div class="step-num-badge">Step 2 / 5 · 모델 선택</div>
           <h2 style="font-size:18px;font-weight:800;margin:4px 0 8px;">AI 모델을 선택하세요</h2>
@@ -1659,7 +1649,7 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 3: Background (그리드 선택) ─── -->
-      <div class="step-panel" id="step-3" style="flex-direction:column;height:100%;overflow:hidden;position:relative;">
+      <div class="step-panel" id="step-3" style="flex-direction:column;overflow:hidden;">
         <div id="step3Header" style="flex-shrink:0;padding:12px 16px 0;">
           <div class="step-num-badge">Step 3 / 5 · 배경 선택</div>
           <h2 style="font-size:18px;font-weight:800;margin:4px 0 8px;">배경을 선택하세요</h2>
@@ -1701,7 +1691,7 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 4: Generate ─── -->
-      <div class="step-panel" id="step-4" style="height:100%;flex-direction:column;overflow:hidden;">
+      <div class="step-panel" id="step-4" style="flex-direction:column;overflow:hidden;padding:20px 20px 0;">
         <div class="step-title-area" id="step5TitleArea" style="flex-shrink:0;">
           <div class="step-num-badge">Step 4 / 5 · 생성 옵션</div>
           <h2 class="step-heading">생성 옵션을 설정하세요</h2>
@@ -1792,7 +1782,7 @@ app.get('/generator', (c) => {
       </div>
 
       <!-- ─── Step 5: Results ─── -->
-      <div class="step-panel" id="step-5" style="height:100%;flex-direction:column;overflow:hidden;">
+      <div class="step-panel" id="step-5" style="flex-direction:column;overflow:hidden;padding:20px 20px 0;">
         <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 5 / 5 · 생성 완료 ✅</div>
           <h2 class="step-heading">이미지가 생성되었습니다!</h2>
