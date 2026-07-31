@@ -48,15 +48,13 @@ let adminPromptConfig: AdminPromptConfig = {
   prefix: '',
   suffix: '',
   styleGuide: [
-    '후지필름 GFX 100S 중형 카메라, 110mm f/2 렌즈로 촬영.',
-    '카메라 왼쪽에서 자연 확산광, 보조 반사판 사용.',
-    '색 보정: 깨끗하고 중립적인 피부 톤, 약간 따뜻한 하이라이트.',
-    '패션 에디토리얼 무드: 우아하고 세련된 매거진 커버 퀄리티.',
-    '모델과 배경이 자연스럽게 어우러지도록 조명, 그림자, 색온도 완벽 일치.',
-    '모델이 실제 해당 장소에 있는 것처럼 현실감 있게 합성.',
-    '배경의 모든 요소(사람, 차량, 나무, 건물)가 약 170cm 신장의 모델을 기준으로 현실적인 비율로 표현되어야 함.',
-    '배경 카메라 앵글과 초점 거리를 모델 사진 촬영 앵글에 맞게 가상 조정하여 동일한 카메라로 현장 촬영한 것처럼 합성.',
-    '배경 지평선(소실점)이 모델의 눈높이와 일치하도록 원근감 교정.',
+    '카메라: 아이레벨(지상 160-165cm 높이) 정면 촬영, 85-135mm 표준 망원 렌즈.',
+    '배경은 참조 이미지의 장소·분위기·색감을 유지하되, 모델의 카메라 앵글과 눈높이에 맞게 원근감을 새로 구성.',
+    '배경 지평선이 반드시 모델의 눈높이와 일치해야 함.',
+    '배경 요소 실제 스케일 기준 — 모델(170cm) 옆의 일반 승용차는 모델 어깨~가슴 높이, 배경 보행자는 거리에 비례해 작게, 나무·건물은 모델보다 훨씬 크게.',
+    '모델 발밑 지면 그림자 자연스럽게 합성, 모델이 실제 그 장소 바닥에 서 있는 것처럼.',
+    '조명 방향·색온도·그림자 방향이 배경과 완벽 일치.',
+    '패션 에디토리얼 무드: 매거진 커버 퀄리티, 배경 얕은 심도 처리.',
   ].join(' '),
   technicalSpec: [
     '초사실적 표현, 직물 질감과 피부 디테일 극사실 재현.',
@@ -661,34 +659,41 @@ app.post('/api/generation/start', async (c) => {
 
     // ── 공통 불변 제약 파라미터 (모든 모드에 공통 적용) ──
     const HARD_CONSTRAINTS = [
-      `STRICT RULES — NEVER VIOLATE:`,
+      `ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,
       `1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,
-      `2. DO NOT alter the model's face, facial features, skin tone, or body structure in any way.`,
-      `3. DO NOT change, redesign, or substitute ANY detail of the clothing: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown.`,
-      `4. The model and the background must be composited naturally and seamlessly — realistic lighting match, consistent shadows, natural depth-of-field, no visible seams or compositing artifacts.`,
-      `5. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by the AI.`,
-      `BACKGROUND PERSPECTIVE & SCALE RULES — CRITICAL:`,
-      `6. The background MUST be adapted so that ALL elements (people, vehicles, trees, buildings, objects) appear at PHYSICALLY CORRECT scale relative to the model's height (~170cm tall person).`,
-      `7. Background pedestrians or people must appear proportionally SMALLER than the model if they are further away — strict real-world perspective must be enforced.`,
-      `8. Vehicles (cars, motorcycles) must appear at realistic size relative to the model — a standard sedan should be roughly the same height as the model's torso, NOT shorter than the model's knee.`,
-      `9. The background virtual camera angle, focal length, and zoom MUST match the model's camera perspective — use the SAME eye-level, shooting angle, and lens compression as the model photograph.`,
-      `10. Apply correct vanishing-point perspective: the background's horizon line must align with the model's eye level. Background elements must diminish naturally in size with distance.`,
-      `11. DO NOT change the background location, environment, mood, or atmosphere — ONLY adjust the framing, zoom level, and perspective to match the model's scale.`,
-      `12. The final image must look as if the model was physically present and photographed ON LOCATION at the background scene with the same camera.`,
+      `2. DO NOT alter the model's face, facial features, skin tone, hair, or body structure in any way whatsoever.`,
+      `3. DO NOT change, redesign, or substitute ANY detail of the clothing: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown in the reference.`,
+      `4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,
       `Ultra-photorealistic, 8K quality, professional fashion editorial, magazine cover quality.`,
     ].join(' ')
 
     if (images.length >= 3) {
       // 의류 + 모델 이미지 + 배경 모두 있는 풀 모드
+      // 핵심 전략: 배경 이미지는 '장소/분위기 참조'로만 사용.
+      // AI가 모델의 카메라 앵글·눈높이·원근감을 기준으로 배경 장면을 새로 구성.
       prompt = [
-        `Create a hyper-realistic professional fashion lookbook photograph.`,
-        `Image 1 is the CLOTHING ITEM — reproduce every single detail of this garment EXACTLY: color, pattern, texture, collar shape, sleeve length, hem, buttons, zippers, prints. NEVER alter the clothing.`,
-        `Image 2 is the MODEL — preserve this person's exact face, facial features, hair, skin tone, and body build with absolute fidelity. NEVER change the model's appearance.`,
-        `Image 3 is the BACKGROUND SCENE — reframe and adapt this background so it visually matches the model's scale and camera perspective. `,
-        `BACKGROUND ADAPTATION: Virtually adjust the background's camera focal length, zoom level, and shooting angle so the scene elements (people, vehicles, trees, buildings) appear at physically accurate sizes relative to a ~170cm model standing in the foreground. `,
-        `The background horizon line must align with the model's eye level. Background pedestrians must be proportionally smaller (further away), vehicles must be car-sized (not toy-sized), and trees/buildings must follow natural vanishing-point perspective. `,
-        `Do NOT change the background location, mood, weather, or environment — only adjust the virtual framing and perspective so the model appears to have been photographed ON-LOCATION at that exact scene.`,
-        `The model is wearing the clothing naturally and organically within the background scene. Lighting, color temperature, and shadows are fully consistent between model and background.`,
+        `Create a hyper-realistic professional fashion editorial photograph.`,
+
+        // ── 의류 (Image 1) ──
+        `Image 1 is the CLOTHING ITEM. Reproduce EVERY detail of this garment with 100% fidelity: exact color, exact pattern, exact texture, collar shape, sleeve length, hem line, buttons, zippers, prints. This clothing must appear IDENTICAL to the reference.`,
+
+        // ── 모델 (Image 2) ──
+        `Image 2 is the MODEL. Preserve this exact person: face, facial features, hair style and color, skin tone, body proportions. Make NO changes to the model's appearance.`,
+
+        // ── 배경 전략 핵심 변경 ──
+        `Image 3 is a LOCATION REFERENCE only — it shows the place, atmosphere, lighting mood, and environment style. Use it SOLELY to understand the scene's character (location type, time of day, color palette, overall vibe).`,
+
+        `CRITICAL COMPOSITING TASK: Reconstruct the background scene FROM SCRATCH using Image 3 as a style/location reference, but built entirely around the model's camera perspective and scale:`,
+        `- Determine the model's shooting camera: eye-level (~160-165cm height from ground), straight-on angle, standard portrait focal length (~85-135mm equivalent).`,
+        `- Re-render the background environment matching THAT exact camera position and angle. The background's horizon line MUST sit at the model's eye level.`,
+        `- All background elements must obey real-world scale relative to a ~170cm tall model in the foreground: full-size cars (sedan ~1.4-1.5m tall) must reach roughly the model's shoulder/chest height when nearby; background pedestrians must be proportionally smaller with distance; trees and buildings must tower appropriately ABOVE the model.`,
+        `- Recreate the same location's atmosphere (same street, same beach/city environment, same time of day, same weather, same color palette from Image 3) — but with correct perspective built around the model.`,
+        `- The model must appear to be physically standing ON the ground of that scene, with correct contact shadows and ground-plane integration.`,
+
+        // ── 조명/합성 ──
+        `Match the scene's natural lighting direction and color temperature to the model. Cast realistic ground shadow beneath the model's feet. Apply shallow depth-of-field to background elements.`,
+        `The final result must look like a single photograph taken on location — zero compositing artifacts, zero scale mismatch, zero perspective conflict.`,
+
         `Show the model in a ${poseTypeText}, ${poseStyleText}.`,
         HARD_CONSTRAINTS,
       ].join(' ')
