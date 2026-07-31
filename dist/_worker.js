@@ -667,21 +667,21 @@ ${t}
                 onclick="removeSlot(event,'BOTTOM')">✕</button>
             </div>
 
-            <!-- 전체(원피스/아우터) 슬롯 -->
-            <div class="cslot" id="slot-OUTER"
-              ondragover="handleSlotDragOver(event,'OUTER')"
-              ondragleave="handleSlotDragLeave(event,'OUTER')"
-              ondrop="handleSlotDrop(event,'OUTER')"
-              onclick="triggerSlotInput('OUTER')">
+            <!-- 전체(상의+하의 한 이미지 / 원피스·세트업) 슬롯 -->
+            <div class="cslot" id="slot-DRESS"
+              ondragover="handleSlotDragOver(event,'DRESS')"
+              ondragleave="handleSlotDragLeave(event,'DRESS')"
+              ondrop="handleSlotDrop(event,'DRESS')"
+              onclick="triggerSlotInput('DRESS')">
               <div class="cslot-label">전체</div>
-              <div class="cslot-body" id="slot-body-OUTER">
+              <div class="cslot-body" id="slot-body-DRESS">
                 <div class="cslot-empty">
                   <div class="cslot-plus">＋</div>
                   <div class="cslot-hint">클릭 또는 드래그</div>
                 </div>
               </div>
-              <button class="cslot-remove hidden" id="slot-remove-OUTER"
-                onclick="removeSlot(event,'OUTER')">✕</button>
+              <button class="cslot-remove hidden" id="slot-remove-DRESS"
+                onclick="removeSlot(event,'DRESS')">✕</button>
             </div>
 
           </div><!-- /.clothing-slots -->
@@ -689,7 +689,7 @@ ${t}
           <!-- 숨겨진 파일 input (슬롯별 category 속성으로 구분) -->
           <input type="file" id="fileInput-TOP"    accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'TOP')" />
           <input type="file" id="fileInput-BOTTOM" accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'BOTTOM')" />
-          <input type="file" id="fileInput-OUTER"  accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'OUTER')" />
+          <input type="file" id="fileInput-DRESS"  accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'DRESS')" />
         </div>
         <div class="gslide-nav">
           <div class="gslide-nav-inner">
