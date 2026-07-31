@@ -6,11 +6,22 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  // ── Genspark Hosted 환경: D1 바인딩 (gsk hosted deploy 시 ID 자동 교체됨) ──
   "d1_databases": [
     {
       "binding": "LOOKBOOK_DB",
       "database_name": "lookbook-ai-production",
       "database_id": "placeholder-will-be-replaced-by-gsk"
+    }
+  ],
+  // ── BYOK 환경 (studiob.aifashion.co.kr): KV 바인딩 영구 등록 ──
+  // KV namespace ID: 2aab8e4e250840e0b3327d4a8e776ed9 (LOOKBOOK_KV)
+  // ※ BYOK 배포 시 d1_databases 블록만 제거하고 kv_namespaces는 유지
+  "kv_namespaces": [
+    {
+      "binding": "LOOKBOOK_KV",
+      "id": "2aab8e4e250840e0b3327d4a8e776ed9",
+      "preview_id": "6a8c336e82d346039bad45e071eaad66"
     }
   ]
 }
