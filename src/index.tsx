@@ -1620,12 +1620,11 @@ app.get('/generator', (c) => {
         </div>
       </div>
 
-      <!-- ─── Step 2: Model (스와이프 카드) ─── -->
+      <!-- ─── Step 2: Model (그리드 선택) ─── -->
       <div class="step-panel" id="step-2" style="flex-direction:column;overflow-y:auto;overflow-x:hidden;padding-bottom:16px;">
         <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 2 / 5 · 모델 선택</div>
           <h2 class="step-heading">AI 모델을 선택하세요</h2>
-          <p class="step-sub">← 스와이프하여 모델을 확인하세요</p>
         </div>
 
         <div class="model-filters" id="modelFilters" style="flex-shrink:0;">
@@ -1634,29 +1633,15 @@ app.get('/generator', (c) => {
           <button class="filter-tag" onclick="filterModels('남성', this)">남성</button>
         </div>
 
-        <!-- 스와이프 카드 뷰어 -->
         <div id="modelsLoading" style="text-align:center;padding:60px;color:var(--text-muted);flex:1;">
           <div style="font-size:36px;margin-bottom:12px;">⏳</div>
           <p>모델 목록을 불러오는 중...</p>
         </div>
 
-        <div id="modelSwipeWrap" style="display:none;flex-direction:column;overflow:visible;">
-          <!-- 카드 스와이프 영역 -->
-          <div class="swipe-outer" id="modelSwipeOuter">
-            <button class="swipe-arrow swipe-arrow-left" id="modelPrev" onclick="swipeCard('model',-1)"><i class="fas fa-chevron-left"></i></button>
-            <div class="swipe-track" id="modelTrack">
-              <!-- JS가 채움 -->
-            </div>
-            <button class="swipe-arrow swipe-arrow-right" id="modelNext" onclick="swipeCard('model',1)"><i class="fas fa-chevron-right"></i></button>
+        <div id="modelGridWrap" style="display:none;flex:1;min-height:0;">
+          <div class="select-grid" id="modelGrid">
+            <!-- JS가 채움 -->
           </div>
-          <!-- 카운터 + 이름 -->
-          <div class="swipe-info">
-            <div class="swipe-counter" id="modelCounter">1 / 1</div>
-            <div class="swipe-name" id="modelCardName">-</div>
-            <div class="swipe-desc" id="modelCardDesc"></div>
-          </div>
-          <!-- 점 인디케이터 -->
-          <div class="swipe-dots" id="modelDots"></div>
         </div>
 
         <div class="step-nav" style="flex-shrink:0;">
@@ -1669,12 +1654,11 @@ app.get('/generator', (c) => {
         </div>
       </div>
 
-      <!-- ─── Step 3: Background (스와이프 카드) ─── -->
+      <!-- ─── Step 3: Background (그리드 선택) ─── -->
       <div class="step-panel" id="step-3" style="flex-direction:column;overflow-y:auto;overflow-x:hidden;padding-bottom:16px;">
         <div class="step-title-area" style="flex-shrink:0;">
           <div class="step-num-badge">Step 3 / 5 · 배경 선택</div>
           <h2 class="step-heading">배경을 선택하세요</h2>
-          <p class="step-sub">← 스와이프하여 배경을 확인하세요</p>
         </div>
 
         <div class="bg-categories" id="bgCategories" style="flex-shrink:0;">
@@ -1692,20 +1676,10 @@ app.get('/generator', (c) => {
           <p>배경 목록을 불러오는 중...</p>
         </div>
 
-        <div id="bgSwipeWrap" style="display:none;flex-direction:column;overflow:visible;">
-          <div class="swipe-outer" id="bgSwipeOuter">
-            <button class="swipe-arrow swipe-arrow-left" id="bgPrev" onclick="swipeCard('bg',-1)"><i class="fas fa-chevron-left"></i></button>
-            <div class="swipe-track" id="bgTrack">
-              <!-- JS가 채움 -->
-            </div>
-            <button class="swipe-arrow swipe-arrow-right" id="bgNext" onclick="swipeCard('bg',1)"><i class="fas fa-chevron-right"></i></button>
+        <div id="bgGridWrap" style="display:none;flex:1;min-height:0;">
+          <div class="select-grid" id="bgGrid">
+            <!-- JS가 채움 -->
           </div>
-          <div class="swipe-info">
-            <div class="swipe-counter" id="bgCounter">1 / 1</div>
-            <div class="swipe-name" id="bgCardName">-</div>
-            <div class="swipe-desc" id="bgCardDesc"></div>
-          </div>
-          <div class="swipe-dots" id="bgDots"></div>
         </div>
 
         <div class="step-nav" style="flex-shrink:0;">

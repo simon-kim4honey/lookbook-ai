@@ -319,10 +319,9 @@ async function loadModelsFromAPI() {
     AppState.allModels = data.models || [];
     AppState.filteredModels = [...AppState.allModels];
 
-    const wrap = document.getElementById('modelSwipeWrap');
+    const wrap = document.getElementById('modelGridWrap');
     const loading = document.getElementById('modelsLoading');
     if (AppState.allModels.length === 0) {
-      // 등록된 모델 없음 안내
       if (loading) {
         loading.style.display = '';
         loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">👤</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 모델이 없습니다</p><p style="font-size:13px">관리자 페이지에서 모델을 먼저 등록해주세요</p></div>';
@@ -330,8 +329,8 @@ async function loadModelsFromAPI() {
     } else {
       if (wrap) {
         if (loading) loading.style.display = 'none';
-        wrap.style.display = 'flex';
-        requestAnimationFrame(() => requestAnimationFrame(() => renderModelSwipe(AppState.allModels)));
+        wrap.style.display = 'block';
+        renderModelGrid(AppState.allModels);
       }
     }
   } catch (err) {
@@ -356,10 +355,9 @@ async function loadBackgroundsFromAPI() {
     AppState.allBackgrounds = data.backgrounds || [];
     AppState.filteredBackgrounds = [...AppState.allBackgrounds];
 
-    const wrap = document.getElementById('bgSwipeWrap');
+    const wrap = document.getElementById('bgGridWrap');
     const loading = document.getElementById('bgsLoading');
     if (AppState.allBackgrounds.length === 0) {
-      // 등록된 배경 없음 안내
       if (loading) {
         loading.style.display = '';
         loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 배경이 없습니다</p><p style="font-size:13px">관리자 페이지에서 배경을 먼저 등록해주세요</p></div>';
@@ -367,8 +365,8 @@ async function loadBackgroundsFromAPI() {
     } else {
       if (wrap) {
         if (loading) loading.style.display = 'none';
-        wrap.style.display = 'flex';
-        requestAnimationFrame(() => requestAnimationFrame(() => renderBgSwipe(AppState.allBackgrounds)));
+        wrap.style.display = 'block';
+        renderBgGrid(AppState.allBackgrounds);
       }
     }
   } catch (err) {
@@ -465,25 +463,25 @@ function changeStep(newStep) {
   AppState.currentStep = newStep;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // Step 2: 모델 스와이프 초기화
+  // Step 2: 모델 그리드 초기화
   if (newStep === 2) {
     const loading = document.getElementById('modelsLoading');
-    const wrap = document.getElementById('modelSwipeWrap');
+    const wrap = document.getElementById('modelGridWrap');
     if (AppState.allModels.length > 0) {
       if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'flex'; requestAnimationFrame(() => requestAnimationFrame(() => renderModelSwipe(AppState.allModels))); }
+      if (wrap) { wrap.style.display = 'block'; renderModelGrid(AppState.allModels); }
     } else {
       loadModelsFromAPI();
     }
   }
 
-  // Step 3: 배경 스와이프 초기화
+  // Step 3: 배경 그리드 초기화
   if (newStep === 3) {
     const loading = document.getElementById('bgsLoading');
-    const wrap = document.getElementById('bgSwipeWrap');
+    const wrap = document.getElementById('bgGridWrap');
     if (AppState.allBackgrounds.length > 0) {
       if (loading) loading.style.display = 'none';
-      if (wrap) { wrap.style.display = 'flex'; requestAnimationFrame(() => requestAnimationFrame(() => renderBgSwipe(AppState.allBackgrounds))); }
+      if (wrap) { wrap.style.display = 'block'; renderBgGrid(AppState.allBackgrounds); }
     } else {
       loadBackgroundsFromAPI();
     }
@@ -571,369 +569,117 @@ function resetUpload() {
 }
 
 // ─────────────────────────────────────────────────────────
-// STEP 2: Model Selection — 스와이프 카드 UI
+// STEP 2: Model Selection — 그리드 UI
 // ─────────────────────────────────────────────────────────
-const SwipeState = {
-  model: { list: [], idx: 0 },
-  bg:    { list: [], idx: 0 },
-};
 
-// ── 모델 스와이프 렌더 ──────────────────────────────────
-function renderModelSwipe(models) {
-  const track = document.getElementById('modelTrack');
-  if (!track) return;
-  // 높이 강제 설정 (CSS 캐시/상속 문제 방지)
-  track.style.height = '320px';
-  track.style.position = 'relative';
-  const outer = document.getElementById('modelSwipeOuter');
-  if (outer) { outer.style.height = '360px'; outer.style.position = 'relative'; outer.style.display = 'flex'; }
+function renderModelGrid(models) {
+  const grid = document.getElementById('modelGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
 
-  // "선택 없음(랜덤)" 스킵 카드를 맨 앞에
-  const skipItem = { __skip: true };
-  const list = [skipItem, ...models];
-  SwipeState.model.list = list;
-
-  // 현재 선택된 모델 인덱스 유지
-  if (AppState.selectedModel) {
-    const found = list.findIndex(m => !m.__skip && m.id === AppState.selectedModel.id);
-    SwipeState.model.idx = found >= 0 ? found : 0;
-  } else {
-    SwipeState.model.idx = 0;
-  }
-
-  track.innerHTML = '';
-  list.forEach((model, i) => {
-    const card = document.createElement('div');
-    card.className = 'swipe-card';
-    card.dataset.idx = i;
-
-    if (model.__skip) {
-      // 스킵 카드
-      card.innerHTML = `
-        <div class="skip-card">
-          <div style="font-size:52px;margin-bottom:16px;">🎲</div>
-          <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">선택 없음</div>
-          <div style="font-size:13px;color:var(--text-muted);line-height:1.5;">AI가 의류에 맞는<br>최적의 모델을 자동 선택</div>
-          <div style="margin-top:20px;padding:8px 20px;background:linear-gradient(135deg,#6C47FF,#FF6B9D);color:white;border-radius:20px;font-size:13px;font-weight:600;">랜덤 배정</div>
-        </div>`;
-    } else {
-      const displayName = model.name && !model.name.match(/^\d+$/)
-        ? model.name : `모델 ${model.name || model.id}`;
-      const imgSrc = model.isCustom
-        ? `/api/proxy/custom-model/${model.customId}`
-        : `/api/proxy/model-image/${model.id}`;
-
-      card.innerHTML = `
-        <div class="swipe-card-img-wrap" style="position:relative;width:100%;flex:1;min-height:0;overflow:hidden;border-radius:16px 16px 0 0;">
-          <img src="${imgSrc}" alt="${displayName}"
-            style="width:100%;height:100%;object-fit:cover;display:block;"
-            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-          <div style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:64px;background:linear-gradient(135deg,#f0e6ff,#e6f0ff);">
-            ${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}
-          </div>
-          <div style="position:absolute;top:10px;left:10px;background:${model.isCustom ? 'rgba(108,71,255,0.9)' : 'rgba(0,0,0,0.6)'};color:white;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;">
-            ${model.isCustom ? '✦ 커스텀' : '#' + model.id}
-          </div>
-          ${AppState.selectedModel?.id === model.id ? '<div class="swipe-selected-badge">✓ 선택됨</div>' : ''}
-        </div>
-        <div class="swipe-card-foot">
-          <div style="font-weight:700;font-size:16px;color:var(--text-primary);">${displayName}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${model.gender || '여성'} · ${model.age || '20대'} · ${model.mood || '내추럴'}</div>
-        </div>`;
-    }
-
-    card.addEventListener('click', () => swipeSelectModel(i));
-    track.appendChild(card);
-  });
-
-  updateSwipeView('model');
-  initSwipeTouch('model', 'modelSwipeOuter');
-}
-
-function swipeSelectModel(idx) {
-  SwipeState.model.idx = idx;
-  const model = SwipeState.model.list[idx];
-  if (model.__skip) {
+  // 스킵 카드
+  const skipCard = document.createElement('div');
+  skipCard.className = 'grid-skip-card' + (!AppState.selectedModel ? ' selected' : '');
+  skipCard.innerHTML = `<span>🎲</span><p>선택 없음<br>(랜덤)</p>`;
+  skipCard.addEventListener('click', () => {
     AppState.selectedModel = null;
-    showToast('랜덤 모델로 자동 배정됩니다.', 'info');
-  } else {
-    AppState.selectedModel = model;
+    document.querySelectorAll('#modelGrid .grid-card, #modelGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
+    skipCard.classList.add('selected');
+  });
+  grid.appendChild(skipCard);
+
+  models.forEach((model) => {
     const displayName = model.name && !model.name.match(/^\d+$/)
       ? model.name : `모델 ${model.name || model.id}`;
-    showToast(`${displayName} 모델을 선택했습니다.`, 'success');
-  }
-  // 선택 배지 갱신
-  document.querySelectorAll('#modelTrack .swipe-card').forEach((card, i) => {
-    const badge = card.querySelector('.swipe-selected-badge');
-    if (badge) badge.remove();
-    const isImg = card.querySelector('.swipe-card-img-wrap');
-    if (isImg && !SwipeState.model.list[i].__skip) {
-      if (AppState.selectedModel && SwipeState.model.list[i].id === AppState.selectedModel.id) {
-        const b = document.createElement('div');
-        b.className = 'swipe-selected-badge';
-        b.textContent = '✓ 선택됨';
-        isImg.appendChild(b);
-      }
-    }
+    const imgSrc = model.isCustom
+      ? `/api/proxy/custom-model/${model.customId}`
+      : `/api/proxy/model-image/${model.id}`;
+
+    const card = document.createElement('div');
+    card.className = 'grid-card' + (AppState.selectedModel?.id === model.id ? ' selected' : '');
+    card.innerHTML = `
+      <img src="${imgSrc}" alt="${displayName}"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="grid-card-fallback">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>
+      <div class="grid-card-label">${displayName}</div>
+      <div class="grid-card-check"><i class="fas fa-check"></i></div>`;
+
+    card.addEventListener('click', () => {
+      AppState.selectedModel = model;
+      document.querySelectorAll('#modelGrid .grid-card, #modelGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+    });
+    grid.appendChild(card);
   });
-  updateSwipeView('model');
 }
 
 let modelFilterState = { gender: null };
 
 function filterModels(value, btn) {
-  if (value === 'all') {
-    modelFilterState.gender = null;
-    document.querySelectorAll('#modelFilters .filter-tag').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    renderModelSwipe(AppState.allModels);
-    return;
-  }
-
-  if (modelFilterState.gender === value) {
-    modelFilterState.gender = null;
-    btn.classList.remove('active');
-    renderModelSwipe(AppState.allModels);
-    const allBtn = document.querySelector('#modelFilters .filter-tag[onclick*="\'all\'"]');
-    if (allBtn) allBtn.classList.add('active');
-    return;
-  }
-
   document.querySelectorAll('#modelFilters .filter-tag').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  modelFilterState.gender = value;
-
-  const filtered = AppState.allModels.filter(m => (m.gender || '여성') === value);
-  renderModelSwipe(filtered.length > 0 ? filtered : AppState.allModels);
-}
-
-// ─────────────────────────────────────────────────────────
-// STEP 3: Background Selection — 스와이프 카드 UI
-// ─────────────────────────────────────────────────────────
-function renderBgSwipe(bgs) {
-  // 높이 강제 설정 (CSS 캐시/상속 문제 방지)
-  const bgTrack = document.getElementById('bgTrack');
-  if (bgTrack) { bgTrack.style.height = '320px'; bgTrack.style.position = 'relative'; }
-  const bgOuter = document.getElementById('bgSwipeOuter');
-  if (bgOuter) { bgOuter.style.height = '360px'; bgOuter.style.position = 'relative'; bgOuter.style.display = 'flex'; }
-  const track = document.getElementById('bgTrack');
-  if (!track) return;
-
-  const skipItem = { __skip: true };
-  const list = [skipItem, ...bgs];
-  SwipeState.bg.list = list;
-
-  if (AppState.selectedBg) {
-    const found = list.findIndex(b => !b.__skip && b.id === AppState.selectedBg.id);
-    SwipeState.bg.idx = found >= 0 ? found : 0;
+  if (value === 'all') {
+    modelFilterState.gender = null;
+    renderModelGrid(AppState.allModels);
   } else {
-    SwipeState.bg.idx = 0;
+    modelFilterState.gender = value;
+    const filtered = AppState.allModels.filter(m => (m.gender || '여성') === value);
+    renderModelGrid(filtered.length > 0 ? filtered : AppState.allModels);
   }
-
-  track.innerHTML = '';
-  list.forEach((bg, i) => {
-    const card = document.createElement('div');
-    card.className = 'swipe-card';
-    card.dataset.idx = i;
-
-    if (bg.__skip) {
-      card.innerHTML = `
-        <div class="skip-card">
-          <div style="font-size:52px;margin-bottom:16px;">🌄</div>
-          <div style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">선택 없음</div>
-          <div style="font-size:13px;color:var(--text-muted);line-height:1.5;">AI가 의류에 어울리는<br>최적의 배경을 자동 선택</div>
-          <div style="margin-top:20px;padding:8px 20px;background:linear-gradient(135deg,#6C47FF,#FF6B9D);color:white;border-radius:20px;font-size:13px;font-weight:600;">랜덤 배정</div>
-        </div>`;
-    } else {
-      const imgSrc = bg.isCustom
-        ? `/api/proxy/custom-bg/${bg.customId}`
-        : `/api/proxy/bg-image/${bg.id}`;
-
-      card.innerHTML = `
-        <div class="swipe-card-img-wrap" style="position:relative;width:100%;flex:1;min-height:0;overflow:hidden;border-radius:16px 16px 0 0;">
-          <img src="${imgSrc}" alt="${bg.name}"
-            style="width:100%;height:100%;object-fit:cover;display:block;"
-            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-          <div style="display:none;position:absolute;inset:0;align-items:center;justify-content:center;font-size:48px;background:linear-gradient(135deg,#e0e0e0,#c0c0c0);color:#666;">
-            🖼️
-          </div>
-          <div style="position:absolute;top:10px;left:10px;background:${bg.isCustom ? 'rgba(108,71,255,0.9)' : 'rgba(0,0,0,0.6)'};color:white;font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600;">
-            ${bg.isCustom ? '✦ 커스텀' : (bg.category || '기타')}
-          </div>
-          ${AppState.selectedBg?.id === bg.id ? '<div class="swipe-selected-badge">✓ 선택됨</div>' : ''}
-        </div>
-        <div class="swipe-card-foot">
-          <div style="font-weight:700;font-size:16px;color:var(--text-primary);">${bg.name}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${bg.category || '기타'} · ${bg.mood || '뉴트럴'}</div>
-        </div>`;
-    }
-
-    card.addEventListener('click', () => swipeSelectBg(i));
-    track.appendChild(card);
-  });
-
-  updateSwipeView('bg');
-  initSwipeTouch('bg', 'bgSwipeOuter');
 }
 
-function swipeSelectBg(idx) {
-  SwipeState.bg.idx = idx;
-  const bg = SwipeState.bg.list[idx];
-  if (bg.__skip) {
+// ─────────────────────────────────────────────────────────
+// STEP 3: Background Selection — 그리드 UI
+// ─────────────────────────────────────────────────────────
+
+function renderBgGrid(bgs) {
+  const grid = document.getElementById('bgGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  // 스킵 카드
+  const skipCard = document.createElement('div');
+  skipCard.className = 'grid-skip-card' + (!AppState.selectedBg ? ' selected' : '');
+  skipCard.innerHTML = `<span>🌄</span><p>선택 없음<br>(랜덤)</p>`;
+  skipCard.addEventListener('click', () => {
     AppState.selectedBg = null;
-    showToast('랜덤 배경으로 자동 배정됩니다.', 'info');
-  } else {
-    AppState.selectedBg = bg;
-    showToast(`"${bg.name}" 배경을 선택했습니다.`, 'success');
-  }
-  // 선택 배지 갱신
-  document.querySelectorAll('#bgTrack .swipe-card').forEach((card, i) => {
-    const badge = card.querySelector('.swipe-selected-badge');
-    if (badge) badge.remove();
-    const isImg = card.querySelector('.swipe-card-img-wrap');
-    if (isImg && !SwipeState.bg.list[i].__skip) {
-      if (AppState.selectedBg && SwipeState.bg.list[i].id === AppState.selectedBg.id) {
-        const b = document.createElement('div');
-        b.className = 'swipe-selected-badge';
-        b.textContent = '✓ 선택됨';
-        isImg.appendChild(b);
-      }
-    }
+    document.querySelectorAll('#bgGrid .grid-card, #bgGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
+    skipCard.classList.add('selected');
   });
-  updateSwipeView('bg');
+  grid.appendChild(skipCard);
+
+  bgs.forEach((bg) => {
+    const imgSrc = bg.isCustom
+      ? `/api/proxy/custom-bg/${bg.customId}`
+      : `/api/proxy/bg-image/${bg.id}`;
+
+    const card = document.createElement('div');
+    card.className = 'grid-card' + (AppState.selectedBg?.id === bg.id ? ' selected' : '');
+    card.innerHTML = `
+      <img src="${imgSrc}" alt="${bg.name}"
+        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+      <div class="grid-card-fallback">🖼️</div>
+      <div class="grid-card-label">${bg.name}</div>
+      <div class="grid-card-check"><i class="fas fa-check"></i></div>`;
+
+    card.addEventListener('click', () => {
+      AppState.selectedBg = bg;
+      document.querySelectorAll('#bgGrid .grid-card, #bgGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+    });
+    grid.appendChild(card);
+  });
 }
 
 function filterBg(category, btn) {
   document.querySelectorAll('.bg-cat').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-
   if (category === '전체') {
-    renderBgSwipe(AppState.allBackgrounds);
+    renderBgGrid(AppState.allBackgrounds);
   } else {
     const filtered = AppState.allBackgrounds.filter(b => b.category === category);
-    renderBgSwipe(filtered.length > 0 ? filtered : AppState.allBackgrounds);
+    renderBgGrid(filtered.length > 0 ? filtered : AppState.allBackgrounds);
   }
-}
-
-// ─────────────────────────────────────────────────────────
-// SWIPE ENGINE  (공통 — model / bg)
-// ─────────────────────────────────────────────────────────
-function swipeCard(type, dir) {
-  const s = SwipeState[type];
-  if (!s) return;
-  const newIdx = s.idx + dir;
-  if (newIdx < 0 || newIdx >= s.list.length) return;
-  s.idx = newIdx;
-
-  // 카드 클릭 선택도 동시에
-  if (type === 'model') swipeSelectModel(newIdx);
-  else if (type === 'bg')  swipeSelectBg(newIdx);
-  else updateSwipeView(type);
-}
-
-function updateSwipeView(type) {
-  const s = SwipeState[type];
-  if (!s) return;
-  const idx = s.idx;
-  const total = s.list.length;
-
-  // 트랙 카드 클래스
-  const trackId = type === 'model' ? 'modelTrack' : 'bgTrack';
-  const cards = document.querySelectorAll(`#${trackId} .swipe-card`);
-  cards.forEach((card, i) => {
-    card.classList.remove('prev', 'active', 'next', 'far');
-    if (i === idx)     card.classList.add('active');
-    else if (i === idx - 1) card.classList.add('prev');
-    else if (i === idx + 1) card.classList.add('next');
-    else                    card.classList.add('far');
-  });
-
-  // 카운터
-  const counterId = type === 'model' ? 'modelCounter' : 'bgCounter';
-  const counterEl = document.getElementById(counterId);
-  if (counterEl) counterEl.textContent = `${idx + 1} / ${total}`;
-
-  // 이름 / 설명
-  const nameId = type === 'model' ? 'modelCardName' : 'bgCardName';
-  const descId = type === 'model' ? 'modelCardDesc' : 'bgCardDesc';
-  const nameEl = document.getElementById(nameId);
-  const descEl = document.getElementById(descId);
-  const item = s.list[idx];
-  if (item && nameEl) {
-    if (item.__skip) {
-      nameEl.textContent = '선택 없음 (랜덤)';
-      if (descEl) descEl.textContent = 'AI가 자동으로 최적 선택';
-    } else if (type === 'model') {
-      const displayName = item.name && !item.name.match(/^\d+$/) ? item.name : `모델 ${item.name || item.id}`;
-      nameEl.textContent = displayName;
-      if (descEl) descEl.textContent = `${item.gender || '여성'} · ${item.age || '20대'} · ${item.mood || '내추럴'}`;
-    } else {
-      nameEl.textContent = item.name;
-      if (descEl) descEl.textContent = `${item.category || '기타'} · ${item.mood || '뉴트럴'}`;
-    }
-  }
-
-  // 화살표 비활성화
-  const prevId = type === 'model' ? 'modelPrev' : 'bgPrev';
-  const nextId = type === 'model' ? 'modelNext' : 'bgNext';
-  const prevBtn = document.getElementById(prevId);
-  const nextBtn = document.getElementById(nextId);
-  if (prevBtn) prevBtn.disabled = (idx === 0);
-  if (nextBtn) nextBtn.disabled = (idx === total - 1);
-
-  // 점 인디케이터
-  const dotsId = type === 'model' ? 'modelDots' : 'bgDots';
-  const dotsEl = document.getElementById(dotsId);
-  if (dotsEl) {
-    dotsEl.innerHTML = '';
-    // 점이 너무 많으면 5개 이내로 범위 표시
-    const maxDots = 7;
-    const start = Math.max(0, Math.min(idx - Math.floor(maxDots / 2), total - maxDots));
-    const end   = Math.min(total, start + maxDots);
-    for (let i = start; i < end; i++) {
-      const dot = document.createElement('button');
-      dot.className = 'swipe-dot' + (i === idx ? ' active' : '');
-      dot.onclick = () => {
-        SwipeState[type].idx = i;
-        if (type === 'model') swipeSelectModel(i);
-        else swipeSelectBg(i);
-      };
-      dotsEl.appendChild(dot);
-    }
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// 터치 스와이프 이벤트
-// ─────────────────────────────────────────────────────────
-function initSwipeTouch(type, wrapperId) {
-  const wrapper = document.getElementById(wrapperId);
-  if (!wrapper) return;
-
-  // 중복 방지
-  wrapper.removeEventListener('touchstart', wrapper._swipeTouchStart, { passive: true });
-  wrapper.removeEventListener('touchend',   wrapper._swipeTouchEnd);
-
-  let startX = 0;
-  let startY = 0;
-  let isDragging = false;
-
-  wrapper._swipeTouchStart = (e) => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    isDragging = true;
-  };
-  wrapper._swipeTouchEnd = (e) => {
-    if (!isDragging) return;
-    isDragging = false;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) < 30 || Math.abs(dy) > Math.abs(dx) * 0.8) return; // 수직 스크롤 무시
-    swipeCard(type, dx < 0 ? 1 : -1);
-  };
-
-  wrapper.addEventListener('touchstart', wrapper._swipeTouchStart, { passive: true });
-  wrapper.addEventListener('touchend',   wrapper._swipeTouchEnd);
 }
 
 // STEP 5: Generation Options
