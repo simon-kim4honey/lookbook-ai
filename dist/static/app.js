@@ -869,7 +869,7 @@ async function startGeneration() {
     const modelDesc = buildModelDescription(model);
     const bg = AppState.selectedBg;
 
-    const count = 3; // 생성 수량 고정
+    const count = 1; // 생성 수량 고정 (1장)
 
     // 의류 이미지 배열 구성 (신규 다중 업로드)
     const clothingImages = AppState.clothingItems.map(ci => ({
@@ -881,22 +881,19 @@ async function startGeneration() {
     // 레거시 단일 필드 (서버에서도 하위 호환 처리)
     const clothingImageUrl = AppState.uploadedImageUrl;
 
-    // 생성 요청 (2단계 파이프라인의 경우 Step1이 서버에서 최대 45초 소요)
-    // → fetch 대기 중에 진행 바를 계속 올려주는 타이머 실행
+    // 생성 요청 시작 — fetch 대기 중 진행 바 애니메이션
     updateProgress(10, '의류 이미지 분석 중...');
 
     let fakeProgress = 10;
     const fakeProgressMessages = [
       '의류 이미지 분석 중...',
-      '1단계: 의상 합성 준비 중...',
-      '1단계: 의상 교체 적용 중...',
-      '1단계: 배경·포즈 유지 확인 중...',
-      '1단계: 의상 합성 마무리 중...',
+      'AI 이미지 합성 준비 중...',
+      '의상·신원 통합 처리 중...',
     ];
     let fakeMsgIdx = 0;
     const fakeTimer = setInterval(() => {
-      if (fakeProgress < 45) {
-        fakeProgress += 2;
+      if (fakeProgress < 30) {
+        fakeProgress += 3;
         fakeMsgIdx = Math.min(Math.floor((fakeProgress - 10) / 7), fakeProgressMessages.length - 1);
         updateProgress(fakeProgress, fakeProgressMessages[fakeMsgIdx]);
       }
@@ -965,17 +962,11 @@ async function startGeneration() {
     }
 
     // 실제 Atlas Cloud 폴링
-    // 2단계 파이프라인: Step1(의상교체) 서버에서 동기처리 후 Step2(얼굴교체) jobId 반환
-    const isPipeline = startData.pipeline === '2-step';
-    if (isPipeline) {
-      updateProgress(50, '1단계 완료! 2단계: 얼굴 합성 시작...');
-    } else {
-      updateProgress(20, 'AI 모델 피팅 적용 중...');
-    }
+    updateProgress(20, 'AI 모델 피팅 적용 중...');
     setMsgState('msg1', 'done');
     setMsgState('msg2', 'current');
 
-    await pollGenerationStatus(startData.jobId, count, isPipeline);
+    await pollGenerationStatus(startData.jobId, count);
 
   } catch (err) {
     console.error('Generation error:', err);
@@ -991,27 +982,18 @@ async function startGeneration() {
 }
 
 // Atlas Cloud 결과 폴링
-async function pollGenerationStatus(jobId, count, isPipeline = false) {
+async function pollGenerationStatus(jobId, count) {
   let attempts = 0;
-  // 2단계 파이프라인: Step1이 서버에서 이미 완료됐으므로 Step2만 폴링
-  // 단일단계: 60회×3초=3분 / 2단계: 50회×3초=2.5분 (Step1은 서버에서 처리)
-  const maxAttempts = isPipeline ? 50 : 60;
+  const maxAttempts = 60; // 60회×3초=3분
   const pollDelay = 3000;
 
-  // 2단계 파이프라인용 진행 메시지
-  const pipelineMessages = [
-    '2단계: 얼굴 합성 분석 중...',
-    '얼굴 특징 추출 중...',
-    '얼굴 자연스럽게 합성 중...',
-    '조명·그림자 조정 중...',
-    '최종 품질 향상 중...',
-  ];
-  const singleMessages = [
+  const progressMessages = [
     'AI 모델 피팅 적용 중...',
-    '배경 합성 중...',
+    '의상·얼굴 통합 합성 중...',
+    '씬 조명 적용 중...',
     '이미지 품질 향상 중...',
+    '최종 렌더링 중...',
   ];
-  const progressMessages = isPipeline ? pipelineMessages : singleMessages;
 
   while (attempts < maxAttempts) {
     await sleep(pollDelay);

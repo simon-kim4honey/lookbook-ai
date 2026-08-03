@@ -1160,204 +1160,57 @@ app.post('/api/generation/start', async (c) => {
     const hasBg    = !!bgImageBase64
     const hasModel = !!modelImageBase64
     const hasClothing = clothingCount > 0
-    // 생성 수량 3장 고정 (2단계 파이프라인 Step2에서도 사용)
-    const jobCount = 3
+    // 생성 수량 1장 고정
+    const jobCount = 1
 
     if (hasClothing && hasModel && hasBg) {
       // ══════════════════════════════════════════════════════════
-      // ── 풀 모드: 2단계 파이프라인 ──
-      //   Step 1: 배경 + 의류 → 의상만 교체 (배경 속 인물 얼굴/포즈 유지)
-      //   Step 2: Step1 결과 + 모델 → 얼굴만 교체 (의상/포즈 유지)
+      // ── 풀 모드: 단일 단계 — 의상 교체 + 얼굴/신원 교체 동시 처리 ──
+      //   이미지 순서: [의류1, 의류2?, ..., 모델(신원), 배경(씬)]
       // ══════════════════════════════════════════════════════════
 
-      console.log('[2-step pipeline] 시작: 의상교체(Step1) → 얼굴교체(Step2)')
+      console.log('[단일 단계] 의상+얼굴+신원 통합 합성 시작')
 
-      // ── Step 1: 의상 교체 ──
-      // 이미지 순서: [배경(기준), 의류1, 의류2?, ...]
-      const step1Images: string[] = [bgImageBase64, ...sortedClothing.map(ci => ci.dataUrl)]
-      const step1BgIdx = 1  // Image 1 = 배경
-      const step1ClothingOffset = 2  // Image 2부터 의류
+      const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
+      const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
 
-      const step1ClothingRoleDesc = buildClothingRoleDesc(
-        sortedClothing.map(ci => ({ ...ci })),
-        step1ClothingOffset
-      )
-      const step1ClothingInstructions = buildClothingReplaceInstructions(
-        sortedClothing,
-        step1ClothingOffset
-      )
+      prompt = [
+        `COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,
 
-      const step1Prompt = [
-        `CLOTHING SWAP TASK — Step 1 of a 2-step fashion pipeline.`,
-        `Image ${step1BgIdx} = BASE SCENE (master reference for everything visual). This scene contains a person.`,
+        // 이미지 역할 정의
+        clothingRoleDesc,
+        `Image ${modelImgIdx} = IDENTITY DONOR. Extract: facial geometry (jawline, eye socket, nose, lips, cheekbones), eye details (shape/iris/lash), hair (color/volume/cut/style), and full-body skin undertone (hue + warmth + texture). DO NOT use body shape, clothing, or pose from this image.`,
+        `Image ${bgImgIdx} = SCENE ANCHOR. This scene defines: background environment, all objects, scene lighting direction/color-temperature/intensity, color grade, and mood. LOCKED: background, all scene objects.`,
 
-        `STRICTLY LOCKED — DO NOT CHANGE:`,
-        `  · Person's face, facial features, skin tone, eye color — IDENTICAL to Image ${step1BgIdx}.`,
-        `  · Background environment and all objects — IDENTICAL to Image ${step1BgIdx}.`,
-        `  · Scene mood and atmosphere — IDENTICAL to Image ${step1BgIdx}.`,
+        // 의상 교체
+        `CLOTHING REPLACEMENT:`,
+        clothingReplaceInstructions,
+        `Body pose may shift slightly so the new clothing fits naturally (minor arm/stance adjustments only).`,
 
-        `ALLOWED TO ADJUST:`,
-        `  · Body pose may shift slightly so the new clothing fits naturally (minor arm/stance adjustments only).`,
+        // 신원 교체
+        `IDENTITY & FACE TRANSPLANT (from Image ${modelImgIdx}):`,
+        `  · Transplant the FACIAL GEOMETRY exactly: jawline, cheekbone position, eye socket shape, nose bridge/tip, lip shape, overall facial proportions.`,
+        `  · Transplant EYE DETAILS exactly: eye shape, lid type, iris color, lash density.`,
+        `  · Transplant HAIR exactly: color (root-to-tip gradient), volume, texture, cut, style.`,
+        `  · Apply the skin UNDERTONE (warm/cool/neutral base hue) from Image ${modelImgIdx} to ALL exposed skin uniformly — face, neck, décolletage, shoulders, arms, hands — ZERO tone mismatch across the body.`,
 
-        step1ClothingRoleDesc,
-        `REPLACE THE CLOTHING: Replace clothing items as follows —`,
-        step1ClothingInstructions,
+        // 씬 조명 통합 (핵심)
+        `SCENE LIGHTING INTEGRATION (from Image ${bgImgIdx} — critical for photorealism):`,
+        `  Re-light ALL elements (clothing, face, skin) under Image ${bgImgIdx}'s physical lighting environment:`,
+        `  · BRIGHTNESS: Match face and skin brightness to the scene's ambient light level. Bright scene → bright face; moody/dim scene → face lit accordingly.`,
+        `  · LIGHT DIRECTION: Apply the scene's key light direction. Highlights land on the correct side of the face (forehead, cheekbone, nose bridge), shadows fall on the opposite side.`,
+        `  · COLOR TEMPERATURE: Tint face, skin, and clothing under the scene's color temperature (warm golden-hour tint, cool blue shade, neutral studio white, etc.). Do NOT render any element under a different white balance from the scene.`,
+        `  · SHADOW QUALITY: Hard shadows in direct sunlight; soft wrap-around shadows in diffuse/cloudy/studio light — match the scene exactly.`,
+        `  · CATCH-LIGHTS: Eyes must reflect Image ${bgImgIdx}'s light source position and shape.`,
+        `  · FABRIC RENDERING: Simulate specular highlights on shiny fabrics, soft diffuse on matte, translucency on thin materials — all under the scene's light.`,
+        `  · SUBSURFACE SCATTERING: Realistic skin SSS under scene light (warm ears/nose in backlit; strong SSS in diffuse light).`,
+        `  · FACE-TO-NECK SEAM: The face-to-neck boundary must be seamless — same lighting falloff, same color temperature, no hard edge or tone jump.`,
+        `  · HAIR INTEGRATION: Hair receives the scene's ambient + key light. Rim/backlight if present in the scene. Flyaways lit naturally.`,
 
-        `SCENE INTEGRATION (critical for photorealism):`,
-        `  Analyze Image ${step1BgIdx}'s visual atmosphere thoroughly and apply it consistently to the new clothing and the person:`,
-        `  · LIGHTING: Match the exact light source direction, spread, and intensity from Image ${step1BgIdx}. Cast natural shadows and highlights on the new clothing that align with the scene's existing shadows.`,
-        `  · COLOR GRADING: The new clothing must be rendered under the same color temperature and color cast as Image ${step1BgIdx} (e.g. warm golden-hour tint, cool blue shade, neutral studio white). Do NOT render the clothing under a different white balance.`,
-        `  · MOOD / TONE: Preserve the scene's overall tonal mood — e.g. bright airy, moody dark, high-contrast editorial, soft pastel. The replaced clothing must feel like it belongs in this exact scene, not pasted in from another environment.`,
-        `  · FABRIC RENDERING: Simulate how the scene's light interacts with the new fabric — specular highlights on shiny materials, soft diffuse on matte fabrics, translucency on thin fabrics — all consistent with Image ${step1BgIdx}'s lighting environment.`,
-
-        `FINAL OUTPUT: One seamless, physically integrated fashion photograph. The new outfit must look as if it was photographed in the original scene — same light, same mood, same color grade.`,
-        `Ultra-photorealistic, 8K fashion editorial quality.`,
-        `ABSOLUTE: NO text, NO logos, NO watermarks.`,
+        `FINAL OUTPUT: One seamless, ultra-photorealistic fashion photograph. The new clothing is worn by Image ${modelImgIdx}'s identity — face, hair, and full-body skin re-lit under Image ${bgImgIdx}'s scene. Result looks like this person was photographed in the original scene wearing the specified outfit — zero compositing artifacts.`,
+        `8K resolution, magazine editorial quality.`,
+        HARD_CONSTRAINTS,
       ].join(' ')
-
-      console.log('[Step1] 의상교체 요청 중...')
-      const step1Url = await atlasGenerateAndWait({
-        images: step1Images,
-        prompt: step1Prompt,
-        aspect_ratio: aspectRatio,
-        resolution: nbResolution,
-        thinking_level: 'default',
-      })
-
-      if (!step1Url) {
-        // Step1 실패 → 단일 단계 폴백으로 전환 (기존 방식)
-        console.warn('[2-step pipeline] Step1 실패 → 단일단계 폴백')
-        const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-        const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
-        prompt = [
-          `PERSON SWAP AND CLOTHING REPLACEMENT on a fashion background scene.`,
-          clothingRoleDesc,
-          `Image ${modelImgIdx} = IDENTITY DONOR. Extract face (bone structure, eyes, nose, lips), hair (color/style/volume), AND full-body skin tone (hue + undertone + texture) — apply skin tone consistently to ALL visible skin: face, neck, décolletage, hands, arms. DO NOT extract body shape, clothing, or pose from this image.`,
-          `Image ${bgImgIdx} = SCENE ANCHOR. LOCKED: background, all objects. Pose may be slightly adjusted to fit the new clothing naturally.`,
-          clothingReplaceInstructions,
-          `SCENE INTEGRATION: Render the person under Image ${bgImgIdx}'s exact lighting and atmosphere — match the scene's light direction, color temperature, and tonal mood (warm/cool/moody/bright). Apply scene-consistent shadows and highlights to clothing, face, and skin. The model's skin tone must be rendered under the scene's color cast, not neutral white. No face/body skin mismatch.`,
-          `FINAL RESULT: One seamless, photorealistic fashion photograph — same scene as Image ${bgImgIdx}, new clothing and new identity, all under the scene's original light and color grade.`,
-          HARD_CONSTRAINTS,
-        ].join(' ')
-        // 이미지 순서 유지 (기존: 의류, 모델, 배경)
-        // images 배열은 위에서 이미 구성됨
-      } else {
-        // Step1 성공 → Step2: 얼굴 교체
-        console.log('[Step1] 성공. Step2 얼굴교체 시작...')
-
-        // Step1 결과 URL → base64 변환
-        const step1Base64 = await urlToBase64(step1Url)
-
-        if (!step1Base64) {
-          console.warn('[2-step pipeline] Step1 URL→base64 변환 실패 → 단일단계 폴백')
-          const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-          const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
-          prompt = [
-            `PERSON SWAP AND CLOTHING REPLACEMENT on a fashion background scene.`,
-            clothingRoleDesc,
-            `Image ${modelImgIdx} = IDENTITY DONOR. Extract face, hair, AND full-body skin tone — apply uniformly to ALL visible skin with zero mismatch. DO NOT extract body shape or pose.`,
-            `Image ${bgImgIdx} = SCENE ANCHOR. LOCKED: background, all objects. Pose may adjust slightly for natural clothing fit.`,
-            clothingReplaceInstructions,
-            `SCENE INTEGRATION: Render clothing, face, and skin under Image ${bgImgIdx}'s exact light direction, color temperature, and tonal mood. Scene-consistent shadows and highlights. Skin color rendered under the scene's color cast. No mismatch.`,
-            HARD_CONSTRAINTS,
-          ].join(' ')
-        } else {
-          // ── Step 2: 얼굴 교체 ──
-          // 이미지 순서: [Step1결과(기준), 모델(얼굴 참조)]
-          const step2Images = [step1Base64, modelImageBase64!]
-          const step2BaseIdx = 1   // Image 1 = Step1 결과 (의상+포즈+배경)
-          const step2FaceIdx = 2   // Image 2 = 모델 (얼굴 참조)
-
-          const step2Prompt = [
-            `FACE, HAIR, AND FULL-BODY SKIN REPLACEMENT TASK — Step 2 of a 2-step fashion pipeline.`,
-
-            `TWO REFERENCE IMAGES — understand the role of each:`,
-            `Image ${step2BaseIdx} = SCENE MASTER (clothing-swapped result). Defines: clothing, body pose, background, and ALL lighting/atmosphere/color-grade conditions.`,
-            `Image ${step2FaceIdx} = FACE & IDENTITY DONOR. Defines: facial geometry, hair style, and base skin undertone ONLY.`,
-
-            `STRICTLY LOCKED — DO NOT CHANGE THESE AT ALL:`,
-            `  · Clothing: every color, pattern, texture, neckline, sleeve, hem — IDENTICAL to Image ${step2BaseIdx}.`,
-            `  · Body pose: all joint angles, stance, body position — IDENTICAL to Image ${step2BaseIdx}.`,
-            `  · Background, environment, objects — IDENTICAL to Image ${step2BaseIdx}.`,
-
-            `WHAT TO REPLACE (from Image ${step2FaceIdx}):`,
-            `  · FACIAL GEOMETRY (structure only): jawline shape, cheekbone position, eye socket shape, nose bridge/tip, lip shape, overall facial proportions — transplant exactly.`,
-            `  · EYE DETAILS: eye shape, lid type, iris color, lash density — transplant exactly.`,
-            `  · HAIR: color, root-to-tip gradient, volume, texture, cut, style — transplant exactly.`,
-            `  · SKIN UNDERTONE: the base hue/undertone (warm/cool/neutral) of the skin — use as starting point, then re-light (see below).`,
-
-            `CRITICAL — SCENE LIGHTING APPLIED TO THE NEW FACE (most important step):`,
-            `  The face and all exposed skin MUST be re-lit to match Image ${step2BaseIdx}'s physical lighting environment. Do NOT preserve Image ${step2FaceIdx}'s original lighting on the face.`,
-            `  · BRIGHTNESS: Match overall face brightness to the ambient light level in Image ${step2BaseIdx}. If the scene is bright, the face should be bright. If dim/moody, the face should be accordingly darker.`,
-            `  · LIGHT DIRECTION: Apply Image ${step2BaseIdx}'s key light direction — highlights land on the correct side of the face (forehead, cheekbone, nose bridge, chin), shadows fall on the opposite side.`,
-            `  · COLOR TEMPERATURE: Tint the skin and face to match the scene's color temperature (e.g. warm golden tint in warm scenes, cool blue-grey in overcast/shade, neutral in studio white light).`,
-            `  · SHADOW QUALITY: Match shadow softness — hard shadows in direct sunlight, soft wrap-around shadows in diffuse/cloudy/studio light.`,
-            `  · CATCH-LIGHTS: Place catch-lights in the eyes that reflect Image ${step2BaseIdx}'s actual light source position and shape.`,
-            `  · SUBSURFACE SCATTERING: Simulate realistic skin SSS under the scene's light (warmer ears/nose tip in backlit scenes, stronger SSS in soft diffuse light).`,
-
-            `SKIN TONE CONSISTENCY ACROSS THE BODY:`,
-            `  Apply the re-lit skin tone UNIFORMLY to ALL exposed skin: face, forehead, neck, throat, décolletage, shoulders, arms, wrists, hands — same undertone, same lighting gradient, ZERO mismatch between face and body.`,
-            `  The face-to-neck boundary must be seamless — no hard edge, no color jump, same lighting falloff.`,
-
-            `HAIR INTEGRATION:`,
-            `  Hair must receive Image ${step2BaseIdx}'s ambient and key lighting. Rim light or backlight should appear if present in the scene. Flyaways lit naturally.`,
-
-            `FINAL OUTPUT: A single cohesive ultra-photorealistic fashion photograph. Image ${step2FaceIdx}'s face geometry and hair transplanted onto Image ${step2BaseIdx}'s body — then the face and all skin physically re-lit to match the scene. Result looks like the model was photographed in the original scene, not composited.`,
-            `8K resolution, magazine editorial quality, zero compositing artifacts.`,
-            `ABSOLUTE: NO text, NO logos, NO watermarks. DO NOT modify clothing, pose, or background.`,
-          ].join(' ')
-
-          console.log('[Step2] 얼굴교체 요청 (3장 병렬)...')
-
-          // Step2는 3장 병렬 생성 (최종 결과)
-          const step2RequestBody = {
-            model: 'google/nano-banana-2/edit',
-            prompt: step2Prompt,
-            aspect_ratio: aspectRatio,
-            resolution: nbResolution,
-            thinking_level: 'default',
-            output_format: 'jpeg',
-            images: step2Images,
-          }
-
-          const jobResults: any[] = await Promise.all(
-            Array.from({ length: jobCount }, () =>
-              fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
-                method: 'POST',
-                headers: atlasHeaders(),
-                body: JSON.stringify(step2RequestBody),
-              }).then(r => r.json())
-            )
-          )
-
-          const step2JobIds = jobResults
-            .filter(r => r.code === 200 && r.data?.id)
-            .map(r => r.data.id)
-
-          console.log('[Step2] jobIds:', step2JobIds)
-
-          if (step2JobIds.length === 0) {
-            const firstErr = jobResults[0]
-            console.error('[Step2] 모든 요청 실패:', firstErr)
-            const fallbackJobId = 'fallback_' + Math.random().toString(36).substr(2, 9)
-            return c.json({
-              jobId: fallbackJobId,
-              estimatedSeconds: 5,
-              status: 'queued',
-              isFallback: true,
-              error: firstErr?.msg || firstErr?.message || 'Step2 Atlas API error',
-            })
-          }
-
-          return c.json({
-            jobId: step2JobIds.join(','),
-            estimatedSeconds: 45,
-            status: 'queued',
-            isFallback: false,
-            pipeline: '2-step',
-          })
-        }
-      }
 
     } else if (hasClothing && hasModel && !hasBg) {
       // ── 의류 + 모델, 배경 없음 ──
