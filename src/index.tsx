@@ -1190,15 +1190,16 @@ app.post('/api/generation/start', async (c) => {
 
       const step1Prompt = [
         `CLOTHING SWAP TASK — Step 1 of a 2-step fashion pipeline.`,
-        `Image ${step1BgIdx} = BASE SCENE (highest priority anchor). This scene contains a person.`,
-        `LOCK THESE — DO NOT CHANGE UNDER ANY CIRCUMSTANCES:`,
+        `Image ${step1BgIdx} = BASE SCENE. This scene contains a person wearing certain clothes.`,
+        `STRICTLY LOCKED (never change):`,
         `  · The person's face, facial features, skin tone, eye color — IDENTICAL to Image ${step1BgIdx}.`,
-        `  · The person's exact body pose: joint angles, weight distribution, head tilt, hand positions — IDENTICAL to Image ${step1BgIdx}.`,
-        `  · Background environment, lighting direction, color temperature, shadows — IDENTICAL to Image ${step1BgIdx}.`,
+        `  · Background environment, objects, lighting direction, color temperature, shadows — IDENTICAL to Image ${step1BgIdx}.`,
+        `ALLOWED TO ADJUST (minor natural changes permitted):`,
+        `  · The person's body pose may be slightly adjusted so the new clothing fits naturally and looks realistic. Minor shifts in arm position, weight distribution, or stance are acceptable to make the outfit look good.`,
         step1ClothingRoleDesc,
-        `ONLY CHANGE: Replace the clothing items as follows —`,
+        `REPLACE THE CLOTHING: Replace clothing items as follows —`,
         step1ClothingInstructions,
-        `FINAL OUTPUT: Exact same scene as Image ${step1BgIdx} with ONLY the clothing replaced. Face and pose completely unchanged.`,
+        `FINAL OUTPUT: Same scene and same face as Image ${step1BgIdx}, with clothing replaced. Pose may be slightly adjusted for a natural fit. Lighting on the model integrates seamlessly with the scene.`,
         `Ultra-photorealistic, seamless integration, 8K fashion editorial quality.`,
         `ABSOLUTE: NO text, NO logos, NO watermarks anywhere.`,
       ].join(' ')
@@ -1220,10 +1221,10 @@ app.post('/api/generation/start', async (c) => {
         prompt = [
           `PERSON SWAP on a fashion background scene.`,
           clothingRoleDesc,
-          `Image ${modelImgIdx} = FACE DONOR ONLY. Extract EXCLUSIVELY: facial bone structure, exact eye shape/color, nose shape, lip shape, skin tone and texture, hair color/volume/style. DO NOT extract body shape, clothing, or pose from this image.`,
-          `Image ${bgImgIdx} = POSE AND SCENE ANCHOR. LOCKED: camera angle, background, lighting direction, color temperature, person's exact body pose (joint angles, weight distribution, limb positions). ONLY REPLACEABLE: face/hair identity and clothing items.`,
+          `Image ${modelImgIdx} = IDENTITY DONOR. Extract face (bone structure, eyes, nose, lips), hair (color/style/volume), AND full skin tone (hue, undertone, texture) — apply skin tone consistently to ALL visible skin: face, neck, hands, arms. DO NOT extract body shape, clothing, or pose from this image.`,
+          `Image ${bgImgIdx} = SCENE ANCHOR. LOCKED: background, lighting direction, color temperature. Pose may be slightly adjusted to fit the new clothing naturally.`,
           clothingReplaceInstructions,
-          `FINAL RESULT: Image ${modelImgIdx}'s face on Image ${bgImgIdx}'s body/pose, wearing the specified clothing, in Image ${bgImgIdx}'s scene. Seamless single photograph.`,
+          `FINAL RESULT: Image ${modelImgIdx}'s face, hair, and skin tone applied to the person in Image ${bgImgIdx}'s scene, wearing the specified clothing. All exposed skin areas must share the same tone — no face/body mismatch. Seamless single photograph.`,
           `Lighting on the model must match Image ${bgImgIdx}'s light direction and color temperature exactly.`,
           HARD_CONSTRAINTS,
         ].join(' ')
@@ -1238,14 +1239,13 @@ app.post('/api/generation/start', async (c) => {
 
         if (!step1Base64) {
           console.warn('[2-step pipeline] Step1 URL→base64 변환 실패 → 단일단계 폴백')
-          // 폴백: 기존 방식 유지
           const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
           const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
           prompt = [
             `PERSON SWAP on a fashion background scene.`,
             clothingRoleDesc,
-            `Image ${modelImgIdx} = FACE DONOR ONLY. Extract EXCLUSIVELY: facial bone structure, exact eye shape/color, nose shape, lip shape, skin tone and texture, hair color/volume/style.`,
-            `Image ${bgImgIdx} = POSE AND SCENE ANCHOR. LOCKED: pose, background, lighting.`,
+            `Image ${modelImgIdx} = IDENTITY DONOR. Extract face, hair, AND full skin tone — apply skin tone to ALL visible skin (face, neck, hands, arms) with zero mismatch. DO NOT extract body shape or pose.`,
+            `Image ${bgImgIdx} = SCENE ANCHOR. LOCKED: background, lighting. Pose may adjust slightly for natural clothing fit.`,
             clothingReplaceInstructions,
             HARD_CONSTRAINTS,
           ].join(' ')
@@ -1257,24 +1257,21 @@ app.post('/api/generation/start', async (c) => {
           const step2FaceIdx = 2   // Image 2 = 모델 (얼굴 참조)
 
           const step2Prompt = [
-            `FACE SWAP TASK — Step 2 of a 2-step fashion pipeline.`,
-            `Image ${step2BaseIdx} = BASE IMAGE (highest priority anchor — the result of clothing swap step).`,
-            `LOCK THESE — DO NOT CHANGE UNDER ANY CIRCUMSTANCES:`,
+            `FACE AND SKIN REPLACEMENT TASK — Step 2 of a 2-step fashion pipeline.`,
+            `Image ${step2BaseIdx} = BASE IMAGE (the result of clothing swap — use as the structural anchor).`,
+            `STRICTLY LOCKED (never change):`,
             `  · The person's clothing: every color, pattern, texture, neckline, sleeve, hem detail — IDENTICAL to Image ${step2BaseIdx}.`,
-            `  · The person's exact body pose: all joint angles, body position, stance, hand positions — IDENTICAL to Image ${step2BaseIdx}.`,
+            `  · The person's body pose: all joint angles, body position, stance — IDENTICAL to Image ${step2BaseIdx}.`,
             `  · Background environment, objects, lighting direction, shadows, color palette — IDENTICAL to Image ${step2BaseIdx}.`,
-            `Image ${step2FaceIdx} = FACE DONOR (extract ONLY these features from this image):`,
-            `  · Facial bone structure: jawline shape, cheekbone position, eye socket depth`,
-            `  · Exact eye shape, double/single eyelid, eye color, lash density`,
-            `  · Nose bridge width, nose tip shape`,
-            `  · Lip shape, cupid's bow, thickness`,
-            `  · Skin tone, undertone, texture`,
-            `  · Hair color, volume, texture, style (cut/length)`,
-            `  · DO NOT use body shape, clothing, or background from Image ${step2FaceIdx}.`,
-            `REPLACEMENT INSTRUCTION: Replace the face of the person in Image ${step2BaseIdx} with Image ${step2FaceIdx}'s face. The new face must be naturally lit by the same light source present in Image ${step2BaseIdx}. Shadow direction, color temperature, and ambient light on the face must match Image ${step2BaseIdx}'s scene. Zero blending with original face — complete replacement only.`,
-            `FINAL OUTPUT: Image ${step2BaseIdx} with only the face replaced. All other elements unchanged.`,
-            `Ultra-photorealistic, seamless face integration, 8K fashion editorial quality.`,
-            `ABSOLUTE: NO text, NO logos, NO watermarks. DO NOT modify clothing or pose in any way.`,
+            `Image ${step2FaceIdx} = IDENTITY DONOR. Extract ALL of the following from this image and apply to the person in Image ${step2BaseIdx}:`,
+            `  FACE: Facial bone structure (jawline, cheekbones, eye sockets), exact eye shape/color/lids/lashes, nose bridge and tip, lip shape and thickness, overall facial proportions.`,
+            `  SKIN: Skin tone (hue + value + saturation), skin undertone (warm/cool/neutral), skin texture. CRITICAL — apply this exact skin tone CONSISTENTLY to ALL exposed skin areas: face, neck, décolletage, hands, wrists, arms, and any other visible skin. There must be NO skin tone mismatch between the face and body.`,
+            `  HAIR: Hair color, root-to-tip gradient, volume, texture, cut length, and style.`,
+            `  DO NOT use body shape, clothing, pose, or background from Image ${step2FaceIdx}.`,
+            `INTEGRATION: The replaced face and skin must be naturally lit by the light source in Image ${step2BaseIdx}. Apply the scene's shadow direction, color temperature, and ambient light to the face and all skin areas. The transition between face and neck must be seamless — same skin tone, same lighting, no visible seam.`,
+            `FINAL OUTPUT: Image ${step2BaseIdx}'s structure (clothing + pose + background) with Image ${step2FaceIdx}'s face, hair, and full-body skin tone fully applied. One cohesive, photorealistic person.`,
+            `Ultra-photorealistic, 8K fashion editorial quality, seamless identity replacement.`,
+            `ABSOLUTE: NO text, NO logos, NO watermarks. DO NOT modify clothing or background in any way.`,
           ].join(' ')
 
           console.log('[Step2] 얼굴교체 요청 (3장 병렬)...')
