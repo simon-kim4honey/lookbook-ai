@@ -49,23 +49,22 @@ let adminPromptConfig: AdminPromptConfig = {
   prefix: '',
   suffix: '',
   styleGuide: [
-    // ── 새 방식: 배경 씬 속 모델을 교체하는 PERSON SWAP 방식 ──
-    'PERSON SWAP MODE: The background scene image contains an existing person.',
-    'CRITICAL — Preserve the ORIGINAL POSE exactly: replicate the exact stance, limb positions, weight distribution, and body language of the person already in the background scene.',
-    'Replace ONLY the person\'s face and identity with the reference model image, and replace ONLY the clothing with the uploaded clothing item.',
-    'The background scene, environment, lighting, shadows, color palette, and atmosphere must remain 100% unchanged.',
-    'The replaced model must appear naturally integrated into the scene — same camera angle, same perspective, same eye-level as the original person.',
-    'Lighting and shadows on the model must match the background scene\'s existing light direction and color temperature exactly.',
-    'Fashion editorial quality: magazine cover level seamless compositing.',
+    'SCENE-FIRST INTEGRATION PRINCIPLE: Every composited element — clothing, face, skin — must look as if it was photographed in the original background scene, not pasted in.',
+    'LIGHTING MATCH: Identify the background scene\'s primary light source direction, color temperature (warm/neutral/cool), and intensity. Apply identical lighting to the person\'s clothing, face, and all exposed skin. Cast-shadows, specular highlights, and subsurface skin scattering must all originate from the scene\'s light source.',
+    'COLOR GRADE MATCH: The background scene carries a specific color grade and tonal mood (e.g. warm golden, cool blue, high-contrast, soft pastel, moody dark). Render all composited elements under this exact color cast — do NOT render clothing or skin under a neutral white balance if the scene is warm or cool-toned.',
+    'MOOD AND ATMOSPHERE MATCH: Preserve the scene\'s overall visual mood and atmosphere. The final image must feel tonally coherent — bright and airy scenes stay bright, moody scenes stay moody, editorial high-contrast stays high-contrast.',
+    'FABRIC LIGHT INTERACTION: Simulate realistic light interaction with the new fabric — specular sheen on satin/silk, soft diffuse on cotton/knit, translucency on chiffon/voile — all under the scene\'s lighting conditions.',
+    'SKIN-SCENE MATCH: The model\'s skin must be rendered under the scene\'s color temperature and ambient color. Skin highlights and shadows must follow the scene\'s light direction. Face-to-neck and face-to-arm transitions must be seamless with no skin tone mismatch.',
+    'Fashion editorial quality: magazine cover level seamless compositing, physically grounded.',
   ].join(' '),
   technicalSpec: [
     '초사실적 표현, 직물 질감과 피부 디테일 극사실 재현.',
     '의류 드레이프와 핏 완벽 재현. 자연스러운 주름 외 구김 없음.',
-    '의류에 선명한 포커스. 배경은 얕은 심도 처리.',
-    '전문 리터칭. 아티팩트 없음, 왜곡 없음.',
+    '의류에 선명한 포커스. 배경과 동일한 심도 및 렌즈 특성 유지.',
+    '배경 씬의 색감·무드·조명 톤을 인물과 의류에 완전히 통합. 합성 아티팩트 없음.',
     '참조 이미지에 없는 의류, 액세서리, 소품 절대 추가 금지.',
     'ABSOLUTE PROHIBITION: NO text, NO letters, NO numbers, NO logos, NO watermarks, NO brand marks, NO typographic elements of any kind anywhere in the image.',
-    'ABSOLUTE PROHIBITION: DO NOT modify the model face, facial features, or skin tone in any way.',
+    'ABSOLUTE PROHIBITION: DO NOT modify the model face, facial features, or skin tone in any way beyond what is specified in the task.',
     'ABSOLUTE PROHIBITION: DO NOT modify, redesign, or alter any detail of the uploaded clothing item.',
   ].join(' '),
   updatedAt: new Date().toISOString(),
@@ -1190,18 +1189,30 @@ app.post('/api/generation/start', async (c) => {
 
       const step1Prompt = [
         `CLOTHING SWAP TASK — Step 1 of a 2-step fashion pipeline.`,
-        `Image ${step1BgIdx} = BASE SCENE. This scene contains a person wearing certain clothes.`,
-        `STRICTLY LOCKED (never change):`,
-        `  · The person's face, facial features, skin tone, eye color — IDENTICAL to Image ${step1BgIdx}.`,
-        `  · Background environment, objects, lighting direction, color temperature, shadows — IDENTICAL to Image ${step1BgIdx}.`,
-        `ALLOWED TO ADJUST (minor natural changes permitted):`,
-        `  · The person's body pose may be slightly adjusted so the new clothing fits naturally and looks realistic. Minor shifts in arm position, weight distribution, or stance are acceptable to make the outfit look good.`,
+        `Image ${step1BgIdx} = BASE SCENE (master reference for everything visual). This scene contains a person.`,
+
+        `STRICTLY LOCKED — DO NOT CHANGE:`,
+        `  · Person's face, facial features, skin tone, eye color — IDENTICAL to Image ${step1BgIdx}.`,
+        `  · Background environment and all objects — IDENTICAL to Image ${step1BgIdx}.`,
+        `  · Scene mood and atmosphere — IDENTICAL to Image ${step1BgIdx}.`,
+
+        `ALLOWED TO ADJUST:`,
+        `  · Body pose may shift slightly so the new clothing fits naturally (minor arm/stance adjustments only).`,
+
         step1ClothingRoleDesc,
         `REPLACE THE CLOTHING: Replace clothing items as follows —`,
         step1ClothingInstructions,
-        `FINAL OUTPUT: Same scene and same face as Image ${step1BgIdx}, with clothing replaced. Pose may be slightly adjusted for a natural fit. Lighting on the model integrates seamlessly with the scene.`,
-        `Ultra-photorealistic, seamless integration, 8K fashion editorial quality.`,
-        `ABSOLUTE: NO text, NO logos, NO watermarks anywhere.`,
+
+        `SCENE INTEGRATION (critical for photorealism):`,
+        `  Analyze Image ${step1BgIdx}'s visual atmosphere thoroughly and apply it consistently to the new clothing and the person:`,
+        `  · LIGHTING: Match the exact light source direction, spread, and intensity from Image ${step1BgIdx}. Cast natural shadows and highlights on the new clothing that align with the scene's existing shadows.`,
+        `  · COLOR GRADING: The new clothing must be rendered under the same color temperature and color cast as Image ${step1BgIdx} (e.g. warm golden-hour tint, cool blue shade, neutral studio white). Do NOT render the clothing under a different white balance.`,
+        `  · MOOD / TONE: Preserve the scene's overall tonal mood — e.g. bright airy, moody dark, high-contrast editorial, soft pastel. The replaced clothing must feel like it belongs in this exact scene, not pasted in from another environment.`,
+        `  · FABRIC RENDERING: Simulate how the scene's light interacts with the new fabric — specular highlights on shiny materials, soft diffuse on matte fabrics, translucency on thin fabrics — all consistent with Image ${step1BgIdx}'s lighting environment.`,
+
+        `FINAL OUTPUT: One seamless, physically integrated fashion photograph. The new outfit must look as if it was photographed in the original scene — same light, same mood, same color grade.`,
+        `Ultra-photorealistic, 8K fashion editorial quality.`,
+        `ABSOLUTE: NO text, NO logos, NO watermarks.`,
       ].join(' ')
 
       console.log('[Step1] 의상교체 요청 중...')
@@ -1219,13 +1230,13 @@ app.post('/api/generation/start', async (c) => {
         const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
         const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
         prompt = [
-          `PERSON SWAP on a fashion background scene.`,
+          `PERSON SWAP AND CLOTHING REPLACEMENT on a fashion background scene.`,
           clothingRoleDesc,
-          `Image ${modelImgIdx} = IDENTITY DONOR. Extract face (bone structure, eyes, nose, lips), hair (color/style/volume), AND full skin tone (hue, undertone, texture) — apply skin tone consistently to ALL visible skin: face, neck, hands, arms. DO NOT extract body shape, clothing, or pose from this image.`,
-          `Image ${bgImgIdx} = SCENE ANCHOR. LOCKED: background, lighting direction, color temperature. Pose may be slightly adjusted to fit the new clothing naturally.`,
+          `Image ${modelImgIdx} = IDENTITY DONOR. Extract face (bone structure, eyes, nose, lips), hair (color/style/volume), AND full-body skin tone (hue + undertone + texture) — apply skin tone consistently to ALL visible skin: face, neck, décolletage, hands, arms. DO NOT extract body shape, clothing, or pose from this image.`,
+          `Image ${bgImgIdx} = SCENE ANCHOR. LOCKED: background, all objects. Pose may be slightly adjusted to fit the new clothing naturally.`,
           clothingReplaceInstructions,
-          `FINAL RESULT: Image ${modelImgIdx}'s face, hair, and skin tone applied to the person in Image ${bgImgIdx}'s scene, wearing the specified clothing. All exposed skin areas must share the same tone — no face/body mismatch. Seamless single photograph.`,
-          `Lighting on the model must match Image ${bgImgIdx}'s light direction and color temperature exactly.`,
+          `SCENE INTEGRATION: Render the person under Image ${bgImgIdx}'s exact lighting and atmosphere — match the scene's light direction, color temperature, and tonal mood (warm/cool/moody/bright). Apply scene-consistent shadows and highlights to clothing, face, and skin. The model's skin tone must be rendered under the scene's color cast, not neutral white. No face/body skin mismatch.`,
+          `FINAL RESULT: One seamless, photorealistic fashion photograph — same scene as Image ${bgImgIdx}, new clothing and new identity, all under the scene's original light and color grade.`,
           HARD_CONSTRAINTS,
         ].join(' ')
         // 이미지 순서 유지 (기존: 의류, 모델, 배경)
@@ -1242,11 +1253,12 @@ app.post('/api/generation/start', async (c) => {
           const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
           const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
           prompt = [
-            `PERSON SWAP on a fashion background scene.`,
+            `PERSON SWAP AND CLOTHING REPLACEMENT on a fashion background scene.`,
             clothingRoleDesc,
-            `Image ${modelImgIdx} = IDENTITY DONOR. Extract face, hair, AND full skin tone — apply skin tone to ALL visible skin (face, neck, hands, arms) with zero mismatch. DO NOT extract body shape or pose.`,
-            `Image ${bgImgIdx} = SCENE ANCHOR. LOCKED: background, lighting. Pose may adjust slightly for natural clothing fit.`,
+            `Image ${modelImgIdx} = IDENTITY DONOR. Extract face, hair, AND full-body skin tone — apply uniformly to ALL visible skin with zero mismatch. DO NOT extract body shape or pose.`,
+            `Image ${bgImgIdx} = SCENE ANCHOR. LOCKED: background, all objects. Pose may adjust slightly for natural clothing fit.`,
             clothingReplaceInstructions,
+            `SCENE INTEGRATION: Render clothing, face, and skin under Image ${bgImgIdx}'s exact light direction, color temperature, and tonal mood. Scene-consistent shadows and highlights. Skin color rendered under the scene's color cast. No mismatch.`,
             HARD_CONSTRAINTS,
           ].join(' ')
         } else {
@@ -1257,21 +1269,33 @@ app.post('/api/generation/start', async (c) => {
           const step2FaceIdx = 2   // Image 2 = 모델 (얼굴 참조)
 
           const step2Prompt = [
-            `FACE AND SKIN REPLACEMENT TASK — Step 2 of a 2-step fashion pipeline.`,
-            `Image ${step2BaseIdx} = BASE IMAGE (the result of clothing swap — use as the structural anchor).`,
-            `STRICTLY LOCKED (never change):`,
-            `  · The person's clothing: every color, pattern, texture, neckline, sleeve, hem detail — IDENTICAL to Image ${step2BaseIdx}.`,
-            `  · The person's body pose: all joint angles, body position, stance — IDENTICAL to Image ${step2BaseIdx}.`,
-            `  · Background environment, objects, lighting direction, shadows, color palette — IDENTICAL to Image ${step2BaseIdx}.`,
-            `Image ${step2FaceIdx} = IDENTITY DONOR. Extract ALL of the following from this image and apply to the person in Image ${step2BaseIdx}:`,
-            `  FACE: Facial bone structure (jawline, cheekbones, eye sockets), exact eye shape/color/lids/lashes, nose bridge and tip, lip shape and thickness, overall facial proportions.`,
-            `  SKIN: Skin tone (hue + value + saturation), skin undertone (warm/cool/neutral), skin texture. CRITICAL — apply this exact skin tone CONSISTENTLY to ALL exposed skin areas: face, neck, décolletage, hands, wrists, arms, and any other visible skin. There must be NO skin tone mismatch between the face and body.`,
-            `  HAIR: Hair color, root-to-tip gradient, volume, texture, cut length, and style.`,
-            `  DO NOT use body shape, clothing, pose, or background from Image ${step2FaceIdx}.`,
-            `INTEGRATION: The replaced face and skin must be naturally lit by the light source in Image ${step2BaseIdx}. Apply the scene's shadow direction, color temperature, and ambient light to the face and all skin areas. The transition between face and neck must be seamless — same skin tone, same lighting, no visible seam.`,
-            `FINAL OUTPUT: Image ${step2BaseIdx}'s structure (clothing + pose + background) with Image ${step2FaceIdx}'s face, hair, and full-body skin tone fully applied. One cohesive, photorealistic person.`,
-            `Ultra-photorealistic, 8K fashion editorial quality, seamless identity replacement.`,
-            `ABSOLUTE: NO text, NO logos, NO watermarks. DO NOT modify clothing or background in any way.`,
+            `FACE, HAIR, AND FULL-BODY SKIN REPLACEMENT TASK — Step 2 of a 2-step fashion pipeline.`,
+            `Image ${step2BaseIdx} = BASE IMAGE (clothing-swapped result — master structural and atmospheric reference).`,
+
+            `STRICTLY LOCKED — DO NOT CHANGE:`,
+            `  · Clothing: every color, pattern, texture, neckline, sleeve, hem detail — IDENTICAL to Image ${step2BaseIdx}.`,
+            `  · Body pose: all joint angles, body position, stance — IDENTICAL to Image ${step2BaseIdx}.`,
+            `  · Background environment, objects, color palette — IDENTICAL to Image ${step2BaseIdx}.`,
+            `  · Scene lighting setup (direction, intensity, color temperature) — IDENTICAL to Image ${step2BaseIdx}.`,
+            `  · Overall scene mood, tonal grade, and atmosphere — IDENTICAL to Image ${step2BaseIdx}.`,
+
+            `Image ${step2FaceIdx} = IDENTITY DONOR. Extract and transplant ALL of the following:`,
+            `  FACE: Bone structure (jawline, cheekbones, eye sockets), exact eye shape/color/lids/lashes, nose bridge and tip, lip shape and thickness, overall facial proportions.`,
+            `  FULL-BODY SKIN TONE: Extract the person's exact skin tone (hue + lightness + saturation + undertone warm/cool/neutral + texture) from Image ${step2FaceIdx}. Apply this skin tone UNIFORMLY to EVERY visible skin area on the person in Image ${step2BaseIdx}: face, forehead, neck, throat, décolletage, shoulders, arms, wrists, hands, fingers, ankles, legs — no area is exempt. There must be ZERO skin tone mismatch anywhere on the body.`,
+            `  HAIR: Color (including root-to-tip gradient), volume, texture, cut length, style, and how it falls.`,
+            `  DO NOT take body shape, clothing, pose, or background from Image ${step2FaceIdx}.`,
+
+            `SCENE-CONSISTENT INTEGRATION (critical):`,
+            `  The new face, hair, and skin must be rendered as if they were physically present in Image ${step2BaseIdx}'s environment:`,
+            `  · LIGHTING ON FACE/SKIN: Apply Image ${step2BaseIdx}'s light direction, softness, and color temperature to the face and all skin. Catch-lights in eyes, shadow under chin, cheekbone highlights, and subsurface scattering must all match the scene's light source.`,
+            `  · COLOR GRADING ON SKIN: The skin tone must be rendered under Image ${step2BaseIdx}'s color cast (e.g. warm sunset tint, cool overcast, neutral studio). Do NOT render skin under a neutral white balance if the scene is warm-toned.`,
+            `  · FACE-NECK SEAM: The transition from face to neck must be seamless — same skin tone, same lighting gradient, no hard edge or mismatch.`,
+            `  · HAIR-SCENE INTEGRATION: Hair must receive the scene's ambient light and cast appropriate shadows. Flyaway strands must be naturally lit.`,
+            `  · MOOD CONSISTENCY: The final portrait must feel emotionally and tonally consistent with Image ${step2BaseIdx}'s overall mood (bright/moody/editorial/warm/cool).`,
+
+            `FINAL OUTPUT: A single, cohesive, ultra-photorealistic fashion photograph. Image ${step2BaseIdx}'s clothing, pose, and scene perfectly combined with Image ${step2FaceIdx}'s face, hair, and skin tone — all rendered under the scene's light and color grade.`,
+            `8K resolution, magazine editorial quality, zero compositing artifacts.`,
+            `ABSOLUTE: NO text, NO logos, NO watermarks. DO NOT modify clothing, pose, or background.`,
           ].join(' ')
 
           console.log('[Step2] 얼굴교체 요청 (3장 병렬)...')
