@@ -429,6 +429,98 @@ const atlasHeaders = () => ({
 })
 
 // ────────────────────────────────────────────────────
+// Atlas API 단일 이미지 생성 → 완료까지 동기 대기 헬퍼
+// 최대 90초 대기 (폴링 간격 3초 × 30회)
+// ────────────────────────────────────────────────────
+async function atlasGenerateAndWait(params: {
+  images: string[]
+  prompt: string
+  aspect_ratio: string
+  resolution: string
+  thinking_level?: string
+}): Promise<string | null> {
+  const { images, prompt, aspect_ratio, resolution, thinking_level = 'default' } = params
+
+  // 1) 생성 요청
+  const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
+    method: 'POST',
+    headers: atlasHeaders(),
+    body: JSON.stringify({
+      model: 'google/nano-banana-2/edit',
+      prompt,
+      aspect_ratio,
+      resolution,
+      thinking_level,
+      output_format: 'jpeg',
+      images,
+    }),
+  })
+  const startData: any = await startRes.json()
+  if (startData.code !== 200 || !startData.data?.id) {
+    console.error('atlasGenerateAndWait start failed:', startData)
+    return null
+  }
+
+  const jobId = startData.data.id
+  console.log('atlasGenerateAndWait jobId:', jobId)
+
+  // 2) 폴링 (최대 30회 × 3초 = 90초)
+  const terminalStatuses = new Set(['completed', 'succeeded', 'failed', 'timeout', 'canceled', 'error'])
+  for (let i = 0; i < 30; i++) {
+    await new Promise(r => setTimeout(r, 3000))
+    const pollRes: any = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
+      headers: { 'Authorization': `Bearer ${ATLAS_API_KEY}` },
+    }).then(r => r.json())
+
+    const status = pollRes.data?.status
+    console.log(`atlasGenerateAndWait poll[${i}] status:`, status)
+
+    if (status === 'completed' || status === 'succeeded') {
+      const rawOut = pollRes.data?.outputs ?? pollRes.data?.output ?? pollRes.data?.images ?? null
+      const urls: string[] = Array.isArray(rawOut)
+        ? rawOut.filter((u: any) => typeof u === 'string' && u.startsWith('http'))
+        : (typeof rawOut === 'string' && rawOut.startsWith('http') ? [rawOut] : [])
+      if (urls.length > 0) {
+        console.log('atlasGenerateAndWait success url:', urls[0].substring(0, 80))
+        return urls[0]  // 첫 번째 URL 반환
+      }
+      return null
+    }
+
+    if (terminalStatuses.has(status)) {
+      console.error('atlasGenerateAndWait failed status:', status)
+      return null
+    }
+  }
+
+  console.error('atlasGenerateAndWait timeout after 90s')
+  return null
+}
+
+// ────────────────────────────────────────────────────
+// 외부 이미지 URL → base64 변환 헬퍼 (Workers 환경)
+// ────────────────────────────────────────────────────
+async function urlToBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) { console.error('urlToBase64 fetch failed:', res.status, url); return null }
+    const arrayBuffer = await res.arrayBuffer()
+    const bytes = new Uint8Array(arrayBuffer)
+    const contentType = res.headers.get('content-type') || 'image/jpeg'
+    // base64 인코딩 (Workers 환경: btoa 사용)
+    let binary = ''
+    const chunkSize = 8192
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+    }
+    return `data:${contentType};base64,${btoa(binary)}`
+  } catch (err) {
+    console.error('urlToBase64 error:', err)
+    return null
+  }
+}
+
+// ────────────────────────────────────────────────────
 // Photorealistic Prompt Builder
 // ────────────────────────────────────────────────────
 function buildPhotorealisticPrompt(params: {
@@ -1065,43 +1157,177 @@ app.post('/api/generation/start', async (c) => {
     console.log(`images 배열: 의류${clothingCount}장 | 모델${modelImageBase64 ? 1 : 0}장 | 배경${bgImageBase64 ? 1 : 0}장 | 총${images.length}장`)
 
     // ── 프롬프트 구성 ──
-    let prompt: string
+    let prompt: string = ''
     const hasBg    = !!bgImageBase64
     const hasModel = !!modelImageBase64
     const hasClothing = clothingCount > 0
+    // 생성 수량 3장 고정 (2단계 파이프라인 Step2에서도 사용)
+    const jobCount = 3
 
     if (hasClothing && hasModel && hasBg) {
-      // ── 풀 모드: 의류N장 + 모델 + 배경 ── PERSON SWAP
-      const clothingRoleDesc = buildClothingRoleDesc(
+      // ══════════════════════════════════════════════════════════
+      // ── 풀 모드: 2단계 파이프라인 ──
+      //   Step 1: 배경 + 의류 → 의상만 교체 (배경 속 인물 얼굴/포즈 유지)
+      //   Step 2: Step1 결과 + 모델 → 얼굴만 교체 (의상/포즈 유지)
+      // ══════════════════════════════════════════════════════════
+
+      console.log('[2-step pipeline] 시작: 의상교체(Step1) → 얼굴교체(Step2)')
+
+      // ── Step 1: 의상 교체 ──
+      // 이미지 순서: [배경(기준), 의류1, 의류2?, ...]
+      const step1Images: string[] = [bgImageBase64, ...sortedClothing.map(ci => ci.dataUrl)]
+      const step1BgIdx = 1  // Image 1 = 배경
+      const step1ClothingOffset = 2  // Image 2부터 의류
+
+      const step1ClothingRoleDesc = buildClothingRoleDesc(
         sortedClothing.map(ci => ({ ...ci })),
-        1
+        step1ClothingOffset
       )
-      const clothingReplaceInstructions = buildClothingReplaceInstructions(
+      const step1ClothingInstructions = buildClothingReplaceInstructions(
         sortedClothing,
-        1
+        step1ClothingOffset
       )
-      prompt = [
-        `You are doing a PERSON SWAP on a fashion background scene. Here is the exact task:`,
 
-        // 의류 역할 정의
-        clothingRoleDesc,
-
-        // 모델 역할
-        `Image ${modelImgIdx} = REPLACEMENT MODEL IDENTITY. Replace ONLY the face, facial features, hair style and color, skin tone, and body proportions of the person in the background scene with this person. Preserve this model's face with zero deviation — no blending, no averaging.`,
-
-        // 배경 역할
-        `Image ${bgImgIdx} = SOURCE BACKGROUND SCENE (the base image). This scene contains a person/model. Keep EVERYTHING in this scene EXACTLY as-is: location, environment, architecture, objects, lighting, color palette, time of day, atmosphere. CRITICAL: Preserve the ORIGINAL POSE and BODY POSITION of the person in Image ${bgImgIdx} — replicate their exact stance, limb positions, weight distribution. Only the person's identity and clothing will change.`,
-
-        // 의류 교체 상세 지시
-        clothingReplaceInstructions,
-
-        // 합성 결과 지시
-        `FINAL RESULT: Image ${modelImgIdx}'s person wearing the specified clothing items, standing in Image ${bgImgIdx}'s exact location with Image ${bgImgIdx}'s original pose. Seamless, physically integrated single photograph.`,
-
-        `Lighting on the model must match Image ${bgImgIdx}'s light direction, color temperature, and intensity exactly.`,
-
-        HARD_CONSTRAINTS,
+      const step1Prompt = [
+        `CLOTHING SWAP TASK — Step 1 of a 2-step fashion pipeline.`,
+        `Image ${step1BgIdx} = BASE SCENE (highest priority anchor). This scene contains a person.`,
+        `LOCK THESE — DO NOT CHANGE UNDER ANY CIRCUMSTANCES:`,
+        `  · The person's face, facial features, skin tone, eye color — IDENTICAL to Image ${step1BgIdx}.`,
+        `  · The person's exact body pose: joint angles, weight distribution, head tilt, hand positions — IDENTICAL to Image ${step1BgIdx}.`,
+        `  · Background environment, lighting direction, color temperature, shadows — IDENTICAL to Image ${step1BgIdx}.`,
+        step1ClothingRoleDesc,
+        `ONLY CHANGE: Replace the clothing items as follows —`,
+        step1ClothingInstructions,
+        `FINAL OUTPUT: Exact same scene as Image ${step1BgIdx} with ONLY the clothing replaced. Face and pose completely unchanged.`,
+        `Ultra-photorealistic, seamless integration, 8K fashion editorial quality.`,
+        `ABSOLUTE: NO text, NO logos, NO watermarks anywhere.`,
       ].join(' ')
+
+      console.log('[Step1] 의상교체 요청 중...')
+      const step1Url = await atlasGenerateAndWait({
+        images: step1Images,
+        prompt: step1Prompt,
+        aspect_ratio: aspectRatio,
+        resolution: nbResolution,
+        thinking_level: 'default',
+      })
+
+      if (!step1Url) {
+        // Step1 실패 → 단일 단계 폴백으로 전환 (기존 방식)
+        console.warn('[2-step pipeline] Step1 실패 → 단일단계 폴백')
+        const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
+        const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+        prompt = [
+          `PERSON SWAP on a fashion background scene.`,
+          clothingRoleDesc,
+          `Image ${modelImgIdx} = FACE DONOR ONLY. Extract EXCLUSIVELY: facial bone structure, exact eye shape/color, nose shape, lip shape, skin tone and texture, hair color/volume/style. DO NOT extract body shape, clothing, or pose from this image.`,
+          `Image ${bgImgIdx} = POSE AND SCENE ANCHOR. LOCKED: camera angle, background, lighting direction, color temperature, person's exact body pose (joint angles, weight distribution, limb positions). ONLY REPLACEABLE: face/hair identity and clothing items.`,
+          clothingReplaceInstructions,
+          `FINAL RESULT: Image ${modelImgIdx}'s face on Image ${bgImgIdx}'s body/pose, wearing the specified clothing, in Image ${bgImgIdx}'s scene. Seamless single photograph.`,
+          `Lighting on the model must match Image ${bgImgIdx}'s light direction and color temperature exactly.`,
+          HARD_CONSTRAINTS,
+        ].join(' ')
+        // 이미지 순서 유지 (기존: 의류, 모델, 배경)
+        // images 배열은 위에서 이미 구성됨
+      } else {
+        // Step1 성공 → Step2: 얼굴 교체
+        console.log('[Step1] 성공. Step2 얼굴교체 시작...')
+
+        // Step1 결과 URL → base64 변환
+        const step1Base64 = await urlToBase64(step1Url)
+
+        if (!step1Base64) {
+          console.warn('[2-step pipeline] Step1 URL→base64 변환 실패 → 단일단계 폴백')
+          // 폴백: 기존 방식 유지
+          const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
+          const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+          prompt = [
+            `PERSON SWAP on a fashion background scene.`,
+            clothingRoleDesc,
+            `Image ${modelImgIdx} = FACE DONOR ONLY. Extract EXCLUSIVELY: facial bone structure, exact eye shape/color, nose shape, lip shape, skin tone and texture, hair color/volume/style.`,
+            `Image ${bgImgIdx} = POSE AND SCENE ANCHOR. LOCKED: pose, background, lighting.`,
+            clothingReplaceInstructions,
+            HARD_CONSTRAINTS,
+          ].join(' ')
+        } else {
+          // ── Step 2: 얼굴 교체 ──
+          // 이미지 순서: [Step1결과(기준), 모델(얼굴 참조)]
+          const step2Images = [step1Base64, modelImageBase64!]
+          const step2BaseIdx = 1   // Image 1 = Step1 결과 (의상+포즈+배경)
+          const step2FaceIdx = 2   // Image 2 = 모델 (얼굴 참조)
+
+          const step2Prompt = [
+            `FACE SWAP TASK — Step 2 of a 2-step fashion pipeline.`,
+            `Image ${step2BaseIdx} = BASE IMAGE (highest priority anchor — the result of clothing swap step).`,
+            `LOCK THESE — DO NOT CHANGE UNDER ANY CIRCUMSTANCES:`,
+            `  · The person's clothing: every color, pattern, texture, neckline, sleeve, hem detail — IDENTICAL to Image ${step2BaseIdx}.`,
+            `  · The person's exact body pose: all joint angles, body position, stance, hand positions — IDENTICAL to Image ${step2BaseIdx}.`,
+            `  · Background environment, objects, lighting direction, shadows, color palette — IDENTICAL to Image ${step2BaseIdx}.`,
+            `Image ${step2FaceIdx} = FACE DONOR (extract ONLY these features from this image):`,
+            `  · Facial bone structure: jawline shape, cheekbone position, eye socket depth`,
+            `  · Exact eye shape, double/single eyelid, eye color, lash density`,
+            `  · Nose bridge width, nose tip shape`,
+            `  · Lip shape, cupid's bow, thickness`,
+            `  · Skin tone, undertone, texture`,
+            `  · Hair color, volume, texture, style (cut/length)`,
+            `  · DO NOT use body shape, clothing, or background from Image ${step2FaceIdx}.`,
+            `REPLACEMENT INSTRUCTION: Replace the face of the person in Image ${step2BaseIdx} with Image ${step2FaceIdx}'s face. The new face must be naturally lit by the same light source present in Image ${step2BaseIdx}. Shadow direction, color temperature, and ambient light on the face must match Image ${step2BaseIdx}'s scene. Zero blending with original face — complete replacement only.`,
+            `FINAL OUTPUT: Image ${step2BaseIdx} with only the face replaced. All other elements unchanged.`,
+            `Ultra-photorealistic, seamless face integration, 8K fashion editorial quality.`,
+            `ABSOLUTE: NO text, NO logos, NO watermarks. DO NOT modify clothing or pose in any way.`,
+          ].join(' ')
+
+          console.log('[Step2] 얼굴교체 요청 (3장 병렬)...')
+
+          // Step2는 3장 병렬 생성 (최종 결과)
+          const step2RequestBody = {
+            model: 'google/nano-banana-2/edit',
+            prompt: step2Prompt,
+            aspect_ratio: aspectRatio,
+            resolution: nbResolution,
+            thinking_level: 'default',
+            output_format: 'jpeg',
+            images: step2Images,
+          }
+
+          const jobResults: any[] = await Promise.all(
+            Array.from({ length: jobCount }, () =>
+              fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
+                method: 'POST',
+                headers: atlasHeaders(),
+                body: JSON.stringify(step2RequestBody),
+              }).then(r => r.json())
+            )
+          )
+
+          const step2JobIds = jobResults
+            .filter(r => r.code === 200 && r.data?.id)
+            .map(r => r.data.id)
+
+          console.log('[Step2] jobIds:', step2JobIds)
+
+          if (step2JobIds.length === 0) {
+            const firstErr = jobResults[0]
+            console.error('[Step2] 모든 요청 실패:', firstErr)
+            const fallbackJobId = 'fallback_' + Math.random().toString(36).substr(2, 9)
+            return c.json({
+              jobId: fallbackJobId,
+              estimatedSeconds: 5,
+              status: 'queued',
+              isFallback: true,
+              error: firstErr?.msg || firstErr?.message || 'Step2 Atlas API error',
+            })
+          }
+
+          return c.json({
+            jobId: step2JobIds.join(','),
+            estimatedSeconds: 45,
+            status: 'queued',
+            isFallback: false,
+            pipeline: '2-step',
+          })
+        }
+      }
 
     } else if (hasClothing && hasModel && !hasBg) {
       // ── 의류 + 모델, 배경 없음 ──
@@ -1175,9 +1401,6 @@ app.post('/api/generation/start', async (c) => {
     }
 
     console.log('Final prompt (first 300):', prompt.substring(0, 300))
-
-    // 생성 수량 3장 고정 (count 파라미터 무시)
-    const jobCount = 3
     console.log('Atlas request → model:', requestBody.model, '| images:', images.length, '| aspect_ratio:', aspectRatio, '| resolution:', nbResolution, '| jobs:', jobCount)
 
     const jobRequests = Array.from({ length: jobCount }, () =>

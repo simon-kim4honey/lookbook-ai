@@ -881,28 +881,52 @@ async function startGeneration() {
     // 레거시 단일 필드 (서버에서도 하위 호환 처리)
     const clothingImageUrl = AppState.uploadedImageUrl;
 
-    // 생성 요청
+    // 생성 요청 (2단계 파이프라인의 경우 Step1이 서버에서 최대 45초 소요)
+    // → fetch 대기 중에 진행 바를 계속 올려주는 타이머 실행
     updateProgress(10, '의류 이미지 분석 중...');
 
-    const startRes = await fetch('/api/generation/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        modelId: model?.id,
-        modelName: model?.name || '패션 모델',
-        modelDesc,
-        bgId: bg?.id,
-        bgName: bg?.name || '스튜디오',
-        bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
-        poseType: AppState.genOptions.pose_type,
-        pose: AppState.genOptions.pose,
-        ratio: AppState.genOptions.ratio || '3:4',
-        resolution: AppState.genOptions.resolution || 'HD',
-        count,
-        clothingImages,   // 신규: 다중 의류 배열
-        clothingImageUrl, // 레거시 호환
-      })
-    });
+    let fakeProgress = 10;
+    const fakeProgressMessages = [
+      '의류 이미지 분석 중...',
+      '1단계: 의상 합성 준비 중...',
+      '1단계: 의상 교체 적용 중...',
+      '1단계: 배경·포즈 유지 확인 중...',
+      '1단계: 의상 합성 마무리 중...',
+    ];
+    let fakeMsgIdx = 0;
+    const fakeTimer = setInterval(() => {
+      if (fakeProgress < 45) {
+        fakeProgress += 2;
+        fakeMsgIdx = Math.min(Math.floor((fakeProgress - 10) / 7), fakeProgressMessages.length - 1);
+        updateProgress(fakeProgress, fakeProgressMessages[fakeMsgIdx]);
+      }
+    }, 2000);
+
+    let startRes;
+    try {
+      startRes = await fetch('/api/generation/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId: model?.id,
+          modelName: model?.name || '패션 모델',
+          modelDesc,
+          bgId: bg?.id,
+          bgName: bg?.name || '스튜디오',
+          bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
+          poseType: AppState.genOptions.pose_type,
+          pose: AppState.genOptions.pose,
+          ratio: AppState.genOptions.ratio || '3:4',
+          resolution: AppState.genOptions.resolution || 'HD',
+          count,
+          clothingImages,   // 신규: 다중 의류 배열
+          clothingImageUrl, // 레거시 호환
+        })
+      });
+    } finally {
+      // Step1 완료 (또는 단일단계 요청 완료) → 가짜 진행 타이머 중지
+      clearInterval(fakeTimer);
+    }
 
     const startData = await startRes.json();
     console.log('Generation start response:', startData);
@@ -941,11 +965,17 @@ async function startGeneration() {
     }
 
     // 실제 Atlas Cloud 폴링
-    updateProgress(20, 'AI 모델 피팅 적용 중...');
+    // 2단계 파이프라인: Step1(의상교체) 서버에서 동기처리 후 Step2(얼굴교체) jobId 반환
+    const isPipeline = startData.pipeline === '2-step';
+    if (isPipeline) {
+      updateProgress(50, '1단계 완료! 2단계: 얼굴 합성 시작...');
+    } else {
+      updateProgress(20, 'AI 모델 피팅 적용 중...');
+    }
     setMsgState('msg1', 'done');
     setMsgState('msg2', 'current');
 
-    await pollGenerationStatus(startData.jobId, count);
+    await pollGenerationStatus(startData.jobId, count, isPipeline);
 
   } catch (err) {
     console.error('Generation error:', err);
@@ -961,10 +991,27 @@ async function startGeneration() {
 }
 
 // Atlas Cloud 결과 폴링
-async function pollGenerationStatus(jobId, count) {
+async function pollGenerationStatus(jobId, count, isPipeline = false) {
   let attempts = 0;
-  const maxAttempts = 60; // 최대 2분 (2초 간격)
-  const pollDelay = 3000; // 3초 간격
+  // 2단계 파이프라인: Step1이 서버에서 이미 완료됐으므로 Step2만 폴링
+  // 단일단계: 60회×3초=3분 / 2단계: 50회×3초=2.5분 (Step1은 서버에서 처리)
+  const maxAttempts = isPipeline ? 50 : 60;
+  const pollDelay = 3000;
+
+  // 2단계 파이프라인용 진행 메시지
+  const pipelineMessages = [
+    '2단계: 얼굴 합성 분석 중...',
+    '얼굴 특징 추출 중...',
+    '얼굴 자연스럽게 합성 중...',
+    '조명·그림자 조정 중...',
+    '최종 품질 향상 중...',
+  ];
+  const singleMessages = [
+    'AI 모델 피팅 적용 중...',
+    '배경 합성 중...',
+    '이미지 품질 향상 중...',
+  ];
+  const progressMessages = isPipeline ? pipelineMessages : singleMessages;
 
   while (attempts < maxAttempts) {
     await sleep(pollDelay);
@@ -996,14 +1043,16 @@ async function pollGenerationStatus(jobId, count) {
       } else {
         // processing
         const progress = Math.min(data.progress || 30, 85);
-        const progressMessages = ['AI 모델 피팅 적용 중...', '배경 합성 중...', '이미지 품질 향상 중...'];
-        const msgIdx = Math.floor((attempts / maxAttempts) * progressMessages.length);
+        const msgIdx = Math.min(
+          Math.floor((attempts / maxAttempts) * progressMessages.length),
+          progressMessages.length - 1
+        );
         updateProgress(20 + progress * 0.65, progressMessages[msgIdx] || '처리 중...');
 
         // 메시지 상태 업데이트
-        if (attempts > 5) setMsgState('msg2', 'done'), setMsgState('msg3', 'current');
-        if (attempts > 15) setMsgState('msg3', 'done'), setMsgState('msg4', 'current');
-        if (attempts > 30) setMsgState('msg4', 'done'), setMsgState('msg5', 'current');
+        if (attempts > 5)  { setMsgState('msg2', 'done'); setMsgState('msg3', 'current'); }
+        if (attempts > 15) { setMsgState('msg3', 'done'); setMsgState('msg4', 'current'); }
+        if (attempts > 30) { setMsgState('msg4', 'done'); setMsgState('msg5', 'current'); }
       }
 
     } catch (pollErr) {
