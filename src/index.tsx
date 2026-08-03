@@ -640,15 +640,12 @@ app.get('/api/proxy/bg-image/:id', (c) => c.notFound())
 // 생성 결과 이미지 프록시 (Atlas Cloud CDN CORS 우회)
 app.get('/api/proxy/gen-image', async (c) => {
   const url = c.req.query('url')
+  const isDownload = c.req.query('download') === '1'
   if (!url) return c.json({ error: 'Missing url param' }, 400)
 
   try {
-    // 허용된 도메인인지 확인 (보안)
-    const parsed = new URL(url)
-    const allowedHosts = ['cdn.atlascloud.ai', 'storage.atlascloud.ai', 'replicate.delivery', 'pbxt.replicate.delivery', 'delivery.replicate.com', 'cdn2.atlascloud.ai']
-    const isAllowed = allowedHosts.some(h => parsed.hostname.endsWith(h)) || parsed.hostname.includes('atlascloud') || parsed.hostname.includes('replicate')
-
     // 모든 https URL 허용 (Atlas Cloud 다양한 CDN 사용)
+    const parsed = new URL(url)
     if (!parsed.protocol.startsWith('https')) {
       return c.json({ error: 'Only HTTPS URLs allowed' }, 400)
     }
@@ -664,15 +661,22 @@ app.get('/api/proxy/gen-image', async (c) => {
     }
 
     const buffer = await res.arrayBuffer()
-    const contentType = res.headers.get('Content-Type') || 'image/png'
+    const contentType = res.headers.get('Content-Type') || 'image/jpeg'
 
-    return new Response(buffer, {
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=3600',
-        'Access-Control-Allow-Origin': '*',
-      },
-    })
+    // 파일명 생성 (다운로드 시)
+    const filename = `lookbook_ai_${Date.now()}.jpg`
+
+    const headers: Record<string, string> = {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600',
+      'Access-Control-Allow-Origin': '*',
+    }
+    // download=1 이면 브라우저가 바로 저장 대화상자 띄움
+    if (isDownload) {
+      headers['Content-Disposition'] = `attachment; filename="${filename}"`
+    }
+
+    return new Response(buffer, { headers })
   } catch (err: any) {
     console.error('Gen image proxy error:', err)
     return c.json({ error: err.message }, 500)
@@ -2292,14 +2296,14 @@ app.get('/generator', (c) => {
         <div class="image-modal-preview"><img id="modalImage" src="" alt="생성된 이미지" /></div>
         <div class="image-modal-sidebar">
           <div class="image-modal-title" id="modalImageTitle">생성된 피팅컷</div>
-          <div class="image-modal-meta" id="modalImageMeta">832 × 1216px · PNG</div>
+          <div class="image-modal-meta" id="modalImageMeta">해상도 확인 중...</div>
           <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:16px 0;" />
           <div class="image-modal-actions">
             <button class="btn btn-primary btn-full" onclick="downloadImage()"><i class="fas fa-download"></i> 다운로드</button>
             <button class="btn btn-full" style="background:rgba(255,255,255,0.1);color:white;" onclick="toggleFavorite()"><i class="fas fa-heart" id="modalFavIcon"></i> 즐겨찾기</button>
           </div>
           <div style="margin-top:auto;">
-            <div style="font-size:11px;color:var(--gray-4);line-height:1.6;" id="modalImageDetail">생성 모델: Atlas Cloud AI<br/>해상도: 832 × 1216px<br/>형식: PNG</div>
+            <div style="font-size:11px;color:var(--gray-4);line-height:1.6;" id="modalImageDetail">생성 모델: Atlas Cloud AI<br/>해상도: 확인 중...<br/>형식: JPEG</div>
           </div>
         </div>
       </div>

@@ -1217,12 +1217,32 @@ function openImageModal(idx) {
     if (img.url) {
       previewArea.innerHTML = `
         <img
+          id="modalImageEl"
           src="${img.url}"
           alt="${img.title || `피팅컷 #${idx + 1}`}"
           style="max-width:100%;max-height:80vh;border-radius:12px;object-fit:contain;"
           onerror="this.parentElement.innerHTML='<div style=\\"width:400px;height:533px;background:${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'};border-radius:12px;display:flex;align-items:center;justify-content:center;\\"</div>'"
         />
       `;
+      // 이미지 로드 후 실제 해상도 읽기
+      const imgEl = document.getElementById('modalImageEl');
+      if (imgEl) {
+        const updateMeta = () => {
+          const w = imgEl.naturalWidth;
+          const h = imgEl.naturalHeight;
+          if (w && h) {
+            const metaEl = document.getElementById('modalImageMeta');
+            const detailEl = document.getElementById('modalImageDetail');
+            if (metaEl) metaEl.textContent = `${w.toLocaleString()} × ${h.toLocaleString()}px · JPEG`;
+            if (detailEl) detailEl.innerHTML = `생성 모델: Atlas Cloud AI<br/>해상도: ${w.toLocaleString()} × ${h.toLocaleString()}px<br/>형식: JPEG`;
+          }
+        };
+        if (imgEl.complete && imgEl.naturalWidth) {
+          updateMeta();
+        } else {
+          imgEl.addEventListener('load', updateMeta);
+        }
+      }
     } else {
       previewArea.innerHTML = `
         <div style="width:400px;height:533px;background:${img.gradient};border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
@@ -1235,7 +1255,8 @@ function openImageModal(idx) {
   }
 
   if (modalTitle) modalTitle.textContent = img.title || `AI 피팅컷 #${idx + 1}`;
-  if (modalMeta) modalMeta.textContent = `${img.width || 832} × ${img.height || 1216}px · PNG`;
+  // 초기 표시 (실제 크기는 이미지 로드 완료 후 위 updateMeta에서 업데이트)
+  if (modalMeta) modalMeta.textContent = img.url ? '해상도 확인 중...' : '미리보기 이미지';
 
   // 현재 이미지 인덱스 저장 (다운로드용)
   modal.dataset.currentIdx = idx;
@@ -1263,14 +1284,17 @@ function downloadSingleImage(url, num) {
     showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success');
     return;
   }
+  // 프록시 URL인 경우 download=1 파라미터 추가 → Content-Disposition: attachment 헤더 적용
+  const dlUrl = url.includes('/api/proxy/gen-image')
+    ? url + (url.includes('?') ? '&' : '?') + 'download=1'
+    : url;
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `lookbook_ai_fitting_${num}.png`;
-  a.target = '_blank';
+  a.href = dlUrl;
+  a.download = `lookbook_ai_fitting_${num}.jpg`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success');
+  showToast(`피팅컷 #${num} 다운로드를 시작합니다. (1792 × 2400px 원본)`, 'success');
 }
 
 function downloadSingle(num) {
@@ -1284,17 +1308,19 @@ function downloadAll() {
   if (realImages.length > 0) {
     realImages.forEach((img, idx) => {
       setTimeout(() => {
+        const dlUrl = img.url.includes('/api/proxy/gen-image')
+          ? img.url + (img.url.includes('?') ? '&' : '?') + 'download=1'
+          : img.url;
         const a = document.createElement('a');
-        a.href = img.url;
-        a.download = `lookbook_ai_fitting_${idx + 1}.png`;
-        a.target = '_blank';
+        a.href = dlUrl;
+        a.download = `lookbook_ai_fitting_${idx + 1}.jpg`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
       }, idx * 500);
     });
   }
-  showToast(`${count}장 다운로드를 시작합니다.`, 'success');
+  showToast(`${count}장 다운로드를 시작합니다. (1792 × 2400px 원본)`, 'success');
 }
 
 function downloadImage() {
