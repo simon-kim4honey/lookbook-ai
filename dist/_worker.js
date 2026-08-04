@@ -1069,22 +1069,11 @@ ${t}
 
   <!-- Image View Modal -->
   <div class="modal-overlay image-modal" id="imageModal">
-    <div class="modal-box" style="max-width:900px;width:95vw;padding:0;overflow:hidden;background:var(--dark);">
-      <button class="modal-close" style="background:rgba(255,255,255,0.1);color:white;top:16px;right:16px;z-index:10;" onclick="closeModal('imageModal')">×</button>
-      <div class="image-modal-inner">
-        <div class="image-modal-preview"><img id="modalImage" src="" alt="생성된 이미지" /></div>
-        <div class="image-modal-sidebar">
-          <div class="image-modal-title" id="modalImageTitle">생성된 피팅컷</div>
-          <div class="image-modal-meta" id="modalImageMeta">해상도 확인 중...</div>
-          <hr style="border:none;border-top:1px solid rgba(255,255,255,0.1);margin:16px 0;" />
-          <div class="image-modal-actions">
-            <button class="btn btn-primary btn-full" onclick="downloadImage()"><i class="fas fa-download"></i> 다운로드</button>
-            <button class="btn btn-full" style="background:rgba(255,255,255,0.1);color:white;" onclick="toggleFavorite()"><i class="fas fa-heart" id="modalFavIcon"></i> 즐겨찾기</button>
-          </div>
-          <div style="margin-top:auto;">
-            <div style="font-size:11px;color:var(--gray-4);line-height:1.6;" id="modalImageDetail">생성 모델: Atlas Cloud AI<br/>해상도: 확인 중...<br/>형식: JPEG</div>
-          </div>
-        </div>
+    <div class="modal-box" style="max-width:700px;width:95vw;padding:0;overflow:hidden;background:transparent;box-shadow:none;position:relative;">
+      <button class="modal-close" style="background:rgba(0,0,0,0.5);color:white;top:12px;right:12px;z-index:20;" onclick="closeModal('imageModal')">×</button>
+      <div style="position:relative;display:inline-block;width:100%;">
+        <img id="modalImage" src="" alt="생성된 이미지" style="display:block;width:100%;height:auto;border-radius:12px;" />
+        <button onclick="downloadImage()" style="position:absolute;bottom:16px;right:16px;z-index:20;display:flex;align-items:center;gap:8px;padding:10px 20px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.85)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'"><i class="fas fa-download"></i> 다운로드</button>
       </div>
     </div>
   </div>
