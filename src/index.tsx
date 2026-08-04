@@ -6,6 +6,13 @@ import { cors } from 'hono/cors'
 type Bindings = {
   LOOKBOOK_KV: KVNamespace   // BYOK(studiob) — Cloudflare KV
   LOOKBOOK_DB: D1Database    // Genspark Hosted — Cloudflare D1
+  // OAuth Secrets (wrangler secret put 으로 설정)
+  KAKAO_CLIENT_ID: string
+  KAKAO_CLIENT_SECRET: string
+  GOOGLE_CLIENT_ID: string
+  GOOGLE_CLIENT_SECRET: string
+  // 어드민
+  ADMIN_PASSWORD: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -19,12 +26,11 @@ app.use('/static/*', serveStatic({ root: './public' }))
 const ATLAS_API_BASE = 'https://api.atlascloud.ai'
 const ATLAS_API_KEY = 'apikey-768c01fdea4c405f972d93ae16f0b9e3'
 const AIFASHION_BASE = 'https://www.aifashion.co.kr'
-const ADMIN_PASSWORD = 'sa3325'   // 어드민 접근 비밀번호
-
 // 어드민 인증 미들웨어 (상단 선언 필수 — 스토어/라우트보다 먼저 참조됨)
 const adminAuth = async (c: any, next: any) => {
   const authHeader = c.req.header('X-Admin-Password')
-  if (authHeader !== ADMIN_PASSWORD) {
+  const adminPassword = c.env.ADMIN_PASSWORD || 'sa3325'
+  if (authHeader !== adminPassword) {
     return c.json({ success: false, message: '인증 실패' }, 401)
   }
   await next()
@@ -702,12 +708,8 @@ app.get('/api/projects', (c) => {
 // D1 users / user_sessions 테이블 사용
 // ════════════════════════════════════════════════════
 
-// ── OAuth 앱 설정 (Cloudflare Secrets 또는 환경변수로 관리 권장)
-// 현재는 코드 내 상수로 관리 (추후 wrangler secret으로 이동)
-const KAKAO_CLIENT_ID  = (globalThis as any).__KAKAO_CLIENT_ID  || ''
-const KAKAO_CLIENT_SECRET = (globalThis as any).__KAKAO_CLIENT_SECRET || ''
-const GOOGLE_CLIENT_ID = (globalThis as any).__GOOGLE_CLIENT_ID || ''
-const GOOGLE_CLIENT_SECRET = (globalThis as any).__GOOGLE_CLIENT_SECRET || ''
+// ── OAuth 앱 설정: c.env에서 읽음 (wrangler secret put으로 설정)
+// KAKAO_CLIENT_ID, KAKAO_CLIENT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 // ── 헬퍼: 랜덤 토큰 생성 (64자 hex)
 function genToken(): string {
@@ -862,8 +864,8 @@ app.post('/api/auth/logout', async (c) => {
 app.get('/api/auth/kakao', (c) => {
   const origin = new URL(c.req.url).origin
   const redirectUri = `${origin}/api/auth/kakao/callback`
-  const clientId = KAKAO_CLIENT_ID
-  if (!clientId) return c.json({ error: '카카오 앱 키가 설정되지 않았습니다.' }, 500)
+  const clientId = c.env.KAKAO_CLIENT_ID || ''
+  if (!clientId) return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();</script>`)
   const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`
   return c.redirect(url)
 })
@@ -889,7 +891,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code', code,
-        client_id: KAKAO_CLIENT_ID, client_secret: KAKAO_CLIENT_SECRET,
+        client_id: c.env.KAKAO_CLIENT_ID || '', client_secret: c.env.KAKAO_CLIENT_SECRET || '',
         redirect_uri: redirectUri,
       }),
     })
@@ -944,8 +946,8 @@ app.get('/api/auth/kakao/callback', async (c) => {
 app.get('/api/auth/google', (c) => {
   const origin = new URL(c.req.url).origin
   const redirectUri = `${origin}/api/auth/google/callback`
-  const clientId = GOOGLE_CLIENT_ID
-  if (!clientId) return c.json({ error: '구글 클라이언트 ID가 설정되지 않았습니다.' }, 500)
+  const clientId = c.env.GOOGLE_CLIENT_ID || ''
+  if (!clientId) return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();</script>`)
   const params = new URLSearchParams({
     client_id: clientId, redirect_uri: redirectUri,
     response_type: 'code', scope: 'openid email profile',
@@ -975,7 +977,7 @@ app.get('/api/auth/google/callback', async (c) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code', code,
-        client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
+        client_id: c.env.GOOGLE_CLIENT_ID || '', client_secret: c.env.GOOGLE_CLIENT_SECRET || '',
         redirect_uri: redirectUri,
       }),
     })
@@ -1857,7 +1859,8 @@ app.put('/api/admin/prompt', adminAuth, async (c) => {
 // POST /api/admin/auth — 비밀번호 확인
 app.post('/api/admin/auth', async (c) => {
   const body: any = await c.req.json()
-  if (body.password === ADMIN_PASSWORD) {
+  const adminPassword = c.env.ADMIN_PASSWORD || 'sa3325'
+  if (body.password === adminPassword) {
     return c.json({ success: true })
   }
   return c.json({ success: false, message: '비밀번호가 올바르지 않습니다.' }, 401)
