@@ -6,8 +6,8 @@ var e=(e,t,n)=>(r,i)=>{let a=-1;return o(0);async function o(s){if(s<=a)throw Er
     SELECT token FROM user_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 4
   )`).bind(t,t).run(),await e.prepare(`INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)`).bind(n,t,r).run(),n}function et(e){return{id:e.id,name:e.name,email:e.email,role:e.role,credits:e.credits,avatar_url:e.avatar_url,provider:e.provider}}G.post(`/api/auth/signup`,async e=>{try{let t=e.env.LOOKBOOK_DB,{name:n,email:r,password:i}=await e.req.json();if(!n||!r||!i)return e.json({success:!1,message:`모든 항목을 입력해주세요.`},400);if(i.length<8)return e.json({success:!1,message:`비밀번호는 8자 이상이어야 합니다.`},400);if(await t.prepare(`SELECT id FROM users WHERE email = ?`).bind(r).first())return e.json({success:!1,message:`이미 가입된 이메일입니다.`},409);let a=Ye(),o=await Xe(i);await t.prepare(`
       INSERT INTO users (id, email, name, password_hash, provider, status, credits, role)
-      VALUES (?, ?, ?, ?, 'email', 'active', 5, 'user')
-    `).bind(a,r.toLowerCase(),n,o).run();let s=await $e(t,a),c={id:a,name:n,email:r.toLowerCase(),role:`user`,credits:5,avatar_url:null,provider:`email`};return e.json({success:!0,user:c,token:s})}catch(t){return console.error(`signup error:`,t),e.json({success:!1,message:`서버 오류가 발생했습니다.`},500)}}),G.post(`/api/auth/login`,async e=>{try{let t=e.env.LOOKBOOK_DB,{email:n,password:r}=await e.req.json();if(!n||!r)return e.json({success:!1,message:`이메일과 비밀번호를 입력해주세요.`},400);let i=await t.prepare(`SELECT * FROM users WHERE email = ? AND provider = 'email'`).bind(n.toLowerCase()).first();if(!i)return e.json({success:!1,message:`이메일 또는 비밀번호가 올바르지 않습니다.`},401);if(i.status!==`active`)return e.json({success:!1,message:`정지된 계정입니다. 관리자에게 문의하세요.`},403);if(!i.password_hash)return e.json({success:!1,message:`소셜 계정으로 가입된 이메일입니다.`},400);if(!await Ze(r,i.password_hash))return e.json({success:!1,message:`이메일 또는 비밀번호가 올바르지 않습니다.`},401);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(i.id).run();let a=await $e(t,i.id);return e.json({success:!0,user:et(i),token:a})}catch(t){return console.error(`login error:`,t),e.json({success:!1,message:`서버 오류가 발생했습니다.`},500)}}),G.get(`/api/auth/me`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await Qe(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);return n?e.json({success:!0,user:et(n)}):e.json({success:!1,message:`로그인이 필요합니다.`},401)}catch{return e.json({success:!1,message:`서버 오류`},500)}}),G.post(`/api/auth/logout`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`);return n&&await t.prepare(`DELETE FROM user_sessions WHERE token = ?`).bind(n).run(),e.json({success:!0})}catch{return e.json({success:!0})}}),G.get(`/api/auth/kakao`,e=>{let t=e.env.KAKAO_CLIENT_ID||``;if(!t)return e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();<\/script>`);let n=`https://kauth.kakao.com/oauth/authorize?client_id=${t}&redirect_uri=https%3A%2F%2Fstudiob.aifashion.co.kr%2Fapi%2Fauth%2Fkakao%2Fcallback&response_type=code`;return e.redirect(n)}),G.get(`/api/auth/kakao/callback`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`code`),r=e.req.query(`error`);if(r||!n)return e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${r||`cancelled`}'},'*');window.close();<\/script>`);try{let r=await(await fetch(`https://kauth.kakao.com/oauth/token`,{method:`POST`,headers:{"Content-Type":`application/x-www-form-urlencoded`},body:new URLSearchParams({grant_type:`authorization_code`,code:n,client_id:e.env.KAKAO_CLIENT_ID||``,client_secret:e.env.KAKAO_CLIENT_SECRET||``,redirect_uri:`https://studiob.aifashion.co.kr/api/auth/kakao/callback`})})).json();if(!r.access_token)throw Error(`카카오 토큰 발급 실패`);let i=await(await fetch(`https://kapi.kakao.com/v2/user/me`,{headers:{Authorization:`Bearer ${r.access_token}`}})).json(),a=String(i.id),o=i.kakao_account?.email||`kakao_${a}@kakao.local`,s=i.kakao_account?.profile?.nickname||`카카오 사용자`,c=i.kakao_account?.profile?.profile_image_url||null,l=await t.prepare(`SELECT * FROM users WHERE provider = 'kakao' AND provider_id = ?`).bind(a).first();if(!l)if(l=await t.prepare(`SELECT * FROM users WHERE email = ?`).bind(o).first(),l)await t.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(a,c,l.id).run();else{let e=Ye();await t.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 5, 'user')`).bind(e,o,s,a,c).run(),l=await t.prepare(`SELECT * FROM users WHERE id = ?`).bind(e).first()}if(!l||l.status!==`active`)throw Error(`계정이 정지 상태입니다.`);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(l.id).run();let u=await $e(t,l.id),d=JSON.stringify(et(l));return e.html(`<!DOCTYPE html>
+      VALUES (?, ?, ?, ?, 'email', 'active', 1000, 'user')
+    `).bind(a,r.toLowerCase(),n,o).run();let s=await $e(t,a),c={id:a,name:n,email:r.toLowerCase(),role:`user`,credits:1e3,avatar_url:null,provider:`email`};return e.json({success:!0,user:c,token:s})}catch(t){return console.error(`signup error:`,t),e.json({success:!1,message:`서버 오류가 발생했습니다.`},500)}}),G.post(`/api/auth/login`,async e=>{try{let t=e.env.LOOKBOOK_DB,{email:n,password:r}=await e.req.json();if(!n||!r)return e.json({success:!1,message:`이메일과 비밀번호를 입력해주세요.`},400);let i=await t.prepare(`SELECT * FROM users WHERE email = ? AND provider = 'email'`).bind(n.toLowerCase()).first();if(!i)return e.json({success:!1,message:`이메일 또는 비밀번호가 올바르지 않습니다.`},401);if(i.status!==`active`)return e.json({success:!1,message:`정지된 계정입니다. 관리자에게 문의하세요.`},403);if(!i.password_hash)return e.json({success:!1,message:`소셜 계정으로 가입된 이메일입니다.`},400);if(!await Ze(r,i.password_hash))return e.json({success:!1,message:`이메일 또는 비밀번호가 올바르지 않습니다.`},401);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(i.id).run();let a=await $e(t,i.id);return e.json({success:!0,user:et(i),token:a})}catch(t){return console.error(`login error:`,t),e.json({success:!1,message:`서버 오류가 발생했습니다.`},500)}}),G.get(`/api/auth/me`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await Qe(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);return n?e.json({success:!0,user:et(n)}):e.json({success:!1,message:`로그인이 필요합니다.`},401)}catch{return e.json({success:!1,message:`서버 오류`},500)}}),G.post(`/api/auth/logout`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`);return n&&await t.prepare(`DELETE FROM user_sessions WHERE token = ?`).bind(n).run(),e.json({success:!0})}catch{return e.json({success:!0})}}),G.get(`/api/auth/kakao`,e=>{let t=e.env.KAKAO_CLIENT_ID||``;if(!t)return e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();<\/script>`);let n=`https://kauth.kakao.com/oauth/authorize?client_id=${t}&redirect_uri=https%3A%2F%2Fstudiob.aifashion.co.kr%2Fapi%2Fauth%2Fkakao%2Fcallback&response_type=code`;return e.redirect(n)}),G.get(`/api/auth/kakao/callback`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`code`),r=e.req.query(`error`);if(r||!n)return e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${r||`cancelled`}'},'*');window.close();<\/script>`);try{let r=await(await fetch(`https://kauth.kakao.com/oauth/token`,{method:`POST`,headers:{"Content-Type":`application/x-www-form-urlencoded`},body:new URLSearchParams({grant_type:`authorization_code`,code:n,client_id:e.env.KAKAO_CLIENT_ID||``,client_secret:e.env.KAKAO_CLIENT_SECRET||``,redirect_uri:`https://studiob.aifashion.co.kr/api/auth/kakao/callback`})})).json();if(!r.access_token)throw Error(`카카오 토큰 발급 실패`);let i=await(await fetch(`https://kapi.kakao.com/v2/user/me`,{headers:{Authorization:`Bearer ${r.access_token}`}})).json(),a=String(i.id),o=i.kakao_account?.email||`kakao_${a}@kakao.local`,s=i.kakao_account?.profile?.nickname||`카카오 사용자`,c=i.kakao_account?.profile?.profile_image_url||null,l=await t.prepare(`SELECT * FROM users WHERE provider = 'kakao' AND provider_id = ?`).bind(a).first();if(!l)if(l=await t.prepare(`SELECT * FROM users WHERE email = ?`).bind(o).first(),l)await t.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(a,c,l.id).run();else{let e=Ye();await t.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 1000, 'user')`).bind(e,o,s,a,c).run(),l=await t.prepare(`SELECT * FROM users WHERE id = ?`).bind(e).first()}if(!l||l.status!==`active`)throw Error(`계정이 정지 상태입니다.`);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(l.id).run();let u=await $e(t,l.id),d=JSON.stringify(et(l));return e.html(`<!DOCTYPE html>
 <html lang="ko">
 <head><meta charset="UTF-8"><title>로그인 성공</title></head>
 <body>
@@ -40,7 +40,7 @@ var e=(e,t,n)=>(r,i)=>{let a=-1;return o(0);async function o(s){if(s<=a)throw Er
 </body></html>`)}catch(t){return console.error(`kakao callback error:`,t),e.html(`<!DOCTYPE html><html><body><script>
       try { if(window.opener) window.opener.postMessage({type:'oauth_error',provider:'kakao',error:'${t.message}'},'*'); } catch(e) {}
       setTimeout(() => window.close(), 500);
-    <\/script><p style="font-family:sans-serif;text-align:center;padding:40px;">로그인 오류가 발생했습니다.</p></body></html>`)}}),G.get(`/api/auth/google`,e=>{let t=e.env.GOOGLE_CLIENT_ID||``;if(!t)return e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();<\/script>`);let n=new URLSearchParams({client_id:t,redirect_uri:`https://studiob.aifashion.co.kr/api/auth/google/callback`,response_type:`code`,scope:`openid email profile`,access_type:`offline`,prompt:`select_account`});return e.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${n}`)}),G.get(`/api/auth/google/callback`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`code`),r=e.req.query(`error`);if(r||!n)return e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'${r||`cancelled`}'},'*');window.close();<\/script>`);try{let r=await(await fetch(`https://oauth2.googleapis.com/token`,{method:`POST`,headers:{"Content-Type":`application/x-www-form-urlencoded`},body:new URLSearchParams({grant_type:`authorization_code`,code:n,client_id:e.env.GOOGLE_CLIENT_ID||``,client_secret:e.env.GOOGLE_CLIENT_SECRET||``,redirect_uri:`https://studiob.aifashion.co.kr/api/auth/google/callback`})})).json();if(!r.access_token)throw Error(`구글 토큰 발급 실패`);let i=await(await fetch(`https://www.googleapis.com/oauth2/v2/userinfo`,{headers:{Authorization:`Bearer ${r.access_token}`}})).json(),a=i.id,o=i.email,s=i.name||`구글 사용자`,c=i.picture||null,l=await t.prepare(`SELECT * FROM users WHERE provider = 'google' AND provider_id = ?`).bind(a).first();if(!l)if(l=await t.prepare(`SELECT * FROM users WHERE email = ?`).bind(o).first(),l)await t.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(a,c,l.id).run();else{let e=Ye();await t.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 5, 'user')`).bind(e,o,s,a,c).run(),l=await t.prepare(`SELECT * FROM users WHERE id = ?`).bind(e).first()}if(!l||l.status!==`active`)throw Error(`계정이 정지 상태입니다.`);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(l.id).run();let u=await $e(t,l.id),d=JSON.stringify(et(l));return e.html(`<!DOCTYPE html>
+    <\/script><p style="font-family:sans-serif;text-align:center;padding:40px;">로그인 오류가 발생했습니다.</p></body></html>`)}}),G.get(`/api/auth/google`,e=>{let t=e.env.GOOGLE_CLIENT_ID||``;if(!t)return e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();<\/script>`);let n=new URLSearchParams({client_id:t,redirect_uri:`https://studiob.aifashion.co.kr/api/auth/google/callback`,response_type:`code`,scope:`openid email profile`,access_type:`offline`,prompt:`select_account`});return e.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${n}`)}),G.get(`/api/auth/google/callback`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`code`),r=e.req.query(`error`);if(r||!n)return e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'${r||`cancelled`}'},'*');window.close();<\/script>`);try{let r=await(await fetch(`https://oauth2.googleapis.com/token`,{method:`POST`,headers:{"Content-Type":`application/x-www-form-urlencoded`},body:new URLSearchParams({grant_type:`authorization_code`,code:n,client_id:e.env.GOOGLE_CLIENT_ID||``,client_secret:e.env.GOOGLE_CLIENT_SECRET||``,redirect_uri:`https://studiob.aifashion.co.kr/api/auth/google/callback`})})).json();if(!r.access_token)throw Error(`구글 토큰 발급 실패`);let i=await(await fetch(`https://www.googleapis.com/oauth2/v2/userinfo`,{headers:{Authorization:`Bearer ${r.access_token}`}})).json(),a=i.id,o=i.email,s=i.name||`구글 사용자`,c=i.picture||null,l=await t.prepare(`SELECT * FROM users WHERE provider = 'google' AND provider_id = ?`).bind(a).first();if(!l)if(l=await t.prepare(`SELECT * FROM users WHERE email = ?`).bind(o).first(),l)await t.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(a,c,l.id).run();else{let e=Ye();await t.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 1000, 'user')`).bind(e,o,s,a,c).run(),l=await t.prepare(`SELECT * FROM users WHERE id = ?`).bind(e).first()}if(!l||l.status!==`active`)throw Error(`계정이 정지 상태입니다.`);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(l.id).run();let u=await $e(t,l.id),d=JSON.stringify(et(l));return e.html(`<!DOCTYPE html>
 <html lang="ko">
 <head><meta charset="UTF-8"><title>로그인 성공</title></head>
 <body>
@@ -74,7 +74,11 @@ var e=(e,t,n)=>(r,i)=>{let a=-1;return o(0);async function o(s){if(s<=a)throw Er
       setTimeout(() => window.close(), 500);
     <\/script><p style="font-family:sans-serif;text-align:center;padding:40px;">로그인 오류가 발생했습니다.</p></body></html>`)}}),G.get(`/api/admin/users`,J,async e=>{try{let t=e.env.LOOKBOOK_DB,n=parseInt(e.req.query(`page`)||`1`),r=parseInt(e.req.query(`limit`)||`50`),i=e.req.query(`search`)||``,a=e.req.query(`status`)||``,o=(n-1)*r,s=`WHERE 1=1`,c=[];i&&(s+=` AND (name LIKE ? OR email LIKE ?)`,c.push(`%${i}%`,`%${i}%`)),a&&(s+=` AND status = ?`,c.push(a));let l=await t.prepare(`SELECT COUNT(*) as cnt FROM users ${s}`).bind(...c).first(),u=await t.prepare(`SELECT id, name, email, provider, status, credits, role, last_login_at, created_at FROM users ${s} ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(...c,r,o).all();return e.json({success:!0,users:u.results,total:l?.cnt||0,page:n,limit:r})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.get(`/api/admin/users/:id`,J,async e=>{try{let t=await e.env.LOOKBOOK_DB.prepare(`SELECT id, name, email, provider, status, credits, role, last_login_at, created_at FROM users WHERE id = ?`).bind(e.req.param(`id`)).first();return t?e.json({success:!0,user:t}):e.json({success:!1,message:`존재하지 않는 사용자입니다.`},404)}catch(t){return e.json({success:!1,message:t.message},500)}}),G.patch(`/api/admin/users/:id`,J,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await e.req.json(),r=e.req.param(`id`),i=[],a=[];if(n.status!==void 0&&(i.push(`status = ?`),a.push(n.status)),n.role!==void 0&&(i.push(`role = ?`),a.push(n.role)),n.add_credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.add_credits),c=Math.max(0,o+s);return i.push(`credits = ?`),a.push(c),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
          VALUES (?, 'grant', ?, ?, 'admin_grant', ?)`).bind(r,s,c,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:c})}if(n.credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.credits),c=s-o;return i.push(`credits = ?`),a.push(s),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),c!==0&&await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-           VALUES (?, ?, ?, ?, 'admin_set', ?)`).bind(r,c>0?`grant`:`deduct`,c,s,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:s})}return i.length===0?e.json({success:!1,message:`변경할 항목이 없습니다.`},400):(i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0}))}catch(t){return e.json({success:!1,message:t.message},500)}}),G.delete(`/api/admin/users/:id`,J,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`);return await t.prepare(`UPDATE users SET status = 'deleted', updated_at = datetime('now') WHERE id = ?`).bind(n).run(),await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(n).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.get(`/api/admin/stats`,J,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status != 'deleted'`).first(),r=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'active'`).first(),i=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'suspended'`).first(),a=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE date(created_at) = date('now') AND status != 'deleted'`).first(),o=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'kakao' AND status = 'active'`).first(),s=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'google' AND status = 'active'`).first(),c=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'email' AND status = 'active'`).first();return e.json({success:!0,stats:{total:n?.cnt||0,active:r?.cnt||0,suspended:i?.cnt||0,today:a?.cnt||0,by_provider:{kakao:o?.cnt||0,google:s?.cnt||0,email:c?.cnt||0}}})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.post(`/api/uploads/image`,async e=>{try{let t=(await e.req.formData()).get(`file`);if(!t)return e.json({success:!1,message:`파일이 없습니다.`},400);let n=await t.arrayBuffer(),r=btoa(String.fromCharCode(...new Uint8Array(n))),i=`data:${t.type||`image/jpeg`};base64,${r}`;return e.json({success:!0,imageId:`img_`+Math.random().toString(36).substr(2,9),url:i,dataUrl:i})}catch(t){return e.json({success:!1,message:t.message},500)}});function tt(e){return{"1:1":`1:1`,"4:5":`4:5`,"3:4":`3:4`,"9:16":`9:16`}[e]||`3:4`}function nt(e){return e===`4K`?`4k`:e===`HD`?`2k`:`1k`}G.post(`/api/clothing/classify`,async e=>{try{let t=(await e.req.json()).images||[];if(t.length===0)return e.json({success:!1,message:`이미지가 없습니다.`},400);await Promise.all(t.map(async({dataUrl:e,index:t})=>{try{let n=[`Analyze this clothing item image and classify it into EXACTLY ONE of these categories:`,`TOP — shirts, t-shirts, blouses, crop tops, hoodies (without coat), sweaters, knits, vests worn as tops`,`BOTTOM — pants, trousers, jeans, skirts, shorts, leggings`,`OUTER — coats, jackets, blazers, cardigans worn as outerwear, parkas, windbreakers, leather jackets, denim jackets`,`DRESS — one-piece dresses, jumpsuits, overalls that cover both top and bottom`,`UNKNOWN — if cannot determine`,`Respond in EXACTLY this JSON format only, no other text:`,`{"category":"TOP","label":"white button-down shirt","confidence":0.95}`].join(` `),r=await(await fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify({model:`google/nano-banana-2/edit`,prompt:n,images:[e],aspect_ratio:`1:1`,resolution:`1k`,thinking_level:`default`,output_format:`jpeg`})})).json();if(console.log(`Classify atlas response code:`,r.code),r.code===200&&r.data?.id){let e=r.data.id;for(let t=0;t<10;t++){await new Promise(e=>setTimeout(e,1500));let t=(await fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json())).data?.status;if(t===`completed`||t===`succeeded`||t===`failed`||t===`error`)break}}return{index:t,category:`UNRESOLVED`,label:``,confidence:0}}catch{return{index:t,category:`UNKNOWN`,label:``,confidence:0}}}));let n=await Promise.all(t.map(async({dataUrl:e,index:t})=>rt(e,t)));return console.log(`Classify results:`,n.map(e=>`[${e.index}]${e.category}`).join(`, `)),e.json({success:!0,items:n})}catch(t){return console.error(`Classify error:`,t),e.json({success:!1,message:t.message},500)}});async function rt(e,t){try{let n=await(await fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify({model:`google/nano-banana-2`,prompt:[`CLASSIFICATION TASK. Look at this clothing item.`,`Output ONLY ONE WORD: TOP or BOTTOM or OUTER or DRESS`,`TOP = shirt/tshirt/blouse/sweater/hoodie/knit/vest`,`BOTTOM = pants/jeans/skirt/shorts/leggings`,`OUTER = coat/jacket/blazer/cardigan/parka`,`DRESS = one-piece dress/jumpsuit`].join(` `),images:[e],aspect_ratio:`1:1`,resolution:`1k`,thinking_level:`low`,output_format:`jpeg`})})).json();if(n.code===200&&n.data?.id){let e=n.data.id;for(let t=0;t<8;t++){await new Promise(e=>setTimeout(e,1500));let t=await fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json());if(t.data?.status===`completed`||t.data?.status===`succeeded`||t.data?.status===`failed`||t.data?.status===`error`)break}}let r=e.split(`,`)[1]||``;return Math.floor(r.length*.75),{index:t,category:`TOP`,label:`clothing item`,confidence:.5}}catch{return{index:t,category:`TOP`,label:`clothing item`,confidence:.3}}}function it(e,t){let n=[];return e.forEach((e,r)=>{let i=t+r,a={TOP:`TOP GARMENT (shirt/blouse/sweater/jacket-top)`,BOTTOM:`BOTTOM GARMENT (pants/skirt/shorts)`,OUTER:`OUTER LAYER (coat/jacket/cardigan)`,DRESS:`FULL OUTFIT (dress/jumpsuit — covers both top and bottom)`,UNKNOWN:`CLOTHING ITEM`}[e.category]||`CLOTHING ITEM`;n.push(`Image ${i} = ${a}${e.label?` — ${e.label}`:``}.`)}),n.join(` `)}function at(e,t){let n=[],r=e.map(e=>e.category),i=r.includes(`DRESS`),a=r.includes(`TOP`),o=r.includes(`BOTTOM`),s=r.includes(`OUTER`);if(i){let r=e.findIndex(e=>e.category===`DRESS`);n.push(`Replace the ENTIRE outfit (top and bottom) with Image ${t+r}'s full dress/jumpsuit. Reproduce every design detail exactly.`)}else{if(a){let r=e.findIndex(e=>e.category===`TOP`);n.push(`Replace ONLY the TOP garment with Image ${t+r}'s item. Exact color, pattern, texture, neckline, sleeve length.`)}if(o){let r=e.findIndex(e=>e.category===`BOTTOM`);n.push(`Replace ONLY the BOTTOM garment with Image ${t+r}'s item. Exact color, pattern, waistband, length, cut.`)}if(s){let r=e.findIndex(e=>e.category===`OUTER`);n.push(`Add/replace the OUTER LAYER (coat/jacket) with Image ${t+r}'s item worn over the other clothing. Exact lapels, buttons, length.`)}}return i||(a||n.push(`Keep the original TOP garment EXACTLY unchanged — do NOT modify it.`),o||n.push(`Keep the original BOTTOM garment EXACTLY unchanged — do NOT modify it.`),s||n.push(`Remove any outer layer if present, or keep it minimal.`)),n.join(` `)}var ot=90;G.post(`/api/generation/start`,async e=>{try{let{modelId:t,modelName:n=`패션 모델`,modelDesc:r=`young Asian female fashion model, slim figure, natural look`,bgId:i,bgName:a=`스튜디오`,bgDesc:o=`clean white studio background with professional lighting`,poseType:s=`전신`,pose:c=`정면`,ratio:l=`3:4`,resolution:u=`HD`,count:d=4,clothingImageUrl:f,clothingImages:p}=await e.req.json(),m=e.env?.LOOKBOOK_DB,h=null;if(m){let t=e.req.header(`X-Session-Token`)||``;if(t){let e=await m.prepare(`SELECT s.user_id, u.name, u.credits FROM user_sessions s
+           VALUES (?, ?, ?, ?, 'admin_set', ?)`).bind(r,c>0?`grant`:`deduct`,c,s,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:s})}return i.length===0?e.json({success:!1,message:`변경할 항목이 없습니다.`},400):(i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0}))}catch(t){return e.json({success:!1,message:t.message},500)}}),G.delete(`/api/admin/users/:id`,J,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`);return await t.prepare(`UPDATE users SET status = 'deleted', updated_at = datetime('now') WHERE id = ?`).bind(n).run(),await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(n).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.get(`/api/admin/stats`,J,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status != 'deleted'`).first(),r=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'active'`).first(),i=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'suspended'`).first(),a=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE date(created_at) = date('now') AND status != 'deleted'`).first(),o=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'kakao' AND status = 'active'`).first(),s=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'google' AND status = 'active'`).first(),c=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'email' AND status = 'active'`).first();return e.json({success:!0,stats:{total:n?.cnt||0,active:r?.cnt||0,suspended:i?.cnt||0,today:a?.cnt||0,by_provider:{kakao:o?.cnt||0,google:s?.cnt||0,email:c?.cnt||0}}})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.get(`/api/credits/history`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`},401);let r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`},401);let i=await t.prepare(`SELECT type, amount, balance, reason, ref_id, created_at
+       FROM credit_logs
+       WHERE user_id = ?
+       ORDER BY created_at DESC
+       LIMIT 100`).bind(r.user_id).all();return e.json({success:!0,logs:i.results||[]})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.post(`/api/uploads/image`,async e=>{try{let t=(await e.req.formData()).get(`file`);if(!t)return e.json({success:!1,message:`파일이 없습니다.`},400);let n=await t.arrayBuffer(),r=btoa(String.fromCharCode(...new Uint8Array(n))),i=`data:${t.type||`image/jpeg`};base64,${r}`;return e.json({success:!0,imageId:`img_`+Math.random().toString(36).substr(2,9),url:i,dataUrl:i})}catch(t){return e.json({success:!1,message:t.message},500)}});function tt(e){return{"1:1":`1:1`,"4:5":`4:5`,"3:4":`3:4`,"9:16":`9:16`}[e]||`3:4`}function nt(e){return e===`4K`?`4k`:e===`HD`?`2k`:`1k`}G.post(`/api/clothing/classify`,async e=>{try{let t=(await e.req.json()).images||[];if(t.length===0)return e.json({success:!1,message:`이미지가 없습니다.`},400);await Promise.all(t.map(async({dataUrl:e,index:t})=>{try{let n=[`Analyze this clothing item image and classify it into EXACTLY ONE of these categories:`,`TOP — shirts, t-shirts, blouses, crop tops, hoodies (without coat), sweaters, knits, vests worn as tops`,`BOTTOM — pants, trousers, jeans, skirts, shorts, leggings`,`OUTER — coats, jackets, blazers, cardigans worn as outerwear, parkas, windbreakers, leather jackets, denim jackets`,`DRESS — one-piece dresses, jumpsuits, overalls that cover both top and bottom`,`UNKNOWN — if cannot determine`,`Respond in EXACTLY this JSON format only, no other text:`,`{"category":"TOP","label":"white button-down shirt","confidence":0.95}`].join(` `),r=await(await fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify({model:`google/nano-banana-2/edit`,prompt:n,images:[e],aspect_ratio:`1:1`,resolution:`1k`,thinking_level:`default`,output_format:`jpeg`})})).json();if(console.log(`Classify atlas response code:`,r.code),r.code===200&&r.data?.id){let e=r.data.id;for(let t=0;t<10;t++){await new Promise(e=>setTimeout(e,1500));let t=(await fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json())).data?.status;if(t===`completed`||t===`succeeded`||t===`failed`||t===`error`)break}}return{index:t,category:`UNRESOLVED`,label:``,confidence:0}}catch{return{index:t,category:`UNKNOWN`,label:``,confidence:0}}}));let n=await Promise.all(t.map(async({dataUrl:e,index:t})=>rt(e,t)));return console.log(`Classify results:`,n.map(e=>`[${e.index}]${e.category}`).join(`, `)),e.json({success:!0,items:n})}catch(t){return console.error(`Classify error:`,t),e.json({success:!1,message:t.message},500)}});async function rt(e,t){try{let n=await(await fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify({model:`google/nano-banana-2`,prompt:[`CLASSIFICATION TASK. Look at this clothing item.`,`Output ONLY ONE WORD: TOP or BOTTOM or OUTER or DRESS`,`TOP = shirt/tshirt/blouse/sweater/hoodie/knit/vest`,`BOTTOM = pants/jeans/skirt/shorts/leggings`,`OUTER = coat/jacket/blazer/cardigan/parka`,`DRESS = one-piece dress/jumpsuit`].join(` `),images:[e],aspect_ratio:`1:1`,resolution:`1k`,thinking_level:`low`,output_format:`jpeg`})})).json();if(n.code===200&&n.data?.id){let e=n.data.id;for(let t=0;t<8;t++){await new Promise(e=>setTimeout(e,1500));let t=await fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json());if(t.data?.status===`completed`||t.data?.status===`succeeded`||t.data?.status===`failed`||t.data?.status===`error`)break}}let r=e.split(`,`)[1]||``;return Math.floor(r.length*.75),{index:t,category:`TOP`,label:`clothing item`,confidence:.5}}catch{return{index:t,category:`TOP`,label:`clothing item`,confidence:.3}}}function it(e,t){let n=[];return e.forEach((e,r)=>{let i=t+r,a={TOP:`TOP GARMENT (shirt/blouse/sweater/jacket-top)`,BOTTOM:`BOTTOM GARMENT (pants/skirt/shorts)`,OUTER:`OUTER LAYER (coat/jacket/cardigan)`,DRESS:`FULL OUTFIT (dress/jumpsuit — covers both top and bottom)`,UNKNOWN:`CLOTHING ITEM`}[e.category]||`CLOTHING ITEM`;n.push(`Image ${i} = ${a}${e.label?` — ${e.label}`:``}.`)}),n.join(` `)}function at(e,t){let n=[],r=e.map(e=>e.category),i=r.includes(`DRESS`),a=r.includes(`TOP`),o=r.includes(`BOTTOM`),s=r.includes(`OUTER`);if(i){let r=e.findIndex(e=>e.category===`DRESS`);n.push(`Replace the ENTIRE outfit (top and bottom) with Image ${t+r}'s full dress/jumpsuit. Reproduce every design detail exactly.`)}else{if(a){let r=e.findIndex(e=>e.category===`TOP`);n.push(`Replace ONLY the TOP garment with Image ${t+r}'s item. Exact color, pattern, texture, neckline, sleeve length.`)}if(o){let r=e.findIndex(e=>e.category===`BOTTOM`);n.push(`Replace ONLY the BOTTOM garment with Image ${t+r}'s item. Exact color, pattern, waistband, length, cut.`)}if(s){let r=e.findIndex(e=>e.category===`OUTER`);n.push(`Add/replace the OUTER LAYER (coat/jacket) with Image ${t+r}'s item worn over the other clothing. Exact lapels, buttons, length.`)}}return i||(a||n.push(`Keep the original TOP garment EXACTLY unchanged — do NOT modify it.`),o||n.push(`Keep the original BOTTOM garment EXACTLY unchanged — do NOT modify it.`),s||n.push(`Remove any outer layer if present, or keep it minimal.`)),n.join(` `)}var ot=90;G.post(`/api/generation/start`,async e=>{try{let{modelId:t,modelName:n=`패션 모델`,modelDesc:r=`young Asian female fashion model, slim figure, natural look`,bgId:i,bgName:a=`스튜디오`,bgDesc:o=`clean white studio background with professional lighting`,poseType:s=`전신`,pose:c=`정면`,ratio:l=`3:4`,resolution:u=`HD`,count:d=4,clothingImageUrl:f,clothingImages:p}=await e.req.json(),m=e.env?.LOOKBOOK_DB,h=null;if(m){let t=e.req.header(`X-Session-Token`)||``;if(t){let e=await m.prepare(`SELECT s.user_id, u.name, u.credits FROM user_sessions s
            JOIN users u ON u.id = s.user_id
            WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(t).first();e&&(h=e)}if(!h)return e.json({error:`로그인이 필요합니다.`,code:`UNAUTHORIZED`},401);let n=d*ot;if(h.credits<n)return e.json({error:`크레딧이 부족합니다. 필요: ${n}크레딧 / 보유: ${h.credits}크레딧`,code:`INSUFFICIENT_CREDITS`,required:n,available:h.credits},402);let r=h.credits-n;await m.prepare(`UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`).bind(r,h.user_id).run(),await m.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
          VALUES (?, 'deduct', ?, ?, 'image_generation', ?)`).bind(h.user_id,-n,r,`gen_${Date.now()}`).run(),console.log(`[Credits] ${h.name}: ${h.credits} → ${r} (-${n})`)}let g=tt(l),_=nt(u);console.log(`Model ID:`,t,`| BG ID:`,i),console.log(`Ratio:`,g,`| Resolution:`,_),console.log(`Clothing:`,f?f.substring(0,60)+`...`:`none`);let v={전신:`full body shot`,반신:`half body shot`,상반신:`upper body shot`},y={정면:`facing camera, natural standing pose`,측면:`3/4 angle, elegant slight turn`,워킹:`dynamic walking pose, confident stride`,정적:`elegant static pose, hands relaxed at sides`},b=v[s]||`full body shot`,x=y[c]||`natural standing pose`,S=null,C=null,w=e.env?.LOOKBOOK_KV;if(t){let e=String(t);if(w){let t=await w.get(`model_img:${e}`);t&&(S=t,console.log(`KV custom model: OK`))}else if(m){let t=await Be(m,e);t&&(S=t,console.log(`D1 custom model: OK`))}else{let t=Q.find(t=>t.id===e);t?.imageBase64&&(S=t.imageBase64,console.log(`Mem custom model: OK`))}S||console.log(`Custom model image not found for id:`,e)}if(i){let e=String(i);if(w){let t=await w.get(`bg_img:${e}`);t&&(C=t,console.log(`KV custom bg: OK`))}else if(m){let t=await We(m,e);t&&(C=t,console.log(`D1 custom bg: OK`))}else{let t=$.find(t=>t.id===e);t?.imageBase64&&(C=t.imageBase64,console.log(`Mem custom bg: OK`))}C||console.log(`Custom bg image not found for id:`,e)}let T=[`ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,`1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,`2. DO NOT alter the model's facial geometry, facial bone structure, eye shape, nose shape, lip shape, or hair style. NOTE: skin brightness and color temperature MAY be adjusted to match the scene's lighting — this is required for natural integration.`,`3. DO NOT change, redesign, or substitute ANY detail of the clothing: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown in the reference.`,`4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,`Ultra-photorealistic, 8K quality, professional fashion editorial, magazine cover quality.`].join(` `),E=[];Array.isArray(p)&&p.length>0?E=p.filter(e=>e?.dataUrl?.startsWith(`data:`)):f&&f.startsWith(`data:`)&&(E=[{dataUrl:f,category:`TOP`,label:`clothing item`}]),console.log(`Clothing items:`,E.map(e=>`[${e.category}]`).join(`, `)||`none`),console.log(`Model ID:`,t,`| BG ID:`,i);let D=[],ee=[`DRESS`,`TOP`,`BOTTOM`,`OUTER`,`UNKNOWN`],O=[...E].sort((e,t)=>ee.indexOf(e.category)-ee.indexOf(t.category));O.forEach(e=>D.push(e.dataUrl));let k=O.length,A=k+1,j=k+ +!!S+1;S&&D.push(S),C&&D.push(C),console.log(`images 배열: 의류${k}장 | 모델${+!!S}장 | 배경${+!!C}장 | 총${D.length}장`);let M=``,N=!!C,P=!!S,F=k>0;if(F&&P&&N){console.log(`[단일 단계] 의상+얼굴+신원 통합 합성 시작`);let e=it(O.map(e=>({...e})),1),t=at(O,1);M=[`COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,e,`Image ${A} = IDENTITY DONOR. Extract: facial geometry (jawline, eye socket, nose, lips, cheekbones), eye details (shape/iris/lash), hair (color/volume/cut/style), and full-body skin undertone (hue + warmth + texture). DO NOT use body shape, clothing, or pose from this image.`,`Image ${j} = SCENE ANCHOR. This scene defines: background environment, all objects, scene lighting direction/color-temperature/intensity, color grade, and mood. LOCKED: background, all scene objects.`,`CLOTHING REPLACEMENT:`,t,`Body pose may shift slightly so the new clothing fits naturally (minor arm/stance adjustments only).`,`IDENTITY & FACE TRANSPLANT (from Image ${A}):`,`  · Transplant the FACIAL GEOMETRY exactly: jawline, cheekbone position, eye socket shape, nose bridge/tip, lip shape, overall facial proportions.`,`  · Transplant EYE DETAILS exactly: eye shape, lid type, iris color, lash density.`,`  · Transplant HAIR exactly: color (root-to-tip gradient), volume, texture, cut, style.`,`  · Apply the skin UNDERTONE (warm/cool/neutral base hue) from Image ${A} to ALL exposed skin uniformly — face, neck, décolletage, shoulders, arms, hands — ZERO tone mismatch across the body.`,`SCENE LIGHTING INTEGRATION (from Image ${j} — critical for photorealism):`,`  Re-light ALL elements (clothing, face, skin) under Image ${j}'s physical lighting environment:`,`  · BRIGHTNESS: Match face and skin brightness to the scene's ambient light level. Bright scene → bright face; moody/dim scene → face lit accordingly.`,`  · LIGHT DIRECTION: Apply the scene's key light direction. Highlights land on the correct side of the face (forehead, cheekbone, nose bridge), shadows fall on the opposite side.`,`  · COLOR TEMPERATURE: Tint face, skin, and clothing under the scene's color temperature (warm golden-hour tint, cool blue shade, neutral studio white, etc.). Do NOT render any element under a different white balance from the scene.`,`  · SHADOW QUALITY: Hard shadows in direct sunlight; soft wrap-around shadows in diffuse/cloudy/studio light — match the scene exactly.`,`  · CATCH-LIGHTS: Eyes must reflect Image ${j}'s light source position and shape.`,`  · FABRIC RENDERING: Simulate specular highlights on shiny fabrics, soft diffuse on matte, translucency on thin materials — all under the scene's light.`,`  · SUBSURFACE SCATTERING: Realistic skin SSS under scene light (warm ears/nose in backlit; strong SSS in diffuse light).`,`  · FACE-TO-NECK SEAM: The face-to-neck boundary must be seamless — same lighting falloff, same color temperature, no hard edge or tone jump.`,`  · HAIR INTEGRATION: Hair receives the scene's ambient + key light. Rim/backlight if present in the scene. Flyaways lit naturally.`,`FINAL OUTPUT: One seamless, ultra-photorealistic fashion photograph. The new clothing is worn by Image ${A}'s identity — face, hair, and full-body skin re-lit under Image ${j}'s scene. Result looks like this person was photographed in the original scene wearing the specified outfit — zero compositing artifacts.`,`8K resolution, magazine editorial quality.`,T].join(` `)}else if(F&&P&&!N){let e=it(O.map(e=>({...e})),1),t=at(O,1);M=[`Create a hyper-realistic professional fashion lookbook photograph.`,e,`Image ${A} = MODEL IDENTITY — preserve this exact person's face, hair, skin tone, body proportions exactly.`,t,`Show a ${b}, ${x}.`,`Background: ${o} (${a}). Create a photorealistic environment. Integrate the model naturally with correct lighting and shadows.`,T].join(` `)}else if(F&&!P&&N){let e=it(O.map(e=>({...e})),1),t=at(O,1);M=[`You are doing a CLOTHING SWAP on a fashion background scene.`,e,`Image ${j} = SOURCE BACKGROUND SCENE containing a person. Keep the scene and person EXACTLY as-is — same face, same pose, same stance, same body position.`,t,`FINAL RESULT: Same scene, same person, same pose — only the specified clothing items are replaced. Natural lighting, seamless integration.`,T].join(` `)}else if(F&&!P&&!N){let e=it(O.map(e=>({...e})),1),t=at(O,1);M=[`Create a hyper-realistic professional fashion lookbook photograph.`,e,`Model: ${r}. Show in a ${b}, ${x}.`,t,`Background: ${o} (${a}). Photorealistic environment with correct lighting and shadows.`,T].join(` `)}else M=[`Ultra-photorealistic professional fashion photography.`,`A ${r} fashion model, ${b}, ${x}.`,`Background: ${o} (${a}). Natural lighting, seamless scene integration.`,`8K resolution, Canon EOS R5, professional lighting, hyperrealistic skin texture, perfect fabric detail, commercial fashion editorial, magazine quality.`,T].join(` `);M=Me(M),console.log(`Prompt (first 300):`,M.substring(0,300)),console.log(`images count:`,D.length,`| mode:`,D.length>=3?`FULL(clothing+model+bg)`:D.length===2?`PARTIAL`:D.length===1?`CLOTHING_ONLY`:`TEXT`);let I={model:`google/nano-banana-2/edit`,prompt:M,aspect_ratio:g,resolution:_,thinking_level:`default`,output_format:`jpeg`};D.length>0&&(I.images=D),console.log(`Final prompt (first 300):`,M.substring(0,300)),console.log(`Atlas request → model:`,I.model,`| images:`,D.length,`| aspect_ratio:`,g,`| resolution:`,_,`| jobs:`,1);let te=Array.from({length:1},()=>fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify(I)}).then(e=>e.json())),L=await Promise.all(te);console.log(`Atlas responses:`,L.map(e=>`${e.code}:${e.data?.id}`).join(`, `));let R=L.filter(e=>e.code===200&&e.data?.id).map(e=>e.data.id);if(R.length===0){let t=L[0];console.error(`All Atlas requests failed:`,t);let n=`fallback_`+Math.random().toString(36).substr(2,9);return e.json({jobId:n,estimatedSeconds:5,status:`queued`,isFallback:!0,error:t?.msg||t?.message||`Atlas API error`})}let ne=h?h.credits-d*ot:void 0;return e.json({jobId:R.join(`,`),estimatedSeconds:30,status:`queued`,isFallback:!1,creditsUsed:h?d*ot:void 0,creditsRemaining:ne})}catch(t){console.error(`Generation start error:`,t);let n=`fallback_`+Math.random().toString(36).substr(2,9);return e.json({jobId:n,estimatedSeconds:5,status:`queued`,isFallback:!0,error:t.message})}}),G.get(`/api/generation/:jobId/status`,async e=>{let t=e.req.param(`jobId`);if(t.startsWith(`fallback_`)){let t=st(4);return e.json({status:`completed`,progress:100,images:t,isFallback:!0})}let n=t.split(`,`).filter(Boolean);try{let t=await Promise.all(n.map(e=>fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json())));console.log(`Poll statuses:`,t.map(e=>`${e.data?.id?.substring(0,8)}:${e.data?.status}`).join(`, `));let r=new Set([`completed`,`succeeded`,`failed`,`timeout`,`canceled`,`error`]),i=t.every(e=>r.has(e.data?.status));if(t.some(e=>!r.has(e.data?.status)),!i){let n=t.filter(e=>r.has(e.data?.status)).length,i=t.length,a=Math.round(20+n/i*60);return e.json({status:`processing`,progress:a,images:[]})}let a=[];if(t.forEach((e,t)=>{let n=e.data?.status,r=e.data?.outputs??e.data?.output??e.data?.images??e.data?.result??null,i=Array.isArray(r)?r.filter(e=>typeof e==`string`&&e.startsWith(`http`)):typeof r==`string`&&r.startsWith(`http`)?[r]:[];console.log(`Job ${t} status:${n} urls:`,i),(n===`completed`||n===`succeeded`)&&i.length>0&&i.forEach((e,t)=>{a.push({id:`result_${a.length+1}`,url:e,title:`AI 피팅컷 #${a.length+1}`})})}),a.length===0){console.error(`All jobs failed:`,t.map(e=>e.data?.status).join(`, `));let n=st(4);return e.json({status:`completed`,progress:100,images:n,isFallback:!0,error:`All jobs failed`})}return e.json({status:`completed`,progress:100,images:a,isFallback:!1})}catch(t){console.error(`Poll error:`,t);let n=st(4);return e.json({status:`completed`,progress:100,images:n,isFallback:!0,error:t.message})}});function st(e){let t=[[`#FF6B9D`,`#FF8C42`],[`#6C47FF`,`#00D4AA`],[`#FF6B9D`,`#6C47FF`],[`#F59E0B`,`#EF4444`]];return Array.from({length:e},(e,n)=>({id:`placeholder_${n+1}`,url:null,placeholder:!0,gradient:`linear-gradient(135deg, ${t[n%t.length][0]}, ${t[n%t.length][1]})`,title:`AI 피팅컷 #${n+1}`,width:832,height:1216}))}G.get(`/api/admin/prompt`,J,e=>e.json({success:!0,config:Y})),G.put(`/api/admin/prompt`,J,async e=>{try{let t=await e.req.json();return Y={enabled:typeof t.enabled==`boolean`?t.enabled:Y.enabled,prefix:typeof t.prefix==`string`?t.prefix:Y.prefix,suffix:typeof t.suffix==`string`?t.suffix:Y.suffix,styleGuide:typeof t.styleGuide==`string`?t.styleGuide:Y.styleGuide,technicalSpec:typeof t.technicalSpec==`string`?t.technicalSpec:Y.technicalSpec,updatedAt:new Date().toISOString()},console.log(`Admin prompt config updated:`,Y.updatedAt),e.json({success:!0,config:Y})}catch(t){return e.json({success:!1,message:t.message},400)}}),G.post(`/api/admin/auth`,async e=>{let t=await e.req.json(),n=e.env.ADMIN_PASSWORD||`sa3325`;return t.password===n?e.json({success:!0}):e.json({success:!1,message:`비밀번호가 올바르지 않습니다.`},401)});var ct=(e,t)=>`<!DOCTYPE html>
@@ -242,7 +246,7 @@ ${t}
                 <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
@@ -618,248 +622,344 @@ ${t}
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="#" style="color:var(--primary);">이용약관</a> 및 <a href="#" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
-  `))}),G.get(`/dashboard`,e=>e.html(ct(`대시보드`,`
+  `))}),G.get(`/dashboard`,e=>e.html(ct(`내 프로필`,`
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Navbar -->
-  <nav id="navbar">
-    <div class="navbar-inner">
-      <a href="/" class="navbar-logo">
-        <div class="logo-icon">✨</div>
-        <span>LookbookAI</span>
+  <style>
+    body { background: #0d0d1a; }
+
+    .db-wrap {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px 80px;
+      background: #0d0d1a;
+    }
+
+    /* ── 프로필 카드 ── */
+    .db-card {
+      width: 100%;
+      max-width: 420px;
+      background: #16162a;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      margin-bottom: 16px;
+    }
+
+    /* 상단 헤더 (아바타 + 이름) */
+    .db-card-header {
+      padding: 32px 28px 24px;
+      border-bottom: 1px solid #2a2a45;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .db-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6c47ff, #a855f7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(108,71,255,0.4);
+    }
+    .db-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f0f0f8;
+      margin-bottom: 3px;
+    }
+    .db-email {
+      font-size: 13px;
+      color: #8b8ba0;
+    }
+
+    /* 크레딧 행 */
+    .db-credit-row {
+      padding: 20px 28px;
+      border-bottom: 1px solid #2a2a45;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .db-credit-label {
+      font-size: 13px;
+      color: #8b8ba0;
+      margin-bottom: 4px;
+    }
+    .db-credit-val {
+      font-size: 22px;
+      font-weight: 800;
+      color: #6c47ff;
+    }
+    .db-credit-sub {
+      font-size: 11px;
+      color: #8b8ba0;
+      margin-top: 2px;
+    }
+    .db-charge-btn {
+      padding: 9px 20px;
+      background: #6c47ff;
+      color: white;
+      border: none;
+      border-radius: 24px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .db-charge-btn:hover { background: #7c57ff; }
+
+    /* 메뉴 항목 */
+    .db-menu-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 28px;
+      cursor: pointer;
+      border-bottom: 1px solid #2a2a45;
+      text-decoration: none;
+      transition: background 0.12s;
+    }
+    .db-menu-item:last-child { border-bottom: none; }
+    .db-menu-item:hover { background: #1e1e35; }
+    .db-menu-label {
+      font-size: 15px;
+      color: #e0e0f0;
+      font-weight: 500;
+    }
+    .db-menu-arrow {
+      font-size: 18px;
+      color: #5a5a7a;
+    }
+
+    /* 로그아웃 카드 */
+    .db-logout-card {
+      width: 100%;
+      max-width: 420px;
+      background: #16162a;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+    .db-logout-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 18px 28px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .db-logout-btn:hover { background: #1e1e35; }
+    .db-logout-label {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ef4444;
+    }
+
+    /* 로고 */
+    .db-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 32px;
+      text-decoration: none;
+    }
+    .db-logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg,#6c47ff,#a855f7);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .db-logo-text {
+      font-size: 18px;
+      font-weight: 800;
+      color: #f0f0f8;
+    }
+
+    /* 생성하러 가기 버튼 */
+    .db-gen-btn {
+      width: 100%;
+      max-width: 420px;
+      margin-top: 16px;
+      padding: 16px;
+      background: linear-gradient(135deg,#6c47ff,#a855f7);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .db-gen-btn:hover { opacity: 0.9; }
+  </style>
+
+  <div class="db-wrap">
+
+    <!-- 로고 -->
+    <a href="/" class="db-logo">
+      <div class="db-logo-icon">✨</div>
+      <span class="db-logo-text">LookbookAI</span>
+    </a>
+
+    <!-- 메인 카드 -->
+    <div class="db-card">
+
+      <!-- 프로필 헤더 -->
+      <div class="db-card-header">
+        <div class="db-avatar" id="dbAvatar">?</div>
+        <div>
+          <div class="db-name" id="dbName">로딩 중...</div>
+          <div class="db-email" id="dbEmail"></div>
+        </div>
+      </div>
+
+      <!-- 크레딧 -->
+      <div class="db-credit-row">
+        <div>
+          <div class="db-credit-label">현재 크레딧</div>
+          <div class="db-credit-val" id="dbCredits">-</div>
+          <div class="db-credit-sub">이미지 1장 = 90크레딧</div>
+        </div>
+        <button class="db-charge-btn" onclick="showToast('크레딧 충전 서비스 준비 중입니다 🔜','info')">충전</button>
+      </div>
+
+      <!-- 생성 내역 -->
+      <a href="/dashboard#history" class="db-menu-item" id="menuHistory">
+        <span class="db-menu-label">생성 내역</span>
+        <span class="db-menu-arrow">›</span>
       </a>
-      <div class="navbar-nav">
-        <a href="/dashboard" style="color:var(--primary);font-weight:600;">대시보드</a>
-        <a href="/generator">새 프로젝트</a>
-      </div>
-      <div class="navbar-actions" style="position:relative;">
-        <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')">로그인</button>
-        <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')">무료 시작</button>
-        <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
-          <span id="navUserCredits" style="display:none;"></span>
-          <span id="navUserName" style="display:none;"></span>
-          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:2000;">
-            <div style="padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;">
-              <div id="ddUserName" style="font-size:14px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
-              <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
-              </div>
-            </div>
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
-            <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
-          </div>
-        </div>
-      </div>
+
+      <!-- 카톡 문의 -->
+      <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" class="db-menu-item">
+        <span class="db-menu-label">카톡 문의</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
     </div>
-  </nav>
 
-  <div id="dashboard-page">
-    <div class="dashboard-layout">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-section">
-          <div class="sidebar-label">메인</div>
-          <button class="sidebar-item active" onclick="switchTab('my-projects')">
-            <span class="icon">📁</span> 내 프로젝트
-            <span class="badge badge-primary">4</span>
-          </button>
-          <button class="sidebar-item" onclick="switchTab('favorites')">
-            <span class="icon">❤️</span> 즐겨찾기
-          </button>
-          <button class="sidebar-item" onclick="switchTab('downloads')">
-            <span class="icon">⬇️</span> 다운로드 내역
-          </button>
+    <!-- 로그아웃 카드 -->
+    <div class="db-logout-card">
+      <button class="db-logout-btn" onclick="handleLogout()">
+        <span class="db-logout-label">로그아웃</span>
+        <span style="font-size:18px;color:#ef4444;">›</span>
+      </button>
+    </div>
+
+    <!-- 이미지 생성 바로가기 -->
+    <a href="/generator" class="db-gen-btn">
+      <i class="fas fa-wand-magic-sparkles"></i> 이미지 생성 바로가기
+    </a>
+
+  </div>
+
+  <!-- 생성 내역 패널 (해시 #history) -->
+  <div id="historyPanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;overflow-y:auto;">
+    <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:28px;">
+        <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">‹</button>
+        <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">생성 내역</h2>
+      </div>
+      <div id="historyList" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
+          <div style="font-size:40px;margin-bottom:12px;">🎨</div>
+          생성 내역을 불러오는 중...
         </div>
-        <div class="sidebar-section">
-          <div class="sidebar-label">설정</div>
-          <button class="sidebar-item" onclick="switchTab('billing')">
-            <span class="icon">💳</span> 요금제 &amp; 결제
-          </button>
-          <button class="sidebar-item" onclick="switchTab('settings')">
-            <span class="icon">⚙️</span> 계정 설정
-          </button>
-        </div>
-        <div class="sidebar-credit">
-          <div class="credit-label">✨ 남은 크레딧</div>
-          <div class="credit-amount" id="sidebarCreditAmount">-</div>
-          <div class="credit-sub">크레딧 (이미지 생성 1회 = 90크레딧)</div>
-          <button class="btn btn-primary btn-sm" style="margin-top:12px;width:100%;" onclick="showToast('요금제 페이지로 이동합니다.','info')">크레딧 충전</button>
-        </div>
-      </aside>
-
-      <!-- Main Content -->
-      <main class="dashboard-main">
-        <!-- Tab: My Projects -->
-        <div id="tab-my-projects" class="tab-content">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">내 프로젝트</h1>
-              <p class="dashboard-sub">생성한 AI 룩북 프로젝트를 관리하세요.</p>
-            </div>
-            <a href="/generator" class="btn btn-primary">
-              <i class="fas fa-plus"></i> 새 프로젝트
-            </a>
-          </div>
-
-          <!-- Stats -->
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-label">총 프로젝트</div>
-              <div class="stat-value">4</div>
-              <div class="stat-change up">↑ 이번 달 2개 추가</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">생성된 이미지</div>
-              <div class="stat-value">12</div>
-              <div class="stat-change up">↑ 지난달 대비 50%</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">다운로드 횟수</div>
-              <div class="stat-value">8</div>
-              <div class="stat-change up">↑ 이번 주 3회</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">남은 크레딧</div>
-              <div class="stat-value" style="color:var(--primary);" id="dashCreditStat">-</div>
-              <div class="stat-change">1,000크레딧 플랜</div>
-            </div>
-          </div>
-
-          <!-- Projects Toolbar -->
-          <div class="projects-toolbar">
-            <div class="toolbar-left">
-              <div class="search-box">
-                <i class="fas fa-search" style="color:var(--text-muted);font-size:13px;"></i>
-                <input type="text" placeholder="프로젝트 검색..." id="projectSearch" oninput="filterProjects()" />
-              </div>
-              <button class="filter-btn active" onclick="filterByStatus('all', this)">전체</button>
-              <button class="filter-btn" onclick="filterByStatus('done', this)">완료</button>
-              <button class="filter-btn" onclick="filterByStatus('processing', this)">생성중</button>
-              <button class="filter-btn" onclick="filterByStatus('draft', this)">초안</button>
-            </div>
-          </div>
-
-          <!-- Projects Grid -->
-          <div class="projects-grid" id="projectsGrid">
-            <!-- New Project Card -->
-            <div class="new-project-card" onclick="window.location.href='/generator'">
-              <div class="new-project-icon">+</div>
-              <div class="new-project-text">새 프로젝트 생성</div>
-              <div style="font-size:13px;color:var(--text-muted);">의류 이미지를 업로드하고<br />AI 룩북을 만들어보세요</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab: Favorites -->
-        <div id="tab-favorites" class="tab-content hidden">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">즐겨찾기</h1>
-              <p class="dashboard-sub">즐겨찾기한 이미지를 모아보세요.</p>
-            </div>
-          </div>
-          <div style="text-align:center;padding:80px;color:var(--text-muted);">
-            <div style="font-size:64px;margin-bottom:16px;">❤️</div>
-            <h3 style="margin-bottom:8px;">즐겨찾기한 이미지가 없습니다</h3>
-            <p style="font-size:14px;">결과 이미지에서 하트 버튼을 눌러 즐겨찾기에 추가하세요.</p>
-          </div>
-        </div>
-
-        <!-- Tab: Downloads -->
-        <div id="tab-downloads" class="tab-content hidden">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">다운로드 내역</h1>
-              <p class="dashboard-sub">다운로드한 이미지 내역을 확인하세요.</p>
-            </div>
-          </div>
-          <div style="background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;">
-            <table style="width:100%;border-collapse:collapse;">
-              <thead>
-                <tr style="border-bottom:1px solid var(--border);">
-                  <th style="padding:16px;text-align:left;font-size:13px;color:var(--text-muted);">프로젝트</th>
-                  <th style="padding:16px;text-align:left;font-size:13px;color:var(--text-muted);">파일명</th>
-                  <th style="padding:16px;text-align:left;font-size:13px;color:var(--text-muted);">날짜</th>
-                  <th style="padding:16px;text-align:left;font-size:13px;color:var(--text-muted);">크기</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:16px;font-size:14px;">2024 S/S 룩북</td>
-                  <td style="padding:16px;font-size:14px;color:var(--primary);">lookbook_001.png</td>
-                  <td style="padding:16px;font-size:14px;color:var(--text-muted);">2024-03-15</td>
-                  <td style="padding:16px;font-size:14px;color:var(--text-muted);">2.4 MB</td>
-                </tr>
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:16px;font-size:14px;">캐주얼 티셔츠 컷</td>
-                  <td style="padding:16px;font-size:14px;color:var(--primary);">fitting_set_001.zip</td>
-                  <td style="padding:16px;font-size:14px;color:var(--text-muted);">2024-03-12</td>
-                  <td style="padding:16px;font-size:14px;color:var(--text-muted);">8.1 MB</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Tab: Billing -->
-        <div id="tab-billing" class="tab-content hidden">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">요금제 &amp; 결제</h1>
-            </div>
-          </div>
-          <div style="background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:var(--radius-xl);padding:32px;color:white;margin-bottom:24px;">
-            <div style="font-size:13px;opacity:0.8;margin-bottom:8px;">현재 플랜</div>
-            <div style="font-size:28px;font-weight:800;margin-bottom:8px;">Pro 플랜</div>
-            <div style="font-size:14px;opacity:0.8;">다음 결제일: 2024-04-15 | ₩49,000/월</div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-            <div style="background:var(--white);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border);">
-              <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">이번 달 크레딧 사용</div>
-              <div style="font-size:32px;font-weight:800;">76 / 100</div>
-              <div style="height:8px;background:var(--border);border-radius:4px;margin-top:12px;overflow:hidden;">
-                <div style="width:76%;height:100%;background:var(--primary);border-radius:4px;"></div>
-              </div>
-            </div>
-            <div style="background:var(--white);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border);">
-              <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">남은 크레딧</div>
-              <div style="font-size:32px;font-weight:800;color:var(--primary);" id="dashCreditDetail">-</div>
-              <button class="btn btn-primary btn-sm" style="margin-top:12px;">크레딧 추가 구매</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab: Settings -->
-        <div id="tab-settings" class="tab-content hidden">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">계정 설정</h1>
-            </div>
-          </div>
-          <div style="background:var(--white);border-radius:var(--radius-xl);padding:32px;border:1px solid var(--border);max-width:560px;">
-            <div class="form-group">
-              <label class="form-label">이름</label>
-              <input class="form-input" value="패션 셀러" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">이메일</label>
-              <input class="form-input" value="seller@fashion.com" type="email" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">비밀번호 변경</label>
-              <input class="form-input" placeholder="새 비밀번호" type="password" />
-            </div>
-            <button class="btn btn-primary" onclick="showToast('설정이 저장되었습니다.','success')">저장하기</button>
-          </div>
-        </div>
-      </main>
+      </div>
     </div>
   </div>
+
+  <script>
+  // ── 대시보드 초기화 ──
+  document.addEventListener('DOMContentLoaded', async () => {
+    await verifySession();
+    const user = AppState.user;
+    if (!user) {
+      window.location.href = '/';
+      return;
+    }
+    // 프로필 채우기
+    const initial = (user.name || user.email || '?')[0].toUpperCase();
+    document.getElementById('dbAvatar').textContent = initial;
+    document.getElementById('dbName').textContent   = user.name || user.email;
+    document.getElementById('dbEmail').textContent  = user.email || '';
+    document.getElementById('dbCredits').textContent = (user.credits ?? 0).toLocaleString();
+
+    // 해시 처리
+    if (location.hash === '#history') openHistory();
+    document.getElementById('menuHistory').addEventListener('click', (e) => {
+      e.preventDefault();
+      openHistory();
+    });
+  });
+
+  function openHistory() {
+    history.replaceState(null,'','/dashboard#history');
+    document.getElementById('historyPanel').style.display = 'block';
+    loadHistory();
+  }
+
+  async function loadHistory() {
+    const list = document.getElementById('historyList');
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
+    try {
+      const token = localStorage.getItem('lookbook_token') || '';
+      const res = await fetch('/api/credits/history', {
+        headers: { 'X-Session-Token': token }
+      });
+      if (!res.ok) throw new Error('서버 오류');
+      const data = await res.json();
+      const logs = data.logs || [];
+      if (!logs.length) {
+        list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요</div>';
+        return;
+      }
+      list.innerHTML = logs.map(log => {
+        const isDeduct = log.amount < 0;
+        const dateStr  = log.created_at ? log.created_at.slice(0,16).replace('T',' ') : '';
+        const reasonLabel = {
+          'image_generation': '이미지 생성',
+          'admin_grant':      '크레딧 지급',
+          'admin_set':        '크레딧 설정',
+          'signup_bonus':     '가입 보너스',
+        }[log.reason] || log.reason;
+        return \`<div style="background:#1e1e35;border-radius:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#e0e0f0;margin-bottom:4px;">\${reasonLabel}</div>
+            <div style="font-size:11px;color:#5a5a7a;">\${dateStr}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:16px;font-weight:800;color:\${isDeduct ? '#ef4444' : '#22c55e'};">\${isDeduct ? '' : '+'}\${log.amount.toLocaleString()}</div>
+            <div style="font-size:11px;color:#5a5a7a;">잔액 \${log.balance.toLocaleString()}</div>
+          </div>
+        </div>\`;
+      }).join('');
+    } catch (e) {
+      list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
+    }
+  }
+  <\/script>
   `))),G.get(`/generator`,e=>e.html(ct(`AI 룩북 생성`,`
   <div class="toast-container" id="toastContainer"></div>
 
@@ -899,7 +999,7 @@ ${t}
                 <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>

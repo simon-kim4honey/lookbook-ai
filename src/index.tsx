@@ -791,11 +791,11 @@ app.post('/api/auth/signup', async (c) => {
     const hash = await hashPassword(password)
     await db.prepare(`
       INSERT INTO users (id, email, name, password_hash, provider, status, credits, role)
-      VALUES (?, ?, ?, ?, 'email', 'active', 5, 'user')
+      VALUES (?, ?, ?, ?, 'email', 'active', 1000, 'user')
     `).bind(id, email.toLowerCase(), name, hash).run()
 
     const token = await createSession(db, id)
-    const user = { id, name, email: email.toLowerCase(), role: 'user', credits: 5, avatar_url: null, provider: 'email' }
+    const user = { id, name, email: email.toLowerCase(), role: 'user', credits: 1000, avatar_url: null, provider: 'email' }
     return c.json({ success: true, user, token })
   } catch (err: any) {
     console.error('signup error:', err)
@@ -919,7 +919,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
       } else {
         // 신규 생성
         const id = genUserId()
-        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 5, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
+        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 1000, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
       }
     }
@@ -1031,7 +1031,7 @@ app.get('/api/auth/google/callback', async (c) => {
         await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(providerId, googleAvatar, user.id).run()
       } else {
         const id = genUserId()
-        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 5, 'user')`).bind(id, googleEmail, googleName, providerId, googleAvatar).run()
+        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 1000, 'user')`).bind(id, googleEmail, googleName, providerId, googleAvatar).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
       }
     }
@@ -1218,6 +1218,34 @@ app.get('/api/admin/stats', adminAuth, async (c) => {
       suspended: suspended?.cnt || 0, today: today?.cnt || 0,
       by_provider: { kakao: kakao?.cnt || 0, google: google?.cnt || 0, email: email?.cnt || 0 }
     }})
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// Credits History API — 내 크레딧 사용 내역
+// ────────────────────────────────────────────────────
+app.get('/api/credits/history', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
+
+    const logs = await db.prepare(
+      `SELECT type, amount, balance, reason, ref_id, created_at
+       FROM credit_logs
+       WHERE user_id = ?
+       ORDER BY created_at DESC
+       LIMIT 100`
+    ).bind(sess.user_id).all()
+
+    return c.json({ success: true, logs: logs.results || [] })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -2214,7 +2242,7 @@ app.get('/', (c) => {
                 <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
@@ -2595,250 +2623,347 @@ app.get('/', (c) => {
 
 // ─── Dashboard Page ───
 app.get('/dashboard', (c) => {
-  return c.html(htmlShell('대시보드', `
+  return c.html(htmlShell('내 프로필', `
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Navbar -->
-  <nav id="navbar">
-    <div class="navbar-inner">
-      <a href="/" class="navbar-logo">
-        <div class="logo-icon">✨</div>
-        <span>LookbookAI</span>
+  <style>
+    body { background: #0d0d1a; }
+
+    .db-wrap {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px 80px;
+      background: #0d0d1a;
+    }
+
+    /* ── 프로필 카드 ── */
+    .db-card {
+      width: 100%;
+      max-width: 420px;
+      background: #16162a;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      margin-bottom: 16px;
+    }
+
+    /* 상단 헤더 (아바타 + 이름) */
+    .db-card-header {
+      padding: 32px 28px 24px;
+      border-bottom: 1px solid #2a2a45;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .db-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6c47ff, #a855f7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 800;
+      color: white;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(108,71,255,0.4);
+    }
+    .db-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f0f0f8;
+      margin-bottom: 3px;
+    }
+    .db-email {
+      font-size: 13px;
+      color: #8b8ba0;
+    }
+
+    /* 크레딧 행 */
+    .db-credit-row {
+      padding: 20px 28px;
+      border-bottom: 1px solid #2a2a45;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .db-credit-label {
+      font-size: 13px;
+      color: #8b8ba0;
+      margin-bottom: 4px;
+    }
+    .db-credit-val {
+      font-size: 22px;
+      font-weight: 800;
+      color: #6c47ff;
+    }
+    .db-credit-sub {
+      font-size: 11px;
+      color: #8b8ba0;
+      margin-top: 2px;
+    }
+    .db-charge-btn {
+      padding: 9px 20px;
+      background: #6c47ff;
+      color: white;
+      border: none;
+      border-radius: 24px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .db-charge-btn:hover { background: #7c57ff; }
+
+    /* 메뉴 항목 */
+    .db-menu-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 28px;
+      cursor: pointer;
+      border-bottom: 1px solid #2a2a45;
+      text-decoration: none;
+      transition: background 0.12s;
+    }
+    .db-menu-item:last-child { border-bottom: none; }
+    .db-menu-item:hover { background: #1e1e35; }
+    .db-menu-label {
+      font-size: 15px;
+      color: #e0e0f0;
+      font-weight: 500;
+    }
+    .db-menu-arrow {
+      font-size: 18px;
+      color: #5a5a7a;
+    }
+
+    /* 로그아웃 카드 */
+    .db-logout-card {
+      width: 100%;
+      max-width: 420px;
+      background: #16162a;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+    .db-logout-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 18px 28px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .db-logout-btn:hover { background: #1e1e35; }
+    .db-logout-label {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ef4444;
+    }
+
+    /* 로고 */
+    .db-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 32px;
+      text-decoration: none;
+    }
+    .db-logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg,#6c47ff,#a855f7);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .db-logo-text {
+      font-size: 18px;
+      font-weight: 800;
+      color: #f0f0f8;
+    }
+
+    /* 생성하러 가기 버튼 */
+    .db-gen-btn {
+      width: 100%;
+      max-width: 420px;
+      margin-top: 16px;
+      padding: 16px;
+      background: linear-gradient(135deg,#6c47ff,#a855f7);
+      color: white;
+      border: none;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .db-gen-btn:hover { opacity: 0.9; }
+  </style>
+
+  <div class="db-wrap">
+
+    <!-- 로고 -->
+    <a href="/" class="db-logo">
+      <div class="db-logo-icon">✨</div>
+      <span class="db-logo-text">LookbookAI</span>
+    </a>
+
+    <!-- 메인 카드 -->
+    <div class="db-card">
+
+      <!-- 프로필 헤더 -->
+      <div class="db-card-header">
+        <div class="db-avatar" id="dbAvatar">?</div>
+        <div>
+          <div class="db-name" id="dbName">로딩 중...</div>
+          <div class="db-email" id="dbEmail"></div>
+        </div>
+      </div>
+
+      <!-- 크레딧 -->
+      <div class="db-credit-row">
+        <div>
+          <div class="db-credit-label">현재 크레딧</div>
+          <div class="db-credit-val" id="dbCredits">-</div>
+          <div class="db-credit-sub">이미지 1장 = 90크레딧</div>
+        </div>
+        <button class="db-charge-btn" onclick="showToast('크레딧 충전 서비스 준비 중입니다 🔜','info')">충전</button>
+      </div>
+
+      <!-- 생성 내역 -->
+      <a href="/dashboard#history" class="db-menu-item" id="menuHistory">
+        <span class="db-menu-label">생성 내역</span>
+        <span class="db-menu-arrow">›</span>
       </a>
-      <div class="navbar-nav">
-        <a href="/dashboard" style="color:var(--primary);font-weight:600;">대시보드</a>
-        <a href="/generator">새 프로젝트</a>
-      </div>
-      <div class="navbar-actions" style="position:relative;">
-        <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')">로그인</button>
-        <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')">무료 시작</button>
-        <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
-          <span id="navUserCredits" style="display:none;"></span>
-          <span id="navUserName" style="display:none;"></span>
-          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:2000;">
-            <div style="padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;">
-              <div id="ddUserName" style="font-size:14px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
-              <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
-              </div>
-            </div>
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
-            <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
-          </div>
-        </div>
-      </div>
+
+      <!-- 카톡 문의 -->
+      <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" class="db-menu-item">
+        <span class="db-menu-label">카톡 문의</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
     </div>
-  </nav>
 
-  <div id="dashboard-page">
-    <div class="dashboard-layout">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-section">
-          <div class="sidebar-label">메인</div>
-          <button class="sidebar-item active" onclick="switchTab('my-projects')">
-            <span class="icon">📁</span> 내 프로젝트
-            <span class="badge badge-primary">4</span>
-          </button>
-          <button class="sidebar-item" onclick="switchTab('favorites')">
-            <span class="icon">❤️</span> 즐겨찾기
-          </button>
-          <button class="sidebar-item" onclick="switchTab('downloads')">
-            <span class="icon">⬇️</span> 다운로드 내역
-          </button>
+    <!-- 로그아웃 카드 -->
+    <div class="db-logout-card">
+      <button class="db-logout-btn" onclick="handleLogout()">
+        <span class="db-logout-label">로그아웃</span>
+        <span style="font-size:18px;color:#ef4444;">›</span>
+      </button>
+    </div>
+
+    <!-- 이미지 생성 바로가기 -->
+    <a href="/generator" class="db-gen-btn">
+      <i class="fas fa-wand-magic-sparkles"></i> 이미지 생성 바로가기
+    </a>
+
+  </div>
+
+  <!-- 생성 내역 패널 (해시 #history) -->
+  <div id="historyPanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;overflow-y:auto;">
+    <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:28px;">
+        <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">‹</button>
+        <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">생성 내역</h2>
+      </div>
+      <div id="historyList" style="display:flex;flex-direction:column;gap:12px;">
+        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
+          <div style="font-size:40px;margin-bottom:12px;">🎨</div>
+          생성 내역을 불러오는 중...
         </div>
-        <div class="sidebar-section">
-          <div class="sidebar-label">설정</div>
-          <button class="sidebar-item" onclick="switchTab('billing')">
-            <span class="icon">💳</span> 요금제 &amp; 결제
-          </button>
-          <button class="sidebar-item" onclick="switchTab('settings')">
-            <span class="icon">⚙️</span> 계정 설정
-          </button>
-        </div>
-        <div class="sidebar-credit">
-          <div class="credit-label">✨ 남은 크레딧</div>
-          <div class="credit-amount" id="sidebarCreditAmount">-</div>
-          <div class="credit-sub">크레딧 (이미지 생성 1회 = 90크레딧)</div>
-          <button class="btn btn-primary btn-sm" style="margin-top:12px;width:100%;" onclick="showToast('요금제 페이지로 이동합니다.','info')">크레딧 충전</button>
-        </div>
-      </aside>
-
-      <!-- Main Content -->
-      <main class="dashboard-main">
-        <!-- Tab: My Projects -->
-        <div id="tab-my-projects" class="tab-content">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">내 프로젝트</h1>
-              <p class="dashboard-sub">생성한 AI 룩북 프로젝트를 관리하세요.</p>
-            </div>
-            <a href="/generator" class="btn btn-primary">
-              <i class="fas fa-plus"></i> 새 프로젝트
-            </a>
-          </div>
-
-          <!-- Stats -->
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-label">총 프로젝트</div>
-              <div class="stat-value">4</div>
-              <div class="stat-change up">↑ 이번 달 2개 추가</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">생성된 이미지</div>
-              <div class="stat-value">12</div>
-              <div class="stat-change up">↑ 지난달 대비 50%</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">다운로드 횟수</div>
-              <div class="stat-value">8</div>
-              <div class="stat-change up">↑ 이번 주 3회</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-label">남은 크레딧</div>
-              <div class="stat-value" style="color:var(--primary);" id="dashCreditStat">-</div>
-              <div class="stat-change">1,000크레딧 플랜</div>
-            </div>
-          </div>
-
-          <!-- Projects Toolbar -->
-          <div class="projects-toolbar">
-            <div class="toolbar-left">
-              <div class="search-box">
-                <i class="fas fa-search" style="color:var(--text-muted);font-size:13px;"></i>
-                <input type="text" placeholder="프로젝트 검색..." id="projectSearch" oninput="filterProjects()" />
-              </div>
-              <button class="filter-btn active" onclick="filterByStatus('all', this)">전체</button>
-              <button class="filter-btn" onclick="filterByStatus('done', this)">완료</button>
-              <button class="filter-btn" onclick="filterByStatus('processing', this)">생성중</button>
-              <button class="filter-btn" onclick="filterByStatus('draft', this)">초안</button>
-            </div>
-          </div>
-
-          <!-- Projects Grid -->
-          <div class="projects-grid" id="projectsGrid">
-            <!-- New Project Card -->
-            <div class="new-project-card" onclick="window.location.href='/generator'">
-              <div class="new-project-icon">+</div>
-              <div class="new-project-text">새 프로젝트 생성</div>
-              <div style="font-size:13px;color:var(--text-muted);">의류 이미지를 업로드하고<br />AI 룩북을 만들어보세요</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab: Favorites -->
-        <div id="tab-favorites" class="tab-content hidden">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">즐겨찾기</h1>
-              <p class="dashboard-sub">즐겨찾기한 이미지를 모아보세요.</p>
-            </div>
-          </div>
-          <div style="text-align:center;padding:80px;color:var(--text-muted);">
-            <div style="font-size:64px;margin-bottom:16px;">❤️</div>
-            <h3 style="margin-bottom:8px;">즐겨찾기한 이미지가 없습니다</h3>
-            <p style="font-size:14px;">결과 이미지에서 하트 버튼을 눌러 즐겨찾기에 추가하세요.</p>
-          </div>
-        </div>
-
-        <!-- Tab: Downloads -->
-        <div id="tab-downloads" class="tab-content hidden">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">다운로드 내역</h1>
-              <p class="dashboard-sub">다운로드한 이미지 내역을 확인하세요.</p>
-            </div>
-          </div>
-          <div style="background:var(--white);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;">
-            <table style="width:100%;border-collapse:collapse;">
-              <thead>
-                <tr style="border-bottom:1px solid var(--border);">
-                  <th style="padding:16px;text-align:left;font-size:13px;color:var(--text-muted);">프로젝트</th>
-                  <th style="padding:16px;text-align:left;font-size:13px;color:var(--text-muted);">파일명</th>
-                  <th style="padding:16px;text-align:left;font-size:13px;color:var(--text-muted);">날짜</th>
-                  <th style="padding:16px;text-align:left;font-size:13px;color:var(--text-muted);">크기</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:16px;font-size:14px;">2024 S/S 룩북</td>
-                  <td style="padding:16px;font-size:14px;color:var(--primary);">lookbook_001.png</td>
-                  <td style="padding:16px;font-size:14px;color:var(--text-muted);">2024-03-15</td>
-                  <td style="padding:16px;font-size:14px;color:var(--text-muted);">2.4 MB</td>
-                </tr>
-                <tr style="border-bottom:1px solid var(--border);">
-                  <td style="padding:16px;font-size:14px;">캐주얼 티셔츠 컷</td>
-                  <td style="padding:16px;font-size:14px;color:var(--primary);">fitting_set_001.zip</td>
-                  <td style="padding:16px;font-size:14px;color:var(--text-muted);">2024-03-12</td>
-                  <td style="padding:16px;font-size:14px;color:var(--text-muted);">8.1 MB</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Tab: Billing -->
-        <div id="tab-billing" class="tab-content hidden">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">요금제 &amp; 결제</h1>
-            </div>
-          </div>
-          <div style="background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:var(--radius-xl);padding:32px;color:white;margin-bottom:24px;">
-            <div style="font-size:13px;opacity:0.8;margin-bottom:8px;">현재 플랜</div>
-            <div style="font-size:28px;font-weight:800;margin-bottom:8px;">Pro 플랜</div>
-            <div style="font-size:14px;opacity:0.8;">다음 결제일: 2024-04-15 | ₩49,000/월</div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-            <div style="background:var(--white);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border);">
-              <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">이번 달 크레딧 사용</div>
-              <div style="font-size:32px;font-weight:800;">76 / 100</div>
-              <div style="height:8px;background:var(--border);border-radius:4px;margin-top:12px;overflow:hidden;">
-                <div style="width:76%;height:100%;background:var(--primary);border-radius:4px;"></div>
-              </div>
-            </div>
-            <div style="background:var(--white);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border);">
-              <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">남은 크레딧</div>
-              <div style="font-size:32px;font-weight:800;color:var(--primary);" id="dashCreditDetail">-</div>
-              <button class="btn btn-primary btn-sm" style="margin-top:12px;">크레딧 추가 구매</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Tab: Settings -->
-        <div id="tab-settings" class="tab-content hidden">
-          <div class="dashboard-header">
-            <div>
-              <h1 class="dashboard-title">계정 설정</h1>
-            </div>
-          </div>
-          <div style="background:var(--white);border-radius:var(--radius-xl);padding:32px;border:1px solid var(--border);max-width:560px;">
-            <div class="form-group">
-              <label class="form-label">이름</label>
-              <input class="form-input" value="패션 셀러" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">이메일</label>
-              <input class="form-input" value="seller@fashion.com" type="email" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">비밀번호 변경</label>
-              <input class="form-input" placeholder="새 비밀번호" type="password" />
-            </div>
-            <button class="btn btn-primary" onclick="showToast('설정이 저장되었습니다.','success')">저장하기</button>
-          </div>
-        </div>
-      </main>
+      </div>
     </div>
   </div>
+
+  <script>
+  // ── 대시보드 초기화 ──
+  document.addEventListener('DOMContentLoaded', async () => {
+    await verifySession();
+    const user = AppState.user;
+    if (!user) {
+      window.location.href = '/';
+      return;
+    }
+    // 프로필 채우기
+    const initial = (user.name || user.email || '?')[0].toUpperCase();
+    document.getElementById('dbAvatar').textContent = initial;
+    document.getElementById('dbName').textContent   = user.name || user.email;
+    document.getElementById('dbEmail').textContent  = user.email || '';
+    document.getElementById('dbCredits').textContent = (user.credits ?? 0).toLocaleString();
+
+    // 해시 처리
+    if (location.hash === '#history') openHistory();
+    document.getElementById('menuHistory').addEventListener('click', (e) => {
+      e.preventDefault();
+      openHistory();
+    });
+  });
+
+  function openHistory() {
+    history.replaceState(null,'','/dashboard#history');
+    document.getElementById('historyPanel').style.display = 'block';
+    loadHistory();
+  }
+
+  async function loadHistory() {
+    const list = document.getElementById('historyList');
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
+    try {
+      const token = localStorage.getItem('lookbook_token') || '';
+      const res = await fetch('/api/credits/history', {
+        headers: { 'X-Session-Token': token }
+      });
+      if (!res.ok) throw new Error('서버 오류');
+      const data = await res.json();
+      const logs = data.logs || [];
+      if (!logs.length) {
+        list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요</div>';
+        return;
+      }
+      list.innerHTML = logs.map(log => {
+        const isDeduct = log.amount < 0;
+        const dateStr  = log.created_at ? log.created_at.slice(0,16).replace('T',' ') : '';
+        const reasonLabel = {
+          'image_generation': '이미지 생성',
+          'admin_grant':      '크레딧 지급',
+          'admin_set':        '크레딧 설정',
+          'signup_bonus':     '가입 보너스',
+        }[log.reason] || log.reason;
+        return \`<div style="background:#1e1e35;border-radius:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:14px;font-weight:600;color:#e0e0f0;margin-bottom:4px;">\${reasonLabel}</div>
+            <div style="font-size:11px;color:#5a5a7a;">\${dateStr}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:16px;font-weight:800;color:\${isDeduct ? '#ef4444' : '#22c55e'};">\${isDeduct ? '' : '+'}\${log.amount.toLocaleString()}</div>
+            <div style="font-size:11px;color:#5a5a7a;">잔액 \${log.balance.toLocaleString()}</div>
+          </div>
+        </div>\`;
+      }).join('');
+    } catch (e) {
+      list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
+    }
+  }
+  </script>
   `))
 })
+
 
 // ─── Generator Page ───
 app.get('/generator', (c) => {
@@ -2881,7 +3006,7 @@ app.get('/generator', (c) => {
                 <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
