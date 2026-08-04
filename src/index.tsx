@@ -1131,12 +1131,55 @@ app.patch('/api/admin/users/:id', adminAuth, async (c) => {
     const sets: string[] = []
     const vals: any[]   = []
     if (body.status  !== undefined) { sets.push(`status = ?`);  vals.push(body.status) }
-    if (body.credits !== undefined) { sets.push(`credits = ?`); vals.push(body.credits) }
     if (body.role    !== undefined) { sets.push(`role = ?`);    vals.push(body.role) }
+
+    // 크레딧: add_credits(증감) 또는 credits(절대값 설정) 지원
+    if (body.add_credits !== undefined) {
+      // 현재 잔액 조회 후 증감
+      const cur = await db.prepare(`SELECT credits FROM users WHERE id = ?`).bind(id).first() as any
+      const current = cur?.credits ?? 0
+      const amount = parseInt(body.add_credits)
+      const newBal = Math.max(0, current + amount)
+      sets.push(`credits = ?`)
+      vals.push(newBal)
+      // 로그 기록
+      sets.push(`updated_at = datetime('now')`)
+      await db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, id).run()
+      await db.prepare(
+        `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+         VALUES (?, 'grant', ?, ?, 'admin_grant', ?)`
+      ).bind(id, amount, newBal, `admin_${Date.now()}`).run()
+      if (body.status === 'suspended') {
+        await db.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(id).run()
+      }
+      return c.json({ success: true, newCredits: newBal })
+    }
+
+    if (body.credits !== undefined) {
+      // 절대값 설정 (레거시 호환)
+      const cur = await db.prepare(`SELECT credits FROM users WHERE id = ?`).bind(id).first() as any
+      const current = cur?.credits ?? 0
+      const newBal = parseInt(body.credits)
+      const diff = newBal - current
+      sets.push(`credits = ?`)
+      vals.push(newBal)
+      sets.push(`updated_at = datetime('now')`)
+      await db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, id).run()
+      if (diff !== 0) {
+        await db.prepare(
+          `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+           VALUES (?, ?, ?, ?, 'admin_set', ?)`
+        ).bind(id, diff > 0 ? 'grant' : 'deduct', diff, newBal, `admin_${Date.now()}`).run()
+      }
+      if (body.status === 'suspended') {
+        await db.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(id).run()
+      }
+      return c.json({ success: true, newCredits: newBal })
+    }
+
     if (sets.length === 0) return c.json({ success: false, message: '변경할 항목이 없습니다.' }, 400)
     sets.push(`updated_at = datetime('now')`)
     await db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, id).run()
-    // 정지된 경우 세션 전체 삭제
     if (body.status === 'suspended') {
       await db.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(id).run()
     }
@@ -1489,6 +1532,9 @@ function buildClothingReplaceInstructions(
   return instructions.join(' ')
 }
 
+// ── 크레딧 상수 ──
+const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
+
 app.post('/api/generation/start', async (c) => {
   try {
     const body: any = await c.req.json()
@@ -1508,6 +1554,51 @@ app.post('/api/generation/start', async (c) => {
       clothingImageUrl,          // 레거시 단일 파라미터 (하위 호환)
       clothingImages,            // 신규: [{ dataUrl, category, label }] 배열
     } = body
+
+    // ── 세션 인증 + 크레딧 차감 ──
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+    let sessionUser: any = null
+
+    if (db) {
+      const sessionToken = c.req.header('X-Session-Token') || ''
+      if (sessionToken) {
+        const sess = await db.prepare(
+          `SELECT s.user_id, u.name, u.credits FROM user_sessions s
+           JOIN users u ON u.id = s.user_id
+           WHERE s.token = ? AND s.expires_at > datetime('now')`
+        ).bind(sessionToken).first() as any
+        if (sess) sessionUser = sess
+      }
+
+      if (!sessionUser) {
+        return c.json({ error: '로그인이 필요합니다.', code: 'UNAUTHORIZED' }, 401)
+      }
+
+      // 차감할 크레딧 계산 (count장 생성 → count * CREDITS_PER_IMAGE)
+      const required = count * CREDITS_PER_IMAGE
+      if (sessionUser.credits < required) {
+        return c.json({
+          error: `크레딧이 부족합니다. 필요: ${required}크레딧 / 보유: ${sessionUser.credits}크레딧`,
+          code: 'INSUFFICIENT_CREDITS',
+          required,
+          available: sessionUser.credits,
+        }, 402)
+      }
+
+      // 크레딧 선차감 (생성 실패 시 복구는 별도 처리)
+      const newBalance = sessionUser.credits - required
+      await db.prepare(
+        `UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`
+      ).bind(newBalance, sessionUser.user_id).run()
+
+      // 크레딧 로그 기록
+      await db.prepare(
+        `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+         VALUES (?, 'deduct', ?, ?, 'image_generation', ?)`
+      ).bind(sessionUser.user_id, -required, newBalance, `gen_${Date.now()}`).run()
+
+      console.log(`[Credits] ${sessionUser.name}: ${sessionUser.credits} → ${newBalance} (-${required})`)
+    }
 
     const aspectRatio = toAspectRatio(ratio)
     const nbResolution = toNBResolution(resolution)
@@ -1534,7 +1625,7 @@ app.post('/api/generation/start', async (c) => {
     let bgImageBase64: string | null = null
 
     const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
-    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+    // db는 위의 세션 인증 블록에서 이미 선언됨
 
     if (modelId) {
       const mid = String(modelId)
@@ -1775,11 +1866,14 @@ app.post('/api/generation/start', async (c) => {
     }
 
     // jobIds를 콤마로 묶어 단일 jobId처럼 전달 (폴링에서 분리)
+    const newBalance = sessionUser ? sessionUser.credits - (count * CREDITS_PER_IMAGE) : undefined
     return c.json({
       jobId: jobIds.join(','),
       estimatedSeconds: 30,
       status: 'queued',
       isFallback: false,
+      creditsUsed: sessionUser ? count * CREDITS_PER_IMAGE : undefined,
+      creditsRemaining: newBalance,
     })
 
   } catch (err: any) {
@@ -2569,8 +2663,8 @@ app.get('/dashboard', (c) => {
         </div>
         <div class="sidebar-credit">
           <div class="credit-label">✨ 남은 크레딧</div>
-          <div class="credit-amount">24</div>
-          <div class="credit-sub">크레딧 (이미지 생성 1회 = 1크레딧)</div>
+          <div class="credit-amount" id="sidebarCreditAmount">-</div>
+          <div class="credit-sub">크레딧 (이미지 생성 1회 = 90크레딧)</div>
           <button class="btn btn-primary btn-sm" style="margin-top:12px;width:100%;" onclick="showToast('요금제 페이지로 이동합니다.','info')">크레딧 충전</button>
         </div>
       </aside>
@@ -2608,8 +2702,8 @@ app.get('/dashboard', (c) => {
             </div>
             <div class="stat-card">
               <div class="stat-label">남은 크레딧</div>
-              <div class="stat-value" style="color:var(--primary);">24</div>
-              <div class="stat-change">100크레딧 플랜 중</div>
+              <div class="stat-value" style="color:var(--primary);" id="dashCreditStat">-</div>
+              <div class="stat-change">1,000크레딧 플랜</div>
             </div>
           </div>
 
@@ -2711,7 +2805,7 @@ app.get('/dashboard', (c) => {
             </div>
             <div style="background:var(--white);border-radius:var(--radius-lg);padding:24px;border:1px solid var(--border);">
               <div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;">남은 크레딧</div>
-              <div style="font-size:32px;font-weight:800;color:var(--primary);">24</div>
+              <div style="font-size:32px;font-weight:800;color:var(--primary);" id="dashCreditDetail">-</div>
               <button class="btn btn-primary btn-sm" style="margin-top:12px;">크레딧 추가 구매</button>
             </div>
           </div>
@@ -3523,7 +3617,11 @@ function renderUserTable(users) {
       + '<td style="padding:12px 16px;">' + (providerBadge[u.provider] || u.provider) + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">'
       +   '<span style="font-size:14px;font-weight:700;color:#9b7cff;">' + credits + '</span>'
-      +   '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="credits" style="margin-left:6px;font-size:10px;padding:2px 6px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">수정</button>'
+      +   '<span style="font-size:10px;color:#8b8ba0;"> 크레딧</span>'\
+      +   '<div style="margin-top:4px;display:flex;gap:4px;justify-content:center;">'\
+      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="grant" style="font-size:10px;padding:2px 8px;background:#6c47ff33;border:1px solid #6c47ff66;border-radius:6px;color:#9b7cff;cursor:pointer;font-weight:600;">지급</button>'\
+      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="credits" style="font-size:10px;padding:2px 8px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">설정</button>'\
+      +   '</div>'
       + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">' + (statusBadge[u.status] || u.status) + '</td>'
       + '<td style="padding:12px 16px;font-size:12px;color:#8b8ba0;">' + joined + '</td>'
@@ -3568,7 +3666,8 @@ async function setUserStatus(id, status) {
 }
 
 async function adjustCredits(id, current) {
-  const val = prompt('크레딧 수정 (현재: ' + current + '크레딧)\\n새 크레딧 수를 입력하세요:', current)
+  // 절대값 설정 (설정 버튼)
+  const val = prompt('크레딧 절대값 설정 (현재: ' + current + '크레딧)\n새 크레딧 수를 입력하세요:', current)
   if (val === null) return
   const credits = parseInt(val)
   if (isNaN(credits) || credits < 0) { showAdminToast('올바른 크레딧 수를 입력하세요', 'err'); return }
@@ -3579,7 +3678,29 @@ async function adjustCredits(id, current) {
       body: JSON.stringify({ credits })
     })
     const data = await res.json()
-    if (data.success) { showAdminToast('크레딧 수정 완료', 'ok'); loadUsers() }
+    if (data.success) { showAdminToast('크레딧 설정 완료 → ' + (data.newCredits ?? credits) + '크레딧', 'ok'); loadUsers() }
+    else showAdminToast(data.message || '실패', 'err')
+  } catch(e) { showAdminToast('서버 오류', 'err') }
+}
+
+async function grantCredits(id, current) {
+  // 크레딧 지급 (증감) — 지급 버튼
+  const val = prompt(
+    '크레딧 지급 (현재: ' + current + '크레딧)\n지급할 크레딧 수를 입력하세요 (음수 입력 시 차감)\n빠른 지급: 100 / 500 / 1000', '1000'
+  )
+  if (val === null) return
+  const amount = parseInt(val)
+  if (isNaN(amount) || amount === 0) { showAdminToast('0이 아닌 숫자를 입력하세요', 'err'); return }
+  const action = amount > 0 ? '지급' : '차감'
+  if (!confirm('"' + Math.abs(amount) + '크레딧"을 ' + action + '하시겠습니까?\n현재: ' + current + ' → 변경 후: ' + (current + amount))) return
+  try {
+    const res = await fetch('/api/admin/users/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ add_credits: amount })
+    })
+    const data = await res.json()
+    if (data.success) { showAdminToast('크레딧 ' + action + ' 완료 → ' + data.newCredits + '크레딧', 'ok'); loadUsers() }
     else showAdminToast(data.message || '실패', 'err')
   } catch(e) { showAdminToast('서버 오류', 'err') }
 }
@@ -3964,6 +4085,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (action === 'activate') { setUserStatus(uid, 'active') }
     else if (action === 'delete') { deleteUser(uid, btn.dataset.name || '', btn.dataset.email || '') }
     else if (action === 'credits') { adjustCredits(uid, parseInt(btn.dataset.credits || '0')) }
+    else if (action === 'grant')   { grantCredits(uid, parseInt(btn.dataset.credits || '0')) }
   })
 })
 </script>

@@ -366,7 +366,12 @@ async function handleLogout() {
 }
 
 /** 헤더/네비바 사용자 UI 업데이트 */
-function updateUserUI() {
+function updateUserUI(partial) {
+  // partial: { credits } 전달 시 크레딧만 부분 업데이트
+  if (partial && partial.credits !== undefined && AppState.user) {
+    AppState.user.credits = partial.credits;
+  }
+
   const user = AppState.user;
 
   const loginBtn   = document.getElementById('navLoginBtn');
@@ -395,6 +400,15 @@ function updateUserUI() {
     if (ddName)    ddName.textContent    = user.name || user.email;
     if (ddEmail)   ddEmail.textContent   = user.email || '';
     if (ddCredits) ddCredits.textContent = `${user.credits ?? 0}크레딧 남음`;
+
+    // 사이드바 크레딧 표시 업데이트 (dashboard / generator 공통)
+    const sidebarAmt = document.getElementById('sidebarCreditAmount');
+    const dashStat   = document.getElementById('dashCreditStat');
+    const dashDetail = document.getElementById('dashCreditDetail');
+    const credits = user.credits ?? 0;
+    if (sidebarAmt) sidebarAmt.textContent = credits.toLocaleString();
+    if (dashStat)   dashStat.textContent   = credits.toLocaleString();
+    if (dashDetail) dashDetail.textContent = credits.toLocaleString();
   } else {
     if (loginBtn)  loginBtn.style.display  = '';
     if (signupBtn) signupBtn.style.display = '';
@@ -1150,11 +1164,17 @@ async function startGeneration() {
       }
     }, 2000);
 
+    // 세션 토큰 (크레딧 차감을 위해 서버에 전달)
+    const sessionToken = localStorage.getItem('lookbook_token') || '';
+
     let startRes;
     try {
       startRes = await fetch('/api/generation/start', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-Token': sessionToken,
+        },
         body: JSON.stringify({
           modelId: model?.id,
           modelName: model?.name || '패션 모델',
@@ -1176,11 +1196,40 @@ async function startGeneration() {
       clearInterval(fakeTimer);
     }
 
+    // 로그인/크레딧 오류 처리
+    if (startRes.status === 401) {
+      showToast('로그인이 필요합니다.', 'error');
+      showStep(1);
+      return;
+    }
+    if (startRes.status === 402) {
+      const errData = await startRes.json();
+      const need = errData.required ?? 90;
+      const have = errData.available ?? 0;
+      showToast(`크레딧이 부족합니다. 필요: ${need}크레딧 / 보유: ${have}크레딧`, 'error');
+      // 드롭다운 열어서 충전 버튼 유도
+      const userArea = document.getElementById('navUserArea');
+      if (userArea) userArea.click();
+      showStep(1);
+      return;
+    }
+
     const startData = await startRes.json();
     console.log('Generation start response:', startData);
 
     if (!startData.jobId) {
       throw new Error('생성 요청 실패: Job ID 없음');
+    }
+
+    // 크레딧 차감 후 잔액 즉시 갱신
+    if (startData.creditsRemaining !== undefined) {
+      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+      if (cachedUser) {
+        cachedUser.credits = startData.creditsRemaining;
+        localStorage.setItem('lookbook_user', JSON.stringify(cachedUser));
+      }
+      updateUserUI({ credits: startData.creditsRemaining });
+      console.log(`[Credits] 차감 완료. 잔액: ${startData.creditsRemaining}크레딧`);
     }
 
     AppState.currentJobId = startData.jobId;
