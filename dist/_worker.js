@@ -1424,7 +1424,7 @@ function renderUserTable(users) {
   }
   tbody.innerHTML = users.map(function(u) {
     var avatar = u.avatar_url
-      ? '<img src="' + u.avatar_url + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display=&quot;none&quot;">'
+      ? '<img src="' + u.avatar_url + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
       : '<div style="width:28px;height:28px;border-radius:50%;background:#6c47ff44;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">' + ((u.name||'?')[0]) + '</div>'
     var joined = u.created_at ? u.created_at.slice(0,10) : '-'
     var isAdmin = u.role === 'admin'
