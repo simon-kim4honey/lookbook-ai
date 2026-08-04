@@ -781,9 +781,19 @@ const SLOT_LABEL = { TOP: '상의', BOTTOM: '하의', DRESS: '전체' };
 // 슬롯별 데이터 저장 (null = 비어 있음)
 const slotData = { TOP: null, BOTTOM: null, DRESS: null };
 
-// ── 슬롯 클릭 → 해당 파일 input 트리거 ──
+// ── label for= 방식: 이미 채워진 슬롯이면 파일선택창 열기 차단 ──
+// label 클릭 시 호출. 이미 이미지가 있으면 false 반환 → label의 for= 동작 억제
+function handleSlotLabelClick(e, cat) {
+  // ✕ 버튼 클릭은 removeSlot()에서 처리 → label 기본동작 억제
+  if (e.target.closest('.cslot-remove')) return false;
+  // 이미 채워진 슬롯: 파일 선택창 열지 않음
+  if (slotData[cat]) return false;
+  // 비어 있으면 label for= 연결로 파일 선택창 열림 (브라우저 네이티브 동작)
+  return true;
+}
+
+// ── 레거시 호환 (혹시 남은 onclick 에서 호출될 경우 대비) ──
 function triggerSlotInput(cat) {
-  // 이미 이미지가 있으면 클릭 무시 (✕ 버튼으로만 삭제)
   if (slotData[cat]) return;
   const input = document.getElementById(`fileInput-${cat}`);
   if (input) input.click();
@@ -879,18 +889,18 @@ function renderSlots() {
     const data = slotData[cat];
 
     if (data) {
-      // 이미지 있음 → 썸네일 표시
+      // 이미지 있음 → 썸네일 표시 + label for= 비활성화 (pointer-events:none 로 파일창 방지)
       slot.classList.add('cslot--filled');
       body.innerHTML = `<img src="${data.dataUrl}" alt="${SLOT_LABEL[cat]}" class="cslot-img" />`;
       if (removeBtn) removeBtn.classList.remove('hidden');
     } else {
-      // 비어 있음 → 플레이스홀더
+      // 비어 있음 → 플레이스홀더 (span 태그 — label 내부에서도 block처럼 동작)
       slot.classList.remove('cslot--filled');
       body.innerHTML = `
-        <div class="cslot-empty">
-          <div class="cslot-plus">＋</div>
-          <div class="cslot-hint">클릭 또는 드래그</div>
-        </div>`;
+        <span class="cslot-empty">
+          <span class="cslot-plus">＋</span>
+          <span class="cslot-hint">탭하여 사진 선택</span>
+        </span>`;
       if (removeBtn) removeBtn.classList.add('hidden');
     }
   });

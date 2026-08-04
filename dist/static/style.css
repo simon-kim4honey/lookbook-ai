@@ -1334,7 +1334,7 @@ footer {
   width: 100%;
 }
 
-/* 개별 슬롯 */
+/* 개별 슬롯 — label 태그로 변경되어 block/inline-block 명시 필요 */
 .cslot {
   position: relative;
   display: flex;
@@ -1346,6 +1346,9 @@ footer {
   background: rgba(255,255,255,0.03);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
+  /* label 기본 스타일 초기화 */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 .cslot:hover {
   border-color: rgba(167,139,250,0.45);
@@ -1366,8 +1369,9 @@ footer {
   background: rgba(255,255,255,0.03);
 }
 
-/* 슬롯 라벨 (상의 / 하의 / 아우터) */
+/* 슬롯 라벨 (상의 / 하의 / 전체) — span이므로 block 명시 */
 .cslot-label {
+  display: block;
   padding: 8px 10px 6px;
   font-size: 11px;
   font-weight: 700;
@@ -1382,11 +1386,11 @@ footer {
   border-bottom-color: rgba(139,92,246,0.2);
 }
 
-/* 슬롯 본문 (이미지 or 플레이스홀더) */
+/* 슬롯 본문 (이미지 or 플레이스홀더) — span이므로 block 명시 */
 .cslot-body {
+  display: flex;
   flex: 1;
   aspect-ratio: 3/4;
-  display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
@@ -1400,7 +1404,7 @@ footer {
   display: block;
 }
 
-/* 플레이스홀더 (비어 있을 때) */
+/* 플레이스홀더 (비어 있을 때) — span이지만 flex 컨테이너로 */
 .cslot-empty {
   display: flex;
   flex-direction: column;
@@ -1412,12 +1416,14 @@ footer {
   height: 100%;
 }
 .cslot-plus {
+  display: block;
   font-size: 26px;
   color: rgba(255,255,255,0.2);
   line-height: 1;
   font-weight: 300;
 }
 .cslot-hint {
+  display: block;
   font-size: 10px;
   color: rgba(255,255,255,0.22);
   text-align: center;
