@@ -29,7 +29,7 @@ var e=(e,t,n)=>(r,i)=>{let a=-1;return o(0);async function o(s){if(s<=a)throw Er
 ${t}
 <script src="/static/app.js"><\/script>
 </body>
-</html>`;U.get(`/`,e=>e.redirect(`/generator`,302)),U.get(`/_home`,e=>e.html(st(`홈`,`
+</html>`;U.get(`/_home_old`,e=>e.redirect(`/generator`,302)),U.get(`/`,e=>e.html(st(`홈`,`
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
@@ -354,20 +354,16 @@ ${t}
         <p>
           <strong>벌거벗은호랑이</strong>&nbsp;&nbsp;
           대표자 : 김사헌&nbsp;&nbsp;
-          사업자등록번호 : 204-29-48306
+          사업자등록번호 : 204-29-48306&nbsp;&nbsp;
+          통신판매업신고번호 : 2025-충북청주-1463
         </p>
         <p>
-          사업장주소 : 충청북도 청주시 서원구 무심서로 377-3, 예술관 309호 (모충동, 서원대학교)
-        </p>
-        <p>
-          개업일 : 2023년 11월 24일&nbsp;&nbsp;
-          업태 : 정보통신업&nbsp;&nbsp;
-          종목 : 응용 소프트웨어 개발 및 공급업
+          사업장주소 : 충청북도 청주시 서원구 무심서로 377-3
         </p>
       </div>
 
       <div class="footer-bottom">
-        <span>© 2025 벌거벗은호랑이 / LookbookAI. All rights reserved.</span>
+        <span>© 2026 벌거벗은호랑이 / NakedTiger. All rights reserved.</span>
         <div style="display:flex;gap:16px;align-items:center;">
           <a href="/terms" style="color:var(--text-muted);font-size:13px;">이용약관</a>
           <a href="/privacy" style="color:var(--text-muted);font-size:13px;font-weight:700;">개인정보처리방침</a>
