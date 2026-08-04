@@ -1176,10 +1176,10 @@ ${t}
 
   <!-- Image View Modal -->
   <div class="modal-overlay image-modal" id="imageModal">
-    <div class="modal-box" style="max-width:700px;width:95vw;padding:0;overflow:hidden;background:transparent;box-shadow:none;position:relative;">
+    <div class="modal-box">
       <button class="modal-close" style="background:rgba(0,0,0,0.5);color:white;top:12px;right:12px;z-index:20;" onclick="closeModal('imageModal')">×</button>
-      <div style="position:relative;display:inline-block;width:100%;">
-        <img id="modalImage" src="" alt="생성된 이미지" style="display:block;width:100%;height:auto;border-radius:12px;" />
+      <div style="position:relative;display:block;width:100%;">
+        <img id="modalImage" src="" alt="생성된 이미지" />
         <!-- 버튼 영역: 재생성 + 다운로드 -->
         <div id="modalButtonArea" style="position:absolute;bottom:16px;right:16px;z-index:20;display:flex;align-items:center;gap:8px;">
           <!-- 재생성 버튼 -->

@@ -1463,13 +1463,14 @@ function renderResults(images) {
             onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패<br/>프록시 오류</span></div>';"
           />
         </div>
-        <button class="result-fav" onclick="toggleResultFav(this, event)" title="즐겨찾기">🤍</button>
         <div class="result-overlay">
-          <button class="result-overlay-btn fav" onclick="toggleResultFav(event.currentTarget, event)">🤍</button>
           <button class="result-overlay-btn download" onclick="downloadSingleImage('${img.url}', ${idx + 1}); event.stopPropagation();">
             ⬇️ 다운로드
           </button>
-          <button class="result-overlay-btn fav" onclick="openImageModal(${idx}); event.stopPropagation();">
+          <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
+            🔄 재생성
+          </button>
+          <button class="result-overlay-btn enlarge" onclick="openImageModal(${idx}); event.stopPropagation();">
             🔍 확대
           </button>
         </div>
@@ -1484,13 +1485,14 @@ function renderResults(images) {
             <span style="color:rgba(255,255,255,0.6);font-size:11px;">데모 이미지</span>
           </div>
         </div>
-        <button class="result-fav" onclick="toggleResultFav(this, event)" title="즐겨찾기">🤍</button>
         <div class="result-overlay">
-          <button class="result-overlay-btn fav" onclick="toggleResultFav(event.currentTarget, event)">🤍</button>
           <button class="result-overlay-btn download" onclick="downloadSingle(${idx + 1}); event.stopPropagation();">
             ⬇️ 다운로드
           </button>
-          <button class="result-overlay-btn fav" onclick="openImageModal(${idx}); event.stopPropagation();">
+          <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
+            🔄 재생성
+          </button>
+          <button class="result-overlay-btn enlarge" onclick="openImageModal(${idx}); event.stopPropagation();">
             🔍 확대
           </button>
         </div>
@@ -1694,6 +1696,21 @@ async function downloadImage() {
       downloadBtn.innerHTML = '<i class="fas fa-download"></i> 다운로드';
     }
   }
+}
+
+// 카드에서 재생성 버튼 클릭 시 (모달 없이 바로 재생성 시작)
+function regenFromCard(idx) {
+  const MAX_REGEN = 3;
+  if (AppState.regenCount >= MAX_REGEN) {
+    showToast('재생성 한도가 초과하였습니다. 다른 옷으로 시도해주세요.', 'error');
+    return;
+  }
+  if (!AppState.lastGenParams) {
+    showToast('재생성할 이미지 정보가 없습니다.', 'error');
+    return;
+  }
+  // regenImage와 동일한 로직 사용
+  regenImage();
 }
 
 // 재생성 함수 (최대 3회)
