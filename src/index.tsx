@@ -1893,6 +1893,11 @@ app.get('/_home_old', (c) => {
 })
 
 app.get('/', (c) => {
+  // studiob.aifashion.co.kr 도메인 접속 시 바로 /generator로 리다이렉트
+  const host = c.req.header('host') || ''
+  if (host.includes('studiob.aifashion.co.kr')) {
+    return c.redirect('/generator', 302)
+  }
   return c.html(htmlShell('홈', `
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>

@@ -29,7 +29,7 @@ var e=(e,t,n)=>(r,i)=>{let a=-1;return o(0);async function o(s){if(s<=a)throw Er
 ${t}
 <script src="/static/app.js"><\/script>
 </body>
-</html>`;U.get(`/_home_old`,e=>e.redirect(`/generator`,302)),U.get(`/`,e=>e.html(st(`홈`,`
+</html>`;U.get(`/_home_old`,e=>e.redirect(`/generator`,302)),U.get(`/`,e=>(e.req.header(`host`)||``).includes(`studiob.aifashion.co.kr`)?e.redirect(`/generator`,302):e.html(st(`홈`,`
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
