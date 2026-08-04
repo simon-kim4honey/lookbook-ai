@@ -2842,7 +2842,8 @@ app.get('/generator', (c) => {
 // ────────────────────────────────────────────────────
 // Admin Page  GET /admin
 // ────────────────────────────────────────────────────
-app.get('/admin', (c) => {
+// ── /admin02: 실제 어드민 페이지 (기존 /admin에서 이동) ──
+app.get('/admin02', (c) => {
   return c.html(`<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -3787,6 +3788,22 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>`)
+})
+
+// ── /admin: 도메인별 분기 ──
+// aifashion.co.kr/admin → studiob.aifashion.co.kr/admin 으로 리다이렉트
+// www.aifashion.co.kr/admin → 삭제 (404)
+// studiob.aifashion.co.kr/admin → /admin02 로 내부 포워드
+app.get('/admin', (c) => {
+  const host = c.req.header('host') || ''
+  if (host === 'www.aifashion.co.kr') {
+    return c.text('Not Found', 404)
+  }
+  if (host === 'aifashion.co.kr') {
+    return c.redirect('https://studiob.aifashion.co.kr/admin', 302)
+  }
+  // studiob.aifashion.co.kr 또는 vip.gensparksite.com → 실제 어드민
+  return c.redirect('/admin02', 302)
 })
 
 // ── /studio-b 경로: 메인 앱 그대로 서빙 ──

@@ -953,7 +953,7 @@ ${t}
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 이용약관 및 개인정보처리방침에 동의합니다.</p>
     </div>
   </div>
-  `))),U.get(`/admin`,e=>e.html(`<!DOCTYPE html>
+  `))),U.get(`/admin02`,e=>e.html(`<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8"/>
@@ -1896,4 +1896,4 @@ document.addEventListener('DOMContentLoaded', () => {
 })
 <\/script>
 </body>
-</html>`)),U.get(`/studio-b`,e=>e.redirect(`/`)),U.get(`/studio-b/*`,e=>{let t=e.req.path.replace(`/studio-b`,``)||`/`;return e.redirect(t)});var ct=new xe,lt=Object.assign({"/src/index.tsx":U}),ut=!1;for(let[,e]of Object.entries(lt))e&&(ct.all(`*`,t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),ct.notFound(t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),ut=!0);if(!ut)throw Error(`Can't import modules from ['/src/index.ts','/src/index.tsx','/app/server.ts']`);export{ct as default};
+</html>`)),U.get(`/admin`,e=>{let t=e.req.header(`host`)||``;return t===`www.aifashion.co.kr`?e.text(`Not Found`,404):t===`aifashion.co.kr`?e.redirect(`https://studiob.aifashion.co.kr/admin`,302):e.redirect(`/admin02`,302)}),U.get(`/studio-b`,e=>e.redirect(`/`)),U.get(`/studio-b/*`,e=>{let t=e.req.path.replace(`/studio-b`,``)||`/`;return e.redirect(t)});var ct=new xe,lt=Object.assign({"/src/index.tsx":U}),ut=!1;for(let[,e]of Object.entries(lt))e&&(ct.all(`*`,t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),ct.notFound(t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),ut=!0);if(!ut)throw Error(`Can't import modules from ['/src/index.ts','/src/index.tsx','/app/server.ts']`);export{ct as default};
