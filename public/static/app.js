@@ -1464,7 +1464,7 @@ function renderResults(images) {
           />
         </div>
         <div class="result-overlay">
-          <button class="result-overlay-btn download" onclick="downloadSingleImage('${img.url}', ${idx + 1}); event.stopPropagation();">
+          <button class="result-overlay-btn download" onclick="downloadWithCreditCheck(${idx}); event.stopPropagation();">
             ⬇️ 다운로드
           </button>
           <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
@@ -1486,7 +1486,7 @@ function renderResults(images) {
           </div>
         </div>
         <div class="result-overlay">
-          <button class="result-overlay-btn download" onclick="downloadSingle(${idx + 1}); event.stopPropagation();">
+          <button class="result-overlay-btn download" onclick="downloadWithCreditCheck(${idx}); event.stopPropagation();">
             ⬇️ 다운로드
           </button>
           <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
@@ -1575,12 +1575,12 @@ function toggleResultFav(btn, e) {
   showToast(isFav ? '즐겨찾기에 추가되었습니다.' : '즐겨찾기에서 제거되었습니다.', isFav ? 'success' : 'info');
 }
 
-function downloadSingleImage(url, num) {
+// ─── 실제 파일 다운로드 (크레딧 차감 없이 파일만 저장) ───
+function _doFileDownload(url, num) {
   if (!url) {
     showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success');
     return;
   }
-  // 프록시 URL인 경우 download=1 파라미터 추가 → Content-Disposition: attachment 헤더 적용
   const dlUrl = url.includes('/api/proxy/gen-image')
     ? url + (url.includes('?') ? '&' : '?') + 'download=1'
     : url;
@@ -1590,12 +1590,64 @@ function downloadSingleImage(url, num) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  showToast(`피팅컷 #${num} 다운로드를 시작합니다. (1792 × 2400px 원본)`, 'success');
 }
 
-function downloadSingle(num) {
-  showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success');
+// ─── 크레딧 차감 후 다운로드 (모든 다운로드 경로의 공통 진입점) ───
+async function downloadWithCreditCheck(idx) {
+  const img = AppState.generatedImages[idx];
+  if (!img) { showToast('이미지를 찾을 수 없습니다.', 'error'); return; }
+
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast('로그인이 필요합니다.', 'error');
+    return;
+  }
+
+  try {
+    const deductRes = await fetch('/api/credits/deduct', {
+      method: 'POST',
+      headers: { 'X-Session-Token': sessionToken },
+    });
+
+    if (deductRes.status === 401) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+    if (deductRes.status === 402) {
+      const errData = await deductRes.json();
+      const have = errData.available ?? 0;
+      showToast(`크레딧이 부족합니다. (보유: ${have}크레딧 / 필요: 90크레딧) 대시보드에서 충전해 주세요.`, 'error');
+      setTimeout(() => {
+        const userArea = document.getElementById('navUserArea');
+        if (userArea) userArea.click();
+      }, 1500);
+      return;
+    }
+    if (!deductRes.ok) {
+      showToast('크레딧 처리 중 오류가 발생했습니다.', 'error');
+      return;
+    }
+
+    const deductData = await deductRes.json();
+    // 크레딧 잔액 UI 갱신
+    if (deductData.creditsRemaining !== undefined) {
+      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+      if (cachedUser) { cachedUser.credits = deductData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+      if (AppState.user) AppState.user.credits = deductData.creditsRemaining;
+      updateUserUI({ credits: deductData.creditsRemaining });
+    }
+    // 파일 다운로드
+    _doFileDownload(img.url, idx + 1);
+    showToast(`다운로드 완료! (90크레딧 차감, 잔액: ${deductData.creditsRemaining}크레딧)`, 'success');
+  } catch (err) {
+    console.error('Download error:', err);
+    showToast('다운로드 중 오류가 발생했습니다.', 'error');
+  }
 }
+
+// 레거시 — 내부에서만 사용 (크레딧 차감 없이 파일 저장만)
+function downloadSingleImage(url, num) { _doFileDownload(url, num); }
+function downloadSingle(num) { showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success'); }
 
 function downloadAll() {
   const count = AppState.generatedImages.length;
