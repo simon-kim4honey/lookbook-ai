@@ -55,14 +55,16 @@ document.addEventListener('DOMContentLoaded', () => {
 function initPage() {
   const path = window.location.pathname;
   initNavbar();
-
-  if (path === '/' || path === '') {
-    // Landing page - no special init needed
-  } else if (path === '/dashboard') {
-    initDashboard();
-  } else if (path === '/generator') {
-    initGenerator();
-  }
+  // 모든 페이지에서 세션 복원 (자동 로그인)
+  verifySession().then(() => {
+    if (path === '/' || path === '') {
+      // Landing — verifySession 후 UI만 업데이트됨
+    } else if (path === '/dashboard') {
+      initDashboard();
+    } else if (path === '/generator') {
+      initGenerator();
+    }
+  });
 }
 
 // ─────────────────────────────────────────────────────────
@@ -183,30 +185,39 @@ function switchAuthTab(tab) {
 
 /** OAuth 소셜 로그인 (팝업 방식) */
 function oauthLogin(provider) {
+  // 이전 oauth_result 잔여 데이터 제거
+  localStorage.removeItem('oauth_result');
+
   const popup = window.open(
     `/api/auth/${provider}`,
     'oauth_popup',
     'width=520,height=640,left=' + Math.round((screen.width - 520) / 2) + ',top=' + Math.round((screen.height - 640) / 2)
   );
 
-  const onMessage = async (e) => {
+  function handleOAuthSuccess(data) {
+    const { token, user } = data;
+    AppState.user = user;
+    localStorage.setItem('lookbook_token', token);
+    localStorage.setItem('lookbook_user', JSON.stringify(user));
+    localStorage.removeItem('oauth_result');
+    updateUserUI();
+    closeModal('loginModal');
+    showToast(`환영합니다, ${user.name}님! 🎉`, 'success');
+    if (AppState.pendingGeneration) {
+      AppState.pendingGeneration = false;
+      setTimeout(() => startGeneration(), 300);
+    } else if (window.location.pathname === '/') {
+      setTimeout(() => window.location.href = '/dashboard', 800);
+    }
+  }
+
+  const onMessage = (e) => {
     if (e.data?.type === 'oauth_success') {
+      clearInterval(checkClosed);
       window.removeEventListener('message', onMessage);
-      const { token, user } = e.data;
-      AppState.user = user;
-      localStorage.setItem('lookbook_token', token);
-      localStorage.setItem('lookbook_user', JSON.stringify(user));
-      updateUserUI();
-      closeModal('loginModal');
-      showToast(`환영합니다, ${user.name}님! 🎉`, 'success');
-      // 로그인 후 생성 재개
-      if (AppState.pendingGeneration) {
-        AppState.pendingGeneration = false;
-        setTimeout(() => startGeneration(), 300);
-      } else if (window.location.pathname === '/') {
-        setTimeout(() => window.location.href = '/dashboard', 800);
-      }
+      handleOAuthSuccess(e.data);
     } else if (e.data?.type === 'oauth_error') {
+      clearInterval(checkClosed);
       window.removeEventListener('message', onMessage);
       showToast('소셜 로그인에 실패했습니다. 다시 시도해주세요.', 'error');
     }
@@ -214,13 +225,24 @@ function oauthLogin(provider) {
 
   window.addEventListener('message', onMessage);
 
-  // 팝업이 닫힌 경우 정리
+  // 팝업이 닫힌 경우 — localStorage 폴백 체크 (postMessage 실패 대비)
   const checkClosed = setInterval(() => {
     if (popup && popup.closed) {
       clearInterval(checkClosed);
       window.removeEventListener('message', onMessage);
+      // postMessage가 전달 안 됐을 경우 localStorage에서 결과 읽기
+      try {
+        const stored = localStorage.getItem('oauth_result');
+        if (stored) {
+          const data = JSON.parse(stored);
+          if (data?.type === 'oauth_success') {
+            handleOAuthSuccess(data);
+            return;
+          }
+        }
+      } catch(e) {}
     }
-  }, 800);
+  }, 500);
 }
 
 /** 이메일 로그인 */
@@ -321,12 +343,16 @@ async function handleSignup(e) {
 
 /** 로그아웃 */
 async function handleLogout() {
+  // 드롭다운 먼저 닫기
+  const menu = document.getElementById('userDropdownMenu');
+  if (menu) menu.style.display = 'none';
+
   try {
     const token = localStorage.getItem('lookbook_token');
     if (token) {
       await fetch('/api/auth/logout', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'X-Session-Token': token }
       });
     }
   } catch (e) { /* ignore */ }
@@ -336,28 +362,39 @@ async function handleLogout() {
   localStorage.removeItem('lookbook_user');
   updateUserUI();
   showToast('로그아웃 되었습니다.', 'info');
-  if (window.location.pathname !== '/') {
-    setTimeout(() => window.location.href = '/', 600);
-  }
+  setTimeout(() => window.location.href = '/', 600);
 }
 
 /** 헤더/네비바 사용자 UI 업데이트 */
 function updateUserUI() {
   const user = AppState.user;
 
-  // 랜딩/Generator 공통 — 로그인·가입 버튼 ↔ 유저 영역 전환
   const loginBtn   = document.getElementById('navLoginBtn');
   const signupBtn  = document.getElementById('navSignupBtn');
   const userArea   = document.getElementById('navUserArea');
   const userName   = document.getElementById('navUserName');
   const userCredits= document.getElementById('navUserCredits');
+  const userAvatar = document.getElementById('navUserAvatar');
 
   if (user) {
     if (loginBtn)  loginBtn.style.display  = 'none';
     if (signupBtn) signupBtn.style.display = 'none';
     if (userArea)  userArea.style.display  = 'flex';
-    if (userName)  userName.textContent    = user.name || user.email;
-    if (userCredits) userCredits.textContent = `${user.credits ?? 0}크레딧`;
+    // 아이콘 영역에는 이름/크레딧 표시 안 함 (드롭다운에서만 보임)
+    if (userName)  userName.textContent    = '';
+    if (userCredits) userCredits.textContent = '';
+    // 아바타 이니셜 업데이트
+    if (userAvatar) {
+      const initial = (user.name || user.email || '?')[0].toUpperCase();
+      userAvatar.textContent = initial;
+    }
+    // 드롭다운 내 정보 업데이트
+    const ddName    = document.getElementById('ddUserName');
+    const ddEmail   = document.getElementById('ddUserEmail');
+    const ddCredits = document.getElementById('ddUserCredits');
+    if (ddName)    ddName.textContent    = user.name || user.email;
+    if (ddEmail)   ddEmail.textContent   = user.email || '';
+    if (ddCredits) ddCredits.textContent = `${user.credits ?? 0}크레딧 남음`;
   } else {
     if (loginBtn)  loginBtn.style.display  = '';
     if (signupBtn) signupBtn.style.display = '';
@@ -365,34 +402,48 @@ function updateUserUI() {
   }
 }
 
-/** 세션 서버 검증 (페이지 로드 시) */
+/** 세션 서버 검증 (페이지 로드 시) — 항상 Promise 반환 */
 async function verifySession() {
   const token = localStorage.getItem('lookbook_token');
   if (!token) {
-    AppState.user = null;
+    // 토큰 없으면 localStorage 캐시도 확인 (최초 로드 flash 방지)
+    const stored = localStorage.getItem('lookbook_user');
+    if (stored) {
+      try { AppState.user = JSON.parse(stored); } catch(e) {}
+    } else {
+      AppState.user = null;
+    }
     updateUserUI();
     return;
   }
+
+  // 먼저 로컬 캐시로 즉시 UI 표시 (Flash 방지)
+  const stored = localStorage.getItem('lookbook_user');
+  if (stored) {
+    try {
+      AppState.user = JSON.parse(stored);
+      updateUserUI(); // 즉시 표시
+    } catch(e) {}
+  }
+
+  // 백그라운드에서 서버 검증
   try {
     const res = await fetch('/api/auth/me', {
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { 'X-Session-Token': token }
     });
     const data = await res.json();
     if (data.success && data.user) {
       AppState.user = data.user;
       localStorage.setItem('lookbook_user', JSON.stringify(data.user));
     } else {
-      // 만료된 세션 정리
+      // 서버에서 만료 확인 → 정리
       AppState.user = null;
       localStorage.removeItem('lookbook_token');
       localStorage.removeItem('lookbook_user');
     }
   } catch (e) {
-    // 네트워크 오류 시 로컬 캐시 유지
-    const stored = localStorage.getItem('lookbook_user');
-    if (stored) {
-      try { AppState.user = JSON.parse(stored); } catch (e2) {}
-    }
+    // 네트워크 오류 시 로컬 캐시 유지 (이미 위에서 설정됨)
+    console.log('Session verify network error, using cached user');
   }
   updateUserUI();
 }
@@ -400,18 +451,13 @@ async function verifySession() {
 /** 유저 메뉴 드롭다운 토글 */
 function toggleUserMenu() {
   const menu = document.getElementById('userDropdownMenu');
-  if (!menu) {
-    // 드롭다운 없으면 간단 토스트
-    if (AppState.user) {
-      showToast(`${AppState.user.name}님 (${AppState.user.credits ?? 0}크레딧)`, 'info');
-    }
-    return;
-  }
+  if (!menu) return;
   const isVisible = menu.style.display !== 'none';
   menu.style.display = isVisible ? 'none' : 'block';
   if (!isVisible) {
     const closeMenu = (e) => {
-      if (!menu.contains(e.target)) {
+      const userArea = document.getElementById('navUserArea');
+      if (!menu.contains(e.target) && !(userArea && userArea.contains(e.target))) {
         menu.style.display = 'none';
         document.removeEventListener('click', closeMenu);
       }
@@ -500,18 +546,14 @@ function filterByStatus(status, btn) {
   });
 }
 
-function toggleUserMenu() {
-  showToast('메뉴가 준비 중입니다.', 'info');
-}
+// toggleUserMenu 는 위에서 정의됨 (중복 제거)
 
 // ─────────────────────────────────────────────────────────
 // GENERATOR INIT
 // ─────────────────────────────────────────────────────────
 function initGenerator() {
-  // 세션 검증 후 UI 업데이트
-  verifySession();
-  // 모델과 배경 API에서 로드 (step 3, 4 진입 시 로드)
-  // 페이지 초기화 시 미리 로드
+  // verifySession은 initPage에서 이미 호출됨
+  // 모델/배경 미리 로드
   loadModelsFromAPI();
   loadBackgroundsFromAPI();
 }

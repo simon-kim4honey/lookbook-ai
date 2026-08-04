@@ -862,7 +862,7 @@ app.post('/api/auth/logout', async (c) => {
 // GET /api/auth/kakao — 카카오 OAuth 시작
 // ────────────────────────────────────────────────────
 app.get('/api/auth/kakao', (c) => {
-  const origin = new URL(c.req.url).origin
+  const origin = 'https://studiob.aifashion.co.kr'
   const redirectUri = `${origin}/api/auth/kakao/callback`
   const clientId = c.env.KAKAO_CLIENT_ID || ''
   if (!clientId) return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();</script>`)
@@ -875,7 +875,7 @@ app.get('/api/auth/kakao', (c) => {
 // ────────────────────────────────────────────────────
 app.get('/api/auth/kakao/callback', async (c) => {
   const db = c.env.LOOKBOOK_DB
-  const origin = new URL(c.req.url).origin
+  const origin = 'https://studiob.aifashion.co.kr'
   const code = c.req.query('code')
   const error = c.req.query('error')
 
@@ -930,13 +930,43 @@ app.get('/api/auth/kakao/callback', async (c) => {
     const userJson = JSON.stringify(publicUser(user))
 
     // 팝업 창에서 부모 창으로 메시지 전달
-    return c.html(`<!DOCTYPE html><html><body><script>
-      window.opener?.postMessage({type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson}},'*');
-      window.close();
-    </script><p>로그인 중...</p></body></html>`)
+    return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>로그인 성공</title></head>
+<body>
+<p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 후 창이 닫힙니다...</p>
+<script>
+(function() {
+  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson}};
+  function tryClose() { try { window.close(); } catch(e) {} }
+  function sendMsg() {
+    try {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(payload, '*');
+        setTimeout(tryClose, 800);
+      } else {
+        // opener가 없으면 localStorage에 저장 후 닫기
+        try { localStorage.setItem('oauth_result', JSON.stringify(payload)); } catch(e) {}
+        setTimeout(tryClose, 500);
+      }
+    } catch(e) {
+      setTimeout(tryClose, 500);
+    }
+  }
+  if (document.readyState === 'complete') {
+    sendMsg();
+  } else {
+    window.addEventListener('load', sendMsg);
+  }
+})();
+</script>
+</body></html>`)
   } catch (err: any) {
     console.error('kakao callback error:', err)
-    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${err.message}'},'*');window.close();</script>`)
+    return c.html(`<!DOCTYPE html><html><body><script>
+      try { if(window.opener) window.opener.postMessage({type:'oauth_error',provider:'kakao',error:'${err.message}'},'*'); } catch(e) {}
+      setTimeout(() => window.close(), 500);
+    </script><p style="font-family:sans-serif;text-align:center;padding:40px;">로그인 오류가 발생했습니다.</p></body></html>`)
   }
 })
 
@@ -944,7 +974,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
 // GET /api/auth/google — 구글 OAuth 시작
 // ────────────────────────────────────────────────────
 app.get('/api/auth/google', (c) => {
-  const origin = new URL(c.req.url).origin
+  const origin = 'https://studiob.aifashion.co.kr'
   const redirectUri = `${origin}/api/auth/google/callback`
   const clientId = c.env.GOOGLE_CLIENT_ID || ''
   if (!clientId) return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();</script>`)
@@ -961,7 +991,7 @@ app.get('/api/auth/google', (c) => {
 // ────────────────────────────────────────────────────
 app.get('/api/auth/google/callback', async (c) => {
   const db = c.env.LOOKBOOK_DB
-  const origin = new URL(c.req.url).origin
+  const origin = 'https://studiob.aifashion.co.kr'
   const code = c.req.query('code')
   const error = c.req.query('error')
 
@@ -1011,13 +1041,42 @@ app.get('/api/auth/google/callback', async (c) => {
     const token = await createSession(db, user.id)
     const userJson = JSON.stringify(publicUser(user))
 
-    return c.html(`<!DOCTYPE html><html><body><script>
-      window.opener?.postMessage({type:'oauth_success',provider:'google',token:'${token}',user:${userJson}},'*');
-      window.close();
-    </script><p>로그인 중...</p></body></html>`)
+    return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>로그인 성공</title></head>
+<body>
+<p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 후 창이 닫힙니다...</p>
+<script>
+(function() {
+  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson}};
+  function tryClose() { try { window.close(); } catch(e) {} }
+  function sendMsg() {
+    try {
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage(payload, '*');
+        setTimeout(tryClose, 800);
+      } else {
+        try { localStorage.setItem('oauth_result', JSON.stringify(payload)); } catch(e) {}
+        setTimeout(tryClose, 500);
+      }
+    } catch(e) {
+      setTimeout(tryClose, 500);
+    }
+  }
+  if (document.readyState === 'complete') {
+    sendMsg();
+  } else {
+    window.addEventListener('load', sendMsg);
+  }
+})();
+</script>
+</body></html>`)
   } catch (err: any) {
     console.error('google callback error:', err)
-    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'${err.message}'},'*');window.close();</script>`)
+    return c.html(`<!DOCTYPE html><html><body><script>
+      try { if(window.opener) window.opener.postMessage({type:'oauth_error',provider:'google',error:'${err.message}'},'*'); } catch(e) {}
+      setTimeout(() => window.close(), 500);
+    </script><p style="font-family:sans-serif;text-align:center;padding:40px;">로그인 오류가 발생했습니다.</p></body></html>`)
   }
 })
 
@@ -1887,6 +1946,130 @@ ${bodyContent}
 </body>
 </html>`
 
+// ─── 이용약관 페이지 ───
+app.get('/terms', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>서비스 이용약관 - LookbookAI Studio</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #333; line-height: 1.8; }
+    h1 { font-size: 28px; border-bottom: 2px solid #eee; padding-bottom: 16px; }
+    h2 { font-size: 18px; margin-top: 32px; color: #111; }
+    p, li { font-size: 15px; color: #444; }
+    .date { color: #888; font-size: 14px; margin-bottom: 32px; }
+    a { color: #6c5ce7; }
+  </style>
+</head>
+<body>
+  <h1>서비스 이용약관</h1>
+  <p class="date">시행일: 2025년 1월 1일 | 최종 수정일: 2025년 1월 1일</p>
+
+  <h2>제1조 (목적)</h2>
+  <p>본 약관은 LookbookAI Studio(이하 "서비스")가 제공하는 AI 패션 룩북 생성 서비스의 이용에 관한 조건 및 절차, 회사와 이용자의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</p>
+
+  <h2>제2조 (정의)</h2>
+  <p>① "서비스"란 LookbookAI Studio가 제공하는 AI 기반 패션 이미지 생성 플랫폼을 의미합니다.</p>
+  <p>② "이용자"란 본 약관에 동의하고 서비스를 이용하는 자를 의미합니다.</p>
+  <p>③ "크레딧"이란 서비스 내 AI 이미지 생성에 사용되는 가상 화폐를 의미합니다.</p>
+
+  <h2>제3조 (약관의 효력 및 변경)</h2>
+  <p>① 본 약관은 서비스 화면에 게시하거나 기타 방법으로 이용자에게 공지함으로써 효력이 발생합니다.</p>
+  <p>② 서비스는 필요한 경우 약관을 변경할 수 있으며, 변경된 약관은 공지 후 7일 이내에 효력이 발생합니다.</p>
+
+  <h2>제4조 (서비스 이용)</h2>
+  <p>① 이용자는 본 약관에 동의함으로써 서비스를 이용할 수 있습니다.</p>
+  <p>② 서비스는 AI를 활용한 패션 이미지 생성 기능을 제공합니다.</p>
+  <p>③ 이용자는 서비스 이용 시 관련 법령을 준수해야 합니다.</p>
+
+  <h2>제5조 (이용자의 의무)</h2>
+  <p>이용자는 다음 행위를 해서는 안 됩니다.</p>
+  <ul>
+    <li>타인의 권리를 침해하는 방식으로 서비스를 이용하는 행위</li>
+    <li>불법적인 콘텐츠를 생성하거나 유포하는 행위</li>
+    <li>서비스의 정상적인 운영을 방해하는 행위</li>
+    <li>다른 이용자의 개인정보를 무단으로 수집·이용하는 행위</li>
+  </ul>
+
+  <h2>제6조 (서비스 변경 및 중단)</h2>
+  <p>서비스는 운영상 필요한 경우 서비스 내용을 변경하거나 중단할 수 있으며, 이 경우 사전에 공지합니다.</p>
+
+  <h2>제7조 (면책조항)</h2>
+  <p>① 서비스는 AI가 생성한 콘텐츠의 정확성, 완전성에 대해 보증하지 않습니다.</p>
+  <p>② 서비스는 이용자의 귀책사유로 인한 손해에 대해 책임을 지지 않습니다.</p>
+
+  <h2>제8조 (분쟁 해결)</h2>
+  <p>본 약관과 관련한 분쟁은 대한민국 법률을 적용하며, 관할 법원은 민사소송법에 따릅니다.</p>
+
+  <p style="margin-top:40px; color:#888; font-size:13px;">문의: <a href="mailto:kim4honey@gmail.com">kim4honey@gmail.com</a></p>
+</body>
+</html>`)
+})
+
+// ─── 개인정보처리방침 페이지 ───
+app.get('/privacy', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>개인정보처리방침 - LookbookAI Studio</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #333; line-height: 1.8; }
+    h1 { font-size: 28px; border-bottom: 2px solid #eee; padding-bottom: 16px; }
+    h2 { font-size: 18px; margin-top: 32px; color: #111; }
+    p, li { font-size: 15px; color: #444; }
+    .date { color: #888; font-size: 14px; margin-bottom: 32px; }
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+    th, td { border: 1px solid #ddd; padding: 10px 14px; font-size: 14px; text-align: left; }
+    th { background: #f5f5f5; }
+    a { color: #6c5ce7; }
+  </style>
+</head>
+<body>
+  <h1>개인정보처리방침</h1>
+  <p class="date">시행일: 2025년 1월 1일 | 최종 수정일: 2025년 1월 1일</p>
+
+  <p>LookbookAI Studio(이하 "서비스")는 이용자의 개인정보를 소중히 여기며, 개인정보 보호법 등 관련 법령을 준수합니다.</p>
+
+  <h2>1. 수집하는 개인정보 항목</h2>
+  <table>
+    <tr><th>수집 항목</th><th>수집 목적</th><th>보유 기간</th></tr>
+    <tr><td>이메일, 닉네임, 프로필 사진</td><td>회원가입 및 서비스 이용</td><td>회원 탈퇴 시까지</td></tr>
+    <tr><td>서비스 이용 기록</td><td>서비스 개선 및 분석</td><td>1년</td></tr>
+  </table>
+
+  <h2>2. 개인정보 수집 방법</h2>
+  <p>카카오 로그인, Google 로그인, 이메일 직접 가입을 통해 수집합니다.</p>
+
+  <h2>3. 개인정보 이용 목적</h2>
+  <ul>
+    <li>회원 식별 및 서비스 제공</li>
+    <li>AI 이미지 생성 서비스 운영</li>
+    <li>고객 문의 응대</li>
+    <li>서비스 개선 및 신규 기능 개발</li>
+  </ul>
+
+  <h2>4. 개인정보 제3자 제공</h2>
+  <p>서비스는 이용자의 동의 없이 개인정보를 제3자에게 제공하지 않습니다. 단, 법령에 의한 요청이 있는 경우는 예외로 합니다.</p>
+
+  <h2>5. 개인정보 보유 및 이용 기간</h2>
+  <p>회원 탈퇴 시 즉시 삭제하며, 관련 법령에 따라 일정 기간 보관이 필요한 경우 해당 기간 동안 보관 후 삭제합니다.</p>
+
+  <h2>6. 이용자의 권리</h2>
+  <p>이용자는 언제든지 개인정보 열람, 정정, 삭제, 처리 정지를 요청할 수 있습니다.</p>
+
+  <h2>7. 개인정보 보호책임자</h2>
+  <p>이메일: <a href="mailto:kim4honey@gmail.com">kim4honey@gmail.com</a></p>
+
+  <h2>8. 개인정보 처리방침 변경</h2>
+  <p>본 방침은 법령·정책 변경에 따라 수정될 수 있으며, 변경 시 서비스 내 공지합니다.</p>
+</body>
+</html>`)
+})
+
 // ─── Landing Page ───
 app.get('/_home_old', (c) => {
   return c.redirect('/generator', 302)
@@ -1919,21 +2102,36 @@ app.get('/', (c) => {
         <a href="#pricing">요금제</a>
         <a href="/dashboard">대시보드</a>
       </div>
-      <div class="navbar-actions">
+      <div class="navbar-actions" style="position:relative;">
         <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')">로그인</button>
         <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')">무료 시작</button>
-        <!-- 로그인 후 노출 영역 -->
-        <div id="navUserArea" style="display:none;align-items:center;gap:10px;">
-          <span style="font-size:13px;color:var(--text-muted);" id="navUserCredits">0크레딧</span>
-          <div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--primary-bg);border-radius:var(--radius-full);cursor:pointer;" onclick="toggleUserMenu()">
-            <div style="width:26px;height:26px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;">✨</div>
-            <span style="font-size:14px;font-weight:600;color:var(--primary);" id="navUserName">사용자</span>
-            <i class="fas fa-chevron-down" style="font-size:10px;color:var(--primary);"></i>
-          </div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:60px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,0.3);z-index:1000;">
-            <a href="/dashboard" style="display:block;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:8px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">📁 대시보드</a>
+        <!-- 로그인 후 프로필 아이콘만 표시 -->
+        <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
+          <span id="navUserCredits" style="display:none;"></span>
+          <span id="navUserName" style="display:none;"></span>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
+          <!-- 드롭다운 -->
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.35);z-index:2000;">
+            <!-- 계정 정보 헤더 -->
+            <div style="padding:12px 14px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+              <div id="ddUserName" style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:12px;color:var(--text-muted);margin-bottom:6px;"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:var(--primary);"></div>
+                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+              </div>
+            </div>
+            <!-- 메뉴 항목 -->
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
+              <span style="font-size:16px;">🖼️</span><span>생성 내역</span>
+            </a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
+              <span style="font-size:16px;">💬</span><span>카톡 문의</span>
+            </a>
             <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:8px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">🚪 로그아웃</button>
+            <button onclick="handleLogout()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">
+              <span style="font-size:16px;">🚪</span><span>로그아웃</span>
+            </button>
           </div>
         </div>
       </div>
@@ -2328,17 +2526,29 @@ app.get('/dashboard', (c) => {
       <div class="navbar-actions" style="position:relative;">
         <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')">로그인</button>
         <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')">무료 시작</button>
-        <div id="navUserArea" style="display:none;align-items:center;gap:10px;">
-          <span style="font-size:13px;color:var(--text-muted);" id="navUserCredits">0크레딧</span>
-          <div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--primary-bg);border-radius:var(--radius-full);cursor:pointer;" onclick="toggleUserMenu()">
-            <div style="width:26px;height:26px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;">✨</div>
-            <span style="font-size:14px;font-weight:600;color:var(--primary);" id="navUserName">사용자</span>
-            <i class="fas fa-chevron-down" style="font-size:10px;color:var(--primary);"></i>
-          </div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:54px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,0.3);z-index:1000;">
-            <a href="/dashboard" style="display:block;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:8px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">📁 대시보드</a>
+        <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
+          <span id="navUserCredits" style="display:none;"></span>
+          <span id="navUserName" style="display:none;"></span>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.35);z-index:2000;">
+            <div style="padding:12px 14px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+              <div id="ddUserName" style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:12px;color:var(--text-muted);margin-bottom:6px;"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:var(--primary);"></div>
+                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+              </div>
+            </div>
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
+              <span style="font-size:16px;">🖼️</span><span>생성 내역</span>
+            </a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
+              <span style="font-size:16px;">💬</span><span>카톡 문의</span>
+            </a>
             <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:8px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">🚪 로그아웃</button>
+            <button onclick="handleLogout()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">
+              <span style="font-size:16px;">🚪</span><span>로그아웃</span>
+            </button>
           </div>
         </div>
       </div>
@@ -2578,15 +2788,30 @@ app.get('/generator', (c) => {
       <!-- 로그인 상태 표시 -->
       <div style="display:flex;align-items:center;gap:8px;position:relative;">
         <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:12px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
-        <div id="navUserArea" style="display:none;align-items:center;gap:6px;cursor:pointer;" onclick="toggleUserMenu()">
-          <div style="width:24px;height:24px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;">✨</div>
-          <span style="font-size:12px;font-weight:600;color:var(--primary);" id="navUserName">사용자</span>
-          <span style="font-size:11px;color:var(--text-muted);" id="navUserCredits"></span>
-        </div>
-        <div id="userDropdownMenu" style="display:none;position:absolute;top:36px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:10001;">
-          <a href="/dashboard" style="display:block;padding:9px 12px;font-size:13px;color:var(--text);text-decoration:none;border-radius:8px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">📁 대시보드</a>
-          <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-          <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:8px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">🚪 로그아웃</button>
+        <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
+          <span id="navUserCredits" style="display:none;"></span>
+          <span id="navUserName" style="display:none;"></span>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.45);z-index:10001;">
+            <div style="padding:12px 14px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:var(--text-muted);margin-bottom:6px;"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:var(--primary);"></div>
+                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+              </div>
+            </div>
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:13px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
+              <span style="font-size:15px;">🖼️</span><span>생성 내역</span>
+            </a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:13px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
+              <span style="font-size:15px;">💬</span><span>카톡 문의</span>
+            </a>
+            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">
+              <span style="font-size:15px;">🚪</span><span>로그아웃</span>
+            </button>
+          </div>
         </div>
       </div>
     </header>
