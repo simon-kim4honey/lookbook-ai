@@ -1791,8 +1791,7 @@ async function setUserStatus(id, status) {
 
 async function adjustCredits(id, current) {
   // 절대값 설정 (설정 버튼)
-  const val = prompt('크레딧 절대값 설정 (현재: ' + current + '크레딧)
-새 크레딧 수를 입력하세요:', current)
+  const val = prompt('크레딧 절대값 설정 (현재: ' + current + '크레딧) - 새 크레딧 수를 입력하세요:', current)
   if (val === null) return
   const credits = parseInt(val)
   if (isNaN(credits) || credits < 0) { showAdminToast('올바른 크레딧 수를 입력하세요', 'err'); return }
@@ -1810,17 +1809,12 @@ async function adjustCredits(id, current) {
 
 async function grantCredits(id, current) {
   // 크레딧 지급 (증감) — 지급 버튼
-  const val = prompt(
-    '크레딧 지급 (현재: ' + current + '크레딧)
-지급할 크레딧 수를 입력하세요 (음수 입력 시 차감)
-빠른 지급: 100 / 500 / 1000', '1000'
-  )
+  const val = prompt('크레딧 지급 (현재: ' + current + '크레딧) - 지급할 크레딧 수 입력 (음수=차감) / 빠른 지급: 100/500/1000', '1000')
   if (val === null) return
   const amount = parseInt(val)
   if (isNaN(amount) || amount === 0) { showAdminToast('0이 아닌 숫자를 입력하세요', 'err'); return }
   const action = amount > 0 ? '지급' : '차감'
-  if (!confirm('"' + Math.abs(amount) + '크레딧"을 ' + action + '하시겠습니까?
-현재: ' + current + ' → 변경 후: ' + (current + amount))) return
+  if (!confirm('"' + Math.abs(amount) + '크레딧"을 ' + action + '하시겠습니까? 현재: ' + current + ' → 변경 후: ' + (current + amount))) return
   try {
     const res = await fetch('/api/admin/users/' + id, {
       method: 'PATCH',
@@ -1834,7 +1828,7 @@ async function grantCredits(id, current) {
 }
 
 async function deleteUser(id, name, email) {
-  if (!confirm('"' + name + '" (' + email + ') 회원을 삭제하시겠습니까?\\n삭제 후 복구가 어렵습니다.')) return
+  if (!confirm('"' + name + '" (' + email + ') 회원을 삭제하시겠습니까? 삭제 후 복구가 어렵습니다.')) return
   try {
     const res = await fetch('/api/admin/users/' + id, {
       method: 'DELETE',

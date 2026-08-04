@@ -1645,7 +1645,15 @@ async function downloadImage() {
 
     if (deductRes.status === 402) {
       const errData = await deductRes.json();
-      showToast(`크레딧이 부족합니다. (보유: ${errData.available || 0}크레딧)`, 'error');
+      const have = errData.available || 0;
+      showToast(`크레딧이 부족합니다. (보유: ${have}크레딧 / 필요: 90크레딧) 대시보드에서 충전해 주세요.`, 'error');
+      // 모달 닫고 대시보드 충전 페이지로 유도
+      setTimeout(() => {
+        closeModal('imageModal');
+        // 네비 드롭다운 열기 (충전 버튼 노출)
+        const userArea = document.getElementById('navUserArea');
+        if (userArea) userArea.click();
+      }, 1500);
       return;
     }
 
