@@ -29,7 +29,7 @@ var e=(e,t,n)=>(r,i)=>{let a=-1;return o(0);async function o(s){if(s<=a)throw Er
 ${t}
 <script src="/static/app.js"><\/script>
 </body>
-</html>`;U.get(`/_home_old`,e=>e.redirect(`/generator`,302)),U.get(`/`,e=>(e.req.header(`host`)||``).includes(`studiob.aifashion.co.kr`)?e.redirect(`/generator`,302):e.html(st(`홈`,`
+</html>`;U.get(`/_home_old`,e=>e.redirect(`/generator`,302)),U.get(`/`,e=>{let t=e.req.header(`host`)||``;return t.includes(`studiob.aifashion.co.kr`)?e.redirect(`/generator`,302):t===`www.aifashion.co.kr`||t===`aifashion.co.kr`?e.redirect(`https://studiob.aifashion.co.kr`,302):e.html(st(`홈`,`
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
@@ -433,7 +433,7 @@ ${t}
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="#" style="color:var(--primary);">이용약관</a> 및 <a href="#" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
-  `))),U.get(`/dashboard`,e=>e.html(st(`대시보드`,`
+  `))}),U.get(`/dashboard`,e=>e.html(st(`대시보드`,`
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- Navbar -->
