@@ -1429,15 +1429,14 @@ function renderUserTable(users) {
     var joined = u.created_at ? u.created_at.slice(0,10) : '-'
     var isAdmin = u.role === 'admin'
     var adminBadge = isAdmin ? ' <span style="font-size:10px;background:#6c47ff;color:white;padding:1px 6px;border-radius:8px;">Admin</span>' : ''
+    var uid = String(u.id)
     var statusBtn = ''
     if (u.status === 'active') {
-      statusBtn = '<button onclick="setUserStatus('' + u.id + '','suspended')" class="btn-sm btn-danger-sm" style="font-size:11px;padding:4px 10px;">정지</button>'
+      statusBtn = '<button data-uid="' + uid + '" data-action="suspend" class="btn-sm btn-danger-sm" style="font-size:11px;padding:4px 10px;">정지</button>'
     } else if (u.status === 'suspended') {
-      statusBtn = '<button onclick="setUserStatus('' + u.id + '','active')" class="btn-sm btn-primary-sm" style="font-size:11px;padding:4px 10px;">활성화</button>'
+      statusBtn = '<button data-uid="' + uid + '" data-action="activate" class="btn-sm btn-primary-sm" style="font-size:11px;padding:4px 10px;">활성화</button>'
     }
-    var safeEmail = (u.email||'').replace(/'/g,"\\'")
-    var safeName = (u.name||'').replace(/'/g,"\\'")
-    var deleteBtn = !isAdmin ? '<button onclick="deleteUser('' + u.id + '','' + safeName + '','' + safeEmail + '')" class="btn-sm btn-danger-sm" style="font-size:11px;padding:4px 10px;">삭제</button>' : ''
+    var deleteBtn = !isAdmin ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||'') + '" data-email="' + escHtml(u.email||'') + '" data-action="delete" class="btn-sm btn-danger-sm" style="font-size:11px;padding:4px 10px;">삭제</button>' : ''
     var credits = (u.credits != null) ? u.credits : 0
     return '<tr style="border-bottom:1px solid #1e1e3a;">'
       + '<td style="padding:12px 16px;">'
@@ -1452,7 +1451,7 @@ function renderUserTable(users) {
       + '<td style="padding:12px 16px;">' + (providerBadge[u.provider] || u.provider) + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">'
       +   '<span style="font-size:14px;font-weight:700;color:#9b7cff;">' + credits + '</span>'
-      +   '<button onclick="adjustCredits('' + u.id + '',' + credits + ')" style="margin-left:6px;font-size:10px;padding:2px 6px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">수정</button>'
+      +   '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="credits" style="margin-left:6px;font-size:10px;padding:2px 6px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">수정</button>'
       + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">' + (statusBadge[u.status] || u.status) + '</td>'
       + '<td style="padding:12px 16px;font-size:12px;color:#8b8ba0;">' + joined + '</td>'
@@ -1497,8 +1496,7 @@ async function setUserStatus(id, status) {
 }
 
 async function adjustCredits(id, current) {
-  const val = prompt('크레딧 수정 (현재: ' + current + '크레딧)
-새 크레딧 수를 입력하세요:', current)
+  const val = prompt('크레딧 수정 (현재: ' + current + '크레딧)\\n새 크레딧 수를 입력하세요:', current)
   if (val === null) return
   const credits = parseInt(val)
   if (isNaN(credits) || credits < 0) { showAdminToast('올바른 크레딧 수를 입력하세요', 'err'); return }
@@ -1515,8 +1513,7 @@ async function adjustCredits(id, current) {
 }
 
 async function deleteUser(id, name, email) {
-  if (!confirm('"' + name + '" (' + email + ') 회원을 삭제하시겠습니까?
-삭제 후 복구가 어렵습니다.')) return
+  if (!confirm('"' + name + '" (' + email + ') 회원을 삭제하시겠습니까?\\n삭제 후 복구가 어렵습니다.')) return
   try {
     const res = await fetch('/api/admin/users/' + id, {
       method: 'DELETE',
@@ -1884,6 +1881,18 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pwInput').focus()
   setupDrop('modelUploadZone', onModelFilesSelect)
   setupDrop('bgUploadZone', onBgFilesSelect)
+
+  // 이벤트 위임: 유저 테이블 버튼 처리 (onclick 대신 data-action 사용)
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]')
+    if (!btn) return
+    var action = btn.dataset.action
+    var uid = btn.dataset.uid
+    if (action === 'suspend') { setUserStatus(uid, 'suspended') }
+    else if (action === 'activate') { setUserStatus(uid, 'active') }
+    else if (action === 'delete') { deleteUser(uid, btn.dataset.name || '', btn.dataset.email || '') }
+    else if (action === 'credits') { adjustCredits(uid, parseInt(btn.dataset.credits || '0')) }
+  })
 })
 <\/script>
 </body>
