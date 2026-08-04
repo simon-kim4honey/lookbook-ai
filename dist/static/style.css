@@ -609,6 +609,22 @@ footer {
 .footer-links { list-style: none; display: flex; flex-direction: column; gap: 10px; }
 .footer-links li a { font-size: 14px; color: #A0A0C0; transition: var(--transition); }
 .footer-links li a:hover { color: var(--white); }
+.footer-company-info {
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.footer-company-info p {
+  font-size: 12px;
+  color: #7a7a9a;
+  line-height: 1.7;
+  margin: 0;
+}
+.footer-company-info strong {
+  color: #a0a0c0;
+  font-weight: 700;
+}
 .footer-bottom {
   border-top: 1px solid rgba(255,255,255,0.1);
   padding-top: 24px;

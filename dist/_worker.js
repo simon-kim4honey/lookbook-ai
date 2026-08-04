@@ -339,15 +339,39 @@ ${t}
         <div class="footer-col">
           <h4>법적 고지</h4>
           <ul class="footer-links">
-            <li><a href="#">이용약관</a></li>
-            <li><a href="#">개인정보처리방침</a></li>
+            <li><a href="/terms">이용약관</a></li>
+            <li><a href="/privacy">개인정보처리방침</a></li>
             <li><a href="#">쿠키 정책</a></li>
           </ul>
         </div>
       </div>
+
+      <!-- 회사 정보 구분선 -->
+      <div style="border-top:1px solid rgba(255,255,255,0.08);margin:32px 0 24px;"></div>
+
+      <!-- 사업자 정보 -->
+      <div class="footer-company-info">
+        <p>
+          <strong>벌거벗은호랑이</strong>&nbsp;&nbsp;
+          대표자 : 김사헌&nbsp;&nbsp;
+          사업자등록번호 : 204-29-48306
+        </p>
+        <p>
+          사업장주소 : 충청북도 청주시 서원구 무심서로 377-3, 예술관 309호 (모충동, 서원대학교)
+        </p>
+        <p>
+          개업일 : 2023년 11월 24일&nbsp;&nbsp;
+          업태 : 정보통신업&nbsp;&nbsp;
+          종목 : 응용 소프트웨어 개발 및 공급업
+        </p>
+      </div>
+
       <div class="footer-bottom">
-        <span>© 2024 LookbookAI. All rights reserved.</span>
-        <span>사업자등록번호: 000-00-00000</span>
+        <span>© 2025 벌거벗은호랑이 / LookbookAI. All rights reserved.</span>
+        <div style="display:flex;gap:16px;align-items:center;">
+          <a href="/terms" style="color:var(--text-muted);font-size:13px;">이용약관</a>
+          <a href="/privacy" style="color:var(--text-muted);font-size:13px;font-weight:700;">개인정보처리방침</a>
+        </div>
       </div>
     </div>
   </footer>
