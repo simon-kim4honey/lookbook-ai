@@ -31,6 +31,10 @@ const AppState = {
   pollInterval: null,
   user: null,
 
+  // 재생성 관련
+  regenCount: 0,          // 현재 재생성 횟수 (최대 3회)
+  lastGenParams: null,    // 마지막 생성에 사용된 파라미터 (재생성용)
+
   // API 로드된 데이터
   allModels: [],
   filteredModels: [],
@@ -1164,8 +1168,26 @@ async function startGeneration() {
       }
     }, 2000);
 
-    // 세션 토큰 (크레딧 차감을 위해 서버에 전달)
+    // 세션 토큰 (로그인 인증용)
     const sessionToken = localStorage.getItem('lookbook_token') || '';
+
+    // 재생성을 위해 파라미터 저장 + 재생성 카운터 초기화
+    AppState.lastGenParams = {
+      modelId: model?.id,
+      modelName: model?.name || '패션 모델',
+      modelDesc,
+      bgId: bg?.id,
+      bgName: bg?.name || '스튜디오',
+      bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
+      poseType: AppState.genOptions.pose_type,
+      pose: AppState.genOptions.pose,
+      ratio: AppState.genOptions.ratio || '3:4',
+      resolution: AppState.genOptions.resolution || 'HD',
+      count,
+      clothingImages,
+      clothingImageUrl,
+    };
+    AppState.regenCount = 0;
 
     let startRes;
     try {
@@ -1175,21 +1197,7 @@ async function startGeneration() {
           'Content-Type': 'application/json',
           'X-Session-Token': sessionToken,
         },
-        body: JSON.stringify({
-          modelId: model?.id,
-          modelName: model?.name || '패션 모델',
-          modelDesc,
-          bgId: bg?.id,
-          bgName: bg?.name || '스튜디오',
-          bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
-          poseType: AppState.genOptions.pose_type,
-          pose: AppState.genOptions.pose,
-          ratio: AppState.genOptions.ratio || '3:4',
-          resolution: AppState.genOptions.resolution || 'HD',
-          count,
-          clothingImages,   // 신규: 다중 의류 배열
-          clothingImageUrl, // 레거시 호환
-        })
+        body: JSON.stringify(AppState.lastGenParams)
       });
     } finally {
       // Step1 완료 (또는 단일단계 요청 완료) → 가짜 진행 타이머 중지
@@ -1221,17 +1229,7 @@ async function startGeneration() {
       throw new Error('생성 요청 실패: Job ID 없음');
     }
 
-    // 크레딧 차감 후 잔액 즉시 갱신
-    if (startData.creditsRemaining !== undefined) {
-      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
-      if (cachedUser) {
-        cachedUser.credits = startData.creditsRemaining;
-        localStorage.setItem('lookbook_user', JSON.stringify(cachedUser));
-      }
-      updateUserUI({ credits: startData.creditsRemaining });
-      console.log(`[Credits] 차감 완료. 잔액: ${startData.creditsRemaining}크레딧`);
-    }
-
+    // 크레딧 차감은 다운로드 시점에 수행
     AppState.currentJobId = startData.jobId;
 
     // Fallback 처리 (즉시 완료)
@@ -1509,59 +1507,55 @@ function openImageModal(idx) {
   if (!img) return;
 
   const modal = document.getElementById('imageModal');
-  const modalTitle = document.getElementById('modalImageTitle');
-  const modalMeta = document.getElementById('modalImageMeta');
-  const previewArea = document.querySelector('.image-modal-preview');
+  const modalImg = document.getElementById('modalImage');
 
-  if (previewArea) {
+  // 이미지 설정
+  if (modalImg) {
     if (img.url) {
-      previewArea.innerHTML = `
-        <img
-          id="modalImageEl"
-          src="${img.url}"
-          alt="${img.title || `피팅컷 #${idx + 1}`}"
-          style="max-width:100%;max-height:80vh;border-radius:12px;object-fit:contain;"
-          onerror="this.parentElement.innerHTML='<div style=\\"width:400px;height:533px;background:${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'};border-radius:12px;display:flex;align-items:center;justify-content:center;\\"</div>'"
-        />
-      `;
-      // 이미지 로드 후 실제 해상도 읽기
-      const imgEl = document.getElementById('modalImageEl');
-      if (imgEl) {
-        const updateMeta = () => {
-          const w = imgEl.naturalWidth;
-          const h = imgEl.naturalHeight;
-          if (w && h) {
-            const metaEl = document.getElementById('modalImageMeta');
-            const detailEl = document.getElementById('modalImageDetail');
-            if (metaEl) metaEl.textContent = `${w.toLocaleString()} × ${h.toLocaleString()}px · JPEG`;
-            if (detailEl) detailEl.innerHTML = `생성 모델: Atlas Cloud AI<br/>해상도: ${w.toLocaleString()} × ${h.toLocaleString()}px<br/>형식: JPEG`;
-          }
-        };
-        if (imgEl.complete && imgEl.naturalWidth) {
-          updateMeta();
-        } else {
-          imgEl.addEventListener('load', updateMeta);
-        }
-      }
+      modalImg.src = img.url;
+      modalImg.style.display = 'block';
     } else {
-      previewArea.innerHTML = `
-        <div style="width:400px;height:533px;background:${img.gradient};border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;">
-          <span style="font-size:80px;">✨</span>
-          <span style="color:rgba(255,255,255,0.9);font-size:16px;font-weight:700;">AI 생성 피팅컷 #${idx + 1}</span>
-          <span style="color:rgba(255,255,255,0.6);font-size:13px;">데모 이미지</span>
-        </div>
-      `;
+      modalImg.src = '';
+      modalImg.style.display = 'none';
     }
   }
 
-  if (modalTitle) modalTitle.textContent = img.title || `AI 피팅컷 #${idx + 1}`;
-  // 초기 표시 (실제 크기는 이미지 로드 완료 후 위 updateMeta에서 업데이트)
-  if (modalMeta) modalMeta.textContent = img.url ? '해상도 확인 중...' : '미리보기 이미지';
-
-  // 현재 이미지 인덱스 저장 (다운로드용)
+  // 현재 이미지 인덱스 저장 (다운로드 / 재생성용)
   modal.dataset.currentIdx = idx;
 
+  // 재생성 버튼 상태 업데이트
+  updateRegenUI();
+
   openModal('imageModal');
+}
+
+// 재생성 버튼 UI 업데이트
+function updateRegenUI() {
+  const regenBtn = document.getElementById('regenBtn');
+  const regenBtnText = document.getElementById('regenBtnText');
+  const regenCounter = document.getElementById('regenCounter');
+  const regenLimitMsg = document.getElementById('regenLimitMsg');
+  const MAX_REGEN = 3;
+
+  if (!regenBtn) return;
+
+  if (AppState.regenCount >= MAX_REGEN) {
+    // 한도 초과
+    regenBtn.disabled = true;
+    regenBtn.style.opacity = '0.4';
+    regenBtn.style.cursor = 'not-allowed';
+    if (regenBtnText) regenBtnText.textContent = '재생성';
+    if (regenCounter) regenCounter.textContent = `${MAX_REGEN}/${MAX_REGEN}`;
+    if (regenLimitMsg) regenLimitMsg.style.display = 'block';
+  } else {
+    // 정상 상태
+    regenBtn.disabled = false;
+    regenBtn.style.opacity = '1';
+    regenBtn.style.cursor = 'pointer';
+    if (regenBtnText) regenBtnText.textContent = '재생성';
+    if (regenCounter) regenCounter.textContent = AppState.regenCount > 0 ? `${AppState.regenCount}/${MAX_REGEN}` : '';
+    if (regenLimitMsg) regenLimitMsg.style.display = 'none';
+  }
 }
 
 function switchResultsTab(tab, btn) {
@@ -1623,17 +1617,164 @@ function downloadAll() {
   showToast(`${count}장 다운로드를 시작합니다. (1792 × 2400px 원본)`, 'success');
 }
 
-function downloadImage() {
+async function downloadImage() {
   const modal = document.getElementById('imageModal');
   const idx = parseInt(modal?.dataset.currentIdx || '0');
   const img = AppState.generatedImages[idx];
+  const downloadBtn = document.getElementById('downloadBtn');
 
-  if (img?.url) {
-    downloadSingleImage(img.url, idx + 1);
-  } else {
-    showToast('이미지를 다운로드합니다.', 'success');
+  // 버튼 비활성화 (중복 클릭 방지)
+  if (downloadBtn) {
+    downloadBtn.disabled = true;
+    downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
   }
-  closeModal('imageModal');
+
+  try {
+    // 크레딧 차감 API 호출
+    const sessionToken = localStorage.getItem('lookbook_token') || '';
+    const deductRes = await fetch('/api/credits/deduct', {
+      method: 'POST',
+      headers: { 'X-Session-Token': sessionToken },
+    });
+
+    if (deductRes.status === 401) {
+      showToast('로그인이 필요합니다.', 'error');
+      closeModal('imageModal');
+      return;
+    }
+
+    if (deductRes.status === 402) {
+      const errData = await deductRes.json();
+      showToast(`크레딧이 부족합니다. (보유: ${errData.available || 0}크레딧)`, 'error');
+      return;
+    }
+
+    if (!deductRes.ok) {
+      showToast('크레딧 처리 중 오류가 발생했습니다.', 'error');
+      return;
+    }
+
+    const deductData = await deductRes.json();
+    console.log('[Credits] 다운로드 차감:', deductData);
+
+    // 크레딧 잔액 UI 갱신
+    if (deductData.creditsRemaining !== undefined) {
+      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+      if (cachedUser) {
+        cachedUser.credits = deductData.creditsRemaining;
+        localStorage.setItem('lookbook_user', JSON.stringify(cachedUser));
+      }
+      if (AppState.user) AppState.user.credits = deductData.creditsRemaining;
+      updateUserUI({ credits: deductData.creditsRemaining });
+    }
+
+    // 실제 다운로드 실행
+    if (img?.url) {
+      downloadSingleImage(img.url, idx + 1);
+      showToast(`다운로드 완료! (90크레딧 차감, 잔액: ${deductData.creditsRemaining}크레딧)`, 'success');
+    } else {
+      showToast('이미지를 다운로드합니다.', 'success');
+    }
+    closeModal('imageModal');
+
+  } catch (err) {
+    console.error('Download error:', err);
+    showToast('다운로드 중 오류가 발생했습니다.', 'error');
+  } finally {
+    if (downloadBtn) {
+      downloadBtn.disabled = false;
+      downloadBtn.innerHTML = '<i class="fas fa-download"></i> 다운로드';
+    }
+  }
+}
+
+// 재생성 함수 (최대 3회)
+async function regenImage() {
+  const MAX_REGEN = 3;
+
+  if (AppState.regenCount >= MAX_REGEN) {
+    updateRegenUI();
+    return;
+  }
+
+  if (!AppState.lastGenParams) {
+    showToast('재생성할 이미지 정보가 없습니다.', 'error');
+    return;
+  }
+
+  const regenBtn = document.getElementById('regenBtn');
+  const regenBtnText = document.getElementById('regenBtnText');
+  const regenCounter = document.getElementById('regenCounter');
+
+  // 버튼 로딩 상태
+  if (regenBtn) {
+    regenBtn.disabled = true;
+    regenBtn.style.opacity = '0.6';
+  }
+  if (regenBtnText) regenBtnText.textContent = '재생성 중...';
+  if (regenCounter) regenCounter.textContent = '';
+
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+
+  try {
+    // 현재 모달의 이미지 인덱스 기억
+    const modal = document.getElementById('imageModal');
+    const currentIdx = parseInt(modal?.dataset.currentIdx || '0');
+
+    // 생성 API 재호출
+    const res = await fetch('/api/generation/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Session-Token': sessionToken,
+      },
+      body: JSON.stringify(AppState.lastGenParams),
+    });
+
+    if (res.status === 401) {
+      showToast('로그인이 필요합니다.', 'error');
+      return;
+    }
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      showToast(errData.error || '재생성 요청 실패', 'error');
+      return;
+    }
+
+    const startData = await res.json();
+    if (!startData.jobId) {
+      showToast('재생성 요청 실패: Job ID 없음', 'error');
+      return;
+    }
+
+    // 재생성 카운트 증가
+    AppState.regenCount++;
+
+    showToast(`재생성 시작! (${AppState.regenCount}/${MAX_REGEN})`, 'info');
+
+    // 모달 닫고 생성 진행 UI 표시
+    closeModal('imageModal');
+
+    // 생성 진행 상태 UI로 전환
+    const generatingView = document.getElementById('generatingView');
+    const resultsSection = document.getElementById('resultsSection');
+    if (generatingView) generatingView.style.display = '';
+    if (resultsSection) resultsSection.style.display = 'none';
+
+    updateProgress(10, '재생성 중...');
+    AppState.isGenerating = true;
+    AppState.currentJobId = startData.jobId;
+
+    // 폴링
+    await pollGenerationStatus(startData.jobId, AppState.lastGenParams.count || 1);
+
+  } catch (err) {
+    console.error('Regen error:', err);
+    showToast(`재생성 오류: ${err.message}`, 'error');
+  } finally {
+    // 버튼 상태 복원은 updateRegenUI에서 처리
+    updateRegenUI();
+  }
 }
 
 function toggleFavorite() {

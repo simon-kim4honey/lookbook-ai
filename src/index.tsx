@@ -1252,6 +1252,50 @@ app.get('/api/credits/history', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
+// Credits Deduct API — 이미지 다운로드 시 크레딧 차감
+// ────────────────────────────────────────────────────
+app.post('/api/credits/deduct', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.', code: 'UNAUTHORIZED' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT s.user_id, u.credits, u.name FROM user_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token = ? AND s.expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.', code: 'UNAUTHORIZED' }, 401)
+
+    const COST = CREDITS_PER_IMAGE  // 90크레딧
+    if (sess.credits < COST) {
+      return c.json({
+        error: `크레딧이 부족합니다. (보유: ${sess.credits}크레딧, 필요: ${COST}크레딧)`,
+        code: 'INSUFFICIENT_CREDITS',
+        available: sess.credits,
+        required: COST,
+      }, 402)
+    }
+
+    const newBalance = sess.credits - COST
+    await db.prepare(
+      `UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`
+    ).bind(newBalance, sess.user_id).run()
+
+    await db.prepare(
+      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       VALUES (?, 'deduct', ?, ?, 'image_download', ?)`
+    ).bind(sess.user_id, -COST, newBalance, `dl_${Date.now()}`).run()
+
+    console.log(`[Credits] Download deduct: ${sess.name} ${sess.credits} → ${newBalance} (-${COST})`)
+
+    return c.json({ success: true, creditsUsed: COST, creditsRemaining: newBalance })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
 // Image Upload API
 // ────────────────────────────────────────────────────
 app.post('/api/uploads/image', async (c) => {
@@ -1583,7 +1627,7 @@ app.post('/api/generation/start', async (c) => {
       clothingImages,            // 신규: [{ dataUrl, category, label }] 배열
     } = body
 
-    // ── 세션 인증 + 크레딧 차감 ──
+    // ── 세션 인증 (로그인 체크만, 크레딧 차감 없음) ──
     const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
     let sessionUser: any = null
 
@@ -1602,30 +1646,8 @@ app.post('/api/generation/start', async (c) => {
         return c.json({ error: '로그인이 필요합니다.', code: 'UNAUTHORIZED' }, 401)
       }
 
-      // 차감할 크레딧 계산 (count장 생성 → count * CREDITS_PER_IMAGE)
-      const required = count * CREDITS_PER_IMAGE
-      if (sessionUser.credits < required) {
-        return c.json({
-          error: `크레딧이 부족합니다. 필요: ${required}크레딧 / 보유: ${sessionUser.credits}크레딧`,
-          code: 'INSUFFICIENT_CREDITS',
-          required,
-          available: sessionUser.credits,
-        }, 402)
-      }
-
-      // 크레딧 선차감 (생성 실패 시 복구는 별도 처리)
-      const newBalance = sessionUser.credits - required
-      await db.prepare(
-        `UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`
-      ).bind(newBalance, sessionUser.user_id).run()
-
-      // 크레딧 로그 기록
-      await db.prepare(
-        `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-         VALUES (?, 'deduct', ?, ?, 'image_generation', ?)`
-      ).bind(sessionUser.user_id, -required, newBalance, `gen_${Date.now()}`).run()
-
-      console.log(`[Credits] ${sessionUser.name}: ${sessionUser.credits} → ${newBalance} (-${required})`)
+      // 크레딧 차감은 다운로드 시점에 수행 (POST /api/credits/deduct)
+      console.log(`[Generation] ${sessionUser.name} started generation (credits: ${sessionUser.credits})`)
     }
 
     const aspectRatio = toAspectRatio(ratio)
@@ -1894,14 +1916,11 @@ app.post('/api/generation/start', async (c) => {
     }
 
     // jobIds를 콤마로 묶어 단일 jobId처럼 전달 (폴링에서 분리)
-    const newBalance = sessionUser ? sessionUser.credits - (count * CREDITS_PER_IMAGE) : undefined
     return c.json({
       jobId: jobIds.join(','),
       estimatedSeconds: 30,
       status: 'queued',
       isFallback: false,
-      creditsUsed: sessionUser ? count * CREDITS_PER_IMAGE : undefined,
-      creditsRemaining: newBalance,
     })
 
   } catch (err: any) {
@@ -3185,7 +3204,23 @@ app.get('/generator', (c) => {
       <button class="modal-close" style="background:rgba(0,0,0,0.5);color:white;top:12px;right:12px;z-index:20;" onclick="closeModal('imageModal')">×</button>
       <div style="position:relative;display:inline-block;width:100%;">
         <img id="modalImage" src="" alt="생성된 이미지" style="display:block;width:100%;height:auto;border-radius:12px;" />
-        <button onclick="downloadImage()" style="position:absolute;bottom:16px;right:16px;z-index:20;display:flex;align-items:center;gap:8px;padding:10px 20px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.85)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'"><i class="fas fa-download"></i> 다운로드</button>
+        <!-- 버튼 영역: 재생성 + 다운로드 -->
+        <div id="modalButtonArea" style="position:absolute;bottom:16px;right:16px;z-index:20;display:flex;align-items:center;gap:8px;">
+          <!-- 재생성 버튼 -->
+          <button id="regenBtn" onclick="regenImage()" style="display:flex;align-items:center;gap:6px;padding:10px 16px;background:rgba(99,102,241,0.85);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,1)'" onmouseout="this.style.background='rgba(99,102,241,0.85)'">
+            <i class="fas fa-redo-alt"></i>
+            <span id="regenBtnText">재생성</span>
+            <span id="regenCounter" style="font-size:12px;opacity:0.8;"></span>
+          </button>
+          <!-- 다운로드 버튼 -->
+          <button id="downloadBtn" onclick="downloadImage()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.85)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">
+            <i class="fas fa-download"></i> 다운로드
+          </button>
+        </div>
+        <!-- 재생성 한도 초과 메시지 -->
+        <div id="regenLimitMsg" style="display:none;position:absolute;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.9);backdrop-filter:blur(8px);color:white;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;white-space:nowrap;z-index:21;">
+          재생성 한도가 초과하였습니다. 다른 옷으로 시도해주세요.
+        </div>
       </div>
     </div>
   </div>
