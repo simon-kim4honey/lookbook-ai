@@ -2111,27 +2111,19 @@ app.get('/', (c) => {
           <span id="navUserName" style="display:none;"></span>
           <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
           <!-- 드롭다운 -->
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.35);z-index:2000;">
-            <!-- 계정 정보 헤더 -->
-            <div style="padding:12px 14px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;">
-              <div id="ddUserName" style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:12px;color:var(--text-muted);margin-bottom:6px;"></div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:2000;">
+            <div style="padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;">
+              <div id="ddUserName" style="font-size:14px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:var(--primary);"></div>
-                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#6c47ff;"></div>
+                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
-            <!-- 메뉴 항목 -->
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
-              <span style="font-size:16px;">🖼️</span><span>생성 내역</span>
-            </a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
-              <span style="font-size:16px;">💬</span><span>카톡 문의</span>
-            </a>
-            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">
-              <span style="font-size:16px;">🚪</span><span>로그아웃</span>
-            </button>
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
+            <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
           </div>
         </div>
       </div>
@@ -2530,25 +2522,19 @@ app.get('/dashboard', (c) => {
           <span id="navUserCredits" style="display:none;"></span>
           <span id="navUserName" style="display:none;"></span>
           <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.35);z-index:2000;">
-            <div style="padding:12px 14px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;">
-              <div id="ddUserName" style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:12px;color:var(--text-muted);margin-bottom:6px;"></div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:2000;">
+            <div style="padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;">
+              <div id="ddUserName" style="font-size:14px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:var(--primary);"></div>
-                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#6c47ff;"></div>
+                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
-              <span style="font-size:16px;">🖼️</span><span>생성 내역</span>
-            </a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
-              <span style="font-size:16px;">💬</span><span>카톡 문의</span>
-            </a>
-            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">
-              <span style="font-size:16px;">🚪</span><span>로그아웃</span>
-            </button>
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
+            <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
           </div>
         </div>
       </div>
@@ -2792,25 +2778,19 @@ app.get('/generator', (c) => {
           <span id="navUserCredits" style="display:none;"></span>
           <span id="navUserName" style="display:none;"></span>
           <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.45);z-index:10001;">
-            <div style="padding:12px 14px 10px;border-bottom:1px solid var(--border);margin-bottom:4px;">
-              <div id="ddUserName" style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:11px;color:var(--text-muted);margin-bottom:6px;"></div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:10001;">
+            <div style="padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:var(--primary);"></div>
-                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#6c47ff;"></div>
+                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:13px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
-              <span style="font-size:15px;">🖼️</span><span>생성 내역</span>
-            </a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:13px;color:var(--text);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">
-              <span style="font-size:15px;">💬</span><span>카톡 문의</span>
-            </a>
-            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">
-              <span style="font-size:15px;">🚪</span><span>로그아웃</span>
-            </button>
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
+            <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
           </div>
         </div>
       </div>
@@ -2965,20 +2945,7 @@ app.get('/generator', (c) => {
 
       <!-- STEP 4 (구 Step5) · 결과 -->
       <div class="gslide" id="step-4">
-        <div class="gslide-header">
-          <div class="gstep-label">생성 완료 ✅</div>
-          <h2 class="gstep-title">이미지가 생성되었습니다!</h2>
-          <div class="results-toolbar" style="padding:0;border:none;margin-top:8px;">
-            <div class="results-tabs">
-              <button class="results-tab active" onclick="switchResultsTab('fitting',this)">피팅컷</button>
-              <button class="results-tab" onclick="switchResultsTab('styleset',this)">스타일샷</button>
-            </div>
-            <div style="display:flex;gap:8px;">
-              <button class="btn btn-primary btn-sm" onclick="downloadAll()"><i class="fas fa-download"></i> 다운로드</button>
-            </div>
-          </div>
-        </div>
-        <div class="gslide-scroll">
+        <div class="gslide-scroll" style="padding-top:12px;">
           <div class="results-grid" id="resultsGrid"></div>
         </div>
         <div class="gslide-nav">
