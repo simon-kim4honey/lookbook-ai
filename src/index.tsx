@@ -697,31 +697,426 @@ app.get('/api/projects', (c) => {
   return c.json({ projects: sampleProjects })
 })
 
+// ════════════════════════════════════════════════════
+// Auth System — 이메일 + 카카오 OAuth + 구글 OAuth
+// D1 users / user_sessions 테이블 사용
+// ════════════════════════════════════════════════════
+
+// ── OAuth 앱 설정 (Cloudflare Secrets 또는 환경변수로 관리 권장)
+// 현재는 코드 내 상수로 관리 (추후 wrangler secret으로 이동)
+const KAKAO_CLIENT_ID  = (globalThis as any).__KAKAO_CLIENT_ID  || ''
+const KAKAO_CLIENT_SECRET = (globalThis as any).__KAKAO_CLIENT_SECRET || ''
+const GOOGLE_CLIENT_ID = (globalThis as any).__GOOGLE_CLIENT_ID || ''
+const GOOGLE_CLIENT_SECRET = (globalThis as any).__GOOGLE_CLIENT_SECRET || ''
+
+// ── 헬퍼: 랜덤 토큰 생성 (64자 hex)
+function genToken(): string {
+  const arr = new Uint8Array(32)
+  crypto.getRandomValues(arr)
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// ── 헬퍼: 사용자 ID 생성
+function genUserId(): string {
+  return 'u_' + genToken().substring(0, 16)
+}
+
+// ── 헬퍼: 비밀번호 해싱 (SHA-256 기반, Workers crypto.subtle)
+async function hashPassword(password: string): Promise<string> {
+  const salt = genToken().substring(0, 16)
+  const data = new TextEncoder().encode(salt + password)
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
+  return `${salt}:${hashHex}`
+}
+
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [salt, storedHash] = stored.split(':')
+  const data = new TextEncoder().encode(salt + password)
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  const hashHex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
+  return hashHex === storedHash
+}
+
+// ── 헬퍼: 세션 토큰으로 사용자 조회 (미들웨어용)
+async function getUserFromToken(db: D1Database, token: string | null) {
+  if (!token) return null
+  const now = new Date().toISOString()
+  const row = await db.prepare(`
+    SELECT u.id, u.name, u.email, u.role, u.status, u.credits, u.avatar_url, u.provider
+    FROM user_sessions s JOIN users u ON s.user_id = u.id
+    WHERE s.token = ? AND s.expires_at > ? AND u.status = 'active'
+  `).bind(token, now).first()
+  return row || null
+}
+
+// ── 헬퍼: 세션 생성 (30일)
+async function createSession(db: D1Database, userId: string): Promise<string> {
+  const token = genToken()
+  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  // 오래된 세션 정리 (사용자당 최대 5개)
+  await db.prepare(`DELETE FROM user_sessions WHERE user_id = ? AND token NOT IN (
+    SELECT token FROM user_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 4
+  )`).bind(userId, userId).run()
+  await db.prepare(
+    `INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)`
+  ).bind(token, userId, expires).run()
+  return token
+}
+
+// ── 공개 사용자 정보 (민감 정보 제외)
+function publicUser(u: any) {
+  return { id: u.id, name: u.name, email: u.email, role: u.role, credits: u.credits, avatar_url: u.avatar_url, provider: u.provider }
+}
+
 // ────────────────────────────────────────────────────
-// Auth API (Mock)
+// POST /api/auth/signup — 이메일 회원가입
 // ────────────────────────────────────────────────────
-app.post('/api/auth/login', async (c) => {
-  const body = await c.req.json()
-  if (body.email && body.password) {
-    return c.json({
-      success: true,
-      user: { id: 'u1', name: '패션 셀러', email: body.email, credits: 24 },
-      token: 'mock-jwt-token'
-    })
+app.post('/api/auth/signup', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const body: any = await c.req.json()
+    const { name, email, password } = body
+
+    if (!name || !email || !password) return c.json({ success: false, message: '모든 항목을 입력해주세요.' }, 400)
+    if (password.length < 8) return c.json({ success: false, message: '비밀번호는 8자 이상이어야 합니다.' }, 400)
+
+    // 중복 이메일 확인
+    const existing = await db.prepare(`SELECT id FROM users WHERE email = ?`).bind(email).first()
+    if (existing) return c.json({ success: false, message: '이미 가입된 이메일입니다.' }, 409)
+
+    const id = genUserId()
+    const hash = await hashPassword(password)
+    await db.prepare(`
+      INSERT INTO users (id, email, name, password_hash, provider, status, credits, role)
+      VALUES (?, ?, ?, ?, 'email', 'active', 5, 'user')
+    `).bind(id, email.toLowerCase(), name, hash).run()
+
+    const token = await createSession(db, id)
+    const user = { id, name, email: email.toLowerCase(), role: 'user', credits: 5, avatar_url: null, provider: 'email' }
+    return c.json({ success: true, user, token })
+  } catch (err: any) {
+    console.error('signup error:', err)
+    return c.json({ success: false, message: '서버 오류가 발생했습니다.' }, 500)
   }
-  return c.json({ success: false, message: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401)
 })
 
-app.post('/api/auth/signup', async (c) => {
-  const body = await c.req.json()
-  if (body.email && body.password && body.name) {
-    return c.json({
-      success: true,
-      user: { id: 'u_new', name: body.name, email: body.email, credits: 5 },
-      token: 'mock-jwt-token-new'
-    })
+// ────────────────────────────────────────────────────
+// POST /api/auth/login — 이메일 로그인
+// ────────────────────────────────────────────────────
+app.post('/api/auth/login', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const body: any = await c.req.json()
+    const { email, password } = body
+
+    if (!email || !password) return c.json({ success: false, message: '이메일과 비밀번호를 입력해주세요.' }, 400)
+
+    const u: any = await db.prepare(`SELECT * FROM users WHERE email = ? AND provider = 'email'`).bind(email.toLowerCase()).first()
+    if (!u) return c.json({ success: false, message: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401)
+    if (u.status !== 'active') return c.json({ success: false, message: '정지된 계정입니다. 관리자에게 문의하세요.' }, 403)
+    if (!u.password_hash) return c.json({ success: false, message: '소셜 계정으로 가입된 이메일입니다.' }, 400)
+
+    const ok = await verifyPassword(password, u.password_hash)
+    if (!ok) return c.json({ success: false, message: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401)
+
+    await db.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(u.id).run()
+    const token = await createSession(db, u.id)
+    return c.json({ success: true, user: publicUser(u), token })
+  } catch (err: any) {
+    console.error('login error:', err)
+    return c.json({ success: false, message: '서버 오류가 발생했습니다.' }, 500)
   }
-  return c.json({ success: false, message: '입력값을 확인해주세요.' }, 400)
+})
+
+// ────────────────────────────────────────────────────
+// GET /api/auth/me — 세션 확인 (토큰 → 사용자 정보)
+// ────────────────────────────────────────────────────
+app.get('/api/auth/me', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const token = c.req.header('X-Session-Token') || c.req.query('token')
+    const user = await getUserFromToken(db, token || null)
+    if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+    return c.json({ success: true, user: publicUser(user) })
+  } catch (err: any) {
+    return c.json({ success: false, message: '서버 오류' }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// POST /api/auth/logout — 로그아웃 (세션 삭제)
+// ────────────────────────────────────────────────────
+app.post('/api/auth/logout', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const token = c.req.header('X-Session-Token')
+    if (token) await db.prepare(`DELETE FROM user_sessions WHERE token = ?`).bind(token).run()
+    return c.json({ success: true })
+  } catch { return c.json({ success: true }) }
+})
+
+// ────────────────────────────────────────────────────
+// GET /api/auth/kakao — 카카오 OAuth 시작
+// ────────────────────────────────────────────────────
+app.get('/api/auth/kakao', (c) => {
+  const origin = new URL(c.req.url).origin
+  const redirectUri = `${origin}/api/auth/kakao/callback`
+  const clientId = KAKAO_CLIENT_ID
+  if (!clientId) return c.json({ error: '카카오 앱 키가 설정되지 않았습니다.' }, 500)
+  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`
+  return c.redirect(url)
+})
+
+// ────────────────────────────────────────────────────
+// GET /api/auth/kakao/callback — 카카오 OAuth 콜백
+// ────────────────────────────────────────────────────
+app.get('/api/auth/kakao/callback', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const origin = new URL(c.req.url).origin
+  const code = c.req.query('code')
+  const error = c.req.query('error')
+
+  if (error || !code) {
+    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${error||'cancelled'}'},'*');window.close();</script>`)
+  }
+
+  try {
+    const redirectUri = `${origin}/api/auth/kakao/callback`
+    // 토큰 교환
+    const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code', code,
+        client_id: KAKAO_CLIENT_ID, client_secret: KAKAO_CLIENT_SECRET,
+        redirect_uri: redirectUri,
+      }),
+    })
+    const tokenData: any = await tokenRes.json()
+    if (!tokenData.access_token) throw new Error('카카오 토큰 발급 실패')
+
+    // 사용자 정보 조회
+    const profileRes = await fetch('https://kapi.kakao.com/v2/user/me', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    })
+    const profile: any = await profileRes.json()
+    const providerId = String(profile.id)
+    const kakaoEmail = profile.kakao_account?.email || `kakao_${providerId}@kakao.local`
+    const kakaoName  = profile.kakao_account?.profile?.nickname || '카카오 사용자'
+    const kakaoAvatar = profile.kakao_account?.profile?.profile_image_url || null
+
+    // 기존 사용자 조회 또는 신규 생성
+    let user: any = await db.prepare(`SELECT * FROM users WHERE provider = 'kakao' AND provider_id = ?`).bind(providerId).first()
+    if (!user) {
+      // 같은 이메일로 가입된 계정 확인
+      user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(kakaoEmail).first()
+      if (user) {
+        // 기존 계정에 카카오 연동
+        await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(providerId, kakaoAvatar, user.id).run()
+      } else {
+        // 신규 생성
+        const id = genUserId()
+        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 5, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
+        user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
+      }
+    }
+    if (!user || user.status !== 'active') throw new Error('계정이 정지 상태입니다.')
+
+    await db.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(user.id).run()
+    const token = await createSession(db, user.id)
+    const userJson = JSON.stringify(publicUser(user))
+
+    // 팝업 창에서 부모 창으로 메시지 전달
+    return c.html(`<!DOCTYPE html><html><body><script>
+      window.opener?.postMessage({type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson}},'*');
+      window.close();
+    </script><p>로그인 중...</p></body></html>`)
+  } catch (err: any) {
+    console.error('kakao callback error:', err)
+    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${err.message}'},'*');window.close();</script>`)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// GET /api/auth/google — 구글 OAuth 시작
+// ────────────────────────────────────────────────────
+app.get('/api/auth/google', (c) => {
+  const origin = new URL(c.req.url).origin
+  const redirectUri = `${origin}/api/auth/google/callback`
+  const clientId = GOOGLE_CLIENT_ID
+  if (!clientId) return c.json({ error: '구글 클라이언트 ID가 설정되지 않았습니다.' }, 500)
+  const params = new URLSearchParams({
+    client_id: clientId, redirect_uri: redirectUri,
+    response_type: 'code', scope: 'openid email profile',
+    access_type: 'offline', prompt: 'select_account',
+  })
+  return c.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
+})
+
+// ────────────────────────────────────────────────────
+// GET /api/auth/google/callback — 구글 OAuth 콜백
+// ────────────────────────────────────────────────────
+app.get('/api/auth/google/callback', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const origin = new URL(c.req.url).origin
+  const code = c.req.query('code')
+  const error = c.req.query('error')
+
+  if (error || !code) {
+    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'${error||'cancelled'}'},'*');window.close();</script>`)
+  }
+
+  try {
+    const redirectUri = `${origin}/api/auth/google/callback`
+    // 토큰 교환
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code', code,
+        client_id: GOOGLE_CLIENT_ID, client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: redirectUri,
+      }),
+    })
+    const tokenData: any = await tokenRes.json()
+    if (!tokenData.access_token) throw new Error('구글 토큰 발급 실패')
+
+    // 사용자 정보 조회
+    const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    })
+    const profile: any = await profileRes.json()
+    const providerId = profile.id
+    const googleEmail = profile.email
+    const googleName  = profile.name || '구글 사용자'
+    const googleAvatar = profile.picture || null
+
+    let user: any = await db.prepare(`SELECT * FROM users WHERE provider = 'google' AND provider_id = ?`).bind(providerId).first()
+    if (!user) {
+      user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(googleEmail).first()
+      if (user) {
+        await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(providerId, googleAvatar, user.id).run()
+      } else {
+        const id = genUserId()
+        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 5, 'user')`).bind(id, googleEmail, googleName, providerId, googleAvatar).run()
+        user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
+      }
+    }
+    if (!user || user.status !== 'active') throw new Error('계정이 정지 상태입니다.')
+
+    await db.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(user.id).run()
+    const token = await createSession(db, user.id)
+    const userJson = JSON.stringify(publicUser(user))
+
+    return c.html(`<!DOCTYPE html><html><body><script>
+      window.opener?.postMessage({type:'oauth_success',provider:'google',token:'${token}',user:${userJson}},'*');
+      window.close();
+    </script><p>로그인 중...</p></body></html>`)
+  } catch (err: any) {
+    console.error('google callback error:', err)
+    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'${err.message}'},'*');window.close();</script>`)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// Admin — 회원 관리 API
+// ────────────────────────────────────────────────────
+
+// GET /api/admin/users — 전체 회원 목록
+app.get('/api/admin/users', adminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const page   = parseInt(c.req.query('page') || '1')
+    const limit  = parseInt(c.req.query('limit') || '50')
+    const search = c.req.query('search') || ''
+    const status = c.req.query('status') || ''
+    const offset = (page - 1) * limit
+
+    let where = 'WHERE 1=1'
+    const params: any[] = []
+    if (search) { where += ` AND (name LIKE ? OR email LIKE ?)`; params.push(`%${search}%`, `%${search}%`) }
+    if (status) { where += ` AND status = ?`; params.push(status) }
+
+    const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM users ${where}`).bind(...params).first()
+    const users = await db.prepare(
+      `SELECT id, name, email, provider, status, credits, role, last_login_at, created_at FROM users ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(...params, limit, offset).all()
+
+    return c.json({ success: true, users: users.results, total: total?.cnt || 0, page, limit })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /api/admin/users/:id — 회원 상세
+app.get('/api/admin/users/:id', adminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const user = await db.prepare(`SELECT id, name, email, provider, status, credits, role, last_login_at, created_at FROM users WHERE id = ?`).bind(c.req.param('id')).first()
+    if (!user) return c.json({ success: false, message: '존재하지 않는 사용자입니다.' }, 404)
+    return c.json({ success: true, user })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// PATCH /api/admin/users/:id — 회원 상태/크레딧/역할 수정
+app.patch('/api/admin/users/:id', adminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const body: any = await c.req.json()
+    const id = c.req.param('id')
+    const sets: string[] = []
+    const vals: any[]   = []
+    if (body.status  !== undefined) { sets.push(`status = ?`);  vals.push(body.status) }
+    if (body.credits !== undefined) { sets.push(`credits = ?`); vals.push(body.credits) }
+    if (body.role    !== undefined) { sets.push(`role = ?`);    vals.push(body.role) }
+    if (sets.length === 0) return c.json({ success: false, message: '변경할 항목이 없습니다.' }, 400)
+    sets.push(`updated_at = datetime('now')`)
+    await db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`).bind(...vals, id).run()
+    // 정지된 경우 세션 전체 삭제
+    if (body.status === 'suspended') {
+      await db.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(id).run()
+    }
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// DELETE /api/admin/users/:id — 회원 삭제 (소프트)
+app.delete('/api/admin/users/:id', adminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const id = c.req.param('id')
+    await db.prepare(`UPDATE users SET status = 'deleted', updated_at = datetime('now') WHERE id = ?`).bind(id).run()
+    await db.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(id).run()
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /api/admin/stats — 전체 통계
+app.get('/api/admin/stats', adminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const total    = await db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status != 'deleted'`).first() as any
+    const active   = await db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'active'`).first() as any
+    const suspended= await db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'suspended'`).first() as any
+    const today    = await db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE date(created_at) = date('now') AND status != 'deleted'`).first() as any
+    const kakao    = await db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'kakao' AND status = 'active'`).first() as any
+    const google   = await db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'google' AND status = 'active'`).first() as any
+    const email    = await db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'email' AND status = 'active'`).first() as any
+    return c.json({ success: true, stats: {
+      total: total?.cnt || 0, active: active?.cnt || 0,
+      suspended: suspended?.cnt || 0, today: today?.cnt || 0,
+      by_provider: { kakao: kakao?.cnt || 0, google: google?.cnt || 0, email: email?.cnt || 0 }
+    }})
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
 })
 
 // ────────────────────────────────────────────────────
@@ -1513,8 +1908,22 @@ app.get('/_home', (c) => {
         <a href="/dashboard">대시보드</a>
       </div>
       <div class="navbar-actions">
-        <button class="btn btn-ghost" onclick="openModal('loginModal')">로그인</button>
-        <button class="btn btn-primary" onclick="openModal('signupModal')">무료 시작</button>
+        <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')">로그인</button>
+        <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')">무료 시작</button>
+        <!-- 로그인 후 노출 영역 -->
+        <div id="navUserArea" style="display:none;align-items:center;gap:10px;">
+          <span style="font-size:13px;color:var(--text-muted);" id="navUserCredits">0크레딧</span>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--primary-bg);border-radius:var(--radius-full);cursor:pointer;" onclick="toggleUserMenu()">
+            <div style="width:26px;height:26px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;">✨</div>
+            <span style="font-size:14px;font-weight:600;color:var(--primary);" id="navUserName">사용자</span>
+            <i class="fas fa-chevron-down" style="font-size:10px;color:var(--primary);"></i>
+          </div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:60px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,0.3);z-index:1000;">
+            <a href="/dashboard" style="display:block;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:8px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">📁 대시보드</a>
+            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:8px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">🚪 로그아웃</button>
+          </div>
+        </div>
       </div>
     </div>
   </nav>
@@ -1804,50 +2213,65 @@ app.get('/_home', (c) => {
     </div>
   </footer>
 
-  <!-- Login Modal -->
+  <!-- Login / Signup Modal (통합) -->
   <div class="modal-overlay" id="loginModal">
-    <div class="modal-box">
+    <div class="modal-box" style="max-width:420px;">
       <button class="modal-close" onclick="closeModal('loginModal')">×</button>
-      <h2 class="modal-title">로그인</h2>
-      <p class="modal-subtitle">계정에 로그인하여 AI 룩북을 제작하세요.</p>
-      <form id="loginForm" onsubmit="handleLogin(event)">
-        <div class="form-group">
-          <label class="form-label">이메일</label>
-          <input type="email" class="form-input" id="loginEmail" placeholder="email@example.com" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">비밀번호</label>
-          <input type="password" class="form-input" id="loginPassword" placeholder="비밀번호 입력" required />
-        </div>
-        <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn">로그인</button>
-      </form>
-      <div class="auth-switch">계정이 없으신가요? <a onclick="switchModal('loginModal','signupModal')">회원가입</a></div>
-    </div>
-  </div>
 
-  <!-- Signup Modal -->
-  <div class="modal-overlay" id="signupModal">
-    <div class="modal-box">
-      <button class="modal-close" onclick="closeModal('signupModal')">×</button>
-      <h2 class="modal-title">무료 회원가입</h2>
-      <p class="modal-subtitle">가입 즉시 5크레딧을 무료로 드려요! 🎁</p>
-      <form id="signupForm" onsubmit="handleSignup(event)">
-        <div class="form-group">
-          <label class="form-label">이름</label>
-          <input type="text" class="form-input" id="signupName" placeholder="홍길동" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">이메일</label>
-          <input type="email" class="form-input" id="signupEmail" placeholder="email@example.com" required />
-        </div>
-        <div class="form-group">
-          <label class="form-label">비밀번호</label>
-          <input type="password" class="form-input" id="signupPassword" placeholder="8자 이상 입력" required />
-          <div class="form-hint">영문, 숫자 포함 8자 이상</div>
-        </div>
-        <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn">회원가입 &amp; 무료 시작</button>
-      </form>
-      <div class="auth-switch">이미 계정이 있으신가요? <a onclick="switchModal('signupModal','loginModal')">로그인</a></div>
+      <!-- 탭 전환 -->
+      <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid var(--border);">
+        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;">로그인</button>
+        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:600;color:var(--text-muted);cursor:pointer;">회원가입</button>
+      </div>
+
+      <!-- 소셜 로그인 버튼 -->
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+        <button onclick="oauthLogin('kakao')" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#FEE500;border:none;border-radius:10px;font-size:15px;font-weight:700;color:#3C1E1E;cursor:pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#3C1E1E"><path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.7 1.628 5.073 4.09 6.51L4.993 21l4.457-2.387A11.3 11.3 0 0 0 12 18.6c5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/></svg>
+          카카오로 시작하기
+        </button>
+        <button onclick="oauthLogin('google')" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#fff;border:1px solid #dadce0;border-radius:10px;font-size:15px;font-weight:600;color:#3c4043;cursor:pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Google로 시작하기
+        </button>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+        <span style="font-size:12px;color:var(--text-muted);">또는 이메일로</span>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+      </div>
+
+      <!-- 로그인 폼 -->
+      <div id="authFormLogin">
+        <form id="loginForm" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <input type="email" class="form-input" id="loginEmail" placeholder="이메일" required />
+          </div>
+          <div class="form-group">
+            <input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" required />
+          </div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;">로그인</button>
+        </form>
+      </div>
+
+      <!-- 회원가입 폼 -->
+      <div id="authFormSignup" style="display:none;">
+        <form id="signupForm" onsubmit="handleSignup(event)">
+          <div class="form-group">
+            <input type="text" class="form-input" id="signupName" placeholder="이름" required />
+          </div>
+          <div class="form-group">
+            <input type="email" class="form-input" id="signupEmail" placeholder="이메일" required />
+          </div>
+          <div class="form-group">
+            <input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" required />
+          </div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;">가입하고 무료 시작 🎁</button>
+        </form>
+      </div>
+
+      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="#" style="color:var(--primary);">이용약관</a> 및 <a href="#" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
   `))
@@ -1869,11 +2293,21 @@ app.get('/dashboard', (c) => {
         <a href="/dashboard" style="color:var(--primary);font-weight:600;">대시보드</a>
         <a href="/generator">새 프로젝트</a>
       </div>
-      <div class="navbar-actions">
-        <div style="display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--primary-bg);border-radius:var(--radius-full);cursor:pointer;" onclick="toggleUserMenu()">
-          <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;">P</div>
-          <span style="font-size:14px;font-weight:600;color:var(--primary);">패션 셀러</span>
-          <i class="fas fa-chevron-down" style="font-size:11px;color:var(--primary);"></i>
+      <div class="navbar-actions" style="position:relative;">
+        <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')">로그인</button>
+        <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')">무료 시작</button>
+        <div id="navUserArea" style="display:none;align-items:center;gap:10px;">
+          <span style="font-size:13px;color:var(--text-muted);" id="navUserCredits">0크레딧</span>
+          <div style="display:flex;align-items:center;gap:8px;padding:7px 14px;background:var(--primary-bg);border-radius:var(--radius-full);cursor:pointer;" onclick="toggleUserMenu()">
+            <div style="width:26px;height:26px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;">✨</div>
+            <span style="font-size:14px;font-weight:600;color:var(--primary);" id="navUserName">사용자</span>
+            <i class="fas fa-chevron-down" style="font-size:10px;color:var(--primary);"></i>
+          </div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:54px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,0.3);z-index:1000;">
+            <a href="/dashboard" style="display:block;padding:10px 14px;font-size:14px;color:var(--text);text-decoration:none;border-radius:8px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">📁 대시보드</a>
+            <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:8px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">🚪 로그아웃</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2109,6 +2543,20 @@ app.get('/generator', (c) => {
         <span class="gstep-line" id="gl2"></span>
         <span class="gstep" id="gs3">3</span>
       </div>
+      <!-- 로그인 상태 표시 -->
+      <div style="display:flex;align-items:center;gap:8px;position:relative;">
+        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:12px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
+        <div id="navUserArea" style="display:none;align-items:center;gap:6px;cursor:pointer;" onclick="toggleUserMenu()">
+          <div style="width:24px;height:24px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;">✨</div>
+          <span style="font-size:12px;font-weight:600;color:var(--primary);" id="navUserName">사용자</span>
+          <span style="font-size:11px;color:var(--text-muted);" id="navUserCredits"></span>
+        </div>
+        <div id="userDropdownMenu" style="display:none;position:absolute;top:36px;right:0;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:150px;box-shadow:0 8px 24px rgba(0,0,0,0.4);z-index:10001;">
+          <a href="/dashboard" style="display:block;padding:9px 12px;font-size:13px;color:var(--text);text-decoration:none;border-radius:8px;" onmouseover="this.style.background='var(--primary-bg)'" onmouseout="this.style.background=''">📁 대시보드</a>
+          <div style="height:1px;background:var(--border);margin:4px 0;"></div>
+          <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:8px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">🚪 로그아웃</button>
+        </div>
+      </div>
     </header>
 
     <!-- ── 슬라이드 컨테이너 ── -->
@@ -2309,6 +2757,53 @@ app.get('/generator', (c) => {
       </div>
     </div>
   </div>
+
+  <!-- Auth Modal (Generator 내부) -->
+  <div class="modal-overlay" id="loginModal" style="z-index:10000;">
+    <div class="modal-box" style="max-width:420px;">
+      <button class="modal-close" onclick="closeModal('loginModal')">×</button>
+      <div style="text-align:center;margin-bottom:20px;">
+        <div style="font-size:28px;margin-bottom:8px;">✨</div>
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">AI 생성을 시작하려면<br/>로그인이 필요해요</h2>
+        <p style="font-size:13px;color:var(--text-muted);">가입 즉시 무료 크레딧을 드려요!</p>
+      </div>
+      <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
+        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;">로그인</button>
+        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:600;color:var(--text-muted);cursor:pointer;">회원가입</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+        <button onclick="oauthLogin('kakao')" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#FEE500;border:none;border-radius:10px;font-size:15px;font-weight:700;color:#3C1E1E;cursor:pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#3C1E1E"><path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.7 1.628 5.073 4.09 6.51L4.993 21l4.457-2.387A11.3 11.3 0 0 0 12 18.6c5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/></svg>
+          카카오로 시작하기
+        </button>
+        <button onclick="oauthLogin('google')" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#fff;border:1px solid #dadce0;border-radius:10px;font-size:15px;font-weight:600;color:#3c4043;cursor:pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Google로 시작하기
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+        <span style="font-size:12px;color:var(--text-muted);">또는 이메일로</span>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+      </div>
+      <div id="authFormLogin">
+        <form id="loginForm" onsubmit="handleLogin(event)">
+          <div class="form-group"><input type="email" class="form-input" id="loginEmail" placeholder="이메일" required /></div>
+          <div class="form-group"><input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" required /></div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;">로그인</button>
+        </form>
+      </div>
+      <div id="authFormSignup" style="display:none;">
+        <form id="signupForm" onsubmit="handleSignup(event)">
+          <div class="form-group"><input type="text" class="form-input" id="signupName" placeholder="이름" required /></div>
+          <div class="form-group"><input type="email" class="form-input" id="signupEmail" placeholder="이메일" required /></div>
+          <div class="form-group"><input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" required /></div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;">가입하고 무료 시작 🎁</button>
+        </form>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 이용약관 및 개인정보처리방침에 동의합니다.</p>
+    </div>
+  </div>
   `))
 })
 
@@ -2450,6 +2945,7 @@ app.get('/admin', (c) => {
     <button class="tab-btn active" onclick="switchTab('prompt')"><i class="fas fa-magic"></i> 프롬프트</button>
     <button class="tab-btn" onclick="switchTab('models')"><i class="fas fa-user-circle"></i> 모델 관리</button>
     <button class="tab-btn" onclick="switchTab('bgs')"><i class="fas fa-image"></i> 배경 관리</button>
+    <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
   </div>
 
   <!-- ▼ 탭: 프롬프트 -->
@@ -2603,6 +3099,82 @@ app.get('/admin', (c) => {
       <div id="customBgGrid"></div>
     </div>
   </div>
+
+  <!-- ▼ 탭: 회원 관리 -->
+  <div class="tab-panel" id="tabUsers">
+    <div class="admin-body">
+      <div class="page-title">👥 회원 관리</div>
+      <div class="page-sub">가입된 회원 목록을 조회하고 상태를 관리합니다.</div>
+
+      <!-- 통계 카드 -->
+      <div id="userStats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:24px;">
+        <div class="section-card" style="padding:16px;text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#9b7cff;" id="statTotal">-</div>
+          <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">전체 회원</div>
+        </div>
+        <div class="section-card" style="padding:16px;text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#22c55e;" id="statActive">-</div>
+          <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">활성</div>
+        </div>
+        <div class="section-card" style="padding:16px;text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#ef4444;" id="statSuspended">-</div>
+          <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">정지</div>
+        </div>
+        <div class="section-card" style="padding:16px;text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#f59e0b;" id="statToday">-</div>
+          <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">오늘 가입</div>
+        </div>
+        <div class="section-card" style="padding:16px;text-align:center;">
+          <div style="font-size:13px;font-weight:700;color:#FEE500;" id="statKakao">-</div>
+          <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">카카오</div>
+        </div>
+        <div class="section-card" style="padding:16px;text-align:center;">
+          <div style="font-size:13px;font-weight:700;color:#4285F4;" id="statGoogle">-</div>
+          <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">구글</div>
+        </div>
+      </div>
+
+      <!-- 필터/검색 바 -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <input type="text" id="userSearch" class="form-input" placeholder="🔍 이름/이메일 검색..." style="flex:1;min-width:200px;" oninput="filterUsers()"/>
+        <select id="userStatusFilter" class="form-input" style="width:130px;" onchange="filterUsers()">
+          <option value="">전체 상태</option>
+          <option value="active">활성</option>
+          <option value="suspended">정지</option>
+        </select>
+        <select id="userProviderFilter" class="form-input" style="width:130px;" onchange="filterUsers()">
+          <option value="">전체 가입경로</option>
+          <option value="email">이메일</option>
+          <option value="kakao">카카오</option>
+          <option value="google">구글</option>
+        </select>
+        <button class="btn-sm btn-primary-sm" onclick="loadUsers()">🔄 새로고침</button>
+      </div>
+
+      <!-- 회원 목록 테이블 -->
+      <div class="section-card" style="padding:0;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#0f0f1a;border-bottom:1px solid #2e2e50;">
+              <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">회원</th>
+              <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">가입경로</th>
+              <th style="text-align:center;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">크레딧</th>
+              <th style="text-align:center;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">상태</th>
+              <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">가입일</th>
+              <th style="text-align:center;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">관리</th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody">
+            <tr><td colspan="6" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 페이징 -->
+      <div id="userPagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:16px;"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -2630,14 +3202,196 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs']
+    const names = ['prompt','models','bgs','users']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
   document.getElementById('tabModels').classList.toggle('active', name === 'models')
   document.getElementById('tabBgs').classList.toggle('active', name === 'bgs')
+  document.getElementById('tabUsers').classList.toggle('active', name === 'users')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
+  if (name === 'users')  loadUsers()
+}
+
+// ─── 회원 관리 ───
+let allUsers = []
+let usersPage = 1
+const USERS_PER_PAGE = 20
+
+async function loadUsers() {
+  try {
+    const res = await fetch('/api/admin/stats', {headers:{'X-Admin-Password':adminPassword}})
+    const stats = await res.json()
+    if (stats.success) {
+      const s = stats.stats
+      document.getElementById('statTotal').textContent     = s.total?.toLocaleString() || 0
+      document.getElementById('statActive').textContent    = s.active?.toLocaleString() || 0
+      document.getElementById('statSuspended').textContent = s.suspended?.toLocaleString() || 0
+      document.getElementById('statToday').textContent     = s.today?.toLocaleString() || 0
+      document.getElementById('statKakao').textContent     = (s.by_provider?.kakao || 0) + '명'
+      document.getElementById('statGoogle').textContent    = (s.by_provider?.google || 0) + '명'
+    }
+  } catch(e) {}
+
+  const q      = document.getElementById('userSearch')?.value || ''
+  const status = document.getElementById('userStatusFilter')?.value || ''
+  const prov   = document.getElementById('userProviderFilter')?.value || ''
+
+  try {
+    const params = new URLSearchParams({ page: usersPage, limit: USERS_PER_PAGE })
+    if (q)      params.set('q', q)
+    if (status) params.set('status', status)
+    if (prov)   params.set('provider', prov)
+
+    const res = await fetch('/api/admin/users?' + params.toString(), {
+      headers: {'X-Admin-Password': adminPassword}
+    })
+    const data = await res.json()
+    if (!data.success) { renderUserTable([]); return }
+
+    allUsers = data.users || []
+    renderUserTable(allUsers)
+    renderUserPagination(data.total || allUsers.length, data.page || 1, data.limit || USERS_PER_PAGE)
+  } catch(e) {
+    document.getElementById('userTableBody').innerHTML =
+      '<tr><td colspan="6" style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">⚠️ 로딩 실패</td></tr>'
+  }
+}
+
+function filterUsers() {
+  usersPage = 1
+  loadUsers()
+}
+
+function renderUserTable(users) {
+  const tbody = document.getElementById('userTableBody')
+  if (!users.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">조건에 맞는 회원이 없습니다</td></tr>'
+    return
+  }
+  const providerBadge = {
+    kakao:  '<span style="font-size:11px;background:#FEE500;color:#3C1E1E;padding:2px 8px;border-radius:10px;font-weight:700;">카카오</span>',
+    google: '<span style="font-size:11px;background:#4285F4;color:white;padding:2px 8px;border-radius:10px;font-weight:700;">구글</span>',
+    email:  '<span style="font-size:11px;background:#3a3a60;color:#e0e0f0;padding:2px 8px;border-radius:10px;font-weight:700;">이메일</span>',
+  }
+  const statusBadge = {
+    active:    '<span style="font-size:11px;background:#22c55e22;color:#22c55e;padding:2px 8px;border-radius:10px;border:1px solid #22c55e44;">활성</span>',
+    suspended: '<span style="font-size:11px;background:#ef444422;color:#ef4444;padding:2px 8px;border-radius:10px;border:1px solid #ef444444;">정지</span>',
+    deleted:   '<span style="font-size:11px;background:#6b728022;color:#6b7280;padding:2px 8px;border-radius:10px;border:1px solid #6b728044;">삭제됨</span>',
+  }
+  tbody.innerHTML = users.map(function(u) {
+    var avatar = u.avatar_url
+      ? '<img src="' + u.avatar_url + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;" onerror="this.style.display=\'none\'">'
+      : '<div style="width:28px;height:28px;border-radius:50%;background:#6c47ff44;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">' + ((u.name||'?')[0]) + '</div>'
+    var joined = u.created_at ? u.created_at.slice(0,10) : '-'
+    var isAdmin = u.role === 'admin'
+    var adminBadge = isAdmin ? ' <span style="font-size:10px;background:#6c47ff;color:white;padding:1px 6px;border-radius:8px;">Admin</span>' : ''
+    var statusBtn = ''
+    if (u.status === 'active') {
+      statusBtn = '<button onclick="setUserStatus(\'' + u.id + '\',\'suspended\')" class="btn-sm btn-danger-sm" style="font-size:11px;padding:4px 10px;">정지</button>'
+    } else if (u.status === 'suspended') {
+      statusBtn = '<button onclick="setUserStatus(\'' + u.id + '\',\'active\')" class="btn-sm btn-primary-sm" style="font-size:11px;padding:4px 10px;">활성화</button>'
+    }
+    var safeEmail = (u.email||'').replace(/\'/g,"\\'")
+    var safeName = (u.name||'').replace(/\'/g,"\\'")
+    var deleteBtn = !isAdmin ? '<button onclick="deleteUser(\'' + u.id + '\',\'' + safeName + '\',\'' + safeEmail + '\')" class="btn-sm btn-danger-sm" style="font-size:11px;padding:4px 10px;">삭제</button>' : ''
+    var credits = (u.credits != null) ? u.credits : 0
+    return '<tr style="border-bottom:1px solid #1e1e3a;">'
+      + '<td style="padding:12px 16px;">'
+      +   '<div style="display:flex;align-items:center;gap:10px;">'
+      +     avatar
+      +     '<div>'
+      +       '<div style="font-size:13px;font-weight:600;">' + (u.name || '(이름 없음)') + adminBadge + '</div>'
+      +       '<div style="font-size:11px;color:#8b8ba0;">' + u.email + '</div>'
+      +     '</div>'
+      +   '</div>'
+      + '</td>'
+      + '<td style="padding:12px 16px;">' + (providerBadge[u.provider] || u.provider) + '</td>'
+      + '<td style="padding:12px 16px;text-align:center;">'
+      +   '<span style="font-size:14px;font-weight:700;color:#9b7cff;">' + credits + '</span>'
+      +   '<button onclick="adjustCredits(\'' + u.id + '\',' + credits + ')" style="margin-left:6px;font-size:10px;padding:2px 6px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">수정</button>'
+      + '</td>'
+      + '<td style="padding:12px 16px;text-align:center;">' + (statusBadge[u.status] || u.status) + '</td>'
+      + '<td style="padding:12px 16px;font-size:12px;color:#8b8ba0;">' + joined + '</td>'
+      + '<td style="padding:12px 16px;text-align:center;">'
+      +   '<div style="display:flex;gap:6px;justify-content:center;">'
+      +     statusBtn + deleteBtn
+      +   '</div>'
+      + '</td>'
+      + '</tr>'
+  }).join('')
+}
+
+function renderUserPagination(total, page, limit) {
+  var totalPages = Math.ceil(total / limit)
+  var pag = document.getElementById('userPagination')
+  if (!pag || totalPages <= 1) { if (pag) pag.innerHTML = ''; return }
+  var html = ''
+  if (page > 1) html += '<button class="btn-sm" onclick="goUsersPage(' + (page-1) + ')">‹ 이전</button>'
+  for (var i = Math.max(1, page-2); i <= Math.min(totalPages, page+2); i++) {
+    html += '<button class="btn-sm' + (i===page ? ' btn-primary-sm' : '') + '" onclick="goUsersPage(' + i + ')">' + i + '</button>'
+  }
+  if (page < totalPages) html += '<button class="btn-sm" onclick="goUsersPage(' + (page+1) + ')">다음 ›</button>'
+  html += '<span style="font-size:12px;color:#8b8ba0;margin-left:8px;">총 ' + total + '명</span>'
+  pag.innerHTML = html
+}
+
+
+function goUsersPage(p) { usersPage = p; loadUsers() }
+
+async function setUserStatus(id, status) {
+  if (!confirm('이 회원을 ' + (status === 'active' ? '활성화' : '정지') + '하시겠습니까?')) return
+  try {
+    const res = await fetch('/api/admin/users/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ status })
+    })
+    const data = await res.json()
+    if (data.success) { showAdminToast(status === 'active' ? '활성화 완료' : '정지 완료', 'ok'); loadUsers() }
+    else showAdminToast(data.message || '실패', 'err')
+  } catch(e) { showAdminToast('서버 오류', 'err') }
+}
+
+async function adjustCredits(id, current) {
+  const val = prompt('크레딧 수정 (현재: ' + current + '크레딧)\n새 크레딧 수를 입력하세요:', current)
+  if (val === null) return
+  const credits = parseInt(val)
+  if (isNaN(credits) || credits < 0) { showAdminToast('올바른 크레딧 수를 입력하세요', 'err'); return }
+  try {
+    const res = await fetch('/api/admin/users/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ credits })
+    })
+    const data = await res.json()
+    if (data.success) { showAdminToast('크레딧 수정 완료', 'ok'); loadUsers() }
+    else showAdminToast(data.message || '실패', 'err')
+  } catch(e) { showAdminToast('서버 오류', 'err') }
+}
+
+async function deleteUser(id, name, email) {
+  if (!confirm('"' + name + '" (' + email + ') 회원을 삭제하시겠습니까?\n삭제 후 복구가 어렵습니다.')) return
+  try {
+    const res = await fetch('/api/admin/users/' + id, {
+      method: 'DELETE',
+      headers: {'X-Admin-Password':adminPassword}
+    })
+    const data = await res.json()
+    if (data.success) { showAdminToast('삭제 완료', 'ok'); loadUsers() }
+    else showAdminToast(data.message || '실패', 'err')
+  } catch(e) { showAdminToast('서버 오류', 'err') }
+}
+
+function showAdminToast(msg, type) {
+  const bar = document.querySelector('.save-bar')
+  const el = document.querySelector('.save-status')
+  if (el) {
+    el.textContent = msg
+    el.className = 'save-status ' + (type === 'ok' ? 'ok' : 'err')
+    setTimeout(() => { if (el) el.textContent = '' }, 3000)
+  }
 }
 
 // ─── 로그인 ───

@@ -142,13 +142,93 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ─────────────────────────────────────────────────────────
-// AUTH
+// AUTH — 탭 전환 / 소셜 로그인 / 이메일 로그인·가입
 // ─────────────────────────────────────────────────────────
+
+/** 로그인/회원가입 탭 전환 */
+function switchAuthTab(tab) {
+  const loginForm   = document.getElementById('authFormLogin');
+  const signupForm  = document.getElementById('authFormSignup');
+  const tabLoginBtn = document.getElementById('tabLogin');
+  const tabSignupBtn= document.getElementById('tabSignup');
+
+  if (tab === 'login') {
+    if (loginForm)   loginForm.style.display  = '';
+    if (signupForm)  signupForm.style.display = 'none';
+    if (tabLoginBtn) {
+      tabLoginBtn.style.color  = 'var(--primary)';
+      tabLoginBtn.style.borderBottom = '2px solid var(--primary)';
+      tabLoginBtn.style.fontWeight = '700';
+    }
+    if (tabSignupBtn) {
+      tabSignupBtn.style.color = 'var(--text-muted)';
+      tabSignupBtn.style.borderBottom = '2px solid transparent';
+      tabSignupBtn.style.fontWeight = '600';
+    }
+  } else {
+    if (loginForm)   loginForm.style.display  = 'none';
+    if (signupForm)  signupForm.style.display = '';
+    if (tabSignupBtn) {
+      tabSignupBtn.style.color = 'var(--primary)';
+      tabSignupBtn.style.borderBottom = '2px solid var(--primary)';
+      tabSignupBtn.style.fontWeight = '700';
+    }
+    if (tabLoginBtn) {
+      tabLoginBtn.style.color = 'var(--text-muted)';
+      tabLoginBtn.style.borderBottom = '2px solid transparent';
+      tabLoginBtn.style.fontWeight = '600';
+    }
+  }
+}
+
+/** OAuth 소셜 로그인 (팝업 방식) */
+function oauthLogin(provider) {
+  const popup = window.open(
+    `/api/auth/${provider}`,
+    'oauth_popup',
+    'width=520,height=640,left=' + Math.round((screen.width - 520) / 2) + ',top=' + Math.round((screen.height - 640) / 2)
+  );
+
+  const onMessage = async (e) => {
+    if (e.data?.type === 'oauth_success') {
+      window.removeEventListener('message', onMessage);
+      const { token, user } = e.data;
+      AppState.user = user;
+      localStorage.setItem('lookbook_token', token);
+      localStorage.setItem('lookbook_user', JSON.stringify(user));
+      updateUserUI();
+      closeModal('loginModal');
+      showToast(`환영합니다, ${user.name}님! 🎉`, 'success');
+      // 로그인 후 생성 재개
+      if (AppState.pendingGeneration) {
+        AppState.pendingGeneration = false;
+        setTimeout(() => startGeneration(), 300);
+      } else if (window.location.pathname === '/') {
+        setTimeout(() => window.location.href = '/dashboard', 800);
+      }
+    } else if (e.data?.type === 'oauth_error') {
+      window.removeEventListener('message', onMessage);
+      showToast('소셜 로그인에 실패했습니다. 다시 시도해주세요.', 'error');
+    }
+  };
+
+  window.addEventListener('message', onMessage);
+
+  // 팝업이 닫힌 경우 정리
+  const checkClosed = setInterval(() => {
+    if (popup && popup.closed) {
+      clearInterval(checkClosed);
+      window.removeEventListener('message', onMessage);
+    }
+  }, 800);
+}
+
+/** 이메일 로그인 */
 async function handleLogin(e) {
   e.preventDefault();
-  const email = document.getElementById('loginEmail').value;
+  const email    = document.getElementById('loginEmail').value;
   const password = document.getElementById('loginPassword').value;
-  const btn = document.getElementById('loginBtn');
+  const btn      = document.getElementById('loginBtn');
 
   btn.textContent = '로그인 중...';
   btn.disabled = true;
@@ -163,29 +243,41 @@ async function handleLogin(e) {
 
     if (data.success) {
       AppState.user = data.user;
-      localStorage.setItem('lookbook_user', JSON.stringify(data.user));
       localStorage.setItem('lookbook_token', data.token);
+      localStorage.setItem('lookbook_user', JSON.stringify(data.user));
+      updateUserUI();
       closeModal('loginModal');
       showToast(`환영합니다, ${data.user.name}님! 🎉`, 'success');
-      setTimeout(() => window.location.href = '/dashboard', 1000);
+      // 로그인 후 생성 재개
+      if (AppState.pendingGeneration) {
+        AppState.pendingGeneration = false;
+        setTimeout(() => startGeneration(), 300);
+      } else if (window.location.pathname === '/') {
+        setTimeout(() => window.location.href = '/dashboard', 800);
+      }
     } else {
-      showToast(data.message || '로그인에 실패했습니다.', 'error');
+      showToast(data.message || '이메일 또는 비밀번호가 올바르지 않습니다.', 'error');
     }
   } catch (err) {
-    showToast('서버 오류가 발생했습니다.', 'error');
+    showToast('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'error');
   } finally {
     btn.textContent = '로그인';
     btn.disabled = false;
   }
 }
 
+/** 이메일 회원가입 */
 async function handleSignup(e) {
   e.preventDefault();
-  const name = document.getElementById('signupName').value;
-  const email = document.getElementById('signupEmail').value;
+  const name     = document.getElementById('signupName').value.trim();
+  const email    = document.getElementById('signupEmail').value.trim();
   const password = document.getElementById('signupPassword').value;
-  const btn = document.getElementById('signupBtn');
+  const btn      = document.getElementById('signupBtn');
 
+  if (!name) {
+    showToast('이름을 입력해주세요.', 'warning');
+    return;
+  }
   if (password.length < 8) {
     showToast('비밀번호는 8자 이상이어야 합니다.', 'warning');
     return;
@@ -204,19 +296,127 @@ async function handleSignup(e) {
 
     if (data.success) {
       AppState.user = data.user;
-      localStorage.setItem('lookbook_user', JSON.stringify(data.user));
       localStorage.setItem('lookbook_token', data.token);
-      closeModal('signupModal');
-      showToast(`가입 완료! 5크레딧을 드렸어요 🎁`, 'success');
-      setTimeout(() => window.location.href = '/dashboard', 1000);
+      localStorage.setItem('lookbook_user', JSON.stringify(data.user));
+      updateUserUI();
+      closeModal('loginModal');
+      showToast(`가입 완료! 무료 크레딧 5개를 드렸어요 🎁`, 'success');
+      // 가입 후 생성 재개
+      if (AppState.pendingGeneration) {
+        AppState.pendingGeneration = false;
+        setTimeout(() => startGeneration(), 300);
+      } else if (window.location.pathname === '/') {
+        setTimeout(() => window.location.href = '/dashboard', 800);
+      }
     } else {
       showToast(data.message || '가입에 실패했습니다.', 'error');
     }
   } catch (err) {
-    showToast('서버 오류가 발생했습니다.', 'error');
+    showToast('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'error');
   } finally {
-    btn.textContent = '회원가입 & 무료 시작';
+    btn.textContent = '가입하고 무료 시작 🎁';
     btn.disabled = false;
+  }
+}
+
+/** 로그아웃 */
+async function handleLogout() {
+  try {
+    const token = localStorage.getItem('lookbook_token');
+    if (token) {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+    }
+  } catch (e) { /* ignore */ }
+
+  AppState.user = null;
+  localStorage.removeItem('lookbook_token');
+  localStorage.removeItem('lookbook_user');
+  updateUserUI();
+  showToast('로그아웃 되었습니다.', 'info');
+  if (window.location.pathname !== '/') {
+    setTimeout(() => window.location.href = '/', 600);
+  }
+}
+
+/** 헤더/네비바 사용자 UI 업데이트 */
+function updateUserUI() {
+  const user = AppState.user;
+
+  // 랜딩/Generator 공통 — 로그인·가입 버튼 ↔ 유저 영역 전환
+  const loginBtn   = document.getElementById('navLoginBtn');
+  const signupBtn  = document.getElementById('navSignupBtn');
+  const userArea   = document.getElementById('navUserArea');
+  const userName   = document.getElementById('navUserName');
+  const userCredits= document.getElementById('navUserCredits');
+
+  if (user) {
+    if (loginBtn)  loginBtn.style.display  = 'none';
+    if (signupBtn) signupBtn.style.display = 'none';
+    if (userArea)  userArea.style.display  = 'flex';
+    if (userName)  userName.textContent    = user.name || user.email;
+    if (userCredits) userCredits.textContent = `${user.credits ?? 0}크레딧`;
+  } else {
+    if (loginBtn)  loginBtn.style.display  = '';
+    if (signupBtn) signupBtn.style.display = '';
+    if (userArea)  userArea.style.display  = 'none';
+  }
+}
+
+/** 세션 서버 검증 (페이지 로드 시) */
+async function verifySession() {
+  const token = localStorage.getItem('lookbook_token');
+  if (!token) {
+    AppState.user = null;
+    updateUserUI();
+    return;
+  }
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const data = await res.json();
+    if (data.success && data.user) {
+      AppState.user = data.user;
+      localStorage.setItem('lookbook_user', JSON.stringify(data.user));
+    } else {
+      // 만료된 세션 정리
+      AppState.user = null;
+      localStorage.removeItem('lookbook_token');
+      localStorage.removeItem('lookbook_user');
+    }
+  } catch (e) {
+    // 네트워크 오류 시 로컬 캐시 유지
+    const stored = localStorage.getItem('lookbook_user');
+    if (stored) {
+      try { AppState.user = JSON.parse(stored); } catch (e2) {}
+    }
+  }
+  updateUserUI();
+}
+
+/** 유저 메뉴 드롭다운 토글 */
+function toggleUserMenu() {
+  const menu = document.getElementById('userDropdownMenu');
+  if (!menu) {
+    // 드롭다운 없으면 간단 토스트
+    if (AppState.user) {
+      showToast(`${AppState.user.name}님 (${AppState.user.credits ?? 0}크레딧)`, 'info');
+    }
+    return;
+  }
+  const isVisible = menu.style.display !== 'none';
+  menu.style.display = isVisible ? 'none' : 'block';
+  if (!isVisible) {
+    const closeMenu = (e) => {
+      if (!menu.contains(e.target)) {
+        menu.style.display = 'none';
+        document.removeEventListener('click', closeMenu);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 10);
   }
 }
 
@@ -308,6 +508,8 @@ function toggleUserMenu() {
 // GENERATOR INIT
 // ─────────────────────────────────────────────────────────
 function initGenerator() {
+  // 세션 검증 후 UI 업데이트
+  verifySession();
   // 모델과 배경 API에서 로드 (step 3, 4 진입 시 로드)
   // 페이지 초기화 시 미리 로드
   loadModelsFromAPI();
@@ -839,6 +1041,13 @@ function updateGenSummary() {
 // ─────────────────────────────────────────────────────────
 async function startGeneration() {
   if (AppState.isGenerating) return;
+
+  // ── 로그인 체크: 미로그인 시 모달 표시 후 리턴 ──
+  if (!AppState.user) {
+    AppState.pendingGeneration = true;
+    openModal('loginModal');
+    return;
+  }
 
   // 배경 미선택 시 랜덤 자동 선택
   if (!AppState.selectedBg) {
@@ -1387,13 +1596,21 @@ document.addEventListener('click', (e) => {
 });
 
 // ─────────────────────────────────────────────────────────
-// LOAD USER FROM LOCAL STORAGE
+// LOAD USER — 로컬 캐시 먼저 적용, 서버 세션 검증
 // ─────────────────────────────────────────────────────────
 (function loadUser() {
   try {
     const stored = localStorage.getItem('lookbook_user');
-    if (stored) AppState.user = JSON.parse(stored);
+    if (stored) {
+      AppState.user = JSON.parse(stored);
+      updateUserUI(); // 즉시 UI 반영 (서버 검증 전)
+    }
   } catch (e) {}
+  // 랜딩 페이지에서도 세션 검증 실행
+  const path = window.location.pathname;
+  if (path === '/' || path === '') {
+    verifySession();
+  }
 })();
 
 // ─────────────────────────────────────────────────────────
