@@ -1252,6 +1252,34 @@ app.get('/api/credits/history', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
+// Generation History API — 이미지 생성 내역 조회
+// ────────────────────────────────────────────────────
+app.get('/api/generation/history', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
+
+    const logs = await db.prepare(
+      `SELECT id, job_id, image_count, model_name, bg_name, ratio, created_at
+       FROM generation_logs
+       WHERE user_id = ?
+       ORDER BY created_at DESC
+       LIMIT 100`
+    ).bind(sess.user_id).all()
+
+    return c.json({ success: true, logs: logs.results || [] })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
 // Credits Deduct API — 이미지 다운로드 시 크레딧 차감
 // ────────────────────────────────────────────────────
 app.post('/api/credits/deduct', async (c) => {
@@ -1916,8 +1944,29 @@ app.post('/api/generation/start', async (c) => {
     }
 
     // jobIds를 콤마로 묶어 단일 jobId처럼 전달 (폴링에서 분리)
+    const combinedJobId = jobIds.join(',')
+
+    // 생성 내역 기록 (크레딧 차감 없이 생성 이벤트만 로깅)
+    if (db && sessionUser) {
+      try {
+        await db.prepare(
+          `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).bind(
+          sessionUser.user_id,
+          combinedJobId,
+          count,
+          modelName || '패션 모델',
+          bgName || '스튜디오',
+          ratio || '3:4'
+        ).run()
+      } catch (logErr) {
+        console.warn('[GenLog] 생성 내역 기록 실패 (무시):', logErr)
+      }
+    }
+
     return c.json({
-      jobId: jobIds.join(','),
+      jobId: combinedJobId,
       estimatedSeconds: 30,
       status: 'queued',
       isFallback: false,
@@ -2945,33 +2994,31 @@ app.get('/dashboard', (c) => {
     list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
     try {
       const token = localStorage.getItem('lookbook_token') || '';
-      const res = await fetch('/api/credits/history', {
+      const res = await fetch('/api/generation/history', {
         headers: { 'X-Session-Token': token }
       });
       if (!res.ok) throw new Error('서버 오류');
       const data = await res.json();
       const logs = data.logs || [];
       if (!logs.length) {
-        list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요</div>';
+        list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
         return;
       }
       list.innerHTML = logs.map(log => {
-        const isDeduct = log.amount < 0;
-        const dateStr  = log.created_at ? log.created_at.slice(0,16).replace('T',' ') : '';
-        const reasonLabel = {
-          'image_generation': '이미지 생성',
-          'admin_grant':      '크레딧 지급',
-          'admin_set':        '크레딧 설정',
-          'signup_bonus':     '가입 보너스',
-        }[log.reason] || log.reason;
-        return \`<div style="background:#1e1e35;border-radius:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            <div style="font-size:14px;font-weight:600;color:#e0e0f0;margin-bottom:4px;">\${reasonLabel}</div>
+        const dateStr = log.created_at ? log.created_at.slice(0,16).replace('T',' ') : '';
+        const modelLabel = log.model_name || '패션 모델';
+        const bgLabel    = log.bg_name    || '스튜디오';
+        const ratioLabel = log.ratio      || '3:4';
+        const countLabel = log.image_count || 1;
+        return \`<div style="background:#1e1e35;border-radius:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:14px;font-weight:600;color:#e0e0f0;margin-bottom:4px;">🎨 이미지 생성</div>
+            <div style="font-size:12px;color:#8b8ba0;margin-bottom:2px;">\${modelLabel} · \${bgLabel}</div>
             <div style="font-size:11px;color:#5a5a7a;">\${dateStr}</div>
           </div>
-          <div style="text-align:right;">
-            <div style="font-size:16px;font-weight:800;color:\${isDeduct ? '#ef4444' : '#22c55e'};">\${isDeduct ? '' : '+'}\${log.amount.toLocaleString()}</div>
-            <div style="font-size:11px;color:#5a5a7a;">잔액 \${log.balance.toLocaleString()}</div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:13px;font-weight:700;color:#9b7cff;">\${countLabel}장 생성</div>
+            <div style="font-size:11px;color:#5a5a7a;">\${ratioLabel}</div>
           </div>
         </div>\`;
       }).join('');
@@ -3185,6 +3232,13 @@ app.get('/generator', (c) => {
       <div class="gslide" id="step-4">
         <div class="gslide-scroll" style="padding-top:12px;">
           <div class="results-grid" id="resultsGrid"></div>
+          <!-- 이미지 하단 ~ 버튼 상단 사이 안내 메시지 -->
+          <div style="padding:18px 16px 4px;text-align:center;">
+            <p style="font-size:13px;color:#8b8ba0;line-height:1.6;margin:0;">
+              <span style="color:#9b7cff;font-weight:600;">이미지 생성은 크레딧이 차감되지 않습니다.</span><br/>
+              오류가 있거나 마음에 들지 않으면 이미지 위 <strong style="color:#e0e0f0;">🔄 재생성</strong> 버튼을 눌러보세요.
+            </p>
+          </div>
         </div>
         <div class="gslide-nav">
           <div class="gslide-nav-inner">
