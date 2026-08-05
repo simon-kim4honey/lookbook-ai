@@ -572,9 +572,6 @@ function filterByStatus(status, btn) {
 // ─────────────────────────────────────────────────────────
 function initGenerator() {
   // verifySession은 initPage에서 이미 호출됨
-  // 슬롯 UI 초기 렌더링
-  renderSlots();
-  updateNextBtn1();
   // 모델/배경 미리 로드
   loadModelsFromAPI();
   loadBackgroundsFromAPI();
@@ -775,22 +772,33 @@ function showGrid(loadingId, gridId, renderFn) {
 
 // ─────────────────────────────────────────────────────────
 // STEP 1: 슬롯 기반 의류 업로드 (상의 / 하의 / 전체)
-// 카테고리별 최대 4장 멀티 업로드 지원
+// 사용자가 직접 카테고리를 선택해 업로드 → 분류 오류 없음
 // ─────────────────────────────────────────────────────────
 
-const SLOT_CATS  = ['TOP', 'BOTTOM', 'DRESS'];
+// AppState.clothingItems 는 슬롯별로 최대 1장씩, 카테고리가 key
+// { TOP: {dataUrl, file} | null, BOTTOM: ..., DRESS: ... }
+// 기존 clothingItems 배열도 generation 요청 시 슬롯 데이터로 채워서 유지
+
+const SLOT_CATS = ['TOP', 'BOTTOM', 'DRESS'];
 const SLOT_LABEL = { TOP: '상의', BOTTOM: '하의', DRESS: '전체' };
-const MAX_PER_CAT = 4; // 카테고리별 최대 업로드 수
 
-// 슬롯별 데이터 저장 — 배열로 변경 (최대 4개)
-const slotData = { TOP: [], BOTTOM: [], DRESS: [] };
+// 슬롯별 데이터 저장 (null = 비어 있음)
+const slotData = { TOP: null, BOTTOM: null, DRESS: null };
 
-// ── "추가" 버튼 클릭 → 해당 카테고리 hidden input 트리거 ──
-function triggerSlotAdd(cat) {
-  if (slotData[cat].length >= MAX_PER_CAT) {
-    showToast(`${SLOT_LABEL[cat]}는 최대 ${MAX_PER_CAT}장까지 업로드 가능합니다.`, 'warning');
-    return;
-  }
+// ── label for= 방식: 이미 채워진 슬롯이면 파일선택창 열기 차단 ──
+// label 클릭 시 호출. 이미 이미지가 있으면 false 반환 → label의 for= 동작 억제
+function handleSlotLabelClick(e, cat) {
+  // ✕ 버튼 클릭은 removeSlot()에서 처리 → label 기본동작 억제
+  if (e.target.closest('.cslot-remove')) return false;
+  // 이미 채워진 슬롯: 파일 선택창 열지 않음
+  if (slotData[cat]) return false;
+  // 비어 있으면 label for= 연결로 파일 선택창 열림 (브라우저 네이티브 동작)
+  return true;
+}
+
+// ── 레거시 호환 (혹시 남은 onclick 에서 호출될 경우 대비) ──
+function triggerSlotInput(cat) {
+  if (slotData[cat]) return;
   const input = document.getElementById(`fileInput-${cat}`);
   if (input) input.click();
 }
@@ -799,36 +807,33 @@ function triggerSlotAdd(cat) {
 function handleSlotDragOver(e, cat) {
   e.preventDefault();
   e.stopPropagation();
-  if (slotData[cat].length >= MAX_PER_CAT) return;
-  document.getElementById(`slot-wrap-${cat}`)?.classList.add('drag-over');
+  if (slotData[cat]) return; // 이미 채워진 슬롯은 무시
+  document.getElementById(`slot-${cat}`)?.classList.add('drag-over');
 }
 function handleSlotDragLeave(e, cat) {
-  const wrap = document.getElementById(`slot-wrap-${cat}`);
-  if (wrap && !wrap.contains(e.relatedTarget)) {
-    wrap.classList.remove('drag-over');
+  const slot = document.getElementById(`slot-${cat}`);
+  if (slot && !slot.contains(e.relatedTarget)) {
+    slot.classList.remove('drag-over');
   }
 }
 function handleSlotDrop(e, cat) {
   e.preventDefault();
   e.stopPropagation();
-  document.getElementById(`slot-wrap-${cat}`)?.classList.remove('drag-over');
-  const files = Array.from(e.dataTransfer.files || []);
-  files.forEach(f => processSlotFile(f, cat));
+  document.getElementById(`slot-${cat}`)?.classList.remove('drag-over');
+  if (slotData[cat]) return; // 이미 채워진 슬롯 무시
+  const file = e.dataTransfer.files?.[0];
+  if (file) processSlotFile(file, cat);
 }
 
-// ── 파일 input change (multiple 허용) ──
+// ── 파일 input change ──
 function handleSlotFileSelect(e, cat) {
-  const files = Array.from(e.target.files || []);
-  files.forEach(f => processSlotFile(f, cat));
+  const file = e.target.files?.[0];
+  if (file) processSlotFile(file, cat);
   e.target.value = ''; // 같은 파일 재선택 허용
 }
 
-// ── 공통: 파일 유효성 검사 + 슬롯 배열에 push ──
+// ── 공통: 파일 유효성 검사 + 슬롯에 저장 ──
 function processSlotFile(file, cat) {
-  if (slotData[cat].length >= MAX_PER_CAT) {
-    showToast(`${SLOT_LABEL[cat]}는 최대 ${MAX_PER_CAT}장까지 업로드 가능합니다.`, 'warning');
-    return;
-  }
   const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (!validTypes.includes(file.type)) {
     showToast('JPG, PNG, WEBP 형식만 지원합니다.', 'error');
@@ -841,112 +846,85 @@ function processSlotFile(file, cat) {
 
   const reader = new FileReader();
   reader.onload = (ev) => {
-    slotData[cat].push({ file, dataUrl: ev.target.result });
+    slotData[cat] = { file, dataUrl: ev.target.result };
     syncClothingItems();
     renderSlots();
     updateNextBtn1();
-    showToast(`${SLOT_LABEL[cat]} 업로드 완료 (${slotData[cat].length}/${MAX_PER_CAT})`, 'success');
+    showToast(`${SLOT_LABEL[cat]} 업로드 완료`, 'success');
   };
   reader.readAsDataURL(file);
 }
 
-// ── 슬롯 개별 삭제 (index 기반) ──
-function removeSlot(e, cat, idx) {
-  e.stopPropagation();
-  e.preventDefault();
-  slotData[cat].splice(idx, 1);
+// ── 슬롯 삭제 ──
+function removeSlot(e, cat) {
+  e.stopPropagation(); // 슬롯 클릭 전파 방지
+  slotData[cat] = null;
   syncClothingItems();
   renderSlots();
   updateNextBtn1();
 }
 
-// ── slotData → AppState.clothingItems 동기화 ──
+// ── slotData → AppState.clothingItems 동기화 (generation 요청에서 사용) ──
 function syncClothingItems() {
-  AppState.clothingItems = SLOT_CATS.flatMap(cat =>
-    slotData[cat].map((item, idx) => ({
-      id:       `slot-${cat}-${idx}`,
-      file:     item.file,
-      dataUrl:  item.dataUrl,
+  AppState.clothingItems = SLOT_CATS
+    .filter(cat => slotData[cat] !== null)
+    .map(cat => ({
+      id:       `slot-${cat}`,
+      file:     slotData[cat].file,
+      dataUrl:  slotData[cat].dataUrl,
       category: cat,
       label:    SLOT_LABEL[cat],
       classifying: false,
-    }))
-  );
+    }));
 
   // 레거시 호환
-  AppState.uploadedFile     = AppState.clothingItems[0]?.file    || null;
-  AppState.uploadedImageUrl = AppState.clothingItems[0]?.dataUrl || null;
+  AppState.uploadedFile     = AppState.clothingItems[0]?.file     || null;
+  AppState.uploadedImageUrl = AppState.clothingItems[0]?.dataUrl  || null;
 }
 
 // ── 슬롯 UI 렌더링 ──
 function renderSlots() {
   SLOT_CATS.forEach(cat => {
-    const container = document.getElementById(`slot-container-${cat}`);
-    if (!container) return;
+    const slot       = document.getElementById(`slot-${cat}`);
+    const body       = document.getElementById(`slot-body-${cat}`);
+    const removeBtn  = document.getElementById(`slot-remove-${cat}`);
+    if (!slot || !body) return;
 
-    const items   = slotData[cat];
-    const canAdd  = items.length < MAX_PER_CAT;
-    const label   = SLOT_LABEL[cat];
+    const data = slotData[cat];
 
-    // 썸네일 목록 HTML
-    const thumbsHtml = items.map((item, idx) => `
-      <div class="cslot-thumb">
-        <img src="${item.dataUrl}" alt="${label} ${idx + 1}" class="cslot-thumb-img" />
-        <button type="button" class="cslot-thumb-remove"
-          onclick="removeSlot(event,'${cat}',${idx})" title="삭제">✕</button>
-      </div>
-    `).join('');
-
-    // 추가 버튼
-    const addBtnHtml = canAdd ? `
-      <button type="button" class="cslot-add-btn" onclick="triggerSlotAdd('${cat}')"
-        title="${label} 추가">
-        <span class="cslot-add-plus">＋</span>
-        <span class="cslot-add-hint">${items.length === 0 ? '탭하여 추가' : '추가'}</span>
-      </button>
-    ` : '';
-
-    // 카운트 표시
-    const countHtml = items.length > 0
-      ? `<span class="cslot-count">${items.length}/${MAX_PER_CAT}</span>`
-      : '';
-
-    container.innerHTML = `
-      <div class="cslot-section-header">
-        <span class="cslot-section-label">${label}</span>
-        ${countHtml}
-      </div>
-      <div class="cslot-grid"
-        ondragover="handleSlotDragOver(event,'${cat}')"
-        ondragleave="handleSlotDragLeave(event,'${cat}')"
-        ondrop="handleSlotDrop(event,'${cat}')"
-        id="slot-wrap-${cat}">
-        ${thumbsHtml}
-        ${addBtnHtml}
-      </div>
-    `;
+    if (data) {
+      // 이미지 있음 → 썸네일 표시 + label for= 비활성화 (pointer-events:none 로 파일창 방지)
+      slot.classList.add('cslot--filled');
+      body.innerHTML = `<img src="${data.dataUrl}" alt="${SLOT_LABEL[cat]}" class="cslot-img" />`;
+      if (removeBtn) removeBtn.classList.remove('hidden');
+    } else {
+      // 비어 있음 → 플레이스홀더 (span 태그 — label 내부에서도 block처럼 동작)
+      slot.classList.remove('cslot--filled');
+      body.innerHTML = `
+        <span class="cslot-empty">
+          <span class="cslot-plus">＋</span>
+          <span class="cslot-hint">탭하여 사진 선택</span>
+        </span>`;
+      if (removeBtn) removeBtn.classList.add('hidden');
+    }
   });
 }
 
-// ── 다음 버튼: 전체 합산 1장 이상 채워지면 활성화 ──
+// ── 다음 버튼: 슬롯 1개 이상 채워지면 활성화 ──
 function updateNextBtn1() {
   const btn = document.getElementById('nextBtn1');
   if (!btn) return;
-  const total = SLOT_CATS.reduce((sum, cat) => sum + slotData[cat].length, 0);
-  btn.disabled = total === 0;
+  const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null);
+  btn.disabled = !hasAny;
 }
 
 // ── 전체 초기화 (레거시 resetUpload 호환) ──
 function resetUpload() {
-  SLOT_CATS.forEach(cat => { slotData[cat] = []; });
+  SLOT_CATS.forEach(cat => { slotData[cat] = null; });
   syncClothingItems();
   renderSlots();
   updateNextBtn1();
 }
-
-// ── 레거시 호환 (기존 onclick 에서 호출될 경우 대비) ──
-function triggerSlotInput(cat) { triggerSlotAdd(cat); }
-function handleSlotLabelClick(e, cat) { return true; }
 
 // ─────────────────────────────────────────────────────────
 // STEP 2/3: PC 스크롤 화살표
