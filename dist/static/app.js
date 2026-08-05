@@ -704,9 +704,12 @@ function prevStep(currentStep) {
 function changeStep(newStep) {
   const prev = AppState.currentStep;
 
+  // 동일 step 전환은 무시 (prev 클래스 오염 방지)
+  if (newStep === prev) return;
+
   // gslide 전환 (새 구조)
   const allSlides = document.querySelectorAll('.gslide');
-  allSlides.forEach(s => { s.classList.remove('active','prev'); });
+  allSlides.forEach(s => { s.classList.remove('active','prev'); s.style.transform = ''; });
 
   const newSlide = document.getElementById(`step-${newStep}`);
   const oldSlide = document.getElementById(`step-${prev}`);
@@ -1393,6 +1396,14 @@ function completeGeneration(images, isFallback = false) {
   }
 
   renderResults(proxiedImages);
+
+  // step3Nav 복원 (재생성 시 숨겼을 수 있으므로)
+  const step3NavEl = document.getElementById('step3Nav');
+  if (step3NavEl) step3NavEl.style.display = '';
+  // generatingView 숨김
+  const genViewEl = document.getElementById('generatingView');
+  if (genViewEl) genViewEl.style.display = 'none';
+
   changeStep(4);
 
   const count = images.length;
@@ -1850,14 +1861,15 @@ async function regenImage() {
 
     showToast(`재생성 시작! (${AppState.regenCount}/${MAX_REGEN})`, 'info');
 
-    // 모달 닫고 생성 진행 UI 표시
+    // 모달 닫고 step-3 (생성 진행 화면)으로 전환
     closeModal('imageModal');
 
-    // 생성 진행 상태 UI로 전환
+    // step-3으로 되돌아가서 generatingView 표시 (step-4 → step-3 → step-4 흐름)
+    changeStep(3);
     const generatingView = document.getElementById('generatingView');
-    const resultsSection = document.getElementById('resultsSection');
+    const step3Nav = document.getElementById('step3Nav');
     if (generatingView) generatingView.style.display = '';
-    if (resultsSection) resultsSection.style.display = 'none';
+    if (step3Nav) step3Nav.style.display = 'none';
 
     updateProgress(10, '재생성 중...');
     AppState.isGenerating = true;
