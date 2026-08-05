@@ -1963,3 +1963,110 @@ window.addEventListener('load', () => {
     observer.observe(el);
   });
 });
+
+// ─────────────────────────────────────────────────────────
+// 크레딧 충전 패널 (모든 페이지 공통)
+// ─────────────────────────────────────────────────────────
+let _selectedPkg = null;
+
+function openChargePanel() {
+  const user = AppState.user;
+  const credits = user ? (user.credits ?? 0) : 0;
+  const el = document.getElementById('chargePanelCredits');
+  if (el) el.textContent = credits.toLocaleString() + ' 크레딧';
+  const panel = document.getElementById('chargePanel');
+  if (!panel) return;
+  panel.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  _selectedPkg = null;
+  // 기본 선택: 4만원 패키지
+  const defaultCard = document.querySelector('[data-pkg="pkg_40000"]');
+  if (defaultCard) selectPackage('pkg_40000', defaultCard);
+}
+
+function closeChargePanel() {
+  const panel = document.getElementById('chargePanel');
+  if (panel) panel.style.display = 'none';
+  document.body.style.overflow = '';
+  _selectedPkg = null;
+}
+
+function selectPackage(pkgId, el) {
+  _selectedPkg = pkgId;
+  document.querySelectorAll('.pkg-card').forEach(c => {
+    c.style.border = '2px solid #3a3a60';
+    c.style.transform = 'scale(1)';
+  });
+  el.style.border = '2px solid #6c47ff';
+  el.style.transform = 'scale(1.01)';
+  const cta = document.getElementById('chargeCta');
+  const lbl = document.getElementById('ctaLabel');
+  if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
+  const map = { pkg_20000: '20,000원 결제 (1,000크레딧)', pkg_40000: '40,000원 결제 (2,300크레딧)', pkg_60000: '60,000원 결제 (4,000크레딧)' };
+  if (lbl) lbl.textContent = map[pkgId] || '결제하기';
+}
+
+async function startPayment() {
+  if (!_selectedPkg) { showToast('패키지를 선택해주세요.', 'error'); return; }
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) { showToast('로그인이 필요합니다.', 'error'); return; }
+
+  const cta = document.getElementById('chargeCta');
+  try {
+    if (cta) { cta.style.opacity = '0.6'; cta.style.pointerEvents = 'none'; }
+
+    const res = await fetch('/api/payments/prepare', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+      body: JSON.stringify({ packageId: _selectedPkg }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '결제 준비 실패');
+
+    if (!window.TossPayments) await loadTossSDK();
+
+    const clientKey = 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
+    const toss = TossPayments(clientKey);
+    await toss.requestPayment('카드', {
+      amount: data.amount,
+      orderId: data.orderId,
+      orderName: data.orderName,
+      customerName: data.customerName,
+      successUrl: location.origin + '/payment/success',
+      failUrl:    location.origin + '/payment/fail',
+    });
+  } catch (e) {
+    if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
+    if (e.code !== 'USER_CANCEL') {
+      showToast(e.message || '결제 중 오류가 발생했습니다.', 'error');
+    }
+  }
+}
+
+function loadTossSDK() {
+  return new Promise((resolve, reject) => {
+    if (window.TossPayments) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://js.tosspayments.com/v1/payment';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('토스페이먼츠 SDK 로드 실패'));
+    document.head.appendChild(s);
+  });
+}
+
+// 결제 완료 후 creditsRefresh 신호 처리 (탭 복귀 시)
+window.addEventListener('focus', () => {
+  if (sessionStorage.getItem('creditsRefresh')) {
+    sessionStorage.removeItem('creditsRefresh');
+    verifySession().then(() => {
+      const user = AppState.user;
+      if (!user) return;
+      ['dbCredits'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = (user.credits ?? 0).toLocaleString();
+      });
+      const dd = document.getElementById('ddUserCredits');
+      if (dd) dd.textContent = (user.credits ?? 0).toLocaleString() + ' 크레딧';
+    });
+  }
+});

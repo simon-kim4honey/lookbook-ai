@@ -2344,6 +2344,77 @@ const htmlShell = (title: string, bodyContent: string) => `<!DOCTYPE html>
 </head>
 <body>
 ${bodyContent}
+
+<!-- ── 크레딧 충전 패널 (모든 페이지 공통) ── -->
+<div id="chargePanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:9000;overflow-y:auto;">
+  <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+      <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+      <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;margin:0;">크레딧 충전</h2>
+    </div>
+    <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">현재 보유 크레딧</div>
+        <div id="chargePanelCredits" style="font-size:28px;font-weight:800;color:#a78bfa;">-</div>
+      </div>
+      <div style="font-size:32px;opacity:0.5;">💎</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;">
+      <div class="pkg-card" onclick="selectPackage('pkg_20000',this)" data-pkg="pkg_20000"
+           style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">1,000 크레딧</div>
+            <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:22px;font-weight:800;color:#6c47ff;">20,000원</div>
+            <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,818원</div>
+          </div>
+        </div>
+      </div>
+      <div class="pkg-card" onclick="selectPackage('pkg_40000',this)" data-pkg="pkg_40000"
+           style="background:linear-gradient(135deg,#1e1435,#2a1a50);border:2px solid #6c47ff;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;">
+        <div style="position:absolute;top:0;right:20px;background:linear-gradient(135deg,#6c47ff,#a855f7);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;">인기</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">2,300 크레딧</div>
+            <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">25장</strong> 다운로드 가능</div>
+            <div style="font-size:11px;color:#a78bfa;margin-top:4px;">✨ 기본 대비 15% 더 받기</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:22px;font-weight:800;color:#6c47ff;">40,000원</div>
+            <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,600원</div>
+          </div>
+        </div>
+      </div>
+      <div class="pkg-card" onclick="selectPackage('pkg_60000',this)" data-pkg="pkg_60000"
+           style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">4,000 크레딧</div>
+            <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">44장</strong> 다운로드 가능</div>
+            <div style="font-size:11px;color:#a78bfa;margin-top:4px;">🚀 기본 대비 33% 더 받기</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:22px;font-weight:800;color:#6c47ff;">60,000원</div>
+            <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,364원</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button id="chargeCta" onclick="startPayment()"
+            style="width:100%;padding:16px;background:linear-gradient(135deg,#6c47ff,#a855f7);border:none;border-radius:16px;color:white;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.5;pointer-events:none;transition:all 0.2s;">
+      <i class="fas fa-credit-card"></i>
+      <span id="ctaLabel">패키지를 선택하세요</span>
+    </button>
+    <div style="margin-top:16px;font-size:11px;color:#5a5a7a;text-align:center;line-height:1.7;">
+      토스페이먼츠를 통한 안전한 결제 · 카드/계좌이체 지원<br>
+      결제 완료 즉시 크레딧 지급 · 환불은 카톡 문의로 접수
+    </div>
+  </div>
+</div>
+
 <script src="/static/app.js"></script>
 </body>
 </html>`
@@ -3177,93 +3248,6 @@ app.get('/dashboard', (c) => {
     </div>
   </div>
 
-  <!-- 크레딧 충전 패널 -->
-  <div id="chargePanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:600;overflow-y:auto;">
-    <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
-      <!-- 헤더 -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-        <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
-        <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">크레딧 충전</h2>
-      </div>
-
-      <!-- 현재 크레딧 -->
-      <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
-        <div>
-          <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">현재 보유 크레딧</div>
-          <div id="chargePanelCredits" style="font-size:28px;font-weight:800;color:#a78bfa;"></div>
-        </div>
-        <div style="font-size:32px;opacity:0.5;">💎</div>
-      </div>
-
-      <!-- 패키지 카드 -->
-      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;" id="pkgList">
-
-        <!-- 2만원 패키지 -->
-        <div class="pkg-card" onclick="selectPackage('pkg_20000',this)" data-pkg="pkg_20000"
-             style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;">
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <div>
-              <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">1,000 크레딧</div>
-              <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-size:22px;font-weight:800;color:#6c47ff;">20,000원</div>
-              <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,818원</div>
-            </div>
-          </div>
-          <div class="pkg-check" style="display:none;position:absolute;top:10px;right:10px;width:22px;height:22px;background:#6c47ff;border-radius:50%;display:none;align-items:center;justify-content:center;color:white;font-size:12px;">✓</div>
-        </div>
-
-        <!-- 4만원 패키지 -->
-        <div class="pkg-card" onclick="selectPackage('pkg_40000',this)" data-pkg="pkg_40000"
-             style="background:linear-gradient(135deg,#1e1435,#2a1a50);border:2px solid #6c47ff;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;">
-          <!-- 인기 배지 -->
-          <div style="position:absolute;top:0;right:20px;background:linear-gradient(135deg,#6c47ff,#a855f7);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;">인기</div>
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <div>
-              <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">2,300 크레딧</div>
-              <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">25장</strong> 다운로드 가능</div>
-              <div style="font-size:11px;color:#a78bfa;margin-top:4px;">✨ 기본 대비 15% 더 받기</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-size:22px;font-weight:800;color:#6c47ff;">40,000원</div>
-              <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,600원</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 6만원 패키지 -->
-        <div class="pkg-card" onclick="selectPackage('pkg_60000',this)" data-pkg="pkg_60000"
-             style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;">
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <div>
-              <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">4,000 크레딧</div>
-              <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">44장</strong> 다운로드 가능</div>
-              <div style="font-size:11px;color:#a78bfa;margin-top:4px;">🚀 기본 대비 33% 더 받기</div>
-            </div>
-            <div style="text-align:right;">
-              <div style="font-size:22px;font-weight:800;color:#6c47ff;">60,000원</div>
-              <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,364원</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 결제 버튼 -->
-      <button id="chargeCta" onclick="startPayment()"
-              style="width:100%;padding:16px;background:linear-gradient(135deg,#6c47ff,#a855f7);border:none;border-radius:16px;color:white;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.5;pointer-events:none;transition:all 0.2s;">
-        <i class="fas fa-credit-card"></i>
-        <span id="ctaLabel">패키지를 선택하세요</span>
-      </button>
-
-      <!-- 안내 -->
-      <div style="margin-top:16px;font-size:11px;color:#5a5a7a;text-align:center;line-height:1.7;">
-        토스페이먼츠를 통한 안전한 결제 · 카드/계좌이체 지원<br>
-        결제 완료 즉시 크레딧 지급 · 환불은 카톡 문의로 접수
-      </div>
-    </div>
-  </div>
-
   <!-- 이미지 확대 다운로드 모달 (히스토리 전용) -->
   <div id="histImgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1000;align-items:center;justify-content:center;flex-direction:column;padding:20px;">
     <button onclick="closeHistModal()" style="position:absolute;top:16px;right:16px;width:36px;height:36px;border:none;background:rgba(255,255,255,0.1);border-radius:50%;color:#fff;font-size:20px;cursor:pointer;">×</button>
@@ -3455,117 +3439,6 @@ app.get('/dashboard', (c) => {
     }
   }
 
-  // ────────────────────────────────
-  // 크레딧 충전 패널
-  // ────────────────────────────────
-  let _selectedPkg = null;
-
-  function openChargePanel() {
-    const user = AppState.user;
-    const credits = user ? (user.credits ?? 0) : 0;
-    document.getElementById('chargePanelCredits').textContent = credits.toLocaleString() + ' 크레딧';
-    document.getElementById('chargePanel').style.display = 'block';
-    document.body.style.overflow = 'hidden';
-    _selectedPkg = null;
-    // 기본 선택: 4만원 패키지
-    const defaultCard = document.querySelector('[data-pkg="pkg_40000"]');
-    if (defaultCard) selectPackage('pkg_40000', defaultCard);
-  }
-
-  function closeChargePanel() {
-    document.getElementById('chargePanel').style.display = 'none';
-    document.body.style.overflow = '';
-    _selectedPkg = null;
-  }
-
-  function selectPackage(pkgId, el) {
-    _selectedPkg = pkgId;
-    // 카드 스타일 초기화
-    document.querySelectorAll('.pkg-card').forEach(c => {
-      c.style.border = '2px solid #3a3a60';
-      c.style.transform = 'scale(1)';
-    });
-    // 선택 카드 강조
-    el.style.border = '2px solid #6c47ff';
-    el.style.transform = 'scale(1.01)';
-    // CTA 버튼 활성화
-    const cta = document.getElementById('chargeCta');
-    const lbl = document.getElementById('ctaLabel');
-    cta.style.opacity = '1';
-    cta.style.pointerEvents = 'auto';
-    const map = { pkg_20000: '20,000원 결제 (1,000크레딧)', pkg_40000: '40,000원 결제 (2,300크레딧)', pkg_60000: '60,000원 결제 (4,000크레딧)' };
-    lbl.textContent = map[pkgId] || '결제하기';
-  }
-
-  async function startPayment() {
-    if (!_selectedPkg) { showToast('패키지를 선택해주세요.', 'error'); return; }
-    const sessionToken = localStorage.getItem('lookbook_token') || '';
-    if (!sessionToken) { showToast('로그인이 필요합니다.', 'error'); return; }
-
-    try {
-      const cta = document.getElementById('chargeCta');
-      cta.style.opacity = '0.6';
-      cta.style.pointerEvents = 'none';
-
-      const res = await fetch('/api/payments/prepare', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
-        body: JSON.stringify({ packageId: _selectedPkg }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || '결제 준비 실패');
-
-      // 토스페이먼츠 SDK 로드 (없으면 동적 로드)
-      if (!window.TossPayments) {
-        await loadTossSDK();
-      }
-
-      const clientKey = 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
-      const toss = TossPayments(clientKey);
-      await toss.requestPayment('카드', {
-        amount: data.amount,
-        orderId: data.orderId,
-        orderName: data.orderName,
-        customerName: data.customerName,
-        successUrl: location.origin + '/payment/success',
-        failUrl:    location.origin + '/payment/fail',
-      });
-    } catch (e) {
-      const cta = document.getElementById('chargeCta');
-      cta.style.opacity = '1';
-      cta.style.pointerEvents = 'auto';
-      if (e.code !== 'USER_CANCEL') {
-        showToast(e.message || '결제 중 오류가 발생했습니다.', 'error');
-      }
-    }
-  }
-
-  function loadTossSDK() {
-    return new Promise((resolve, reject) => {
-      if (window.TossPayments) { resolve(); return; }
-      const s = document.createElement('script');
-      s.src = 'https://js.tosspayments.com/v1/payment';
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('토스페이먼츠 SDK 로드 실패'));
-      document.head.appendChild(s);
-    });
-  }
-
-  // 결제 완료 후 creditsRefresh 신호 처리
-  window.addEventListener('focus', () => {
-    if (sessionStorage.getItem('creditsRefresh')) {
-      sessionStorage.removeItem('creditsRefresh');
-      verifySession().then(() => {
-        const user = AppState.user;
-        if (user) {
-          document.getElementById('dbCredits').textContent = (user.credits ?? 0).toLocaleString();
-          if (document.getElementById('ddUserCredits')) {
-            document.getElementById('ddUserCredits').textContent = (user.credits ?? 0).toLocaleString() + ' 크레딧';
-          }
-        }
-      });
-    }
-  });
   </script>
   `))
 })
