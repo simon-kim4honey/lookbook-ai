@@ -3499,7 +3499,7 @@ app.get('/dashboard', (c) => {
 
   async function startPayment() {
     if (!_selectedPkg) { showToast('패키지를 선택해주세요.', 'error'); return; }
-    const sessionToken = AppState.sessionToken || localStorage.getItem('sessionToken') || '';
+    const sessionToken = localStorage.getItem('lookbook_token') || '';
     if (!sessionToken) { showToast('로그인이 필요합니다.', 'error'); return; }
 
     try {
@@ -4929,7 +4929,7 @@ app.get('/payment/success', (c) => {
     const paymentKey = params.get('paymentKey')
     const orderId    = params.get('orderId')
     const amount     = params.get('amount')
-    const sessionToken = localStorage.getItem('sessionToken') || ''
+    const sessionToken = localStorage.getItem('lookbook_token') || ''
 
     async function confirmPayment() {
       try {
