@@ -2341,6 +2341,8 @@ const htmlShell = (title: string, bodyContent: string) => `<!DOCTYPE html>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
   <link href="/static/style.css" rel="stylesheet" />
+  <!-- app.js는 head에 defer — body 인라인 script보다 항상 먼저 파싱·실행됨 -->
+  <script src="/static/app.js" defer></script>
 </head>
 <body>
 ${bodyContent}
@@ -2415,7 +2417,6 @@ ${bodyContent}
   </div>
 </div>
 
-<script src="/static/app.js"></script>
 </body>
 </html>`
 
