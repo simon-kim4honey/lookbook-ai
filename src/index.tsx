@@ -1266,7 +1266,8 @@ app.get('/api/generation/history', async (c) => {
     if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
 
     const logs = await db.prepare(
-      `SELECT id, job_id, image_count, model_name, bg_name, ratio, created_at
+      `SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
+              image_urls, expires_at, created_at
        FROM generation_logs
        WHERE user_id = ?
        ORDER BY created_at DESC
@@ -1274,6 +1275,38 @@ app.get('/api/generation/history', async (c) => {
     ).bind(sess.user_id).all()
 
     return c.json({ success: true, logs: logs.results || [] })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// Generation Images Update — 폴링 완료 후 이미지 URL 저장
+// ────────────────────────────────────────────────────
+app.post('/api/generation/save-images', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
+
+    const body = await c.req.json() as any
+    const { job_id, image_urls } = body
+    if (!job_id || !image_urls) return c.json({ error: 'job_id, image_urls 필수' }, 400)
+
+    const urlsJson = JSON.stringify(Array.isArray(image_urls) ? image_urls : [image_urls])
+    const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19)
+
+    await db.prepare(
+      `UPDATE generation_logs
+       SET image_urls = ?, expires_at = datetime('now', '+14 days')
+       WHERE job_id = ? AND user_id = ?`
+    ).bind(urlsJson, job_id, sess.user_id).run()
+
+    return c.json({ success: true, expires_at: expiresAt })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -1949,17 +1982,25 @@ app.post('/api/generation/start', async (c) => {
     // 생성 내역 기록 (크레딧 차감 없이 생성 이벤트만 로깅)
     if (db && sessionUser) {
       try {
+        // 유저별 seq_no 채번 (1부터 시작)
+        const lastSeq = await db.prepare(
+          `SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`
+        ).bind(sessionUser.user_id).first() as any
+        const nextSeq = (lastSeq?.last_seq || 0) + 1
+
         await db.prepare(
-          `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio)
-           VALUES (?, ?, ?, ?, ?, ?)`
+          `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))`
         ).bind(
           sessionUser.user_id,
           combinedJobId,
           count,
           modelName || '패션 모델',
           bgName || '스튜디오',
-          ratio || '3:4'
+          ratio || '3:4',
+          nextSeq
         ).run()
+        console.log(`[GenLog] seq_no=${nextSeq} 기록 완료`)
       } catch (logErr) {
         console.warn('[GenLog] 생성 내역 기록 실패 (무시):', logErr)
       }
@@ -2946,17 +2987,34 @@ app.get('/dashboard', (c) => {
   <!-- 생성 내역 패널 (해시 #history) -->
   <div id="historyPanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;overflow-y:auto;">
     <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:28px;">
-        <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">‹</button>
+      <!-- 헤더 -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
         <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">생성 내역</h2>
       </div>
-      <div id="historyList" style="display:flex;flex-direction:column;gap:12px;">
+      <!-- 14일 보관 안내 -->
+      <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:15px;">⏰</span>
+        <span style="font-size:12px;color:#fca5a5;line-height:1.5;">이미지는 <strong>14일 동안만 보관</strong>됩니다. 제때 다운로드하시기 바랍니다.</span>
+      </div>
+      <div id="historyList" style="display:flex;flex-direction:column;gap:16px;">
         <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
           <div style="font-size:40px;margin-bottom:12px;">🎨</div>
           생성 내역을 불러오는 중...
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- 이미지 확대 다운로드 모달 (히스토리 전용) -->
+  <div id="histImgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1000;align-items:center;justify-content:center;flex-direction:column;padding:20px;">
+    <button onclick="closeHistModal()" style="position:absolute;top:16px;right:16px;width:36px;height:36px;border:none;background:rgba(255,255,255,0.1);border-radius:50%;color:#fff;font-size:20px;cursor:pointer;">×</button>
+    <img id="histModalImg" src="" alt="생성 이미지"
+      style="max-width:min(420px,90vw);max-height:calc(100dvh - 140px);object-fit:contain;border-radius:14px;display:block;" />
+    <div id="histModalExpiry" style="font-size:11px;color:#f87171;margin-top:8px;text-align:center;"></div>
+    <button id="histModalDlBtn" onclick="histModalDownload()" style="margin-top:14px;padding:12px 28px;background:linear-gradient(135deg,#7c3aed,#a855f7);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;">
+      <i class="fas fa-download"></i> 다운로드 (90크레딧)
+    </button>
   </div>
 
   <script>
@@ -2989,14 +3047,95 @@ app.get('/dashboard', (c) => {
     loadHistory();
   }
 
+  // ── 순번 포맷: YYYYMMDDHHMM + zero-padded seq_no ──
+  function formatHistSeq(createdAt, seqNo) {
+    // createdAt: "2026-08-04 08:39:49" 형태
+    const dt = createdAt ? createdAt.replace('T',' ') : '';
+    const parts = dt.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
+    if (!parts) return String(seqNo || '?').padStart(3,'0');
+    const yy = parts[1].slice(2); // 26
+    const mm = parts[2]; const dd = parts[3];
+    const hh = parts[4]; const mi = parts[5];
+    const seq = String(seqNo || 1).padStart(3,'0');
+    return \`\${yy}\${mm}\${dd}\${hh}\${mi}-\${seq}\`;
+  }
+
+  // ── 만료까지 남은 일수 계산 ──
+  function expiryLabel(expiresAt) {
+    if (!expiresAt) return null;
+    const exp = new Date(expiresAt.replace(' ','T') + (expiresAt.includes('Z') ? '' : 'Z'));
+    const now = Date.now();
+    const diffMs = exp.getTime() - now;
+    if (diffMs <= 0) return '만료됨';
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays <= 3) return \`⚠️ \${diffDays}일 후 만료\`;
+    return \`\${diffDays}일 후 만료\`;
+  }
+
+  // ── 히스토리 이미지 모달 상태 ──
+  let _histModalUrl = null;
+  let _histModalJobId = null;
+
+  function openHistModal(imgUrl, expiresAt) {
+    _histModalUrl = imgUrl;
+    const modal = document.getElementById('histImgModal');
+    document.getElementById('histModalImg').src = imgUrl;
+    const expLabel = expiresAt ? expiryLabel(expiresAt) : null;
+    document.getElementById('histModalExpiry').textContent = expLabel ? \`만료: \${expLabel}\` : '';
+    modal.style.display = 'flex';
+  }
+  function closeHistModal() {
+    document.getElementById('histImgModal').style.display = 'none';
+    _histModalUrl = null;
+  }
+  async function histModalDownload() {
+    if (!_histModalUrl) return;
+    const btn = document.getElementById('histModalDlBtn');
+    const token = localStorage.getItem('lookbook_token') || '';
+    if (!token) { showToast('로그인이 필요합니다.', 'error'); return; }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
+    try {
+      const deductRes = await fetch('/api/credits/deduct', {
+        method: 'POST', headers: { 'X-Session-Token': token }
+      });
+      if (deductRes.status === 401) { showToast('로그인이 필요합니다.', 'error'); return; }
+      if (deductRes.status === 402) {
+        const errData = await deductRes.json();
+        showToast(\`크레딧 부족 (보유: \${errData.available ?? 0}크레딧 / 필요: 90크레딧)\`, 'error');
+        return;
+      }
+      if (!deductRes.ok) { showToast('크레딧 처리 오류', 'error'); return; }
+      const deductData = await deductRes.json();
+      // 크레딧 UI 갱신
+      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+      if (cachedUser) { cachedUser.credits = deductData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+      if (AppState.user) AppState.user.credits = deductData.creditsRemaining;
+      const dbCredEl = document.getElementById('dbCredits');
+      if (dbCredEl) dbCredEl.textContent = (deductData.creditsRemaining ?? 0).toLocaleString();
+      // 파일 다운로드
+      const dlUrl = _histModalUrl.includes('/api/proxy/gen-image')
+        ? _histModalUrl + (_histModalUrl.includes('?') ? '&' : '?') + 'download=1'
+        : \`/api/proxy/gen-image?url=\${encodeURIComponent(_histModalUrl)}&download=1\`;
+      const a = document.createElement('a');
+      a.href = dlUrl; a.download = \`lookbook_ai_\${Date.now()}.jpg\`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showToast(\`다운로드 완료! (잔액: \${deductData.creditsRemaining}크레딧)\`, 'success');
+      closeHistModal();
+    } catch (err) {
+      showToast('다운로드 중 오류가 발생했습니다.', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-download"></i> 다운로드 (90크레딧)';
+    }
+  }
+
   async function loadHistory() {
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
     try {
       const token = localStorage.getItem('lookbook_token') || '';
-      const res = await fetch('/api/generation/history', {
-        headers: { 'X-Session-Token': token }
-      });
+      const res = await fetch('/api/generation/history', { headers: { 'X-Session-Token': token } });
       if (!res.ok) throw new Error('서버 오류');
       const data = await res.json();
       const logs = data.logs || [];
@@ -3004,22 +3143,53 @@ app.get('/dashboard', (c) => {
         list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
         return;
       }
-      list.innerHTML = logs.map(log => {
-        const dateStr = log.created_at ? log.created_at.slice(0,16).replace('T',' ') : '';
-        const modelLabel = log.model_name || '패션 모델';
-        const bgLabel    = log.bg_name    || '스튜디오';
-        const ratioLabel = log.ratio      || '3:4';
+
+      list.innerHTML = logs.map((log, i) => {
+        const seqLabel  = formatHistSeq(log.created_at, log.seq_no || (logs.length - i));
+        const dateStr   = log.created_at ? log.created_at.slice(0,16).replace('T',' ') : '';
+        const expLabel  = expiryLabel(log.expires_at);
+        const expired   = expLabel === '만료됨';
         const countLabel = log.image_count || 1;
-        return \`<div style="background:#1e1e35;border-radius:14px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:14px;font-weight:600;color:#e0e0f0;margin-bottom:4px;">🎨 이미지 생성</div>
-            <div style="font-size:12px;color:#8b8ba0;margin-bottom:2px;">\${modelLabel} · \${bgLabel}</div>
-            <div style="font-size:11px;color:#5a5a7a;">\${dateStr}</div>
+
+        // image_urls 파싱 (JSON 배열 문자열)
+        let urls = [];
+        try { urls = log.image_urls ? JSON.parse(log.image_urls) : []; } catch(e) { urls = []; }
+
+        // 썸네일 그리드 (최대 4장)
+        const thumbsHtml = urls.length > 0 ? \`
+          <div style="display:grid;grid-template-columns:repeat(\${Math.min(urls.length,4)},1fr);gap:4px;margin-top:10px;border-radius:10px;overflow:hidden;">
+            \${urls.slice(0,4).map((u, ti) => {
+              const proxyUrl = u.startsWith('/api/proxy') ? u : \`/api/proxy/gen-image?url=\${encodeURIComponent(u)}\`;
+              const expiresAtEsc = (log.expires_at || '').replace(/'/g,"\\\\'");
+              if (expired) {
+                return \`<div style="aspect-ratio:3/4;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#5a5a7a;">만료됨</div>\`;
+              }
+              return \`<div style="aspect-ratio:3/4;overflow:hidden;cursor:pointer;position:relative;" onclick="openHistModal('\${proxyUrl}','\${expiresAtEsc}')">
+                <img src="\${proxyUrl}" alt="생성 이미지 \${ti+1}"
+                  style="width:100%;height:100%;object-fit:cover;display:block;"
+                  onerror="this.parentNode.innerHTML='<div style=\\"width:100%;height:100%;background:#1e1e35;display:flex;align-items:center;justify-content:center;font-size:10px;color:#5a5a7a;\\">로드 실패</div>'" />
+                <div style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);border-radius:4px;padding:2px 5px;font-size:10px;color:#fff;">
+                  <i class="fas fa-expand-alt"></i>
+                </div>
+              </div>\`;
+            }).join('')}
+          </div>\` : \`<div style="height:4px;"></div>\`;
+
+        const expColor  = expLabel === '만료됨' ? '#6b7280' : (expLabel?.includes('⚠️') ? '#fbbf24' : '#6b7280');
+
+        return \`<div style="background:#1e1e35;border-radius:16px;padding:14px 16px;border:1px solid rgba(255,255,255,0.04);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:11px;font-weight:700;color:#9b7cff;letter-spacing:0.5px;margin-bottom:3px;">#\${seqLabel}</div>
+              <div style="font-size:13px;font-weight:600;color:#e0e0f0;">\${countLabel}장 생성</div>
+              <div style="font-size:11px;color:#5a5a7a;margin-top:2px;">\${dateStr}</div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:11px;color:\${expColor};">\${expLabel || ''}</div>
+              <div style="font-size:11px;color:#5a5a7a;margin-top:2px;">\${log.ratio || '3:4'}</div>
+            </div>
           </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:13px;font-weight:700;color:#9b7cff;">\${countLabel}장 생성</div>
-            <div style="font-size:11px;color:#5a5a7a;">\${ratioLabel}</div>
-          </div>
+          \${thumbsHtml}
         </div>\`;
       }).join('');
     } catch (e) {

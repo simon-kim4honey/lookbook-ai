@@ -1944,7 +1944,7 @@ footer {
 .result-overlay-btn.download { background: var(--white); color: var(--text-primary); }
 .result-overlay-btn.regen { background: rgba(99,102,241,0.85); color: white; backdrop-filter: blur(4px); }
 .result-overlay-btn.regen:hover { background: rgba(99,102,241,1); }
-.result-overlay-btn.enlarge { background: rgba(255,255,255,0.2); color: white; backdrop-filter: blur(4px); }
+/* .result-overlay-btn.enlarge 제거 — 캡처 방지 */
 .result-overlay-btn:hover { transform: scale(1.05); }
 
 /* Image Modal — 확대 화면이 뷰포트를 넘지 않도록 */

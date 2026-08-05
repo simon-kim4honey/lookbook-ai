@@ -28,6 +28,7 @@ const AppState = {
   generatedImages: [],
   isGenerating: false,
   currentJobId: null,
+  lastJobId: null,        // 이미지 URL 저장용 (save-images API)
   pollInterval: null,
   user: null,
 
@@ -1241,6 +1242,7 @@ async function startGeneration() {
 
     // 크레딧 차감은 다운로드 시점에 수행
     AppState.currentJobId = startData.jobId;
+    AppState.lastJobId = startData.jobId; // 이미지 URL 저장용
 
     // Fallback 처리 (즉시 완료)
     if (startData.isFallback) {
@@ -1375,6 +1377,21 @@ function completeGeneration(images, isFallback = false) {
 
   AppState.generatedImages = proxiedImages;
 
+  // 생성된 이미지 URL을 서버에 저장 (썸네일 미리보기용, 14일 보관)
+  if (!isFallback && AppState.lastJobId) {
+    const realUrls = images
+      .filter(img => img.url && img.url.startsWith('http'))
+      .map(img => img.url);
+    if (realUrls.length > 0) {
+      const token = localStorage.getItem('lookbook_token') || '';
+      fetch('/api/generation/save-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Session-Token': token },
+        body: JSON.stringify({ job_id: AppState.lastJobId, image_urls: realUrls }),
+      }).catch(e => console.warn('[SaveImages] 저장 실패(무시):', e));
+    }
+  }
+
   renderResults(proxiedImages);
   changeStep(4);
 
@@ -1480,9 +1497,6 @@ function renderResults(images) {
           <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
             🔄 재생성
           </button>
-          <button class="result-overlay-btn enlarge" onclick="openImageModal(${idx}); event.stopPropagation();">
-            🔍 확대
-          </button>
         </div>
       `;
     } else {
@@ -1502,14 +1516,11 @@ function renderResults(images) {
           <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
             🔄 재생성
           </button>
-          <button class="result-overlay-btn enlarge" onclick="openImageModal(${idx}); event.stopPropagation();">
-            🔍 확대
-          </button>
         </div>
       `;
     }
 
-    card.addEventListener('click', () => openImageModal(idx));
+    // 카드 클릭 확대 비활성화 (캡처 방지)
     grid.appendChild(card);
   });
 }
