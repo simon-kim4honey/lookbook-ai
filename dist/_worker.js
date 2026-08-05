@@ -87,11 +87,24 @@ var e=(e,t,n)=>(r,i)=>{let a=-1;return o(0);async function o(s){if(s<=a)throw Er
        SET image_urls = ?, expires_at = datetime('now', '+14 days')
        WHERE job_id = ? AND user_id = ?`).bind(o,i,r.user_id).run(),e.json({success:!0,expires_at:s})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.post(`/api/credits/deduct`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`,code:`UNAUTHORIZED`},401);let r=await t.prepare(`SELECT s.user_id, u.credits, u.name FROM user_sessions s
        JOIN users u ON u.id = s.user_id
-       WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`,code:`UNAUTHORIZED`},401);let i=ot;if(r.credits<i)return e.json({error:`크레딧이 부족합니다. (보유: ${r.credits}크레딧, 필요: ${i}크레딧)`,code:`INSUFFICIENT_CREDITS`,available:r.credits,required:i},402);let a=r.credits-i;return await t.prepare(`UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`).bind(a,r.user_id).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-       VALUES (?, 'deduct', ?, ?, 'image_download', ?)`).bind(r.user_id,-i,a,`dl_${Date.now()}`).run(),console.log(`[Credits] Download deduct: ${r.name} ${r.credits} → ${a} (-${i})`),e.json({success:!0,creditsUsed:i,creditsRemaining:a})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.post(`/api/uploads/image`,async e=>{try{let t=(await e.req.formData()).get(`file`);if(!t)return e.json({success:!1,message:`파일이 없습니다.`},400);let n=await t.arrayBuffer(),r=btoa(String.fromCharCode(...new Uint8Array(n))),i=`data:${t.type||`image/jpeg`};base64,${r}`;return e.json({success:!0,imageId:`img_`+Math.random().toString(36).substr(2,9),url:i,dataUrl:i})}catch(t){return e.json({success:!1,message:t.message},500)}});function tt(e){return{"1:1":`1:1`,"4:5":`4:5`,"3:4":`3:4`,"9:16":`9:16`}[e]||`3:4`}function nt(e){return e===`4K`?`4k`:e===`HD`?`2k`:`1k`}G.post(`/api/clothing/classify`,async e=>{try{let t=(await e.req.json()).images||[];if(t.length===0)return e.json({success:!1,message:`이미지가 없습니다.`},400);await Promise.all(t.map(async({dataUrl:e,index:t})=>{try{let n=[`Analyze this clothing item image and classify it into EXACTLY ONE of these categories:`,`TOP — shirts, t-shirts, blouses, crop tops, hoodies (without coat), sweaters, knits, vests worn as tops`,`BOTTOM — pants, trousers, jeans, skirts, shorts, leggings`,`OUTER — coats, jackets, blazers, cardigans worn as outerwear, parkas, windbreakers, leather jackets, denim jackets`,`DRESS — one-piece dresses, jumpsuits, overalls that cover both top and bottom`,`UNKNOWN — if cannot determine`,`Respond in EXACTLY this JSON format only, no other text:`,`{"category":"TOP","label":"white button-down shirt","confidence":0.95}`].join(` `),r=await(await fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify({model:`google/nano-banana-2/edit`,prompt:n,images:[e],aspect_ratio:`1:1`,resolution:`1k`,thinking_level:`default`,output_format:`jpeg`})})).json();if(console.log(`Classify atlas response code:`,r.code),r.code===200&&r.data?.id){let e=r.data.id;for(let t=0;t<10;t++){await new Promise(e=>setTimeout(e,1500));let t=(await fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json())).data?.status;if(t===`completed`||t===`succeeded`||t===`failed`||t===`error`)break}}return{index:t,category:`UNRESOLVED`,label:``,confidence:0}}catch{return{index:t,category:`UNKNOWN`,label:``,confidence:0}}}));let n=await Promise.all(t.map(async({dataUrl:e,index:t})=>rt(e,t)));return console.log(`Classify results:`,n.map(e=>`[${e.index}]${e.category}`).join(`, `)),e.json({success:!0,items:n})}catch(t){return console.error(`Classify error:`,t),e.json({success:!1,message:t.message},500)}});async function rt(e,t){try{let n=await(await fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify({model:`google/nano-banana-2`,prompt:[`CLASSIFICATION TASK. Look at this clothing item.`,`Output ONLY ONE WORD: TOP or BOTTOM or OUTER or DRESS`,`TOP = shirt/tshirt/blouse/sweater/hoodie/knit/vest`,`BOTTOM = pants/jeans/skirt/shorts/leggings`,`OUTER = coat/jacket/blazer/cardigan/parka`,`DRESS = one-piece dress/jumpsuit`].join(` `),images:[e],aspect_ratio:`1:1`,resolution:`1k`,thinking_level:`low`,output_format:`jpeg`})})).json();if(n.code===200&&n.data?.id){let e=n.data.id;for(let t=0;t<8;t++){await new Promise(e=>setTimeout(e,1500));let t=await fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json());if(t.data?.status===`completed`||t.data?.status===`succeeded`||t.data?.status===`failed`||t.data?.status===`error`)break}}let r=e.split(`,`)[1]||``;return Math.floor(r.length*.75),{index:t,category:`TOP`,label:`clothing item`,confidence:.5}}catch{return{index:t,category:`TOP`,label:`clothing item`,confidence:.3}}}function it(e,t){let n=[];return e.forEach((e,r)=>{let i=t+r,a={TOP:`TOP GARMENT (shirt/blouse/sweater/jacket-top)`,BOTTOM:`BOTTOM GARMENT (pants/skirt/shorts)`,OUTER:`OUTER LAYER (coat/jacket/cardigan)`,DRESS:`FULL OUTFIT (dress/jumpsuit — covers both top and bottom)`,UNKNOWN:`CLOTHING ITEM`}[e.category]||`CLOTHING ITEM`;n.push(`Image ${i} = ${a}${e.label?` — ${e.label}`:``}.`)}),n.join(` `)}function at(e,t){let n=[],r=e.map(e=>e.category),i=r.includes(`DRESS`),a=r.includes(`TOP`),o=r.includes(`BOTTOM`),s=r.includes(`OUTER`);if(i){let r=e.findIndex(e=>e.category===`DRESS`);n.push(`Replace the ENTIRE outfit (top and bottom) with Image ${t+r}'s full dress/jumpsuit. Reproduce every design detail exactly.`)}else{if(a){let r=e.findIndex(e=>e.category===`TOP`);n.push(`Replace ONLY the TOP garment with Image ${t+r}'s item. Exact color, pattern, texture, neckline, sleeve length.`)}if(o){let r=e.findIndex(e=>e.category===`BOTTOM`);n.push(`Replace ONLY the BOTTOM garment with Image ${t+r}'s item. Exact color, pattern, waistband, length, cut.`)}if(s){let r=e.findIndex(e=>e.category===`OUTER`);n.push(`Add/replace the OUTER LAYER (coat/jacket) with Image ${t+r}'s item worn over the other clothing. Exact lapels, buttons, length.`)}}return i||(a||n.push(`Keep the original TOP garment EXACTLY unchanged — do NOT modify it.`),o||n.push(`Keep the original BOTTOM garment EXACTLY unchanged — do NOT modify it.`),s||n.push(`Remove any outer layer if present, or keep it minimal.`)),n.join(` `)}var ot=90;G.post(`/api/generation/start`,async e=>{try{let{modelId:t,modelName:n=`패션 모델`,modelDesc:r=`young Asian female fashion model, slim figure, natural look`,bgId:i,bgName:a=`스튜디오`,bgDesc:o=`clean white studio background with professional lighting`,poseType:s=`전신`,pose:c=`정면`,ratio:l=`3:4`,resolution:u=`HD`,count:d=4,clothingImageUrl:f,clothingImages:p}=await e.req.json(),m=e.env?.LOOKBOOK_DB,h=null;if(m){let t=e.req.header(`X-Session-Token`)||``;if(t){let e=await m.prepare(`SELECT s.user_id, u.name, u.credits FROM user_sessions s
+       WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`,code:`UNAUTHORIZED`},401);let i=st;if(r.credits<i)return e.json({error:`크레딧이 부족합니다. (보유: ${r.credits}크레딧, 필요: ${i}크레딧)`,code:`INSUFFICIENT_CREDITS`,available:r.credits,required:i},402);let a=r.credits-i;return await t.prepare(`UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`).bind(a,r.user_id).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       VALUES (?, 'deduct', ?, ?, 'image_download', ?)`).bind(r.user_id,-i,a,`dl_${Date.now()}`).run(),console.log(`[Credits] Download deduct: ${r.name} ${r.credits} → ${a} (-${i})`),e.json({success:!0,creditsUsed:i,creditsRemaining:a})}catch(t){return e.json({success:!1,message:t.message},500)}});var tt={pkg_20000:{amount:2e4,credits:1e3,label:`20,000원 → 1,000크레딧`},pkg_40000:{amount:4e4,credits:2300,label:`40,000원 → 2,300크레딧`},pkg_60000:{amount:6e4,credits:4e3,label:`60,000원 → 4,000크레딧`}};G.get(`/api/payments/packages`,e=>e.json({success:!0,packages:tt})),G.post(`/api/payments/prepare`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`},401);let r=await t.prepare(`SELECT s.user_id, u.name, u.email FROM user_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`},401);let{packageId:i}=await e.req.json(),a=tt[i];if(!a)return e.json({error:`잘못된 패키지입니다.`},400);let o=`lookbook-${r.user_id.slice(0,6)}-${Date.now()}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;return await t.prepare(`INSERT INTO payment_logs (user_id, order_id, amount, credits, status)
+       VALUES (?, ?, ?, ?, 'pending')`).bind(r.user_id,o,a.amount,a.credits).run(),e.json({success:!0,orderId:o,amount:a.amount,credits:a.credits,orderName:a.label,customerName:r.name,customerEmail:r.email})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.post(`/api/payments/confirm`,async e=>{try{let t=e.env.LOOKBOOK_DB,{paymentKey:n,orderId:r,amount:i}=await e.req.json();if(!n||!r||!i)return e.json({error:`paymentKey, orderId, amount 필수`},400);let a=await t.prepare(`SELECT id, user_id, amount, credits, status FROM payment_logs
+       WHERE order_id = ? AND status = 'pending'`).bind(r).first();if(!a)return e.json({error:`결제 정보를 찾을 수 없거나 이미 처리되었습니다.`},404);if(Number(i)!==Number(a.amount))return e.json({error:`결제 금액이 일치하지 않습니다.`},400);let o=e.env.TOSS_SECRET_KEY||`test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R`,s=btoa(o+`:`),c=await fetch(`https://api.tosspayments.com/v1/payments/confirm`,{method:`POST`,headers:{Authorization:`Basic ${s}`,"Content-Type":`application/json`},body:JSON.stringify({paymentKey:n,orderId:r,amount:Number(i)})}),l=await c.json();if(!c.ok)return await t.prepare(`UPDATE payment_logs
+         SET status='failed', toss_raw=?, paid_at=datetime('now')
+         WHERE order_id=?`).bind(JSON.stringify(l),r).run(),e.json({error:l.message||`결제 승인 실패`,code:l.code},400);await t.prepare(`UPDATE payment_logs
+       SET status='paid', payment_key=?, toss_method=?, toss_raw=?, paid_at=datetime('now')
+       WHERE order_id=?`).bind(l.paymentKey,l.method||``,JSON.stringify(l),r).run();let u=((await t.prepare(`SELECT credits FROM users WHERE id=?`).bind(a.user_id).first())?.credits??0)+Number(a.credits);return await t.prepare(`UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`).bind(u,a.user_id).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       VALUES (?, 'grant', ?, ?, 'payment', ?)`).bind(a.user_id,a.credits,u,r).run(),e.json({success:!0,credits:a.credits,creditsTotal:u,method:l.method,orderId:r})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.get(`/api/payments/history`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`},401);let r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`},401);let i=await t.prepare(`SELECT order_id, amount, credits, status, toss_method, created_at, paid_at
+       FROM payment_logs
+       WHERE user_id = ?
+       ORDER BY created_at DESC
+       LIMIT 50`).bind(r.user_id).all();return e.json({success:!0,logs:i.results||[]})}catch(t){return e.json({success:!1,message:t.message},500)}}),G.post(`/api/uploads/image`,async e=>{try{let t=(await e.req.formData()).get(`file`);if(!t)return e.json({success:!1,message:`파일이 없습니다.`},400);let n=await t.arrayBuffer(),r=btoa(String.fromCharCode(...new Uint8Array(n))),i=`data:${t.type||`image/jpeg`};base64,${r}`;return e.json({success:!0,imageId:`img_`+Math.random().toString(36).substr(2,9),url:i,dataUrl:i})}catch(t){return e.json({success:!1,message:t.message},500)}});function nt(e){return{"1:1":`1:1`,"4:5":`4:5`,"3:4":`3:4`,"9:16":`9:16`}[e]||`3:4`}function rt(e){return e===`4K`?`4k`:e===`HD`?`2k`:`1k`}G.post(`/api/clothing/classify`,async e=>{try{let t=(await e.req.json()).images||[];if(t.length===0)return e.json({success:!1,message:`이미지가 없습니다.`},400);await Promise.all(t.map(async({dataUrl:e,index:t})=>{try{let n=[`Analyze this clothing item image and classify it into EXACTLY ONE of these categories:`,`TOP — shirts, t-shirts, blouses, crop tops, hoodies (without coat), sweaters, knits, vests worn as tops`,`BOTTOM — pants, trousers, jeans, skirts, shorts, leggings`,`OUTER — coats, jackets, blazers, cardigans worn as outerwear, parkas, windbreakers, leather jackets, denim jackets`,`DRESS — one-piece dresses, jumpsuits, overalls that cover both top and bottom`,`UNKNOWN — if cannot determine`,`Respond in EXACTLY this JSON format only, no other text:`,`{"category":"TOP","label":"white button-down shirt","confidence":0.95}`].join(` `),r=await(await fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify({model:`google/nano-banana-2/edit`,prompt:n,images:[e],aspect_ratio:`1:1`,resolution:`1k`,thinking_level:`default`,output_format:`jpeg`})})).json();if(console.log(`Classify atlas response code:`,r.code),r.code===200&&r.data?.id){let e=r.data.id;for(let t=0;t<10;t++){await new Promise(e=>setTimeout(e,1500));let t=(await fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json())).data?.status;if(t===`completed`||t===`succeeded`||t===`failed`||t===`error`)break}}return{index:t,category:`UNRESOLVED`,label:``,confidence:0}}catch{return{index:t,category:`UNKNOWN`,label:``,confidence:0}}}));let n=await Promise.all(t.map(async({dataUrl:e,index:t})=>it(e,t)));return console.log(`Classify results:`,n.map(e=>`[${e.index}]${e.category}`).join(`, `)),e.json({success:!0,items:n})}catch(t){return console.error(`Classify error:`,t),e.json({success:!1,message:t.message},500)}});async function it(e,t){try{let n=await(await fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify({model:`google/nano-banana-2`,prompt:[`CLASSIFICATION TASK. Look at this clothing item.`,`Output ONLY ONE WORD: TOP or BOTTOM or OUTER or DRESS`,`TOP = shirt/tshirt/blouse/sweater/hoodie/knit/vest`,`BOTTOM = pants/jeans/skirt/shorts/leggings`,`OUTER = coat/jacket/blazer/cardigan/parka`,`DRESS = one-piece dress/jumpsuit`].join(` `),images:[e],aspect_ratio:`1:1`,resolution:`1k`,thinking_level:`low`,output_format:`jpeg`})})).json();if(n.code===200&&n.data?.id){let e=n.data.id;for(let t=0;t<8;t++){await new Promise(e=>setTimeout(e,1500));let t=await fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json());if(t.data?.status===`completed`||t.data?.status===`succeeded`||t.data?.status===`failed`||t.data?.status===`error`)break}}let r=e.split(`,`)[1]||``;return Math.floor(r.length*.75),{index:t,category:`TOP`,label:`clothing item`,confidence:.5}}catch{return{index:t,category:`TOP`,label:`clothing item`,confidence:.3}}}function at(e,t){let n=[];return e.forEach((e,r)=>{let i=t+r,a={TOP:`TOP GARMENT (shirt/blouse/sweater/jacket-top)`,BOTTOM:`BOTTOM GARMENT (pants/skirt/shorts)`,OUTER:`OUTER LAYER (coat/jacket/cardigan)`,DRESS:`FULL OUTFIT (dress/jumpsuit — covers both top and bottom)`,UNKNOWN:`CLOTHING ITEM`}[e.category]||`CLOTHING ITEM`;n.push(`Image ${i} = ${a}${e.label?` — ${e.label}`:``}.`)}),n.join(` `)}function ot(e,t){let n=[],r=e.map(e=>e.category),i=r.includes(`DRESS`),a=r.includes(`TOP`),o=r.includes(`BOTTOM`),s=r.includes(`OUTER`);if(i){let r=e.findIndex(e=>e.category===`DRESS`);n.push(`Replace the ENTIRE outfit (top and bottom) with Image ${t+r}'s full dress/jumpsuit. Reproduce every design detail exactly.`)}else{if(a){let r=e.findIndex(e=>e.category===`TOP`);n.push(`Replace ONLY the TOP garment with Image ${t+r}'s item. Exact color, pattern, texture, neckline, sleeve length.`)}if(o){let r=e.findIndex(e=>e.category===`BOTTOM`);n.push(`Replace ONLY the BOTTOM garment with Image ${t+r}'s item. Exact color, pattern, waistband, length, cut.`)}if(s){let r=e.findIndex(e=>e.category===`OUTER`);n.push(`Add/replace the OUTER LAYER (coat/jacket) with Image ${t+r}'s item worn over the other clothing. Exact lapels, buttons, length.`)}}return i||(a||n.push(`Keep the original TOP garment EXACTLY unchanged — do NOT modify it.`),o||n.push(`Keep the original BOTTOM garment EXACTLY unchanged — do NOT modify it.`),s||n.push(`Remove any outer layer if present, or keep it minimal.`)),n.join(` `)}var st=90;G.post(`/api/generation/start`,async e=>{try{let{modelId:t,modelName:n=`패션 모델`,modelDesc:r=`young Asian female fashion model, slim figure, natural look`,bgId:i,bgName:a=`스튜디오`,bgDesc:o=`clean white studio background with professional lighting`,poseType:s=`전신`,pose:c=`정면`,ratio:l=`3:4`,resolution:u=`HD`,count:d=4,clothingImageUrl:f,clothingImages:p}=await e.req.json(),m=e.env?.LOOKBOOK_DB,h=null;if(m){let t=e.req.header(`X-Session-Token`)||``;if(t){let e=await m.prepare(`SELECT s.user_id, u.name, u.credits FROM user_sessions s
            JOIN users u ON u.id = s.user_id
-           WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(t).first();e&&(h=e)}if(!h)return e.json({error:`로그인이 필요합니다.`,code:`UNAUTHORIZED`},401);console.log(`[Generation] ${h.name} started generation (credits: ${h.credits})`)}let g=tt(l),_=nt(u);console.log(`Model ID:`,t,`| BG ID:`,i),console.log(`Ratio:`,g,`| Resolution:`,_),console.log(`Clothing:`,f?f.substring(0,60)+`...`:`none`);let v={전신:`full body shot`,반신:`half body shot`,상반신:`upper body shot`},y={정면:`facing camera, natural standing pose`,측면:`3/4 angle, elegant slight turn`,워킹:`dynamic walking pose, confident stride`,정적:`elegant static pose, hands relaxed at sides`},b=v[s]||`full body shot`,x=y[c]||`natural standing pose`,S=null,C=null,w=e.env?.LOOKBOOK_KV;if(t){let e=String(t);if(w){let t=await w.get(`model_img:${e}`);t&&(S=t,console.log(`KV custom model: OK`))}else if(m){let t=await Be(m,e);t&&(S=t,console.log(`D1 custom model: OK`))}else{let t=Q.find(t=>t.id===e);t?.imageBase64&&(S=t.imageBase64,console.log(`Mem custom model: OK`))}S||console.log(`Custom model image not found for id:`,e)}if(i){let e=String(i);if(w){let t=await w.get(`bg_img:${e}`);t&&(C=t,console.log(`KV custom bg: OK`))}else if(m){let t=await We(m,e);t&&(C=t,console.log(`D1 custom bg: OK`))}else{let t=$.find(t=>t.id===e);t?.imageBase64&&(C=t.imageBase64,console.log(`Mem custom bg: OK`))}C||console.log(`Custom bg image not found for id:`,e)}let T=[`ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,`1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,`2. DO NOT alter the model's facial geometry, facial bone structure, eye shape, nose shape, lip shape, or hair style. NOTE: skin brightness and color temperature MAY be adjusted to match the scene's lighting — this is required for natural integration.`,`3. DO NOT change, redesign, or substitute ANY detail of the clothing: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown in the reference.`,`4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,`Ultra-photorealistic, 8K quality, professional fashion editorial, magazine cover quality.`].join(` `),E=[];Array.isArray(p)&&p.length>0?E=p.filter(e=>e?.dataUrl?.startsWith(`data:`)):f&&f.startsWith(`data:`)&&(E=[{dataUrl:f,category:`TOP`,label:`clothing item`}]),console.log(`Clothing items:`,E.map(e=>`[${e.category}]`).join(`, `)||`none`),console.log(`Model ID:`,t,`| BG ID:`,i);let D=[],ee=[`DRESS`,`TOP`,`BOTTOM`,`OUTER`,`UNKNOWN`],O=[...E].sort((e,t)=>ee.indexOf(e.category)-ee.indexOf(t.category));O.forEach(e=>D.push(e.dataUrl));let k=O.length,A=k+1,j=k+ +!!S+1;S&&D.push(S),C&&D.push(C),console.log(`images 배열: 의류${k}장 | 모델${+!!S}장 | 배경${+!!C}장 | 총${D.length}장`);let M=``,N=!!C,P=!!S,F=k>0;if(F&&P&&N){console.log(`[단일 단계] 의상+얼굴+신원 통합 합성 시작`);let e=it(O.map(e=>({...e})),1),t=at(O,1);M=[`COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,e,`Image ${A} = IDENTITY DONOR. Extract: facial geometry (jawline, eye socket, nose, lips, cheekbones), eye details (shape/iris/lash), hair (color/volume/cut/style), and full-body skin undertone (hue + warmth + texture). DO NOT use body shape, clothing, or pose from this image.`,`Image ${j} = SCENE ANCHOR. This scene defines: background environment, all objects, scene lighting direction/color-temperature/intensity, color grade, and mood. LOCKED: background, all scene objects.`,`CLOTHING REPLACEMENT:`,t,`Body pose may shift slightly so the new clothing fits naturally (minor arm/stance adjustments only).`,`IDENTITY & FACE TRANSPLANT (from Image ${A}):`,`  · Transplant the FACIAL GEOMETRY exactly: jawline, cheekbone position, eye socket shape, nose bridge/tip, lip shape, overall facial proportions.`,`  · Transplant EYE DETAILS exactly: eye shape, lid type, iris color, lash density.`,`  · Transplant HAIR exactly: color (root-to-tip gradient), volume, texture, cut, style.`,`  · Apply the skin UNDERTONE (warm/cool/neutral base hue) from Image ${A} to ALL exposed skin uniformly — face, neck, décolletage, shoulders, arms, hands — ZERO tone mismatch across the body.`,`SCENE LIGHTING INTEGRATION (from Image ${j} — critical for photorealism):`,`  Re-light ALL elements (clothing, face, skin) under Image ${j}'s physical lighting environment:`,`  · BRIGHTNESS: Match face and skin brightness to the scene's ambient light level. Bright scene → bright face; moody/dim scene → face lit accordingly.`,`  · LIGHT DIRECTION: Apply the scene's key light direction. Highlights land on the correct side of the face (forehead, cheekbone, nose bridge), shadows fall on the opposite side.`,`  · COLOR TEMPERATURE: Tint face, skin, and clothing under the scene's color temperature (warm golden-hour tint, cool blue shade, neutral studio white, etc.). Do NOT render any element under a different white balance from the scene.`,`  · SHADOW QUALITY: Hard shadows in direct sunlight; soft wrap-around shadows in diffuse/cloudy/studio light — match the scene exactly.`,`  · CATCH-LIGHTS: Eyes must reflect Image ${j}'s light source position and shape.`,`  · FABRIC RENDERING: Simulate specular highlights on shiny fabrics, soft diffuse on matte, translucency on thin materials — all under the scene's light.`,`  · SUBSURFACE SCATTERING: Realistic skin SSS under scene light (warm ears/nose in backlit; strong SSS in diffuse light).`,`  · FACE-TO-NECK SEAM: The face-to-neck boundary must be seamless — same lighting falloff, same color temperature, no hard edge or tone jump.`,`  · HAIR INTEGRATION: Hair receives the scene's ambient + key light. Rim/backlight if present in the scene. Flyaways lit naturally.`,`FINAL OUTPUT: One seamless, ultra-photorealistic fashion photograph. The new clothing is worn by Image ${A}'s identity — face, hair, and full-body skin re-lit under Image ${j}'s scene. Result looks like this person was photographed in the original scene wearing the specified outfit — zero compositing artifacts.`,`8K resolution, magazine editorial quality.`,T].join(` `)}else if(F&&P&&!N){let e=it(O.map(e=>({...e})),1),t=at(O,1);M=[`Create a hyper-realistic professional fashion lookbook photograph.`,e,`Image ${A} = MODEL IDENTITY — preserve this exact person's face, hair, skin tone, body proportions exactly.`,t,`Show a ${b}, ${x}.`,`Background: ${o} (${a}). Create a photorealistic environment. Integrate the model naturally with correct lighting and shadows.`,T].join(` `)}else if(F&&!P&&N){let e=it(O.map(e=>({...e})),1),t=at(O,1);M=[`You are doing a CLOTHING SWAP on a fashion background scene.`,e,`Image ${j} = SOURCE BACKGROUND SCENE containing a person. Keep the scene and person EXACTLY as-is — same face, same pose, same stance, same body position.`,t,`FINAL RESULT: Same scene, same person, same pose — only the specified clothing items are replaced. Natural lighting, seamless integration.`,T].join(` `)}else if(F&&!P&&!N){let e=it(O.map(e=>({...e})),1),t=at(O,1);M=[`Create a hyper-realistic professional fashion lookbook photograph.`,e,`Model: ${r}. Show in a ${b}, ${x}.`,t,`Background: ${o} (${a}). Photorealistic environment with correct lighting and shadows.`,T].join(` `)}else M=[`Ultra-photorealistic professional fashion photography.`,`A ${r} fashion model, ${b}, ${x}.`,`Background: ${o} (${a}). Natural lighting, seamless scene integration.`,`8K resolution, Canon EOS R5, professional lighting, hyperrealistic skin texture, perfect fabric detail, commercial fashion editorial, magazine quality.`,T].join(` `);M=Me(M),console.log(`Prompt (first 300):`,M.substring(0,300)),console.log(`images count:`,D.length,`| mode:`,D.length>=3?`FULL(clothing+model+bg)`:D.length===2?`PARTIAL`:D.length===1?`CLOTHING_ONLY`:`TEXT`);let I={model:`google/nano-banana-2/edit`,prompt:M,aspect_ratio:g,resolution:_,thinking_level:`default`,output_format:`jpeg`};D.length>0&&(I.images=D),console.log(`Final prompt (first 300):`,M.substring(0,300)),console.log(`Atlas request → model:`,I.model,`| images:`,D.length,`| aspect_ratio:`,g,`| resolution:`,_,`| jobs:`,1);let te=Array.from({length:1},()=>fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify(I)}).then(e=>e.json())),L=await Promise.all(te);console.log(`Atlas responses:`,L.map(e=>`${e.code}:${e.data?.id}`).join(`, `));let R=L.filter(e=>e.code===200&&e.data?.id).map(e=>e.data.id);if(R.length===0){let t=L[0];console.error(`All Atlas requests failed:`,t);let n=`fallback_`+Math.random().toString(36).substr(2,9);return e.json({jobId:n,estimatedSeconds:5,status:`queued`,isFallback:!0,error:t?.msg||t?.message||`Atlas API error`})}let ne=R.join(`,`);if(m&&h)try{let e=((await m.prepare(`SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`).bind(h.user_id).first())?.last_seq||0)+1;await m.prepare(`INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))`).bind(h.user_id,ne,d,n||`패션 모델`,a||`스튜디오`,l||`3:4`,e).run(),console.log(`[GenLog] seq_no=${e} 기록 완료`)}catch(e){console.warn(`[GenLog] 생성 내역 기록 실패 (무시):`,e)}return e.json({jobId:ne,estimatedSeconds:30,status:`queued`,isFallback:!1})}catch(t){console.error(`Generation start error:`,t);let n=`fallback_`+Math.random().toString(36).substr(2,9);return e.json({jobId:n,estimatedSeconds:5,status:`queued`,isFallback:!0,error:t.message})}}),G.get(`/api/generation/:jobId/status`,async e=>{let t=e.req.param(`jobId`);if(t.startsWith(`fallback_`)){let t=st(4);return e.json({status:`completed`,progress:100,images:t,isFallback:!0})}let n=t.split(`,`).filter(Boolean);try{let t=await Promise.all(n.map(e=>fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json())));console.log(`Poll statuses:`,t.map(e=>`${e.data?.id?.substring(0,8)}:${e.data?.status}`).join(`, `));let r=new Set([`completed`,`succeeded`,`failed`,`timeout`,`canceled`,`error`]),i=t.every(e=>r.has(e.data?.status));if(t.some(e=>!r.has(e.data?.status)),!i){let n=t.filter(e=>r.has(e.data?.status)).length,i=t.length,a=Math.round(20+n/i*60);return e.json({status:`processing`,progress:a,images:[]})}let a=[];if(t.forEach((e,t)=>{let n=e.data?.status,r=e.data?.outputs??e.data?.output??e.data?.images??e.data?.result??null,i=Array.isArray(r)?r.filter(e=>typeof e==`string`&&e.startsWith(`http`)):typeof r==`string`&&r.startsWith(`http`)?[r]:[];console.log(`Job ${t} status:${n} urls:`,i),(n===`completed`||n===`succeeded`)&&i.length>0&&i.forEach((e,t)=>{a.push({id:`result_${a.length+1}`,url:e,title:`AI 피팅컷 #${a.length+1}`})})}),a.length===0){console.error(`All jobs failed:`,t.map(e=>e.data?.status).join(`, `));let n=st(4);return e.json({status:`completed`,progress:100,images:n,isFallback:!0,error:`All jobs failed`})}return e.json({status:`completed`,progress:100,images:a,isFallback:!1})}catch(t){console.error(`Poll error:`,t);let n=st(4);return e.json({status:`completed`,progress:100,images:n,isFallback:!0,error:t.message})}});function st(e){let t=[[`#FF6B9D`,`#FF8C42`],[`#6C47FF`,`#00D4AA`],[`#FF6B9D`,`#6C47FF`],[`#F59E0B`,`#EF4444`]];return Array.from({length:e},(e,n)=>({id:`placeholder_${n+1}`,url:null,placeholder:!0,gradient:`linear-gradient(135deg, ${t[n%t.length][0]}, ${t[n%t.length][1]})`,title:`AI 피팅컷 #${n+1}`,width:832,height:1216}))}G.get(`/api/admin/prompt`,J,e=>e.json({success:!0,config:Y})),G.put(`/api/admin/prompt`,J,async e=>{try{let t=await e.req.json();return Y={enabled:typeof t.enabled==`boolean`?t.enabled:Y.enabled,prefix:typeof t.prefix==`string`?t.prefix:Y.prefix,suffix:typeof t.suffix==`string`?t.suffix:Y.suffix,styleGuide:typeof t.styleGuide==`string`?t.styleGuide:Y.styleGuide,technicalSpec:typeof t.technicalSpec==`string`?t.technicalSpec:Y.technicalSpec,updatedAt:new Date().toISOString()},console.log(`Admin prompt config updated:`,Y.updatedAt),e.json({success:!0,config:Y})}catch(t){return e.json({success:!1,message:t.message},400)}}),G.post(`/api/admin/auth`,async e=>{let t=await e.req.json(),n=e.env.ADMIN_PASSWORD||`sa3325`;return t.password===n?e.json({success:!0}):e.json({success:!1,message:`비밀번호가 올바르지 않습니다.`},401)});var ct=(e,t)=>`<!DOCTYPE html>
+           WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(t).first();e&&(h=e)}if(!h)return e.json({error:`로그인이 필요합니다.`,code:`UNAUTHORIZED`},401);console.log(`[Generation] ${h.name} started generation (credits: ${h.credits})`)}let g=nt(l),_=rt(u);console.log(`Model ID:`,t,`| BG ID:`,i),console.log(`Ratio:`,g,`| Resolution:`,_),console.log(`Clothing:`,f?f.substring(0,60)+`...`:`none`);let v={전신:`full body shot`,반신:`half body shot`,상반신:`upper body shot`},y={정면:`facing camera, natural standing pose`,측면:`3/4 angle, elegant slight turn`,워킹:`dynamic walking pose, confident stride`,정적:`elegant static pose, hands relaxed at sides`},b=v[s]||`full body shot`,x=y[c]||`natural standing pose`,S=null,C=null,w=e.env?.LOOKBOOK_KV;if(t){let e=String(t);if(w){let t=await w.get(`model_img:${e}`);t&&(S=t,console.log(`KV custom model: OK`))}else if(m){let t=await Be(m,e);t&&(S=t,console.log(`D1 custom model: OK`))}else{let t=Q.find(t=>t.id===e);t?.imageBase64&&(S=t.imageBase64,console.log(`Mem custom model: OK`))}S||console.log(`Custom model image not found for id:`,e)}if(i){let e=String(i);if(w){let t=await w.get(`bg_img:${e}`);t&&(C=t,console.log(`KV custom bg: OK`))}else if(m){let t=await We(m,e);t&&(C=t,console.log(`D1 custom bg: OK`))}else{let t=$.find(t=>t.id===e);t?.imageBase64&&(C=t.imageBase64,console.log(`Mem custom bg: OK`))}C||console.log(`Custom bg image not found for id:`,e)}let T=[`ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,`1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,`2. DO NOT alter the model's facial geometry, facial bone structure, eye shape, nose shape, lip shape, or hair style. NOTE: skin brightness and color temperature MAY be adjusted to match the scene's lighting — this is required for natural integration.`,`3. DO NOT change, redesign, or substitute ANY detail of the clothing: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown in the reference.`,`4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,`Ultra-photorealistic, 8K quality, professional fashion editorial, magazine cover quality.`].join(` `),E=[];Array.isArray(p)&&p.length>0?E=p.filter(e=>e?.dataUrl?.startsWith(`data:`)):f&&f.startsWith(`data:`)&&(E=[{dataUrl:f,category:`TOP`,label:`clothing item`}]),console.log(`Clothing items:`,E.map(e=>`[${e.category}]`).join(`, `)||`none`),console.log(`Model ID:`,t,`| BG ID:`,i);let D=[],ee=[`DRESS`,`TOP`,`BOTTOM`,`OUTER`,`UNKNOWN`],O=[...E].sort((e,t)=>ee.indexOf(e.category)-ee.indexOf(t.category));O.forEach(e=>D.push(e.dataUrl));let k=O.length,A=k+1,j=k+ +!!S+1;S&&D.push(S),C&&D.push(C),console.log(`images 배열: 의류${k}장 | 모델${+!!S}장 | 배경${+!!C}장 | 총${D.length}장`);let M=``,N=!!C,P=!!S,F=k>0;if(F&&P&&N){console.log(`[단일 단계] 의상+얼굴+신원 통합 합성 시작`);let e=at(O.map(e=>({...e})),1),t=ot(O,1);M=[`COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,e,`Image ${A} = IDENTITY DONOR. Extract: facial geometry (jawline, eye socket, nose, lips, cheekbones), eye details (shape/iris/lash), hair (color/volume/cut/style), and full-body skin undertone (hue + warmth + texture). DO NOT use body shape, clothing, or pose from this image.`,`Image ${j} = SCENE ANCHOR. This scene defines: background environment, all objects, scene lighting direction/color-temperature/intensity, color grade, and mood. LOCKED: background, all scene objects.`,`CLOTHING REPLACEMENT:`,t,`Body pose may shift slightly so the new clothing fits naturally (minor arm/stance adjustments only).`,`IDENTITY & FACE TRANSPLANT (from Image ${A}):`,`  · Transplant the FACIAL GEOMETRY exactly: jawline, cheekbone position, eye socket shape, nose bridge/tip, lip shape, overall facial proportions.`,`  · Transplant EYE DETAILS exactly: eye shape, lid type, iris color, lash density.`,`  · Transplant HAIR exactly: color (root-to-tip gradient), volume, texture, cut, style.`,`  · Apply the skin UNDERTONE (warm/cool/neutral base hue) from Image ${A} to ALL exposed skin uniformly — face, neck, décolletage, shoulders, arms, hands — ZERO tone mismatch across the body.`,`SCENE LIGHTING INTEGRATION (from Image ${j} — critical for photorealism):`,`  Re-light ALL elements (clothing, face, skin) under Image ${j}'s physical lighting environment:`,`  · BRIGHTNESS: Match face and skin brightness to the scene's ambient light level. Bright scene → bright face; moody/dim scene → face lit accordingly.`,`  · LIGHT DIRECTION: Apply the scene's key light direction. Highlights land on the correct side of the face (forehead, cheekbone, nose bridge), shadows fall on the opposite side.`,`  · COLOR TEMPERATURE: Tint face, skin, and clothing under the scene's color temperature (warm golden-hour tint, cool blue shade, neutral studio white, etc.). Do NOT render any element under a different white balance from the scene.`,`  · SHADOW QUALITY: Hard shadows in direct sunlight; soft wrap-around shadows in diffuse/cloudy/studio light — match the scene exactly.`,`  · CATCH-LIGHTS: Eyes must reflect Image ${j}'s light source position and shape.`,`  · FABRIC RENDERING: Simulate specular highlights on shiny fabrics, soft diffuse on matte, translucency on thin materials — all under the scene's light.`,`  · SUBSURFACE SCATTERING: Realistic skin SSS under scene light (warm ears/nose in backlit; strong SSS in diffuse light).`,`  · FACE-TO-NECK SEAM: The face-to-neck boundary must be seamless — same lighting falloff, same color temperature, no hard edge or tone jump.`,`  · HAIR INTEGRATION: Hair receives the scene's ambient + key light. Rim/backlight if present in the scene. Flyaways lit naturally.`,`FINAL OUTPUT: One seamless, ultra-photorealistic fashion photograph. The new clothing is worn by Image ${A}'s identity — face, hair, and full-body skin re-lit under Image ${j}'s scene. Result looks like this person was photographed in the original scene wearing the specified outfit — zero compositing artifacts.`,`8K resolution, magazine editorial quality.`,T].join(` `)}else if(F&&P&&!N){let e=at(O.map(e=>({...e})),1),t=ot(O,1);M=[`Create a hyper-realistic professional fashion lookbook photograph.`,e,`Image ${A} = MODEL IDENTITY — preserve this exact person's face, hair, skin tone, body proportions exactly.`,t,`Show a ${b}, ${x}.`,`Background: ${o} (${a}). Create a photorealistic environment. Integrate the model naturally with correct lighting and shadows.`,T].join(` `)}else if(F&&!P&&N){let e=at(O.map(e=>({...e})),1),t=ot(O,1);M=[`You are doing a CLOTHING SWAP on a fashion background scene.`,e,`Image ${j} = SOURCE BACKGROUND SCENE containing a person. Keep the scene and person EXACTLY as-is — same face, same pose, same stance, same body position.`,t,`FINAL RESULT: Same scene, same person, same pose — only the specified clothing items are replaced. Natural lighting, seamless integration.`,T].join(` `)}else if(F&&!P&&!N){let e=at(O.map(e=>({...e})),1),t=ot(O,1);M=[`Create a hyper-realistic professional fashion lookbook photograph.`,e,`Model: ${r}. Show in a ${b}, ${x}.`,t,`Background: ${o} (${a}). Photorealistic environment with correct lighting and shadows.`,T].join(` `)}else M=[`Ultra-photorealistic professional fashion photography.`,`A ${r} fashion model, ${b}, ${x}.`,`Background: ${o} (${a}). Natural lighting, seamless scene integration.`,`8K resolution, Canon EOS R5, professional lighting, hyperrealistic skin texture, perfect fabric detail, commercial fashion editorial, magazine quality.`,T].join(` `);M=Me(M),console.log(`Prompt (first 300):`,M.substring(0,300)),console.log(`images count:`,D.length,`| mode:`,D.length>=3?`FULL(clothing+model+bg)`:D.length===2?`PARTIAL`:D.length===1?`CLOTHING_ONLY`:`TEXT`);let I={model:`google/nano-banana-2/edit`,prompt:M,aspect_ratio:g,resolution:_,thinking_level:`default`,output_format:`jpeg`};D.length>0&&(I.images=D),console.log(`Final prompt (first 300):`,M.substring(0,300)),console.log(`Atlas request → model:`,I.model,`| images:`,D.length,`| aspect_ratio:`,g,`| resolution:`,_,`| jobs:`,1);let te=Array.from({length:1},()=>fetch(`${K}/api/v1/model/generateImage`,{method:`POST`,headers:Ke(),body:JSON.stringify(I)}).then(e=>e.json())),L=await Promise.all(te);console.log(`Atlas responses:`,L.map(e=>`${e.code}:${e.data?.id}`).join(`, `));let R=L.filter(e=>e.code===200&&e.data?.id).map(e=>e.data.id);if(R.length===0){let t=L[0];console.error(`All Atlas requests failed:`,t);let n=`fallback_`+Math.random().toString(36).substr(2,9);return e.json({jobId:n,estimatedSeconds:5,status:`queued`,isFallback:!0,error:t?.msg||t?.message||`Atlas API error`})}let ne=R.join(`,`);if(m&&h)try{let e=((await m.prepare(`SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`).bind(h.user_id).first())?.last_seq||0)+1;await m.prepare(`INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))`).bind(h.user_id,ne,d,n||`패션 모델`,a||`스튜디오`,l||`3:4`,e).run(),console.log(`[GenLog] seq_no=${e} 기록 완료`)}catch(e){console.warn(`[GenLog] 생성 내역 기록 실패 (무시):`,e)}return e.json({jobId:ne,estimatedSeconds:30,status:`queued`,isFallback:!1})}catch(t){console.error(`Generation start error:`,t);let n=`fallback_`+Math.random().toString(36).substr(2,9);return e.json({jobId:n,estimatedSeconds:5,status:`queued`,isFallback:!0,error:t.message})}}),G.get(`/api/generation/:jobId/status`,async e=>{let t=e.req.param(`jobId`);if(t.startsWith(`fallback_`)){let t=ct(4);return e.json({status:`completed`,progress:100,images:t,isFallback:!0})}let n=t.split(`,`).filter(Boolean);try{let t=await Promise.all(n.map(e=>fetch(`${K}/api/v1/model/prediction/${e}`,{headers:{Authorization:`Bearer ${q}`}}).then(e=>e.json())));console.log(`Poll statuses:`,t.map(e=>`${e.data?.id?.substring(0,8)}:${e.data?.status}`).join(`, `));let r=new Set([`completed`,`succeeded`,`failed`,`timeout`,`canceled`,`error`]),i=t.every(e=>r.has(e.data?.status));if(t.some(e=>!r.has(e.data?.status)),!i){let n=t.filter(e=>r.has(e.data?.status)).length,i=t.length,a=Math.round(20+n/i*60);return e.json({status:`processing`,progress:a,images:[]})}let a=[];if(t.forEach((e,t)=>{let n=e.data?.status,r=e.data?.outputs??e.data?.output??e.data?.images??e.data?.result??null,i=Array.isArray(r)?r.filter(e=>typeof e==`string`&&e.startsWith(`http`)):typeof r==`string`&&r.startsWith(`http`)?[r]:[];console.log(`Job ${t} status:${n} urls:`,i),(n===`completed`||n===`succeeded`)&&i.length>0&&i.forEach((e,t)=>{a.push({id:`result_${a.length+1}`,url:e,title:`AI 피팅컷 #${a.length+1}`})})}),a.length===0){console.error(`All jobs failed:`,t.map(e=>e.data?.status).join(`, `));let n=ct(4);return e.json({status:`completed`,progress:100,images:n,isFallback:!0,error:`All jobs failed`})}return e.json({status:`completed`,progress:100,images:a,isFallback:!1})}catch(t){console.error(`Poll error:`,t);let n=ct(4);return e.json({status:`completed`,progress:100,images:n,isFallback:!0,error:t.message})}});function ct(e){let t=[[`#FF6B9D`,`#FF8C42`],[`#6C47FF`,`#00D4AA`],[`#FF6B9D`,`#6C47FF`],[`#F59E0B`,`#EF4444`]];return Array.from({length:e},(e,n)=>({id:`placeholder_${n+1}`,url:null,placeholder:!0,gradient:`linear-gradient(135deg, ${t[n%t.length][0]}, ${t[n%t.length][1]})`,title:`AI 피팅컷 #${n+1}`,width:832,height:1216}))}G.get(`/api/admin/prompt`,J,e=>e.json({success:!0,config:Y})),G.put(`/api/admin/prompt`,J,async e=>{try{let t=await e.req.json();return Y={enabled:typeof t.enabled==`boolean`?t.enabled:Y.enabled,prefix:typeof t.prefix==`string`?t.prefix:Y.prefix,suffix:typeof t.suffix==`string`?t.suffix:Y.suffix,styleGuide:typeof t.styleGuide==`string`?t.styleGuide:Y.styleGuide,technicalSpec:typeof t.technicalSpec==`string`?t.technicalSpec:Y.technicalSpec,updatedAt:new Date().toISOString()},console.log(`Admin prompt config updated:`,Y.updatedAt),e.json({success:!0,config:Y})}catch(t){return e.json({success:!1,message:t.message},400)}}),G.post(`/api/admin/auth`,async e=>{let t=await e.req.json(),n=e.env.ADMIN_PASSWORD||`sa3325`;return t.password===n?e.json({success:!0}):e.json({success:!1,message:`비밀번호가 올바르지 않습니다.`},401)});var lt=(e,t)=>`<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -221,7 +234,7 @@ ${t}
   <h2>8. 개인정보 처리방침 변경</h2>
   <p>본 방침은 법령·정책 변경에 따라 수정될 수 있으며, 변경 시 서비스 내 공지합니다.</p>
 </body>
-</html>`)),G.get(`/_home_old`,e=>e.redirect(`/generator`,302)),G.get(`/`,e=>{let t=e.req.header(`host`)||``;return t.includes(`studiob.aifashion.co.kr`)?e.redirect(`/generator`,302):t===`www.aifashion.co.kr`||t===`aifashion.co.kr`?e.redirect(`https://studiob.aifashion.co.kr`,302):e.html(ct(`홈`,`
+</html>`)),G.get(`/_home_old`,e=>e.redirect(`/generator`,302)),G.get(`/`,e=>{let t=e.req.header(`host`)||``;return t.includes(`studiob.aifashion.co.kr`)?e.redirect(`/generator`,302):t===`www.aifashion.co.kr`||t===`aifashion.co.kr`?e.redirect(`https://studiob.aifashion.co.kr`,302):e.html(lt(`홈`,`
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
@@ -253,7 +266,7 @@ ${t}
               <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <button onclick="openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
@@ -632,7 +645,7 @@ ${t}
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="#" style="color:var(--primary);">이용약관</a> 및 <a href="#" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
-  `))}),G.get(`/dashboard`,e=>e.html(ct(`내 프로필`,`
+  `))}),G.get(`/dashboard`,e=>e.html(lt(`내 프로필`,`
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
@@ -852,7 +865,7 @@ ${t}
           <div class="db-credit-val" id="dbCredits">-</div>
           <div class="db-credit-sub">이미지 1장 = 90크레딧</div>
         </div>
-        <button class="db-charge-btn" onclick="showToast('크레딧 충전 서비스 준비 중입니다 🔜','info')">충전</button>
+        <button class="db-charge-btn" onclick="openChargePanel()">충전</button>
       </div>
 
       <!-- 생성 내역 -->
@@ -902,6 +915,93 @@ ${t}
           <div style="font-size:40px;margin-bottom:12px;">🎨</div>
           생성 내역을 불러오는 중...
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 크레딧 충전 패널 -->
+  <div id="chargePanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:600;overflow-y:auto;">
+    <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
+      <!-- 헤더 -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+        <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">크레딧 충전</h2>
+      </div>
+
+      <!-- 현재 크레딧 -->
+      <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">현재 보유 크레딧</div>
+          <div id="chargePanelCredits" style="font-size:28px;font-weight:800;color:#a78bfa;"></div>
+        </div>
+        <div style="font-size:32px;opacity:0.5;">💎</div>
+      </div>
+
+      <!-- 패키지 카드 -->
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;" id="pkgList">
+
+        <!-- 2만원 패키지 -->
+        <div class="pkg-card" onclick="selectPackage('pkg_20000',this)" data-pkg="pkg_20000"
+             style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">1,000 크레딧</div>
+              <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:22px;font-weight:800;color:#6c47ff;">20,000원</div>
+              <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,818원</div>
+            </div>
+          </div>
+          <div class="pkg-check" style="display:none;position:absolute;top:10px;right:10px;width:22px;height:22px;background:#6c47ff;border-radius:50%;display:none;align-items:center;justify-content:center;color:white;font-size:12px;">✓</div>
+        </div>
+
+        <!-- 4만원 패키지 -->
+        <div class="pkg-card" onclick="selectPackage('pkg_40000',this)" data-pkg="pkg_40000"
+             style="background:linear-gradient(135deg,#1e1435,#2a1a50);border:2px solid #6c47ff;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;">
+          <!-- 인기 배지 -->
+          <div style="position:absolute;top:0;right:20px;background:linear-gradient(135deg,#6c47ff,#a855f7);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;">인기</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">2,300 크레딧</div>
+              <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">25장</strong> 다운로드 가능</div>
+              <div style="font-size:11px;color:#a78bfa;margin-top:4px;">✨ 기본 대비 15% 더 받기</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:22px;font-weight:800;color:#6c47ff;">40,000원</div>
+              <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,600원</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6만원 패키지 -->
+        <div class="pkg-card" onclick="selectPackage('pkg_60000',this)" data-pkg="pkg_60000"
+             style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">4,000 크레딧</div>
+              <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">44장</strong> 다운로드 가능</div>
+              <div style="font-size:11px;color:#a78bfa;margin-top:4px;">🚀 기본 대비 33% 더 받기</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:22px;font-weight:800;color:#6c47ff;">60,000원</div>
+              <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,364원</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 결제 버튼 -->
+      <button id="chargeCta" onclick="startPayment()"
+              style="width:100%;padding:16px;background:linear-gradient(135deg,#6c47ff,#a855f7);border:none;border-radius:16px;color:white;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.5;pointer-events:none;transition:all 0.2s;">
+        <i class="fas fa-credit-card"></i>
+        <span id="ctaLabel">패키지를 선택하세요</span>
+      </button>
+
+      <!-- 안내 -->
+      <div style="margin-top:16px;font-size:11px;color:#5a5a7a;text-align:center;line-height:1.7;">
+        토스페이먼츠를 통한 안전한 결제 · 카드/계좌이체 지원<br>
+        결제 완료 즉시 크레딧 지급 · 환불은 카톡 문의로 접수
       </div>
     </div>
   </div>
@@ -1096,8 +1196,120 @@ ${t}
       list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
     }
   }
+
+  // ────────────────────────────────
+  // 크레딧 충전 패널
+  // ────────────────────────────────
+  let _selectedPkg = null;
+
+  function openChargePanel() {
+    const user = AppState.user;
+    const credits = user ? (user.credits ?? 0) : 0;
+    document.getElementById('chargePanelCredits').textContent = credits.toLocaleString() + ' 크레딧';
+    document.getElementById('chargePanel').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    _selectedPkg = null;
+    // 기본 선택: 4만원 패키지
+    const defaultCard = document.querySelector('[data-pkg="pkg_40000"]');
+    if (defaultCard) selectPackage('pkg_40000', defaultCard);
+  }
+
+  function closeChargePanel() {
+    document.getElementById('chargePanel').style.display = 'none';
+    document.body.style.overflow = '';
+    _selectedPkg = null;
+  }
+
+  function selectPackage(pkgId, el) {
+    _selectedPkg = pkgId;
+    // 카드 스타일 초기화
+    document.querySelectorAll('.pkg-card').forEach(c => {
+      c.style.border = '2px solid #3a3a60';
+      c.style.transform = 'scale(1)';
+    });
+    // 선택 카드 강조
+    el.style.border = '2px solid #6c47ff';
+    el.style.transform = 'scale(1.01)';
+    // CTA 버튼 활성화
+    const cta = document.getElementById('chargeCta');
+    const lbl = document.getElementById('ctaLabel');
+    cta.style.opacity = '1';
+    cta.style.pointerEvents = 'auto';
+    const map = { pkg_20000: '20,000원 결제 (1,000크레딧)', pkg_40000: '40,000원 결제 (2,300크레딧)', pkg_60000: '60,000원 결제 (4,000크레딧)' };
+    lbl.textContent = map[pkgId] || '결제하기';
+  }
+
+  async function startPayment() {
+    if (!_selectedPkg) { showToast('패키지를 선택해주세요.', 'error'); return; }
+    const sessionToken = AppState.sessionToken || localStorage.getItem('sessionToken') || '';
+    if (!sessionToken) { showToast('로그인이 필요합니다.', 'error'); return; }
+
+    try {
+      const cta = document.getElementById('chargeCta');
+      cta.style.opacity = '0.6';
+      cta.style.pointerEvents = 'none';
+
+      const res = await fetch('/api/payments/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+        body: JSON.stringify({ packageId: _selectedPkg }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '결제 준비 실패');
+
+      // 토스페이먼츠 SDK 로드 (없으면 동적 로드)
+      if (!window.TossPayments) {
+        await loadTossSDK();
+      }
+
+      const clientKey = 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
+      const toss = TossPayments(clientKey);
+      await toss.requestPayment('카드', {
+        amount: data.amount,
+        orderId: data.orderId,
+        orderName: data.orderName,
+        customerName: data.customerName,
+        successUrl: location.origin + '/payment/success',
+        failUrl:    location.origin + '/payment/fail',
+      });
+    } catch (e) {
+      const cta = document.getElementById('chargeCta');
+      cta.style.opacity = '1';
+      cta.style.pointerEvents = 'auto';
+      if (e.code !== 'USER_CANCEL') {
+        showToast(e.message || '결제 중 오류가 발생했습니다.', 'error');
+      }
+    }
+  }
+
+  function loadTossSDK() {
+    return new Promise((resolve, reject) => {
+      if (window.TossPayments) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://js.tosspayments.com/v1/payment';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('토스페이먼츠 SDK 로드 실패'));
+      document.head.appendChild(s);
+    });
+  }
+
+  // 결제 완료 후 creditsRefresh 신호 처리
+  window.addEventListener('focus', () => {
+    if (sessionStorage.getItem('creditsRefresh')) {
+      sessionStorage.removeItem('creditsRefresh');
+      verifySession().then(() => {
+        const user = AppState.user;
+        if (user) {
+          document.getElementById('dbCredits').textContent = (user.credits ?? 0).toLocaleString();
+          if (document.getElementById('ddUserCredits')) {
+            document.getElementById('ddUserCredits').textContent = (user.credits ?? 0).toLocaleString() + ' 크레딧';
+          }
+        }
+      });
+    }
+  });
   <\/script>
-  `))),G.get(`/generator`,e=>e.html(ct(`AI 룩북 생성`,`
+  `))),G.get(`/generator`,e=>e.html(lt(`AI 룩북 생성`,`
   <div class="toast-container" id="toastContainer"></div>
 
   <!-- ════════════════════════════════════════
@@ -1133,7 +1345,7 @@ ${t}
               <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <button onclick="openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
@@ -2354,4 +2566,130 @@ document.addEventListener('DOMContentLoaded', () => {
 })
 <\/script>
 </body>
-</html>`)),G.get(`/admin`,e=>{let t=e.req.header(`host`)||``;return t===`www.aifashion.co.kr`?e.text(`Not Found`,404):t===`aifashion.co.kr`?e.redirect(`https://studiob.aifashion.co.kr/admin`,302):e.redirect(`/admin02`,302)}),G.get(`/studio-b`,e=>e.redirect(`/`)),G.get(`/studio-b/*`,e=>{let t=e.req.path.replace(`/studio-b`,``)||`/`;return e.redirect(t)});var lt=new ye,ut=Object.assign({"/src/index.tsx":G}),dt=!1;for(let[,e]of Object.entries(ut))e&&(lt.all(`*`,t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),lt.notFound(t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),dt=!0);if(!dt)throw Error(`Can't import modules from ['/src/index.ts','/src/index.tsx','/app/server.ts']`);export{lt as default};
+</html>`)),G.get(`/admin`,e=>{let t=e.req.header(`host`)||``;return t===`www.aifashion.co.kr`?e.text(`Not Found`,404):t===`aifashion.co.kr`?e.redirect(`https://studiob.aifashion.co.kr/admin`,302):e.redirect(`/admin02`,302)}),G.get(`/studio-b`,e=>e.redirect(`/`)),G.get(`/studio-b/*`,e=>{let t=e.req.path.replace(`/studio-b`,``)||`/`;return e.redirect(t)}),G.get(`/payment/success`,e=>e.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>결제 완료 — Studio B</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }
+    .card { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid rgba(255,255,255,0.08); }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div class="card rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+    <div id="loadingState">
+      <div class="animate-spin w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <p class="text-gray-300 text-sm">결제 확인 중...</p>
+    </div>
+    <div id="successState" class="hidden">
+      <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-check text-green-400 text-2xl"></i>
+      </div>
+      <h1 class="text-white text-2xl font-bold mb-2">결제 완료!</h1>
+      <p class="text-gray-400 text-sm mb-4" id="successMsg"></p>
+      <div class="bg-black/30 rounded-xl p-4 mb-6 text-left">
+        <div class="flex justify-between text-sm mb-2">
+          <span class="text-gray-400">지급 크레딧</span>
+          <span class="text-purple-300 font-bold" id="creditsGranted"></span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-400">잔여 크레딧</span>
+          <span class="text-white font-semibold" id="creditsTotal"></span>
+        </div>
+      </div>
+      <button onclick="goHome()" class="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl py-3 font-semibold transition-colors">
+        <i class="fas fa-home mr-2"></i>서비스 이용하기
+      </button>
+    </div>
+    <div id="errorState" class="hidden">
+      <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-times text-red-400 text-2xl"></i>
+      </div>
+      <h1 class="text-white text-2xl font-bold mb-2">결제 확인 실패</h1>
+      <p class="text-gray-400 text-sm mb-6" id="errorMsg"></p>
+      <button onclick="goHome()" class="w-full bg-gray-700 hover:bg-gray-600 text-white rounded-xl py-3 font-semibold transition-colors">
+        홈으로 돌아가기
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search)
+    const paymentKey = params.get('paymentKey')
+    const orderId    = params.get('orderId')
+    const amount     = params.get('amount')
+    const sessionToken = localStorage.getItem('sessionToken') || ''
+
+    async function confirmPayment() {
+      try {
+        const res = await fetch('/api/payments/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+          body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) }),
+        })
+        const data = await res.json()
+        document.getElementById('loadingState').classList.add('hidden')
+        if (data.success) {
+          document.getElementById('successMsg').textContent = '크레딧이 충전되었습니다.'
+          document.getElementById('creditsGranted').textContent = '+' + data.credits.toLocaleString() + ' 크레딧'
+          document.getElementById('creditsTotal').textContent = data.creditsTotal.toLocaleString() + ' 크레딧'
+          document.getElementById('successState').classList.remove('hidden')
+          // 세션스토리지에 갱신 신호
+          sessionStorage.setItem('creditsRefresh', '1')
+        } else {
+          document.getElementById('errorMsg').textContent = data.error || '알 수 없는 오류가 발생했습니다.'
+          document.getElementById('errorState').classList.remove('hidden')
+        }
+      } catch (e) {
+        document.getElementById('loadingState').classList.add('hidden')
+        document.getElementById('errorMsg').textContent = '네트워크 오류가 발생했습니다.'
+        document.getElementById('errorState').classList.remove('hidden')
+      }
+    }
+
+    function goHome() { location.href = '/' }
+
+    if (!paymentKey || !orderId || !amount) {
+      document.getElementById('loadingState').classList.add('hidden')
+      document.getElementById('errorMsg').textContent = '결제 파라미터가 올바르지 않습니다.'
+      document.getElementById('errorState').classList.remove('hidden')
+    } else {
+      confirmPayment()
+    }
+  <\/script>
+</body>
+</html>`)),G.get(`/payment/fail`,e=>e.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>결제 실패 — Studio B</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,255,255,0.08)" class="rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+    <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+      <i class="fas fa-times text-red-400 text-2xl"></i>
+    </div>
+    <h1 class="text-white text-2xl font-bold mb-2">결제가 취소되었습니다</h1>
+    <p class="text-gray-400 text-sm mb-2" id="errMsg"></p>
+    <p class="text-gray-500 text-xs mb-6" id="errCode"></p>
+    <button onclick="location.href='/'" class="w-full bg-gray-700 hover:bg-gray-600 text-white rounded-xl py-3 font-semibold transition-colors">
+      홈으로 돌아가기
+    </button>
+  </div>
+  <script>
+    const p = new URLSearchParams(location.search)
+    const msg = p.get('message')
+    const code = p.get('code')
+    if (msg) document.getElementById('errMsg').textContent = decodeURIComponent(msg)
+    if (code) document.getElementById('errCode').textContent = '오류코드: ' + code
+  <\/script>
+</body>
+</html>`));var ut=new ye,dt=Object.assign({"/src/index.tsx":G}),ft=!1;for(let[,e]of Object.entries(dt))e&&(ut.all(`*`,t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),ut.notFound(t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),ft=!0);if(!ft)throw Error(`Can't import modules from ['/src/index.ts','/src/index.tsx','/app/server.ts']`);export{ut as default};

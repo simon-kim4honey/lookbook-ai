@@ -13,6 +13,8 @@ type Bindings = {
   GOOGLE_CLIENT_SECRET: string
   // 어드민
   ADMIN_PASSWORD: string
+  // 토스페이먼츠
+  TOSS_SECRET_KEY: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -1357,6 +1359,175 @@ app.post('/api/credits/deduct', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
+// Payments API — 토스페이먼츠 연동
+// ────────────────────────────────────────────────────
+
+// 크레딧 패키지 정의
+const CREDIT_PACKAGES: Record<string, { amount: number; credits: number; label: string }> = {
+  pkg_20000: { amount: 20000, credits: 1000,  label: '20,000원 → 1,000크레딧' },
+  pkg_40000: { amount: 40000, credits: 2300,  label: '40,000원 → 2,300크레딧' },
+  pkg_60000: { amount: 60000, credits: 4000,  label: '60,000원 → 4,000크레딧' },
+}
+
+// GET /api/payments/packages — 패키지 목록
+app.get('/api/payments/packages', (c) => {
+  return c.json({ success: true, packages: CREDIT_PACKAGES })
+})
+
+// POST /api/payments/prepare — orderId 발급 + payment_logs pending 생성
+app.post('/api/payments/prepare', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT s.user_id, u.name, u.email FROM user_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token = ? AND s.expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
+
+    const { packageId } = await c.req.json() as any
+    const pkg = CREDIT_PACKAGES[packageId]
+    if (!pkg) return c.json({ error: '잘못된 패키지입니다.' }, 400)
+
+    // 고유 orderId: lookbook-{userId6}-{timestamp}-{random4}
+    const shortUid = sess.user_id.slice(0, 6)
+    const ts = Date.now()
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
+    const orderId = `lookbook-${shortUid}-${ts}-${rand}`
+
+    await db.prepare(
+      `INSERT INTO payment_logs (user_id, order_id, amount, credits, status)
+       VALUES (?, ?, ?, ?, 'pending')`
+    ).bind(sess.user_id, orderId, pkg.amount, pkg.credits).run()
+
+    return c.json({
+      success: true,
+      orderId,
+      amount: pkg.amount,
+      credits: pkg.credits,
+      orderName: pkg.label,
+      customerName: sess.name,
+      customerEmail: sess.email,
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// POST /api/payments/confirm — 토스 서버사이드 confirm + 크레딧 지급
+app.post('/api/payments/confirm', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const { paymentKey, orderId, amount } = await c.req.json() as any
+
+    if (!paymentKey || !orderId || !amount) {
+      return c.json({ error: 'paymentKey, orderId, amount 필수' }, 400)
+    }
+
+    // 1) payment_logs 에서 pending 레코드 조회
+    const log = await db.prepare(
+      `SELECT id, user_id, amount, credits, status FROM payment_logs
+       WHERE order_id = ? AND status = 'pending'`
+    ).bind(orderId).first() as any
+    if (!log) return c.json({ error: '결제 정보를 찾을 수 없거나 이미 처리되었습니다.' }, 404)
+
+    // 2) 금액 검증
+    if (Number(amount) !== Number(log.amount)) {
+      return c.json({ error: '결제 금액이 일치하지 않습니다.' }, 400)
+    }
+
+    // 3) 토스페이먼츠 서버사이드 confirm
+    const secretKey = c.env.TOSS_SECRET_KEY || 'test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R'
+    const encoded = btoa(secretKey + ':')
+    const tossResp = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${encoded}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) }),
+    })
+
+    const tossData = await tossResp.json() as any
+
+    if (!tossResp.ok) {
+      // 토스 에러 → payment_logs failed 업데이트
+      await db.prepare(
+        `UPDATE payment_logs
+         SET status='failed', toss_raw=?, paid_at=datetime('now')
+         WHERE order_id=?`
+      ).bind(JSON.stringify(tossData), orderId).run()
+      return c.json({ error: tossData.message || '결제 승인 실패', code: tossData.code }, 400)
+    }
+
+    // 4) payment_logs paid 업데이트
+    await db.prepare(
+      `UPDATE payment_logs
+       SET status='paid', payment_key=?, toss_method=?, toss_raw=?, paid_at=datetime('now')
+       WHERE order_id=?`
+    ).bind(
+      tossData.paymentKey,
+      tossData.method || '',
+      JSON.stringify(tossData),
+      orderId
+    ).run()
+
+    // 5) users.credits 증가
+    const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(log.user_id).first() as any
+    const prevBal = userRow?.credits ?? 0
+    const newBal  = prevBal + Number(log.credits)
+    await db.prepare(
+      `UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`
+    ).bind(newBal, log.user_id).run()
+
+    // 6) credit_logs grant 기록
+    await db.prepare(
+      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       VALUES (?, 'grant', ?, ?, 'payment', ?)`
+    ).bind(log.user_id, log.credits, newBal, orderId).run()
+
+    return c.json({
+      success: true,
+      credits: log.credits,
+      creditsTotal: newBal,
+      method: tossData.method,
+      orderId,
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /api/payments/history — 결제 내역 조회
+app.get('/api/payments/history', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
+
+    const logs = await db.prepare(
+      `SELECT order_id, amount, credits, status, toss_method, created_at, paid_at
+       FROM payment_logs
+       WHERE user_id = ?
+       ORDER BY created_at DESC
+       LIMIT 50`
+    ).bind(sess.user_id).all()
+
+    return c.json({ success: true, logs: logs.results || [] })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
 // Image Upload API
 // ────────────────────────────────────────────────────
 app.post('/api/uploads/image', async (c) => {
@@ -2348,7 +2519,7 @@ app.get('/', (c) => {
               <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <button onclick="openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
@@ -2952,7 +3123,7 @@ app.get('/dashboard', (c) => {
           <div class="db-credit-val" id="dbCredits">-</div>
           <div class="db-credit-sub">이미지 1장 = 90크레딧</div>
         </div>
-        <button class="db-charge-btn" onclick="showToast('크레딧 충전 서비스 준비 중입니다 🔜','info')">충전</button>
+        <button class="db-charge-btn" onclick="openChargePanel()">충전</button>
       </div>
 
       <!-- 생성 내역 -->
@@ -3002,6 +3173,93 @@ app.get('/dashboard', (c) => {
           <div style="font-size:40px;margin-bottom:12px;">🎨</div>
           생성 내역을 불러오는 중...
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 크레딧 충전 패널 -->
+  <div id="chargePanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:600;overflow-y:auto;">
+    <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
+      <!-- 헤더 -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+        <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+        <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">크레딧 충전</h2>
+      </div>
+
+      <!-- 현재 크레딧 -->
+      <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">현재 보유 크레딧</div>
+          <div id="chargePanelCredits" style="font-size:28px;font-weight:800;color:#a78bfa;"></div>
+        </div>
+        <div style="font-size:32px;opacity:0.5;">💎</div>
+      </div>
+
+      <!-- 패키지 카드 -->
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;" id="pkgList">
+
+        <!-- 2만원 패키지 -->
+        <div class="pkg-card" onclick="selectPackage('pkg_20000',this)" data-pkg="pkg_20000"
+             style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">1,000 크레딧</div>
+              <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:22px;font-weight:800;color:#6c47ff;">20,000원</div>
+              <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,818원</div>
+            </div>
+          </div>
+          <div class="pkg-check" style="display:none;position:absolute;top:10px;right:10px;width:22px;height:22px;background:#6c47ff;border-radius:50%;display:none;align-items:center;justify-content:center;color:white;font-size:12px;">✓</div>
+        </div>
+
+        <!-- 4만원 패키지 -->
+        <div class="pkg-card" onclick="selectPackage('pkg_40000',this)" data-pkg="pkg_40000"
+             style="background:linear-gradient(135deg,#1e1435,#2a1a50);border:2px solid #6c47ff;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;">
+          <!-- 인기 배지 -->
+          <div style="position:absolute;top:0;right:20px;background:linear-gradient(135deg,#6c47ff,#a855f7);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;">인기</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">2,300 크레딧</div>
+              <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">25장</strong> 다운로드 가능</div>
+              <div style="font-size:11px;color:#a78bfa;margin-top:4px;">✨ 기본 대비 15% 더 받기</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:22px;font-weight:800;color:#6c47ff;">40,000원</div>
+              <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,600원</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6만원 패키지 -->
+        <div class="pkg-card" onclick="selectPackage('pkg_60000',this)" data-pkg="pkg_60000"
+             style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">4,000 크레딧</div>
+              <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">44장</strong> 다운로드 가능</div>
+              <div style="font-size:11px;color:#a78bfa;margin-top:4px;">🚀 기본 대비 33% 더 받기</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:22px;font-weight:800;color:#6c47ff;">60,000원</div>
+              <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,364원</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 결제 버튼 -->
+      <button id="chargeCta" onclick="startPayment()"
+              style="width:100%;padding:16px;background:linear-gradient(135deg,#6c47ff,#a855f7);border:none;border-radius:16px;color:white;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.5;pointer-events:none;transition:all 0.2s;">
+        <i class="fas fa-credit-card"></i>
+        <span id="ctaLabel">패키지를 선택하세요</span>
+      </button>
+
+      <!-- 안내 -->
+      <div style="margin-top:16px;font-size:11px;color:#5a5a7a;text-align:center;line-height:1.7;">
+        토스페이먼츠를 통한 안전한 결제 · 카드/계좌이체 지원<br>
+        결제 완료 즉시 크레딧 지급 · 환불은 카톡 문의로 접수
       </div>
     </div>
   </div>
@@ -3196,6 +3454,118 @@ app.get('/dashboard', (c) => {
       list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
     }
   }
+
+  // ────────────────────────────────
+  // 크레딧 충전 패널
+  // ────────────────────────────────
+  let _selectedPkg = null;
+
+  function openChargePanel() {
+    const user = AppState.user;
+    const credits = user ? (user.credits ?? 0) : 0;
+    document.getElementById('chargePanelCredits').textContent = credits.toLocaleString() + ' 크레딧';
+    document.getElementById('chargePanel').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    _selectedPkg = null;
+    // 기본 선택: 4만원 패키지
+    const defaultCard = document.querySelector('[data-pkg="pkg_40000"]');
+    if (defaultCard) selectPackage('pkg_40000', defaultCard);
+  }
+
+  function closeChargePanel() {
+    document.getElementById('chargePanel').style.display = 'none';
+    document.body.style.overflow = '';
+    _selectedPkg = null;
+  }
+
+  function selectPackage(pkgId, el) {
+    _selectedPkg = pkgId;
+    // 카드 스타일 초기화
+    document.querySelectorAll('.pkg-card').forEach(c => {
+      c.style.border = '2px solid #3a3a60';
+      c.style.transform = 'scale(1)';
+    });
+    // 선택 카드 강조
+    el.style.border = '2px solid #6c47ff';
+    el.style.transform = 'scale(1.01)';
+    // CTA 버튼 활성화
+    const cta = document.getElementById('chargeCta');
+    const lbl = document.getElementById('ctaLabel');
+    cta.style.opacity = '1';
+    cta.style.pointerEvents = 'auto';
+    const map = { pkg_20000: '20,000원 결제 (1,000크레딧)', pkg_40000: '40,000원 결제 (2,300크레딧)', pkg_60000: '60,000원 결제 (4,000크레딧)' };
+    lbl.textContent = map[pkgId] || '결제하기';
+  }
+
+  async function startPayment() {
+    if (!_selectedPkg) { showToast('패키지를 선택해주세요.', 'error'); return; }
+    const sessionToken = AppState.sessionToken || localStorage.getItem('sessionToken') || '';
+    if (!sessionToken) { showToast('로그인이 필요합니다.', 'error'); return; }
+
+    try {
+      const cta = document.getElementById('chargeCta');
+      cta.style.opacity = '0.6';
+      cta.style.pointerEvents = 'none';
+
+      const res = await fetch('/api/payments/prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+        body: JSON.stringify({ packageId: _selectedPkg }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '결제 준비 실패');
+
+      // 토스페이먼츠 SDK 로드 (없으면 동적 로드)
+      if (!window.TossPayments) {
+        await loadTossSDK();
+      }
+
+      const clientKey = 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
+      const toss = TossPayments(clientKey);
+      await toss.requestPayment('카드', {
+        amount: data.amount,
+        orderId: data.orderId,
+        orderName: data.orderName,
+        customerName: data.customerName,
+        successUrl: location.origin + '/payment/success',
+        failUrl:    location.origin + '/payment/fail',
+      });
+    } catch (e) {
+      const cta = document.getElementById('chargeCta');
+      cta.style.opacity = '1';
+      cta.style.pointerEvents = 'auto';
+      if (e.code !== 'USER_CANCEL') {
+        showToast(e.message || '결제 중 오류가 발생했습니다.', 'error');
+      }
+    }
+  }
+
+  function loadTossSDK() {
+    return new Promise((resolve, reject) => {
+      if (window.TossPayments) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://js.tosspayments.com/v1/payment';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('토스페이먼츠 SDK 로드 실패'));
+      document.head.appendChild(s);
+    });
+  }
+
+  // 결제 완료 후 creditsRefresh 신호 처리
+  window.addEventListener('focus', () => {
+    if (sessionStorage.getItem('creditsRefresh')) {
+      sessionStorage.removeItem('creditsRefresh');
+      verifySession().then(() => {
+        const user = AppState.user;
+        if (user) {
+          document.getElementById('dbCredits').textContent = (user.credits ?? 0).toLocaleString();
+          if (document.getElementById('ddUserCredits')) {
+            document.getElementById('ddUserCredits').textContent = (user.credits ?? 0).toLocaleString() + ' 크레딧';
+          }
+        }
+      });
+    }
+  });
   </script>
   `))
 })
@@ -3239,7 +3609,7 @@ app.get('/generator', (c) => {
               <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="showToast('크레딧 구매 페이지는 준비 중입니다. 🔜','info');toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <button onclick="openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </div>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
@@ -4497,6 +4867,143 @@ app.get('/studio-b', (c) => c.redirect('/'))
 app.get('/studio-b/*', (c) => {
   const path = c.req.path.replace('/studio-b', '') || '/'
   return c.redirect(path)
+})
+
+// ────────────────────────────────────────────────────
+// 결제 결과 페이지 — 토스페이먼츠 redirectUrl
+// ────────────────────────────────────────────────────
+app.get('/payment/success', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>결제 완료 — Studio B</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }
+    .card { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid rgba(255,255,255,0.08); }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div class="card rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+    <div id="loadingState">
+      <div class="animate-spin w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <p class="text-gray-300 text-sm">결제 확인 중...</p>
+    </div>
+    <div id="successState" class="hidden">
+      <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-check text-green-400 text-2xl"></i>
+      </div>
+      <h1 class="text-white text-2xl font-bold mb-2">결제 완료!</h1>
+      <p class="text-gray-400 text-sm mb-4" id="successMsg"></p>
+      <div class="bg-black/30 rounded-xl p-4 mb-6 text-left">
+        <div class="flex justify-between text-sm mb-2">
+          <span class="text-gray-400">지급 크레딧</span>
+          <span class="text-purple-300 font-bold" id="creditsGranted"></span>
+        </div>
+        <div class="flex justify-between text-sm">
+          <span class="text-gray-400">잔여 크레딧</span>
+          <span class="text-white font-semibold" id="creditsTotal"></span>
+        </div>
+      </div>
+      <button onclick="goHome()" class="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl py-3 font-semibold transition-colors">
+        <i class="fas fa-home mr-2"></i>서비스 이용하기
+      </button>
+    </div>
+    <div id="errorState" class="hidden">
+      <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-times text-red-400 text-2xl"></i>
+      </div>
+      <h1 class="text-white text-2xl font-bold mb-2">결제 확인 실패</h1>
+      <p class="text-gray-400 text-sm mb-6" id="errorMsg"></p>
+      <button onclick="goHome()" class="w-full bg-gray-700 hover:bg-gray-600 text-white rounded-xl py-3 font-semibold transition-colors">
+        홈으로 돌아가기
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search)
+    const paymentKey = params.get('paymentKey')
+    const orderId    = params.get('orderId')
+    const amount     = params.get('amount')
+    const sessionToken = localStorage.getItem('sessionToken') || ''
+
+    async function confirmPayment() {
+      try {
+        const res = await fetch('/api/payments/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+          body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) }),
+        })
+        const data = await res.json()
+        document.getElementById('loadingState').classList.add('hidden')
+        if (data.success) {
+          document.getElementById('successMsg').textContent = '크레딧이 충전되었습니다.'
+          document.getElementById('creditsGranted').textContent = '+' + data.credits.toLocaleString() + ' 크레딧'
+          document.getElementById('creditsTotal').textContent = data.creditsTotal.toLocaleString() + ' 크레딧'
+          document.getElementById('successState').classList.remove('hidden')
+          // 세션스토리지에 갱신 신호
+          sessionStorage.setItem('creditsRefresh', '1')
+        } else {
+          document.getElementById('errorMsg').textContent = data.error || '알 수 없는 오류가 발생했습니다.'
+          document.getElementById('errorState').classList.remove('hidden')
+        }
+      } catch (e) {
+        document.getElementById('loadingState').classList.add('hidden')
+        document.getElementById('errorMsg').textContent = '네트워크 오류가 발생했습니다.'
+        document.getElementById('errorState').classList.remove('hidden')
+      }
+    }
+
+    function goHome() { location.href = '/' }
+
+    if (!paymentKey || !orderId || !amount) {
+      document.getElementById('loadingState').classList.add('hidden')
+      document.getElementById('errorMsg').textContent = '결제 파라미터가 올바르지 않습니다.'
+      document.getElementById('errorState').classList.remove('hidden')
+    } else {
+      confirmPayment()
+    }
+  </script>
+</body>
+</html>`)
+})
+
+app.get('/payment/fail', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>결제 실패 — Studio B</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+  <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,255,255,0.08)" class="rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+    <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+      <i class="fas fa-times text-red-400 text-2xl"></i>
+    </div>
+    <h1 class="text-white text-2xl font-bold mb-2">결제가 취소되었습니다</h1>
+    <p class="text-gray-400 text-sm mb-2" id="errMsg"></p>
+    <p class="text-gray-500 text-xs mb-6" id="errCode"></p>
+    <button onclick="location.href='/'" class="w-full bg-gray-700 hover:bg-gray-600 text-white rounded-xl py-3 font-semibold transition-colors">
+      홈으로 돌아가기
+    </button>
+  </div>
+  <script>
+    const p = new URLSearchParams(location.search)
+    const msg = p.get('message')
+    const code = p.get('code')
+    if (msg) document.getElementById('errMsg').textContent = decodeURIComponent(msg)
+    if (code) document.getElementById('errCode').textContent = '오류코드: ' + code
+  </script>
+</body>
+</html>`)
 })
 
 export default app
