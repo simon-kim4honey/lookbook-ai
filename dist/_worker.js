@@ -1241,65 +1241,16 @@ ${t}
           <h2 class="gstep-title">의류를 종류별로 업로드하세요</h2>
           <p class="gstep-sub">각 칸에 해당하는 의류를 업로드하세요 · 원하는 칸만 사용해도 됩니다</p>
 
-          <!-- 숨겨진 파일 input — label for= 연결용 (슬롯 위에 선언해야 label이 참조 가능) -->
-          <input type="file" id="fileInput-TOP"    accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'TOP')" />
-          <input type="file" id="fileInput-BOTTOM" accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'BOTTOM')" />
-          <input type="file" id="fileInput-DRESS"  accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'DRESS')" />
+          <!-- 숨겨진 파일 input (multiple 허용) — triggerSlotAdd() 에서 호출 -->
+          <input type="file" id="fileInput-TOP"    accept="image/*" multiple style="display:none;" onchange="handleSlotFileSelect(event,'TOP')" />
+          <input type="file" id="fileInput-BOTTOM" accept="image/*" multiple style="display:none;" onchange="handleSlotFileSelect(event,'BOTTOM')" />
+          <input type="file" id="fileInput-DRESS"  accept="image/*" multiple style="display:none;" onchange="handleSlotFileSelect(event,'DRESS')" />
 
-          <!-- 3칸 슬롯 — label for= 방식으로 변경 (모바일 iOS/Android 완전 지원) -->
+          <!-- 3칸 슬롯 — renderSlots() 가 동적으로 내부 DOM 갱신 -->
           <div class="clothing-slots">
-
-            <!-- 상의 슬롯 -->
-            <label class="cslot" id="slot-TOP" for="fileInput-TOP"
-              ondragover="handleSlotDragOver(event,'TOP')"
-              ondragleave="handleSlotDragLeave(event,'TOP')"
-              ondrop="handleSlotDrop(event,'TOP')"
-              onclick="return handleSlotLabelClick(event,'TOP')">
-              <span class="cslot-label">상의</span>
-              <span class="cslot-body" id="slot-body-TOP">
-                <span class="cslot-empty">
-                  <span class="cslot-plus">＋</span>
-                  <span class="cslot-hint">탭하여 사진 선택</span>
-                </span>
-              </span>
-              <button type="button" class="cslot-remove hidden" id="slot-remove-TOP"
-                onclick="removeSlot(event,'TOP')">✕</button>
-            </label>
-
-            <!-- 하의 슬롯 -->
-            <label class="cslot" id="slot-BOTTOM" for="fileInput-BOTTOM"
-              ondragover="handleSlotDragOver(event,'BOTTOM')"
-              ondragleave="handleSlotDragLeave(event,'BOTTOM')"
-              ondrop="handleSlotDrop(event,'BOTTOM')"
-              onclick="return handleSlotLabelClick(event,'BOTTOM')">
-              <span class="cslot-label">하의</span>
-              <span class="cslot-body" id="slot-body-BOTTOM">
-                <span class="cslot-empty">
-                  <span class="cslot-plus">＋</span>
-                  <span class="cslot-hint">탭하여 사진 선택</span>
-                </span>
-              </span>
-              <button type="button" class="cslot-remove hidden" id="slot-remove-BOTTOM"
-                onclick="removeSlot(event,'BOTTOM')">✕</button>
-            </label>
-
-            <!-- 전체(상의+하의 한 이미지 / 원피스·세트업) 슬롯 -->
-            <label class="cslot" id="slot-DRESS" for="fileInput-DRESS"
-              ondragover="handleSlotDragOver(event,'DRESS')"
-              ondragleave="handleSlotDragLeave(event,'DRESS')"
-              ondrop="handleSlotDrop(event,'DRESS')"
-              onclick="return handleSlotLabelClick(event,'DRESS')">
-              <span class="cslot-label">전체</span>
-              <span class="cslot-body" id="slot-body-DRESS">
-                <span class="cslot-empty">
-                  <span class="cslot-plus">＋</span>
-                  <span class="cslot-hint">탭하여 사진 선택</span>
-                </span>
-              </span>
-              <button type="button" class="cslot-remove hidden" id="slot-remove-DRESS"
-                onclick="removeSlot(event,'DRESS')">✕</button>
-            </label>
-
+            <div class="cslot-section" id="slot-container-TOP"></div>
+            <div class="cslot-section" id="slot-container-BOTTOM"></div>
+            <div class="cslot-section" id="slot-container-DRESS"></div>
           </div><!-- /.clothing-slots -->
         </div>
         <div class="gslide-nav">

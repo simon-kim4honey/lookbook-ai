@@ -1319,14 +1319,10 @@ footer {
 }
 
 /* ─────────────────────────────────────────────
-   업로드 존 — 통합 드래그&드롭 컨테이너
-   카드 + 추가버튼이 함께 들어있음
-───────────────────────────────────────────── */
-/* ─────────────────────────────────────────────
-   슬롯 기반 의류 업로드 (상의 / 하의 / 아우터)
+   슬롯 기반 의류 업로드 — 멀티 이미지 (최대 4장/카테고리)
 ───────────────────────────────────────────── */
 
-/* 3칸 가로 그리드 */
+/* 3칸 가로 그리드 — 카테고리(상의/하의/전체) */
 .clothing-slots {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1334,119 +1330,127 @@ footer {
   width: 100%;
 }
 
-/* 개별 슬롯 — label 태그로 변경되어 block/inline-block 명시 필요 */
-.cslot {
-  position: relative;
+/* 카테고리 섹션 래퍼 */
+.cslot-section {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 6px;
   border-radius: 14px;
-  overflow: hidden;
-  border: 1.5px dashed rgba(255,255,255,0.13);
+  border: 1.5px solid rgba(255,255,255,0.08);
   background: rgba(255,255,255,0.03);
-  cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-  /* label 기본 스타일 초기화 */
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-}
-.cslot:hover {
-  border-color: rgba(167,139,250,0.45);
-  background: rgba(167,139,250,0.05);
-}
-.cslot.drag-over {
-  border-color: rgba(167,139,250,0.7);
-  background: rgba(167,139,250,0.09);
-}
-/* 이미지 채워진 슬롯: 테두리 solid + 보라 */
-.cslot--filled {
-  border-style: solid;
-  border-color: rgba(139,92,246,0.5);
-  cursor: default;
-}
-.cslot--filled:hover {
-  border-color: rgba(139,92,246,0.6);
-  background: rgba(255,255,255,0.03);
+  padding: 8px 6px;
+  min-height: 100px;
 }
 
-/* 슬롯 라벨 (상의 / 하의 / 전체) — span이므로 block 명시 */
-.cslot-label {
-  display: block;
-  padding: 8px 10px 6px;
+/* 섹션 헤더 (레이블 + 카운트) */
+.cslot-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2px 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.cslot-section-label {
   font-size: 11px;
   font-weight: 700;
   color: rgba(255,255,255,0.55);
   letter-spacing: 0.4px;
-  text-align: center;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-  flex-shrink: 0;
 }
-.cslot--filled .cslot-label {
-  color: rgba(167,139,250,0.9);
-  border-bottom-color: rgba(139,92,246,0.2);
+.cslot-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(167,139,250,0.85);
+  background: rgba(139,92,246,0.15);
+  padding: 1px 6px;
+  border-radius: 99px;
 }
 
-/* 슬롯 본문 (이미지 or 플레이스홀더) — span이므로 block 명시 */
-.cslot-body {
-  display: flex;
-  flex: 1;
-  aspect-ratio: 3/4;
-  align-items: center;
-  justify-content: center;
+/* 썸네일 + 추가버튼 그리드 */
+.cslot-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  transition: outline 0.15s;
+}
+.cslot-grid.drag-over {
+  outline: 2px dashed rgba(167,139,250,0.6);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* 개별 썸네일 카드 */
+.cslot-thumb {
+  position: relative;
+  border-radius: 8px;
   overflow: hidden;
+  aspect-ratio: 3/4;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(139,92,246,0.35);
 }
-
-/* 업로드된 이미지 */
-.cslot-img {
+.cslot-thumb-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-/* 플레이스홀더 (비어 있을 때) — span이지만 flex 컨테이너로 */
-.cslot-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 16px 8px;
-  width: 100%;
-  height: 100%;
-}
-.cslot-plus {
-  display: block;
-  font-size: 26px;
-  color: rgba(255,255,255,0.2);
-  line-height: 1;
-  font-weight: 300;
-}
-.cslot-hint {
-  display: block;
-  font-size: 10px;
-  color: rgba(255,255,255,0.22);
-  text-align: center;
-  line-height: 1.4;
-}
-
-/* ✕ 삭제 버튼 */
-.cslot-remove {
+/* 썸네일 개별 삭제 버튼 */
+.cslot-thumb-remove {
   position: absolute;
-  top: 6px; right: 6px;
-  width: 22px; height: 22px;
+  top: 3px; right: 3px;
+  width: 20px; height: 20px;
   border-radius: 50%;
-  background: rgba(0,0,0,0.65);
+  background: rgba(0,0,0,0.7);
   border: none;
-  color: rgba(255,255,255,0.85);
-  font-size: 11px;
+  color: rgba(255,255,255,0.9);
+  font-size: 10px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   backdrop-filter: blur(4px);
   z-index: 3;
   transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
 }
-.cslot-remove:hover { background: rgba(239,68,68,0.85); }
+.cslot-thumb-remove:hover { background: rgba(239,68,68,0.9); }
+
+/* 추가 버튼 */
+.cslot-add-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 3/4;
+  border-radius: 8px;
+  border: 1.5px dashed rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  padding: 4px;
+}
+.cslot-add-btn:hover {
+  border-color: rgba(167,139,250,0.5);
+  background: rgba(167,139,250,0.06);
+}
+.cslot-add-btn:active {
+  background: rgba(139,92,246,0.1);
+}
+.cslot-add-plus {
+  display: block;
+  font-size: 22px;
+  color: rgba(255,255,255,0.22);
+  line-height: 1;
+  font-weight: 300;
+}
+.cslot-add-hint {
+  display: block;
+  font-size: 9px;
+  color: rgba(255,255,255,0.22);
+  text-align: center;
+  line-height: 1.3;
+  word-break: keep-all;
+}
 
 /* gen options 다크 */
 #gapp .gen-options-grid .gen-option-group { background: rgba(255,255,255,0.04); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
