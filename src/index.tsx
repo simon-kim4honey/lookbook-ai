@@ -861,13 +861,23 @@ app.post('/api/auth/logout', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
+// ── origin 헬퍼: 요청 URL에서 동적으로 추출 (하드코딩 제거) ──
+function getOrigin(c: any): string {
+  const url = new URL(c.req.url)
+  return `${url.protocol}//${url.host}`
+}
+
 // GET /api/auth/kakao — 카카오 OAuth 시작
 // ────────────────────────────────────────────────────
 app.get('/api/auth/kakao', (c) => {
-  const origin = 'https://studiob.aifashion.co.kr'
-  const redirectUri = `${origin}/api/auth/kakao/callback`
+  const origin = getOrigin(c)
+  const mode = c.req.query('mode') || 'popup'  // popup | redirect
+  const redirectUri = `${origin}/api/auth/kakao/callback?mode=${mode}`
   const clientId = c.env.KAKAO_CLIENT_ID || ''
-  if (!clientId) return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();</script>`)
+  if (!clientId) {
+    if (mode === 'redirect') return c.redirect(`/?oauth_error=kakao_no_key`)
+    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다.'},'*');window.close();</script>`)
+  }
   const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`
   return c.redirect(url)
 })
@@ -877,16 +887,22 @@ app.get('/api/auth/kakao', (c) => {
 // ────────────────────────────────────────────────────
 app.get('/api/auth/kakao/callback', async (c) => {
   const db = c.env.LOOKBOOK_DB
-  const origin = 'https://studiob.aifashion.co.kr'
+  const origin = getOrigin(c)
   const code = c.req.query('code')
   const error = c.req.query('error')
+  const mode = c.req.query('mode') || 'popup'  // popup | redirect
 
-  if (error || !code) {
-    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${error||'cancelled'}'},'*');window.close();</script>`)
+  function errorResponse(msg: string) {
+    if (mode === 'redirect') {
+      return c.redirect(`/?oauth_error=${encodeURIComponent(msg)}`)
+    }
+    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${msg}'},'*');window.close();</script>`)
   }
 
+  if (error || !code) return errorResponse(error || 'cancelled')
+
   try {
-    const redirectUri = `${origin}/api/auth/kakao/callback`
+    const redirectUri = `${origin}/api/auth/kakao/callback?mode=${mode}`
     // 토큰 교환
     const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
       method: 'POST',
@@ -913,13 +929,10 @@ app.get('/api/auth/kakao/callback', async (c) => {
     // 기존 사용자 조회 또는 신규 생성
     let user: any = await db.prepare(`SELECT * FROM users WHERE provider = 'kakao' AND provider_id = ?`).bind(providerId).first()
     if (!user) {
-      // 같은 이메일로 가입된 계정 확인
       user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(kakaoEmail).first()
       if (user) {
-        // 기존 계정에 카카오 연동
         await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(providerId, kakaoAvatar, user.id).run()
       } else {
-        // 신규 생성
         const id = genUserId()
         await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 1000, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
@@ -931,7 +944,29 @@ app.get('/api/auth/kakao/callback', async (c) => {
     const token = await createSession(db, user.id)
     const userJson = JSON.stringify(publicUser(user))
 
-    // 팝업 창에서 부모 창으로 메시지 전달
+    if (mode === 'redirect') {
+      // ── 모바일 리다이렉트 모드: localStorage 저장 후 원래 페이지로 복귀 ──
+      return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>로그인 성공</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body>
+<p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 이동합니다...</p>
+<script>
+(function(){
+  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson}};
+  try { localStorage.setItem('oauth_result', JSON.stringify(payload)); } catch(e) {}
+  var pending = {};
+  try { pending = JSON.parse(localStorage.getItem('oauth_redirect_pending') || '{}'); } catch(e) {}
+  var dest = (pending.returnPath && pending.returnPath !== '/') ? pending.returnPath : '/';
+  window.location.replace(dest);
+})();
+</script>
+</body></html>`)
+    }
+
+    // ── 팝업 모드: 부모 창으로 postMessage ──
     return c.html(`<!DOCTYPE html>
 <html lang="ko">
 <head><meta charset="UTF-8"><title>로그인 성공</title></head>
@@ -947,7 +982,6 @@ app.get('/api/auth/kakao/callback', async (c) => {
         window.opener.postMessage(payload, '*');
         setTimeout(tryClose, 800);
       } else {
-        // opener가 없으면 localStorage에 저장 후 닫기
         try { localStorage.setItem('oauth_result', JSON.stringify(payload)); } catch(e) {}
         setTimeout(tryClose, 500);
       }
@@ -955,20 +989,14 @@ app.get('/api/auth/kakao/callback', async (c) => {
       setTimeout(tryClose, 500);
     }
   }
-  if (document.readyState === 'complete') {
-    sendMsg();
-  } else {
-    window.addEventListener('load', sendMsg);
-  }
+  if (document.readyState === 'complete') { sendMsg(); }
+  else { window.addEventListener('load', sendMsg); }
 })();
 </script>
 </body></html>`)
   } catch (err: any) {
     console.error('kakao callback error:', err)
-    return c.html(`<!DOCTYPE html><html><body><script>
-      try { if(window.opener) window.opener.postMessage({type:'oauth_error',provider:'kakao',error:'${err.message}'},'*'); } catch(e) {}
-      setTimeout(() => window.close(), 500);
-    </script><p style="font-family:sans-serif;text-align:center;padding:40px;">로그인 오류가 발생했습니다.</p></body></html>`)
+    return errorResponse(err.message || '로그인 오류')
   }
 })
 
@@ -976,10 +1004,14 @@ app.get('/api/auth/kakao/callback', async (c) => {
 // GET /api/auth/google — 구글 OAuth 시작
 // ────────────────────────────────────────────────────
 app.get('/api/auth/google', (c) => {
-  const origin = 'https://studiob.aifashion.co.kr'
-  const redirectUri = `${origin}/api/auth/google/callback`
+  const origin = getOrigin(c)
+  const mode = c.req.query('mode') || 'popup'
+  const redirectUri = `${origin}/api/auth/google/callback?mode=${mode}`
   const clientId = c.env.GOOGLE_CLIENT_ID || ''
-  if (!clientId) return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다. 관리자에게 문의하세요.'},'*');window.close();</script>`)
+  if (!clientId) {
+    if (mode === 'redirect') return c.redirect(`/?oauth_error=google_no_key`)
+    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다.'},'*');window.close();</script>`)
+  }
   const params = new URLSearchParams({
     client_id: clientId, redirect_uri: redirectUri,
     response_type: 'code', scope: 'openid email profile',
@@ -993,16 +1025,22 @@ app.get('/api/auth/google', (c) => {
 // ────────────────────────────────────────────────────
 app.get('/api/auth/google/callback', async (c) => {
   const db = c.env.LOOKBOOK_DB
-  const origin = 'https://studiob.aifashion.co.kr'
+  const origin = getOrigin(c)
   const code = c.req.query('code')
   const error = c.req.query('error')
+  const mode = c.req.query('mode') || 'popup'
 
-  if (error || !code) {
-    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'${error||'cancelled'}'},'*');window.close();</script>`)
+  function errorResponse(msg: string) {
+    if (mode === 'redirect') {
+      return c.redirect(`/?oauth_error=${encodeURIComponent(msg)}`)
+    }
+    return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'${msg}'},'*');window.close();</script>`)
   }
 
+  if (error || !code) return errorResponse(error || 'cancelled')
+
   try {
-    const redirectUri = `${origin}/api/auth/google/callback`
+    const redirectUri = `${origin}/api/auth/google/callback?mode=${mode}`
     // 토큰 교환
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -1043,6 +1081,29 @@ app.get('/api/auth/google/callback', async (c) => {
     const token = await createSession(db, user.id)
     const userJson = JSON.stringify(publicUser(user))
 
+    if (mode === 'redirect') {
+      // ── 모바일 리다이렉트 모드 ──
+      return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="UTF-8"><title>로그인 성공</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+</head>
+<body>
+<p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 이동합니다...</p>
+<script>
+(function(){
+  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson}};
+  try { localStorage.setItem('oauth_result', JSON.stringify(payload)); } catch(e) {}
+  var pending = {};
+  try { pending = JSON.parse(localStorage.getItem('oauth_redirect_pending') || '{}'); } catch(e) {}
+  var dest = (pending.returnPath && pending.returnPath !== '/') ? pending.returnPath : '/';
+  window.location.replace(dest);
+})();
+</script>
+</body></html>`)
+    }
+
+    // ── 팝업 모드 ──
     return c.html(`<!DOCTYPE html>
 <html lang="ko">
 <head><meta charset="UTF-8"><title>로그인 성공</title></head>
@@ -1065,20 +1126,14 @@ app.get('/api/auth/google/callback', async (c) => {
       setTimeout(tryClose, 500);
     }
   }
-  if (document.readyState === 'complete') {
-    sendMsg();
-  } else {
-    window.addEventListener('load', sendMsg);
-  }
+  if (document.readyState === 'complete') { sendMsg(); }
+  else { window.addEventListener('load', sendMsg); }
 })();
 </script>
 </body></html>`)
   } catch (err: any) {
     console.error('google callback error:', err)
-    return c.html(`<!DOCTYPE html><html><body><script>
-      try { if(window.opener) window.opener.postMessage({type:'oauth_error',provider:'google',error:'${err.message}'},'*'); } catch(e) {}
-      setTimeout(() => window.close(), 500);
-    </script><p style="font-family:sans-serif;text-align:center;padding:40px;">로그인 오류가 발생했습니다.</p></body></html>`)
+    return errorResponse(err.message || '로그인 오류')
   }
 })
 

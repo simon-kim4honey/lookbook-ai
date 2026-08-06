@@ -60,6 +60,8 @@ document.addEventListener('DOMContentLoaded', () => {
 function initPage() {
   const path = window.location.pathname;
   initNavbar();
+  // 모바일 OAuth 리다이렉트 콜백 결과 먼저 처리
+  checkOAuthRedirectResult();
   // 모든 페이지에서 세션 복원 (자동 로그인)
   verifySession().then(() => {
     if (path === '/' || path === '') {
@@ -188,11 +190,31 @@ function switchAuthTab(tab) {
   }
 }
 
-/** OAuth 소셜 로그인 (팝업 방식) */
+/** 모바일 여부 감지 */
+function isMobileDevice() {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+    (typeof window.orientation !== 'undefined');
+}
+
+/** OAuth 소셜 로그인 — 모바일: 리다이렉트 / PC: 팝업 */
 function oauthLogin(provider) {
   // 이전 oauth_result 잔여 데이터 제거
   localStorage.removeItem('oauth_result');
 
+  if (isMobileDevice()) {
+    // ── 모바일: 현재 탭에서 OAuth 제공자로 이동 (팝업 차단 우회) ──
+    // 콜백 복귀 후 처리할 정보 저장
+    localStorage.setItem('oauth_redirect_pending', JSON.stringify({
+      provider,
+      returnPath: window.location.pathname,
+      pendingGeneration: AppState.pendingGeneration || false,
+      ts: Date.now(),
+    }));
+    window.location.href = `/api/auth/${provider}?mode=redirect`;
+    return;
+  }
+
+  // ── PC: 팝업 방식 유지 ──
   const popup = window.open(
     `/api/auth/${provider}`,
     'oauth_popup',
@@ -235,7 +257,6 @@ function oauthLogin(provider) {
     if (popup && popup.closed) {
       clearInterval(checkClosed);
       window.removeEventListener('message', onMessage);
-      // postMessage가 전달 안 됐을 경우 localStorage에서 결과 읽기
       try {
         const stored = localStorage.getItem('oauth_result');
         if (stored) {
@@ -248,6 +269,48 @@ function oauthLogin(provider) {
       } catch(e) {}
     }
   }, 500);
+}
+
+/** 모바일 OAuth 리다이렉트 콜백 복귀 처리 */
+function checkOAuthRedirectResult() {
+  try {
+    const pendingStr = localStorage.getItem('oauth_redirect_pending');
+    const resultStr  = localStorage.getItem('oauth_result');
+    if (!pendingStr || !resultStr) return;
+
+    const pending = JSON.parse(pendingStr);
+    const data    = JSON.parse(resultStr);
+
+    // 5분 이상 지난 데이터는 무효
+    if (Date.now() - (pending.ts || 0) > 5 * 60 * 1000) {
+      localStorage.removeItem('oauth_redirect_pending');
+      localStorage.removeItem('oauth_result');
+      return;
+    }
+
+    localStorage.removeItem('oauth_redirect_pending');
+    localStorage.removeItem('oauth_result');
+
+    if (data?.type === 'oauth_success') {
+      const { token, user } = data;
+      AppState.user = user;
+      localStorage.setItem('lookbook_token', token);
+      localStorage.setItem('lookbook_user', JSON.stringify(user));
+      updateUserUI();
+      showToast(`환영합니다, ${user.name}님! 🎉`, 'success');
+      if (pending.pendingGeneration) {
+        AppState.pendingGeneration = false;
+        setTimeout(() => startGeneration(), 300);
+      } else if (window.location.pathname === '/') {
+        setTimeout(() => window.location.href = '/dashboard', 800);
+      }
+    } else if (data?.type === 'oauth_error') {
+      showToast('소셜 로그인에 실패했습니다. 다시 시도해주세요.', 'error');
+    }
+  } catch(e) {
+    localStorage.removeItem('oauth_redirect_pending');
+    localStorage.removeItem('oauth_result');
+  }
 }
 
 /** 이메일 로그인 */
