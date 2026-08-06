@@ -423,13 +423,17 @@ async function handleLogin(e) {
 /** 이메일 회원가입 */
 async function handleSignup(e) {
   e.preventDefault();
-  const nameEl     = document.getElementById('signupName');
-  const emailEl    = document.getElementById('signupEmail');
-  const passwordEl = document.getElementById('signupPassword');
-  const name       = nameEl     ? nameEl.value.trim()     : '';
-  const email      = emailEl    ? emailEl.value.trim()    : '';
-  const password   = passwordEl ? passwordEl.value        : '';
-  const btn        = document.getElementById('signupBtn');
+  const nameEl          = document.getElementById('signupName');
+  const emailEl         = document.getElementById('signupEmail');
+  const passwordEl      = document.getElementById('signupPassword');
+  const agreePrivacyEl  = document.getElementById('agreePrivacy');
+  const agreeMarketingEl= document.getElementById('agreeMarketing');
+  const name            = nameEl     ? nameEl.value.trim()     : '';
+  const email           = emailEl    ? emailEl.value.trim()    : '';
+  const password        = passwordEl ? passwordEl.value        : '';
+  const agreePrivacy    = agreePrivacyEl  ? agreePrivacyEl.checked  : false;
+  const agreeMarketing  = agreeMarketingEl? agreeMarketingEl.checked : false;
+  const btn             = document.getElementById('signupBtn');
 
   // 클라이언트 유효성 검사
   if (!name) {
@@ -452,6 +456,12 @@ async function handleSignup(e) {
     if (passwordEl) passwordEl.focus();
     return;
   }
+  // 개인정보 동의는 필수
+  if (!agreePrivacy) {
+    showAuthError('signupError', 'signupErrorText', '개인정보 수집 및 이용에 동의해주세요. (필수)');
+    if (agreePrivacyEl) agreePrivacyEl.focus();
+    return;
+  }
 
   clearAuthError('signupError');
   btn.textContent = '가입 중...';
@@ -461,7 +471,7 @@ async function handleSignup(e) {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password })
+      body: JSON.stringify({ name, email, password, agreeMarketing })
     });
     const data = await res.json();
 

@@ -797,7 +797,7 @@ app.post('/api/auth/signup', async (c) => {
   try {
     const db = c.env.LOOKBOOK_DB
     const body: any = await c.req.json()
-    const { name, email, password } = body
+    const { name, email, password, agreeMarketing } = body
 
     if (!name || !email || !password) return c.json({ success: false, message: '모든 항목을 입력해주세요.' }, 400)
     if (password.length < 8) return c.json({ success: false, message: '비밀번호는 8자 이상이어야 합니다.' }, 400)
@@ -808,10 +808,11 @@ app.post('/api/auth/signup', async (c) => {
 
     const id = genUserId()
     const hash = await hashPassword(password)
+    const marketingFlag = agreeMarketing ? 1 : 0
     await db.prepare(`
-      INSERT INTO users (id, email, name, password_hash, provider, status, credits, role)
-      VALUES (?, ?, ?, ?, 'email', 'active', 1000, 'user')
-    `).bind(id, email.toLowerCase(), name, hash).run()
+      INSERT INTO users (id, email, name, password_hash, provider, status, credits, role, agree_marketing)
+      VALUES (?, ?, ?, ?, 'email', 'active', 1000, 'user', ?)
+    `).bind(id, email.toLowerCase(), name, hash, marketingFlag).run()
 
     const token = await createSession(db, id)
     const user = { id, name, email: email.toLowerCase(), role: 'user', credits: 1000, avatar_url: null, provider: 'email' }
@@ -3121,11 +3122,24 @@ app.get('/', (c) => {
           <div class="form-group">
             <input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" />
           </div>
-          <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;">가입하고 무료 시작 🎁</button>
+
+          <!-- 약관 동의 체크박스 -->
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;padding:14px 16px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);">
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-secondary,#555);line-height:1.5;">
+              <input type="checkbox" id="agreePrivacy" style="margin-top:2px;width:16px;height:16px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" />
+              <span><a href="/privacy" target="_blank" style="color:var(--primary,#6366f1);font-weight:600;text-decoration:underline;">개인정보처리방침</a>에 따른 개인정보 수집 및 이용에 동의합니다. <span style="color:#e53e3e;font-weight:700;">(필수)</span></span>
+            </label>
+            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-secondary,#555);line-height:1.5;">
+              <input type="checkbox" id="agreeMarketing" style="margin-top:2px;width:16px;height:16px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" />
+              <span>가끔 프로모션 이메일 및 알림을 수신합니다. 언제든지 수신 거부할 수 있습니다. <span style="color:var(--text-muted,#999);">(선택)</span></span>
+            </label>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:12px;">가입하고 무료 시작 🎁</button>
         </form>
       </div>
 
-      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="#" style="color:var(--primary);">이용약관</a> 및 <a href="#" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
+      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
   `))
