@@ -1832,26 +1832,67 @@ async function downloadWithCreditCheck(idx) {
 function downloadSingleImage(url, num) { _doFileDownload(url, num); }
 function downloadSingle(num) { showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success'); }
 
-function downloadAll() {
-  const count = AppState.generatedImages.length;
-  // 실제 이미지가 있는 경우 순차 다운로드 시도
+// ─── 전체 다운로드: 이미지 1장씩 크레딧 차감 후 순차 다운로드 ───
+async function downloadAll() {
   const realImages = AppState.generatedImages.filter(img => img.url);
-  if (realImages.length > 0) {
-    realImages.forEach((img, idx) => {
-      setTimeout(() => {
-        const dlUrl = img.url.includes('/api/proxy/gen-image')
-          ? img.url + (img.url.includes('?') ? '&' : '?') + 'download=1'
-          : img.url;
-        const a = document.createElement('a');
-        a.href = dlUrl;
-        a.download = `lookbook_ai_fitting_${idx + 1}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }, idx * 500);
-    });
+  if (!realImages.length) {
+    showToast('다운로드할 이미지가 없습니다.', 'error');
+    return;
   }
-  showToast(`${count}장 다운로드를 시작합니다. (1792 × 2400px 원본)`, 'success');
+
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast('로그인이 필요합니다.', 'error');
+    return;
+  }
+
+  showToast(`${realImages.length}장 다운로드를 시작합니다. 이미지당 90크레딧이 차감됩니다.`, 'info');
+
+  let successCount = 0;
+  for (let i = 0; i < realImages.length; i++) {
+    const img = realImages[i];
+    try {
+      const deductRes = await fetch('/api/credits/deduct', {
+        method: 'POST',
+        headers: { 'X-Session-Token': sessionToken },
+      });
+
+      if (deductRes.status === 401) {
+        showToast('로그인이 필요합니다.', 'error');
+        return;
+      }
+      if (deductRes.status === 402) {
+        const errData = await deductRes.json();
+        const have = errData.available ?? 0;
+        showToast(`크레딧 부족으로 ${i}장만 다운로드했습니다. (보유: ${have}크레딧 / 필요: 90크레딧)`, 'error');
+        return;
+      }
+      if (!deductRes.ok) {
+        showToast(`${i + 1}번 이미지 크레딧 처리 오류`, 'error');
+        continue;
+      }
+
+      const deductData = await deductRes.json();
+      // 크레딧 UI 갱신
+      if (deductData.creditsRemaining !== undefined) {
+        const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+        if (cachedUser) { cachedUser.credits = deductData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+        if (AppState.user) AppState.user.credits = deductData.creditsRemaining;
+        updateUserUI({ credits: deductData.creditsRemaining });
+      }
+
+      // 파일 다운로드
+      await new Promise(resolve => setTimeout(resolve, i * 600));
+      _doFileDownload(img.url, i + 1);
+      successCount++;
+    } catch (err) {
+      console.error(`downloadAll error at index ${i}:`, err);
+    }
+  }
+
+  if (successCount > 0) {
+    showToast(`${successCount}장 다운로드 완료!`, 'success');
+  }
 }
 
 async function downloadImage() {

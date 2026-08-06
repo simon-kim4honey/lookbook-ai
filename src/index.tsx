@@ -20,6 +20,8 @@ type Bindings = {
   ADMIN_PASSWORD: string
   // 토스페이먼츠
   TOSS_SECRET_KEY: string
+  // Atlas Cloud AI
+  ATLAS_API_KEY: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -31,12 +33,15 @@ app.use('/static/*', serveStatic({ root: './public' }))
 // Constants
 // ────────────────────────────────────────────────────
 const ATLAS_API_BASE = 'https://api.atlascloud.ai'
-const ATLAS_API_KEY = 'apikey-768c01fdea4c405f972d93ae16f0b9e3'
+// ATLAS_API_KEY는 c.env.ATLAS_API_KEY (환경변수)로 각 라우트에서 직접 참조
 const AIFASHION_BASE = 'https://www.aifashion.co.kr'
 // 어드민 인증 미들웨어 (상단 선언 필수 — 스토어/라우트보다 먼저 참조됨)
 const adminAuth = async (c: any, next: any) => {
   const authHeader = c.req.header('X-Admin-Password')
-  const adminPassword = c.env.ADMIN_PASSWORD || 'sa3325'
+  const adminPassword = c.env.ADMIN_PASSWORD
+  if (!adminPassword) {
+    return c.json({ success: false, message: '서버 설정 오류: ADMIN_PASSWORD 환경변수가 설정되지 않았습니다.' }, 500)
+  }
   if (authHeader !== adminPassword) {
     return c.json({ success: false, message: '인증 실패' }, 401)
   }
@@ -161,6 +166,12 @@ async function d1EnsureSchema(db: D1Database) {
     bg_desc TEXT NOT NULL DEFAULT '',
     image_b64 TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`).run()
+  // 어드민 프롬프트 설정 영속화 테이블
+  await db.prepare(`CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`).run()
 }
 async function d1NextId(db: D1Database): Promise<string> {
@@ -435,8 +446,8 @@ app.get('/api/proxy/custom-bg/:id', async (c) => {
 })
 
 // Atlas Cloud 헤더 생성
-const atlasHeaders = () => ({
-  'Authorization': `Bearer ${ATLAS_API_KEY}`,
+const atlasHeaders = (apiKey: string) => ({
+  'Authorization': `Bearer ${apiKey}`,
   'Content-Type': 'application/json',
 })
 
@@ -450,13 +461,14 @@ async function atlasGenerateAndWait(params: {
   aspect_ratio: string
   resolution: string
   thinking_level?: string
+  apiKey: string
 }): Promise<string | null> {
-  const { images, prompt, aspect_ratio, resolution, thinking_level = 'default' } = params
+  const { images, prompt, aspect_ratio, resolution, thinking_level = 'default', apiKey } = params
 
   // 1) 생성 요청
   const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
     method: 'POST',
-    headers: atlasHeaders(),
+    headers: atlasHeaders(apiKey),
     body: JSON.stringify({
       model: 'google/nano-banana-2/edit',
       prompt,
@@ -481,7 +493,7 @@ async function atlasGenerateAndWait(params: {
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 3000))
     const pollRes: any = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
-      headers: { 'Authorization': `Bearer ${ATLAS_API_KEY}` },
+      headers: { 'Authorization': `Bearer ${apiKey}` },
     }).then(r => r.json())
 
     const status = pollRes.data?.status
@@ -1464,6 +1476,29 @@ app.post('/api/payments/prepare', async (c) => {
     const pkg = CREDIT_PACKAGES[packageId]
     if (!pkg) return c.json({ error: '잘못된 패키지입니다.' }, 400)
 
+    // ── M-7: 중복 orderId 방지 ─────────────────────────────
+    // 동일 유저가 5분 이내 동일 패키지로 pending 레코드를 이미 생성했으면
+    // 새 orderId를 발급하지 않고 기존 것을 재사용 (토스 위젯 중복 호출 방어)
+    const existing = await db.prepare(
+      `SELECT order_id FROM payment_logs
+       WHERE user_id = ? AND amount = ? AND status = 'pending'
+         AND created_at > datetime('now', '-5 minutes')
+       ORDER BY created_at DESC LIMIT 1`
+    ).bind(sess.user_id, pkg.amount).first() as any
+
+    if (existing?.order_id) {
+      return c.json({
+        success: true,
+        orderId: existing.order_id,
+        amount: pkg.amount,
+        credits: pkg.credits,
+        orderName: pkg.label,
+        customerName: sess.name,
+        customerEmail: sess.email,
+      })
+    }
+    // ─────────────────────────────────────────────────────────
+
     // 고유 orderId: lookbook-{userId6}-{timestamp}-{random4}
     const shortUid = sess.user_id.slice(0, 6)
     const ts = Date.now()
@@ -1702,7 +1737,7 @@ app.post('/api/clothing/classify', async (c) => {
 
           const res = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
             method: 'POST',
-            headers: atlasHeaders(),
+            headers: atlasHeaders(c.env.ATLAS_API_KEY),
             body: JSON.stringify({
               model: 'google/nano-banana-2/edit',
               prompt: classifyPrompt,
@@ -1728,7 +1763,7 @@ app.post('/api/clothing/classify', async (c) => {
             for (let i = 0; i < 10; i++) {
               await new Promise(r => setTimeout(r, 1500))
               const poll: any = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
-                headers: { 'Authorization': `Bearer ${ATLAS_API_KEY}` },
+                headers: { 'Authorization': `Bearer ${c.env.ATLAS_API_KEY}` },
               }).then(r => r.json())
 
               const status = poll.data?.status
@@ -1790,7 +1825,7 @@ async function classifyByImageAnalysis(
     // Atlas vision-only 분류 시도 (text prompt only generation)
     const res = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
       method: 'POST',
-      headers: atlasHeaders(),
+      headers: atlasHeaders(c.env.ATLAS_API_KEY),
       body: JSON.stringify({
         model: 'google/nano-banana-2',
         prompt: [
@@ -1815,7 +1850,7 @@ async function classifyByImageAnalysis(
       for (let i = 0; i < 8; i++) {
         await new Promise(r => setTimeout(r, 1500))
         const poll: any = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
-          headers: { 'Authorization': `Bearer ${ATLAS_API_KEY}` },
+          headers: { 'Authorization': `Bearer ${c.env.ATLAS_API_KEY}` },
         }).then(r => r.json())
         if (poll.data?.status === 'completed' || poll.data?.status === 'succeeded') {
           // 생성된 이미지에서 텍스트 추출 불가 → 메타데이터에서 힌트 탐색
@@ -2168,7 +2203,11 @@ app.post('/api/generation/start', async (c) => {
       ].join(' ')
     }
 
-    // 어드민 프롬프트 주입 (requestBody 생성 전에 적용)
+    // 어드민 프롬프트 주입 — D1에서 최신 설정 로드 후 적용
+    try {
+      const latestConfig = await d1GetPromptConfig(c.env.LOOKBOOK_DB)
+      adminPromptConfig = latestConfig  // 메모리 동기화
+    } catch (e) { /* D1 실패 시 메모리 기본값 사용 */ }
     prompt = injectAdminPrompt(prompt)
 
     console.log('Prompt (first 300):', prompt.substring(0, 300))
@@ -2194,7 +2233,7 @@ app.post('/api/generation/start', async (c) => {
     const jobRequests = Array.from({ length: jobCount }, () =>
       fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
         method: 'POST',
-        headers: atlasHeaders(),
+        headers: atlasHeaders(c.env.ATLAS_API_KEY),
         body: JSON.stringify(requestBody),
       }).then(r => r.json())
     )
@@ -2287,7 +2326,7 @@ app.get('/api/generation/:jobId/status', async (c) => {
     const pollResults = await Promise.all(
       jobIds.map(id =>
         fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${id}`, {
-          headers: { 'Authorization': `Bearer ${ATLAS_API_KEY}` },
+          headers: { 'Authorization': `Bearer ${c.env.ATLAS_API_KEY}` },
         }).then(r => r.json())
       )
     )
@@ -2365,25 +2404,67 @@ function generatePlaceholderImages(count: number) {
 // Admin API Routes
 // ────────────────────────────────────────────────────
 
-// GET /api/admin/prompt — 현재 설정 조회
-app.get('/api/admin/prompt', adminAuth, (c) => {
-  return c.json({ success: true, config: adminPromptConfig })
+// ── 어드민 프롬프트 D1 헬퍼 ──
+async function d1GetPromptConfig(db: D1Database): Promise<AdminPromptConfig> {
+  try {
+    const row: any = await db.prepare(`SELECT value FROM app_settings WHERE key = 'admin_prompt_config'`).first()
+    if (row?.value) {
+      const saved = JSON.parse(row.value)
+      // 저장된 값이 없는 필드는 메모리 기본값으로 보완
+      return {
+        enabled:      typeof saved.enabled === 'boolean'      ? saved.enabled      : adminPromptConfig.enabled,
+        prefix:       typeof saved.prefix === 'string'        ? saved.prefix       : adminPromptConfig.prefix,
+        suffix:       typeof saved.suffix === 'string'        ? saved.suffix       : adminPromptConfig.suffix,
+        styleGuide:   typeof saved.styleGuide === 'string'    ? saved.styleGuide   : adminPromptConfig.styleGuide,
+        technicalSpec: typeof saved.technicalSpec === 'string' ? saved.technicalSpec : adminPromptConfig.technicalSpec,
+        updatedAt:    saved.updatedAt || adminPromptConfig.updatedAt,
+      }
+    }
+  } catch (e) {
+    console.warn('d1GetPromptConfig fallback to memory:', e)
+  }
+  return adminPromptConfig
+}
+
+async function d1SavePromptConfig(db: D1Database, config: AdminPromptConfig): Promise<void> {
+  await db.prepare(
+    `INSERT INTO app_settings (key, value, updated_at) VALUES ('admin_prompt_config', ?, datetime('now'))
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+  ).bind(JSON.stringify(config)).run()
+}
+
+// GET /api/admin/prompt — D1에서 설정 조회 (없으면 메모리 기본값)
+app.get('/api/admin/prompt', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const config = await d1GetPromptConfig(db)
+    return c.json({ success: true, config })
+  } catch (err: any) {
+    // D1 오류 시 메모리 fallback
+    return c.json({ success: true, config: adminPromptConfig })
+  }
 })
 
-// PUT /api/admin/prompt — 설정 업데이트
+// PUT /api/admin/prompt — D1에 저장 + 메모리 동기화
 app.put('/api/admin/prompt', adminAuth, async (c) => {
   try {
+    const db: D1Database = c.env.LOOKBOOK_DB
     const body: any = await c.req.json()
-    adminPromptConfig = {
-      enabled:      typeof body.enabled === 'boolean' ? body.enabled : adminPromptConfig.enabled,
-      prefix:       typeof body.prefix === 'string'   ? body.prefix  : adminPromptConfig.prefix,
-      suffix:       typeof body.suffix === 'string'   ? body.suffix  : adminPromptConfig.suffix,
-      styleGuide:   typeof body.styleGuide === 'string'    ? body.styleGuide    : adminPromptConfig.styleGuide,
-      technicalSpec: typeof body.technicalSpec === 'string' ? body.technicalSpec : adminPromptConfig.technicalSpec,
+    const current = await d1GetPromptConfig(db)
+    const updated: AdminPromptConfig = {
+      enabled:      typeof body.enabled === 'boolean'      ? body.enabled      : current.enabled,
+      prefix:       typeof body.prefix === 'string'        ? body.prefix       : current.prefix,
+      suffix:       typeof body.suffix === 'string'        ? body.suffix       : current.suffix,
+      styleGuide:   typeof body.styleGuide === 'string'    ? body.styleGuide   : current.styleGuide,
+      technicalSpec: typeof body.technicalSpec === 'string' ? body.technicalSpec : current.technicalSpec,
       updatedAt: new Date().toISOString(),
     }
-    console.log('Admin prompt config updated:', adminPromptConfig.updatedAt)
-    return c.json({ success: true, config: adminPromptConfig })
+    // D1 저장
+    await d1SavePromptConfig(db, updated)
+    // 메모리 동기화 (같은 Worker 인스턴스 내 즉시 반영)
+    adminPromptConfig = updated
+    console.log('Admin prompt config saved to D1:', updated.updatedAt)
+    return c.json({ success: true, config: updated })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 400)
   }
@@ -2392,7 +2473,10 @@ app.put('/api/admin/prompt', adminAuth, async (c) => {
 // POST /api/admin/auth — 비밀번호 확인
 app.post('/api/admin/auth', async (c) => {
   const body: any = await c.req.json()
-  const adminPassword = c.env.ADMIN_PASSWORD || 'sa3325'
+  const adminPassword = c.env.ADMIN_PASSWORD
+  if (!adminPassword) {
+    return c.json({ success: false, message: '서버 설정 오류: ADMIN_PASSWORD 환경변수가 설정되지 않았습니다.' }, 500)
+  }
   if (body.password === adminPassword) {
     return c.json({ success: true })
   }
