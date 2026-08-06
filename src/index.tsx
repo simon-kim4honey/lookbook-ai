@@ -3579,11 +3579,12 @@ app.get('/generator', (c) => {
           <input type="file" id="fileInput-BOTTOM" accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'BOTTOM')" />
           <input type="file" id="fileInput-DRESS"  accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'DRESS')" />
 
-          <!-- 3칸 슬롯 — label for= 방식으로 변경 (모바일 iOS/Android 완전 지원) -->
+          <!-- 2열 슬롯 그리드: 왼쪽=상의(위)+하의(아래) / 오른쪽=전체(전체 높이) -->
           <div class="clothing-slots">
 
-            <!-- 상의 슬롯 -->
+            <!-- 상의 슬롯 (왼쪽 열 1행) -->
             <label class="cslot" id="slot-TOP" for="fileInput-TOP"
+              style="grid-column:1; grid-row:1;"
               ondragover="handleSlotDragOver(event,'TOP')"
               ondragleave="handleSlotDragLeave(event,'TOP')"
               ondrop="handleSlotDrop(event,'TOP')"
@@ -3599,8 +3600,9 @@ app.get('/generator', (c) => {
                 onclick="removeSlot(event,'TOP')">✕</button>
             </label>
 
-            <!-- 하의 슬롯 -->
+            <!-- 하의 슬롯 (왼쪽 열 2행) -->
             <label class="cslot" id="slot-BOTTOM" for="fileInput-BOTTOM"
+              style="grid-column:1; grid-row:2;"
               ondragover="handleSlotDragOver(event,'BOTTOM')"
               ondragleave="handleSlotDragLeave(event,'BOTTOM')"
               ondrop="handleSlotDrop(event,'BOTTOM')"
@@ -3616,8 +3618,9 @@ app.get('/generator', (c) => {
                 onclick="removeSlot(event,'BOTTOM')">✕</button>
             </label>
 
-            <!-- 전체(상의+하의 한 이미지 / 원피스·세트업) 슬롯 -->
-            <label class="cslot" id="slot-DRESS" for="fileInput-DRESS"
+            <!-- 전체 슬롯 (오른쪽 열 전체 높이: 1행~2행 span) -->
+            <label class="cslot cslot--full" id="slot-DRESS" for="fileInput-DRESS"
+              style="grid-column:2; grid-row:1 / span 2;"
               ondragover="handleSlotDragOver(event,'DRESS')"
               ondragleave="handleSlotDragLeave(event,'DRESS')"
               ondrop="handleSlotDrop(event,'DRESS')"

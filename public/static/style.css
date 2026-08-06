@@ -1329,9 +1329,13 @@ footer {
 /* 3칸 가로 그리드 */
 .clothing-slots {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* 왼쪽 열: 상의+하의 세로 스택 / 오른쪽 열: 전체(DRESS) 전체 높이 */
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
   gap: 10px;
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 /* 개별 슬롯 — label 태그로 변경되어 block/inline-block 명시 필요 */
@@ -1369,6 +1373,19 @@ footer {
   background: rgba(255,255,255,0.03);
 }
 
+/* Step1: clothing-slots가 gslide-body 남은 공간을 꽉 채우도록 */
+#step-1 .gslide-body {
+  overflow: hidden;  /* 스크롤 제거 → flex로 꽉 채움 */
+}
+#step-1 .clothing-slots {
+  flex: 1;
+  min-height: 0;
+  align-self: stretch;
+  /* max-width 상속 무효화하여 가로 전체 사용 */
+  max-width: 480px;
+  width: 100%;
+}
+
 /* 슬롯 라벨 (상의 / 하의 / 전체) — span이므로 block 명시 */
 .cslot-label {
   display: block;
@@ -1390,7 +1407,7 @@ footer {
 .cslot-body {
   display: flex;
   flex: 1;
-  aspect-ratio: 3/4;
+  min-height: 0;
   align-items: center;
   justify-content: center;
   overflow: hidden;
