@@ -861,10 +861,13 @@ app.post('/api/auth/logout', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
-// ── origin 헬퍼: 요청 URL에서 동적으로 추출 (하드코딩 제거) ──
+// ── origin 헬퍼: Host 헤더 기반으로 추출 (Cloudflare Workers 호환) ──
 function getOrigin(c: any): string {
-  const url = new URL(c.req.url)
-  return `${url.protocol}//${url.host}`
+  // Cloudflare Workers: 실제 클라이언트 도메인은 Host 헤더에 있음
+  const host = c.req.header('host') || c.req.header('x-forwarded-host') || ''
+  // localhost는 http, 나머지는 https
+  const proto = host.startsWith('localhost') ? 'http' : 'https'
+  return `${proto}://${host}`
 }
 
 // GET /api/auth/kakao — 카카오 OAuth 시작
