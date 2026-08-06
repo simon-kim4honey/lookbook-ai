@@ -377,7 +377,7 @@ async function handleLogin(e) {
   }
 
   clearAuthError('loginError');
-  btn.textContent = '로그인 중...';
+  btn.innerHTML = '<span class="btn-spinner"></span> 로그인 중...';
   btn.disabled = true;
 
   try {
@@ -415,7 +415,7 @@ async function handleLogin(e) {
   } catch (err) {
     showAuthError('loginError', 'loginErrorText', '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   } finally {
-    btn.textContent = '로그인';
+    btn.innerHTML = '로그인';
     btn.disabled = false;
   }
 }
@@ -464,7 +464,7 @@ async function handleSignup(e) {
   }
 
   clearAuthError('signupError');
-  btn.textContent = '가입 중...';
+  btn.innerHTML = '<span class="btn-spinner"></span> 가입 중...';
   btn.disabled = true;
 
   try {
@@ -502,7 +502,7 @@ async function handleSignup(e) {
   } catch (err) {
     showAuthError('signupError', 'signupErrorText', '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   } finally {
-    btn.textContent = '가입하고 무료 시작 🎁';
+    btn.innerHTML = '가입하고 무료 시작 🎁';
     btn.disabled = false;
   }
 }
@@ -1277,9 +1277,17 @@ function updateGenSummary() {
 async function startGeneration() {
   if (AppState.isGenerating) return;
 
+  // 생성 버튼 즉각 눌림 피드백
+  const nextBtn3 = document.getElementById('nextBtn3');
+  if (nextBtn3) {
+    nextBtn3.innerHTML = '<span class="btn-spinner"></span> 준비 중...';
+    nextBtn3.disabled = true;
+  }
+
   // ── 로그인 체크: 미로그인 시 모달 표시 후 리턴 ──
   if (!AppState.user) {
     AppState.pendingGeneration = true;
+    if (nextBtn3) { nextBtn3.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; nextBtn3.disabled = false; }
     openModal('loginModal');
     return;
   }
@@ -1450,6 +1458,8 @@ async function startGeneration() {
     // UI 복원
     const step3Nav = document.getElementById('step3Nav');
     if (step3Nav) step3Nav.style.display = '';
+    const nb3err = document.getElementById('nextBtn3');
+    if (nb3err) { nb3err.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; nb3err.disabled = false; }
     const genView = document.getElementById('generatingView');
     if (genView) genView.classList.remove('active');
   }
@@ -1558,9 +1568,11 @@ function completeGeneration(images, isFallback = false) {
 
   renderResults(proxiedImages);
 
-  // step3Nav 복원 (재생성 시 숨겼을 수 있으므로)
+  // step3Nav 복원 + 생성 버튼 상태 복원
   const step3NavEl = document.getElementById('step3Nav');
   if (step3NavEl) step3NavEl.style.display = '';
+  const nb3 = document.getElementById('nextBtn3');
+  if (nb3) { nb3.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; nb3.disabled = false; }
   // generatingView 숨김
   const genViewEl = document.getElementById('generatingView');
   if (genViewEl) genViewEl.style.display = 'none';
@@ -2022,7 +2034,9 @@ async function regenImage() {
     regenBtn.disabled = true;
     regenBtn.style.opacity = '0.6';
   }
-  if (regenBtnText) regenBtnText.textContent = '재생성 중...';
+  if (regenBtnText) {
+    regenBtnText.innerHTML = '<span class="btn-spinner" style="width:14px;height:14px;border-width:2px;"></span> 재생성 중...';
+  }
   if (regenCounter) regenCounter.textContent = '';
 
   const sessionToken = localStorage.getItem('lookbook_token') || '';
