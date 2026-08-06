@@ -334,20 +334,21 @@ function checkOAuthRedirectResult() {
 function showAuthError(boxId, textId, msg) {
   const box  = document.getElementById(boxId);
   const text = document.getElementById(textId);
-  if (!box || !text) return;
-  text.textContent = msg;
-  box.className = 'auth-message error show';
-  // 아이콘이 없으면 추가
-  if (!box.querySelector('.auth-msg-icon')) {
-    const ico = document.createElement('span');
-    ico.className = 'auth-msg-icon';
-    ico.textContent = '❌';
-    box.insertBefore(ico, text);
+  if (!box || !text) {
+    // fallback: 에러 박스를 찾지 못하면 alert으로 표시
+    alert(msg);
+    return;
   }
+  text.textContent = msg;
+  // className 방식 대신 style.display로 직접 제어 (모바일 호환성 향상)
+  box.style.display = 'flex';
+  box.style.opacity = '1';
+  // 스크롤로 에러 박스가 보이도록
+  try { box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch(e) {}
 }
 function clearAuthError(boxId) {
   const box = document.getElementById(boxId);
-  if (box) box.className = 'auth-message error';
+  if (box) box.style.display = 'none';
 }
 
 async function handleLogin(e) {

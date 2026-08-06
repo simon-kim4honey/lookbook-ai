@@ -708,13 +708,13 @@ ${t}
 
       <!-- 로그인 폼 -->
       <div id="authFormLogin">
-        <form id="loginForm" onsubmit="handleLogin(event)">
-          <div id="loginError" class="auth-message error" role="alert"><span class="auth-msg-icon">❌</span><span id="loginErrorText"></span></div>
+        <form id="loginForm" onsubmit="handleLogin(event)" novalidate>
+          <div id="loginError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="loginErrorText"></span></div>
           <div class="form-group">
-            <input type="email" class="form-input" id="loginEmail" placeholder="이메일" required autocomplete="email" />
+            <input type="email" class="form-input" id="loginEmail" placeholder="이메일" autocomplete="email" />
           </div>
           <div class="form-group">
-            <input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" required autocomplete="current-password" />
+            <input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" />
           </div>
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;">로그인</button>
         </form>
@@ -722,16 +722,16 @@ ${t}
 
       <!-- 회원가입 폼 -->
       <div id="authFormSignup" style="display:none;">
-        <form id="signupForm" onsubmit="handleSignup(event)">
-          <div id="signupError" class="auth-message error" role="alert"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
+        <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
+          <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
           <div class="form-group">
-            <input type="text" class="form-input" id="signupName" placeholder="이름" required autocomplete="name" />
+            <input type="text" class="form-input" id="signupName" placeholder="이름" autocomplete="name" />
           </div>
           <div class="form-group">
-            <input type="email" class="form-input" id="signupEmail" placeholder="이메일" required autocomplete="email" />
+            <input type="email" class="form-input" id="signupEmail" placeholder="이메일" autocomplete="email" />
           </div>
           <div class="form-group">
-            <input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" required autocomplete="new-password" />
+            <input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" />
           </div>
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;">가입하고 무료 시작 🎁</button>
         </form>
@@ -1481,19 +1481,19 @@ ${t}
         <div style="flex:1;height:1px;background:var(--border);"></div>
       </div>
       <div id="authFormLogin">
-        <form id="loginForm" onsubmit="handleLogin(event)">
-          <div id="loginError" class="auth-message error" role="alert"><span class="auth-msg-icon">❌</span><span id="loginErrorText"></span></div>
-          <div class="form-group"><input type="email" class="form-input" id="loginEmail" placeholder="이메일" required autocomplete="email" /></div>
-          <div class="form-group"><input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" required autocomplete="current-password" /></div>
+        <form id="loginForm" onsubmit="handleLogin(event)" novalidate>
+          <div id="loginError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="loginErrorText"></span></div>
+          <div class="form-group"><input type="email" class="form-input" id="loginEmail" placeholder="이메일" autocomplete="email" /></div>
+          <div class="form-group"><input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" /></div>
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;">로그인</button>
         </form>
       </div>
       <div id="authFormSignup" style="display:none;">
-        <form id="signupForm" onsubmit="handleSignup(event)">
-          <div id="signupError" class="auth-message error" role="alert"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
-          <div class="form-group"><input type="text" class="form-input" id="signupName" placeholder="이름" required autocomplete="name" /></div>
-          <div class="form-group"><input type="email" class="form-input" id="signupEmail" placeholder="이메일" required autocomplete="email" /></div>
-          <div class="form-group"><input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" required autocomplete="new-password" /></div>
+        <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
+          <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
+          <div class="form-group"><input type="text" class="form-input" id="signupName" placeholder="이름" autocomplete="name" /></div>
+          <div class="form-group"><input type="email" class="form-input" id="signupEmail" placeholder="이메일" autocomplete="email" /></div>
+          <div class="form-group"><input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" /></div>
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;">가입하고 무료 시작 🎁</button>
         </form>
       </div>

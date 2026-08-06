@@ -2060,7 +2060,7 @@ footer {
 
 /* 모달 내 인라인 에러/성공 메시지 박스 */
 .auth-message {
-  display: none;
+  display: none; /* JS에서 style.display='flex'로 직접 제어 */
   align-items: flex-start;
   gap: 8px;
   padding: 11px 14px;
@@ -2069,9 +2069,7 @@ footer {
   font-weight: 500;
   line-height: 1.45;
   margin-bottom: 12px;
-  animation: fadeInDown 0.2s ease;
 }
-.auth-message.show { display: flex; }
 .auth-message.error {
   background: #fff1f2;
   border: 1px solid #fecdd3;
@@ -2088,10 +2086,6 @@ footer {
   color: #166534;
 }
 .auth-message .auth-msg-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
-@keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
 .toast {
   display: flex;
   align-items: center;
