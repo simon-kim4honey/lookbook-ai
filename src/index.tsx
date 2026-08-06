@@ -2,6 +2,11 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
 
+// Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
+// → 배포할 때마다 값이 바뀌어 브라우저가 새 파일로 인식 (캐시 자동 무효화)
+declare const __BUILD_VERSION__: string
+const BUILD_VERSION: string = (typeof __BUILD_VERSION__ !== 'undefined') ? __BUILD_VERSION__ : 'dev'
+
 // Cloudflare 바인딩 타입
 type Bindings = {
   LOOKBOOK_KV: KVNamespace   // BYOK(studiob) — Cloudflare KV
@@ -2407,9 +2412,9 @@ const htmlShell = (title: string, bodyContent: string) => `<!DOCTYPE html>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
-  <link href="/static/style.css" rel="stylesheet" />
+  <link href="/static/style.css?v=${BUILD_VERSION}" rel="stylesheet" />
   <!-- app.js는 head에 defer — body 인라인 script보다 항상 먼저 파싱·실행됨 -->
-  <script src="/static/app.js" defer></script>
+  <script src="/static/app.js?v=${BUILD_VERSION}" defer></script>
 </head>
 <body>
 ${bodyContent}
