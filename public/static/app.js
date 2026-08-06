@@ -273,6 +273,18 @@ function oauthLogin(provider) {
 
 /** 모바일 OAuth 리다이렉트 콜백 복귀 처리 */
 function checkOAuthRedirectResult() {
+  // URL에 oauth_error 파라미터가 있으면 오류 토스트 표시
+  const urlParams = new URLSearchParams(window.location.search);
+  const oauthError = urlParams.get('oauth_error');
+  if (oauthError) {
+    // URL에서 파라미터 제거 (히스토리 정리)
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+    localStorage.removeItem('oauth_redirect_pending');
+    showToast('소셜 로그인에 실패했습니다. 다시 시도해주세요.', 'error');
+    return;
+  }
+
   try {
     const pendingStr = localStorage.getItem('oauth_redirect_pending');
     const resultStr  = localStorage.getItem('oauth_result');

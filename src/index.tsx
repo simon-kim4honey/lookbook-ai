@@ -875,13 +875,15 @@ function getOrigin(c: any): string {
 app.get('/api/auth/kakao', (c) => {
   const origin = getOrigin(c)
   const mode = c.req.query('mode') || 'popup'  // popup | redirect
-  const redirectUri = `${origin}/api/auth/kakao/callback?mode=${mode}`
+  // ✅ redirect_uri는 mode 없이 고정 (카카오 콘솔 등록값과 정확히 일치)
+  const redirectUri = `${origin}/api/auth/kakao/callback`
   const clientId = c.env.KAKAO_CLIENT_ID || ''
   if (!clientId) {
     if (mode === 'redirect') return c.redirect(`/?oauth_error=kakao_no_key`)
     return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다.'},'*');window.close();</script>`)
   }
-  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`
+  // mode는 state 파라미터로 전달 (redirect_uri 변경 없이 mode 구분)
+  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}`
   return c.redirect(url)
 })
 
@@ -893,7 +895,8 @@ app.get('/api/auth/kakao/callback', async (c) => {
   const origin = getOrigin(c)
   const code = c.req.query('code')
   const error = c.req.query('error')
-  const mode = c.req.query('mode') || 'popup'  // popup | redirect
+  // ✅ mode는 state 파라미터에서 읽음 (redirect_uri에 포함하지 않음)
+  const mode = c.req.query('state') || 'popup'  // popup | redirect
 
   function errorResponse(msg: string) {
     if (mode === 'redirect') {
@@ -905,7 +908,8 @@ app.get('/api/auth/kakao/callback', async (c) => {
   if (error || !code) return errorResponse(error || 'cancelled')
 
   try {
-    const redirectUri = `${origin}/api/auth/kakao/callback?mode=${mode}`
+    // ✅ 토큰 교환용 redirect_uri도 mode 없이 고정
+    const redirectUri = `${origin}/api/auth/kakao/callback`
     // 토큰 교환
     const tokenRes = await fetch('https://kauth.kakao.com/oauth/token', {
       method: 'POST',
@@ -1009,16 +1013,19 @@ app.get('/api/auth/kakao/callback', async (c) => {
 app.get('/api/auth/google', (c) => {
   const origin = getOrigin(c)
   const mode = c.req.query('mode') || 'popup'
-  const redirectUri = `${origin}/api/auth/google/callback?mode=${mode}`
+  // ✅ redirect_uri는 mode 없이 고정 (구글 콘솔 등록값과 정확히 일치)
+  const redirectUri = `${origin}/api/auth/google/callback`
   const clientId = c.env.GOOGLE_CLIENT_ID || ''
   if (!clientId) {
     if (mode === 'redirect') return c.redirect(`/?oauth_error=google_no_key`)
     return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다.'},'*');window.close();</script>`)
   }
+  // mode는 state 파라미터로 전달 (redirect_uri 변경 없이 mode 구분)
   const params = new URLSearchParams({
     client_id: clientId, redirect_uri: redirectUri,
     response_type: 'code', scope: 'openid email profile',
     access_type: 'offline', prompt: 'select_account',
+    state: mode,
   })
   return c.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
 })
@@ -1031,7 +1038,8 @@ app.get('/api/auth/google/callback', async (c) => {
   const origin = getOrigin(c)
   const code = c.req.query('code')
   const error = c.req.query('error')
-  const mode = c.req.query('mode') || 'popup'
+  // ✅ mode는 state 파라미터에서 읽음 (redirect_uri에 포함하지 않음)
+  const mode = c.req.query('state') || 'popup'
 
   function errorResponse(msg: string) {
     if (mode === 'redirect') {
@@ -1043,7 +1051,8 @@ app.get('/api/auth/google/callback', async (c) => {
   if (error || !code) return errorResponse(error || 'cancelled')
 
   try {
-    const redirectUri = `${origin}/api/auth/google/callback?mode=${mode}`
+    // ✅ 토큰 교환용 redirect_uri도 mode 없이 고정
+    const redirectUri = `${origin}/api/auth/google/callback`
     // 토큰 교환
     const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
