@@ -1964,56 +1964,66 @@ footer {
   padding: 0;
 }
 .result-card {
-  border-radius: 0;
+  border-radius: var(--radius-md);
   overflow: hidden;
-  cursor: pointer;
-  position: relative;
   background: var(--gray-2);
   transition: var(--transition);
   width: 100%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-.result-card:hover .result-overlay { opacity: 1; }
+.result-card:hover {
+  box-shadow: 0 6px 20px rgba(0,0,0,0.13);
+  transform: translateY(-2px);
+}
 .result-thumb {
   width: 100%;
   overflow: hidden;
+  display: block;
 }
 .result-thumb img {
   width: 100%;
   height: auto;
   display: block;
-  object-fit: cover;
-  transition: transform 0.3s;
 }
-.result-card:hover .result-thumb img { transform: scale(1.02); }
-.result-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(transparent 40%, rgba(0,0,0,0.7));
-  opacity: 0;
-  transition: var(--transition);
+
+/* ── 이미지 하단 고정 버튼 영역 ── */
+.result-card-actions {
   display: flex;
-  align-items: flex-end;
-  padding: 16px;
   gap: 8px;
+  padding: 10px;
+  background: var(--white);
+  border-top: 1px solid var(--border-color, #eee);
 }
-.result-overlay-btn {
-  padding: 8px 14px;
+.result-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
   border-radius: var(--radius-md);
   border: none;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  -webkit-tap-highlight-color: transparent;
 }
-.result-overlay-btn.download { background: var(--white); color: var(--text-primary); }
-.result-overlay-btn.regen { background: rgba(99,102,241,0.85); color: white; backdrop-filter: blur(4px); }
-.result-overlay-btn.regen:hover { background: rgba(99,102,241,1); }
-/* .result-overlay-btn.enlarge 제거 — 캡처 방지 */
-.result-overlay-btn:hover { transform: scale(1.05); }
-.result-overlay-btn:active { transform: scale(0.93) !important; filter: brightness(0.88); transition: transform 0.08s, filter 0.08s; }
+.result-action-btn:active {
+  transform: scale(0.95) !important;
+  filter: brightness(0.88);
+}
+.result-action-btn.download {
+  background: var(--gray-2, #f4f4f6);
+  color: var(--text-primary);
+}
+.result-action-btn.download:hover { background: var(--gray-3, #e8e8ee); }
+.result-action-btn.regen {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(108,71,255,0.25);
+}
+.result-action-btn.regen:hover { background: var(--primary-light); }
 
 /* Image Modal — 확대 화면이 뷰포트를 넘지 않도록 */
 .image-modal .modal-box {

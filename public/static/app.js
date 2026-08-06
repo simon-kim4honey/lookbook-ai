@@ -1663,48 +1663,31 @@ function renderResults(images) {
     const card = document.createElement('div');
     card.className = 'result-card';
 
-    if (img.url) {
-      // 실제 생성된 이미지 (Atlas Cloud)
-      card.innerHTML = `
-        <div class="result-thumb" style="overflow:hidden;">
-          <img
+    const thumbContent = img.url
+      ? `<img
             src="${img.url}"
             alt="${img.title || `피팅컷 #${idx + 1}`}"
-            style="width:100%;height:100%;object-fit:cover;display:block;"
-            onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패<br/>프록시 오류</span></div>';"
-          />
-        </div>
-        <div class="result-overlay">
-          <button class="result-overlay-btn download" onclick="downloadWithCreditCheck(${idx}); event.stopPropagation();">
-            ⬇️ 다운로드
-          </button>
-          <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
-            🔄 재생성
-          </button>
-        </div>
-      `;
-    } else {
-      // 플레이스홀더 (폴백)
-      card.innerHTML = `
-        <div class="result-thumb">
-          <div style="width:100%;height:100%;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
-            <span style="font-size:48px;">✨</span>
-            <span style="color:rgba(255,255,255,0.9);font-size:13px;font-weight:700;">AI 생성 #${idx + 1}</span>
-            <span style="color:rgba(255,255,255,0.6);font-size:11px;">데모 이미지</span>
-          </div>
-        </div>
-        <div class="result-overlay">
-          <button class="result-overlay-btn download" onclick="downloadWithCreditCheck(${idx}); event.stopPropagation();">
-            ⬇️ 다운로드
-          </button>
-          <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
-            🔄 재생성
-          </button>
-        </div>
-      `;
-    }
+            style="width:100%;height:auto;display:block;"
+            onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패</span></div>');"
+          />`
+      : `<div style="width:100%;aspect-ratio:3/4;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+           <span style="font-size:48px;">✨</span>
+           <span style="color:rgba(255,255,255,0.9);font-size:13px;font-weight:700;">AI 생성 #${idx + 1}</span>
+           <span style="color:rgba(255,255,255,0.6);font-size:11px;">데모 이미지</span>
+         </div>`;
 
-    // 카드 클릭 확대 비활성화 (캡처 방지)
+    card.innerHTML = `
+      <div class="result-thumb">${thumbContent}</div>
+      <div class="result-card-actions">
+        <button class="result-action-btn download" onclick="downloadWithCreditCheck(${idx});">
+          <i class="fas fa-download"></i> 다운로드
+        </button>
+        <button class="result-action-btn regen" onclick="regenFromCard(${idx});">
+          <i class="fas fa-rotate-right"></i> 재생성
+        </button>
+      </div>
+    `;
+
     grid.appendChild(card);
   });
 }
