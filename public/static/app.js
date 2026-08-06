@@ -1207,7 +1207,6 @@ function renderBgGrid(bgs) {
       <img src="${imgSrc}" alt="${bg.name}"
         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="grid-card-fallback">🖼️</div>
-      <div class="grid-card-label">${bg.name}</div>
       <div class="grid-card-check"><i class="fas fa-check"></i></div>`;
 
     card.addEventListener('click', () => {
