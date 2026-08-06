@@ -161,6 +161,10 @@ function switchAuthTab(tab) {
   const tabLoginBtn = document.getElementById('tabLogin');
   const tabSignupBtn= document.getElementById('tabSignup');
 
+  // 탭 전환 시 에러 메시지 초기화
+  clearAuthError('loginError');
+  clearAuthError('signupError');
+
   if (tab === 'login') {
     if (loginForm)   loginForm.style.display  = '';
     if (signupForm)  signupForm.style.display = 'none';
@@ -326,12 +330,52 @@ function checkOAuthRedirectResult() {
 }
 
 /** 이메일 로그인 */
+/** 모달 내 에러 박스 표시/숨김 헬퍼 */
+function showAuthError(boxId, textId, msg) {
+  const box  = document.getElementById(boxId);
+  const text = document.getElementById(textId);
+  if (!box || !text) return;
+  text.textContent = msg;
+  box.className = 'auth-message error show';
+  // 아이콘이 없으면 추가
+  if (!box.querySelector('.auth-msg-icon')) {
+    const ico = document.createElement('span');
+    ico.className = 'auth-msg-icon';
+    ico.textContent = '❌';
+    box.insertBefore(ico, text);
+  }
+}
+function clearAuthError(boxId) {
+  const box = document.getElementById(boxId);
+  if (box) box.className = 'auth-message error';
+}
+
 async function handleLogin(e) {
   e.preventDefault();
-  const email    = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
-  const btn      = document.getElementById('loginBtn');
+  const emailEl    = document.getElementById('loginEmail');
+  const passwordEl = document.getElementById('loginPassword');
+  const email      = emailEl ? emailEl.value.trim() : '';
+  const password   = passwordEl ? passwordEl.value : '';
+  const btn        = document.getElementById('loginBtn');
 
+  // 클라이언트 유효성 검사
+  if (!email) {
+    showAuthError('loginError', 'loginErrorText', '이메일을 입력해주세요.');
+    if (emailEl) emailEl.focus();
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showAuthError('loginError', 'loginErrorText', '올바른 이메일 주소를 입력해주세요.');
+    if (emailEl) emailEl.focus();
+    return;
+  }
+  if (!password) {
+    showAuthError('loginError', 'loginErrorText', '비밀번호를 입력해주세요.');
+    if (passwordEl) passwordEl.focus();
+    return;
+  }
+
+  clearAuthError('loginError');
   btn.textContent = '로그인 중...';
   btn.disabled = true;
 
@@ -358,10 +402,17 @@ async function handleLogin(e) {
         setTimeout(() => window.location.href = '/dashboard', 800);
       }
     } else {
-      showToast(data.message || '이메일 또는 비밀번호가 올바르지 않습니다.', 'error');
+      // 서버 오류 메시지를 모달 안에 표시
+      const msg = data.message || '이메일 또는 비밀번호가 올바르지 않습니다.';
+      showAuthError('loginError', 'loginErrorText', msg);
+      // 비밀번호 오류면 비밀번호 필드 포커스
+      if (res.status === 401 && passwordEl) {
+        passwordEl.select();
+        passwordEl.focus();
+      }
     }
   } catch (err) {
-    showToast('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'error');
+    showAuthError('loginError', 'loginErrorText', '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   } finally {
     btn.textContent = '로그인';
     btn.disabled = false;
@@ -371,20 +422,37 @@ async function handleLogin(e) {
 /** 이메일 회원가입 */
 async function handleSignup(e) {
   e.preventDefault();
-  const name     = document.getElementById('signupName').value.trim();
-  const email    = document.getElementById('signupEmail').value.trim();
-  const password = document.getElementById('signupPassword').value;
-  const btn      = document.getElementById('signupBtn');
+  const nameEl     = document.getElementById('signupName');
+  const emailEl    = document.getElementById('signupEmail');
+  const passwordEl = document.getElementById('signupPassword');
+  const name       = nameEl     ? nameEl.value.trim()     : '';
+  const email      = emailEl    ? emailEl.value.trim()    : '';
+  const password   = passwordEl ? passwordEl.value        : '';
+  const btn        = document.getElementById('signupBtn');
 
+  // 클라이언트 유효성 검사
   if (!name) {
-    showToast('이름을 입력해주세요.', 'warning');
+    showAuthError('signupError', 'signupErrorText', '이름을 입력해주세요.');
+    if (nameEl) nameEl.focus();
+    return;
+  }
+  if (!email) {
+    showAuthError('signupError', 'signupErrorText', '이메일을 입력해주세요.');
+    if (emailEl) emailEl.focus();
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showAuthError('signupError', 'signupErrorText', '올바른 이메일 주소 형식이 아닙니다. (예: example@email.com)');
+    if (emailEl) emailEl.focus();
     return;
   }
   if (password.length < 8) {
-    showToast('비밀번호는 8자 이상이어야 합니다.', 'warning');
+    showAuthError('signupError', 'signupErrorText', '비밀번호는 8자 이상이어야 합니다.');
+    if (passwordEl) passwordEl.focus();
     return;
   }
 
+  clearAuthError('signupError');
   btn.textContent = '가입 중...';
   btn.disabled = true;
 
@@ -402,7 +470,7 @@ async function handleSignup(e) {
       localStorage.setItem('lookbook_user', JSON.stringify(data.user));
       updateUserUI();
       closeModal('loginModal');
-      showToast(`가입 완료! 무료 크레딧 5개를 드렸어요 🎁`, 'success');
+      showToast(`가입 완료! 무료 크레딧을 드렸어요 🎁`, 'success');
       // 가입 후 생성 재개
       if (AppState.pendingGeneration) {
         AppState.pendingGeneration = false;
@@ -411,10 +479,17 @@ async function handleSignup(e) {
         setTimeout(() => window.location.href = '/dashboard', 800);
       }
     } else {
-      showToast(data.message || '가입에 실패했습니다.', 'error');
+      // 서버 오류 메시지를 모달 안에 표시
+      const msg = data.message || '가입에 실패했습니다. 다시 시도해주세요.';
+      showAuthError('signupError', 'signupErrorText', msg);
+      // 중복 이메일이면 이메일 필드 포커스
+      if (res.status === 409 && emailEl) {
+        emailEl.select();
+        emailEl.focus();
+      }
     }
   } catch (err) {
-    showToast('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'error');
+    showAuthError('signupError', 'signupErrorText', '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   } finally {
     btn.textContent = '가입하고 무료 시작 🎁';
     btn.disabled = false;

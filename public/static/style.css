@@ -2052,10 +2052,45 @@ footer {
   position: fixed;
   top: 80px;
   right: 24px;
-  z-index: 9999;
+  z-index: 99999;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* 모달 내 인라인 에러/성공 메시지 박스 */
+.auth-message {
+  display: none;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  margin-bottom: 12px;
+  animation: fadeInDown 0.2s ease;
+}
+.auth-message.show { display: flex; }
+.auth-message.error {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #be123c;
+}
+.auth-message.warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+.auth-message.success {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+.auth-message .auth-msg-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .toast {
   display: flex;
