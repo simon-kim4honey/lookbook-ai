@@ -377,7 +377,7 @@ async function handleLogin(e) {
   }
 
   clearAuthError('loginError');
-  btn.textContent = '로그인 중...';
+  btn.innerHTML = '<span class="btn-spinner"></span> 로그인 중...';
   btn.disabled = true;
 
   try {
@@ -415,7 +415,7 @@ async function handleLogin(e) {
   } catch (err) {
     showAuthError('loginError', 'loginErrorText', '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   } finally {
-    btn.textContent = '로그인';
+    btn.innerHTML = '로그인';
     btn.disabled = false;
   }
 }
@@ -423,13 +423,17 @@ async function handleLogin(e) {
 /** 이메일 회원가입 */
 async function handleSignup(e) {
   e.preventDefault();
-  const nameEl     = document.getElementById('signupName');
-  const emailEl    = document.getElementById('signupEmail');
-  const passwordEl = document.getElementById('signupPassword');
-  const name       = nameEl     ? nameEl.value.trim()     : '';
-  const email      = emailEl    ? emailEl.value.trim()    : '';
-  const password   = passwordEl ? passwordEl.value        : '';
-  const btn        = document.getElementById('signupBtn');
+  const nameEl          = document.getElementById('signupName');
+  const emailEl         = document.getElementById('signupEmail');
+  const passwordEl      = document.getElementById('signupPassword');
+  const agreePrivacyEl  = document.getElementById('agreePrivacy');
+  const agreeMarketingEl= document.getElementById('agreeMarketing');
+  const name            = nameEl     ? nameEl.value.trim()     : '';
+  const email           = emailEl    ? emailEl.value.trim()    : '';
+  const password        = passwordEl ? passwordEl.value        : '';
+  const agreePrivacy    = agreePrivacyEl  ? agreePrivacyEl.checked  : false;
+  const agreeMarketing  = agreeMarketingEl? agreeMarketingEl.checked : false;
+  const btn             = document.getElementById('signupBtn');
 
   // 클라이언트 유효성 검사
   if (!name) {
@@ -452,16 +456,22 @@ async function handleSignup(e) {
     if (passwordEl) passwordEl.focus();
     return;
   }
+  // 개인정보 동의는 필수
+  if (!agreePrivacy) {
+    showAuthError('signupError', 'signupErrorText', '개인정보 수집 및 이용에 동의해주세요. (필수)');
+    if (agreePrivacyEl) agreePrivacyEl.focus();
+    return;
+  }
 
   clearAuthError('signupError');
-  btn.textContent = '가입 중...';
+  btn.innerHTML = '<span class="btn-spinner"></span> 가입 중...';
   btn.disabled = true;
 
   try {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password })
+      body: JSON.stringify({ name, email, password, agreeMarketing })
     });
     const data = await res.json();
 
@@ -492,7 +502,7 @@ async function handleSignup(e) {
   } catch (err) {
     showAuthError('signupError', 'signupErrorText', '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   } finally {
-    btn.textContent = '가입하고 무료 시작 🎁';
+    btn.innerHTML = '가입하고 무료 시작 🎁';
     btn.disabled = false;
   }
 }
@@ -1197,7 +1207,6 @@ function renderBgGrid(bgs) {
       <img src="${imgSrc}" alt="${bg.name}"
         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="grid-card-fallback">🖼️</div>
-      <div class="grid-card-label">${bg.name}</div>
       <div class="grid-card-check"><i class="fas fa-check"></i></div>`;
 
     card.addEventListener('click', () => {
@@ -1267,9 +1276,17 @@ function updateGenSummary() {
 async function startGeneration() {
   if (AppState.isGenerating) return;
 
+  // 생성 버튼 즉각 눌림 피드백
+  const nextBtn3 = document.getElementById('nextBtn3');
+  if (nextBtn3) {
+    nextBtn3.innerHTML = '<span class="btn-spinner"></span> 준비 중...';
+    nextBtn3.disabled = true;
+  }
+
   // ── 로그인 체크: 미로그인 시 모달 표시 후 리턴 ──
   if (!AppState.user) {
     AppState.pendingGeneration = true;
+    if (nextBtn3) { nextBtn3.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; nextBtn3.disabled = false; }
     openModal('loginModal');
     return;
   }
@@ -1440,6 +1457,8 @@ async function startGeneration() {
     // UI 복원
     const step3Nav = document.getElementById('step3Nav');
     if (step3Nav) step3Nav.style.display = '';
+    const nb3err = document.getElementById('nextBtn3');
+    if (nb3err) { nb3err.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; nb3err.disabled = false; }
     const genView = document.getElementById('generatingView');
     if (genView) genView.classList.remove('active');
   }
@@ -1548,9 +1567,11 @@ function completeGeneration(images, isFallback = false) {
 
   renderResults(proxiedImages);
 
-  // step3Nav 복원 (재생성 시 숨겼을 수 있으므로)
+  // step3Nav 복원 + 생성 버튼 상태 복원
   const step3NavEl = document.getElementById('step3Nav');
   if (step3NavEl) step3NavEl.style.display = '';
+  const nb3 = document.getElementById('nextBtn3');
+  if (nb3) { nb3.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; nb3.disabled = false; }
   // generatingView 숨김
   const genViewEl = document.getElementById('generatingView');
   if (genViewEl) genViewEl.style.display = 'none';
@@ -1641,48 +1662,31 @@ function renderResults(images) {
     const card = document.createElement('div');
     card.className = 'result-card';
 
-    if (img.url) {
-      // 실제 생성된 이미지 (Atlas Cloud)
-      card.innerHTML = `
-        <div class="result-thumb" style="overflow:hidden;">
-          <img
+    const thumbContent = img.url
+      ? `<img
             src="${img.url}"
             alt="${img.title || `피팅컷 #${idx + 1}`}"
-            style="width:100%;height:100%;object-fit:cover;display:block;"
-            onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.parentElement.innerHTML='<div style=\\'width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패<br/>프록시 오류</span></div>';"
-          />
-        </div>
-        <div class="result-overlay">
-          <button class="result-overlay-btn download" onclick="downloadWithCreditCheck(${idx}); event.stopPropagation();">
-            ⬇️ 다운로드
-          </button>
-          <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
-            🔄 재생성
-          </button>
-        </div>
-      `;
-    } else {
-      // 플레이스홀더 (폴백)
-      card.innerHTML = `
-        <div class="result-thumb">
-          <div style="width:100%;height:100%;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
-            <span style="font-size:48px;">✨</span>
-            <span style="color:rgba(255,255,255,0.9);font-size:13px;font-weight:700;">AI 생성 #${idx + 1}</span>
-            <span style="color:rgba(255,255,255,0.6);font-size:11px;">데모 이미지</span>
-          </div>
-        </div>
-        <div class="result-overlay">
-          <button class="result-overlay-btn download" onclick="downloadWithCreditCheck(${idx}); event.stopPropagation();">
-            ⬇️ 다운로드
-          </button>
-          <button class="result-overlay-btn regen" onclick="regenFromCard(${idx}); event.stopPropagation();" title="재생성">
-            🔄 재생성
-          </button>
-        </div>
-      `;
-    }
+            style="width:100%;height:auto;display:block;"
+            onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패</span></div>');"
+          />`
+      : `<div style="width:100%;aspect-ratio:3/4;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+           <span style="font-size:48px;">✨</span>
+           <span style="color:rgba(255,255,255,0.9);font-size:13px;font-weight:700;">AI 생성 #${idx + 1}</span>
+           <span style="color:rgba(255,255,255,0.6);font-size:11px;">데모 이미지</span>
+         </div>`;
 
-    // 카드 클릭 확대 비활성화 (캡처 방지)
+    card.innerHTML = `
+      <div class="result-thumb">${thumbContent}</div>
+      <div class="result-card-actions">
+        <button class="result-action-btn download" onclick="downloadWithCreditCheck(${idx});">
+          <i class="fas fa-download"></i> 다운로드
+        </button>
+        <button class="result-action-btn regen" onclick="regenFromCard(${idx});">
+          <i class="fas fa-rotate-right"></i> 재생성
+        </button>
+      </div>
+    `;
+
     grid.appendChild(card);
   });
 }
@@ -1832,26 +1836,67 @@ async function downloadWithCreditCheck(idx) {
 function downloadSingleImage(url, num) { _doFileDownload(url, num); }
 function downloadSingle(num) { showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success'); }
 
-function downloadAll() {
-  const count = AppState.generatedImages.length;
-  // 실제 이미지가 있는 경우 순차 다운로드 시도
+// ─── 전체 다운로드: 이미지 1장씩 크레딧 차감 후 순차 다운로드 ───
+async function downloadAll() {
   const realImages = AppState.generatedImages.filter(img => img.url);
-  if (realImages.length > 0) {
-    realImages.forEach((img, idx) => {
-      setTimeout(() => {
-        const dlUrl = img.url.includes('/api/proxy/gen-image')
-          ? img.url + (img.url.includes('?') ? '&' : '?') + 'download=1'
-          : img.url;
-        const a = document.createElement('a');
-        a.href = dlUrl;
-        a.download = `lookbook_ai_fitting_${idx + 1}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }, idx * 500);
-    });
+  if (!realImages.length) {
+    showToast('다운로드할 이미지가 없습니다.', 'error');
+    return;
   }
-  showToast(`${count}장 다운로드를 시작합니다. (1792 × 2400px 원본)`, 'success');
+
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast('로그인이 필요합니다.', 'error');
+    return;
+  }
+
+  showToast(`${realImages.length}장 다운로드를 시작합니다. 이미지당 90크레딧이 차감됩니다.`, 'info');
+
+  let successCount = 0;
+  for (let i = 0; i < realImages.length; i++) {
+    const img = realImages[i];
+    try {
+      const deductRes = await fetch('/api/credits/deduct', {
+        method: 'POST',
+        headers: { 'X-Session-Token': sessionToken },
+      });
+
+      if (deductRes.status === 401) {
+        showToast('로그인이 필요합니다.', 'error');
+        return;
+      }
+      if (deductRes.status === 402) {
+        const errData = await deductRes.json();
+        const have = errData.available ?? 0;
+        showToast(`크레딧 부족으로 ${i}장만 다운로드했습니다. (보유: ${have}크레딧 / 필요: 90크레딧)`, 'error');
+        return;
+      }
+      if (!deductRes.ok) {
+        showToast(`${i + 1}번 이미지 크레딧 처리 오류`, 'error');
+        continue;
+      }
+
+      const deductData = await deductRes.json();
+      // 크레딧 UI 갱신
+      if (deductData.creditsRemaining !== undefined) {
+        const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+        if (cachedUser) { cachedUser.credits = deductData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+        if (AppState.user) AppState.user.credits = deductData.creditsRemaining;
+        updateUserUI({ credits: deductData.creditsRemaining });
+      }
+
+      // 파일 다운로드
+      await new Promise(resolve => setTimeout(resolve, i * 600));
+      _doFileDownload(img.url, i + 1);
+      successCount++;
+    } catch (err) {
+      console.error(`downloadAll error at index ${i}:`, err);
+    }
+  }
+
+  if (successCount > 0) {
+    showToast(`${successCount}장 다운로드 완료!`, 'success');
+  }
 }
 
 async function downloadImage() {
@@ -1971,7 +2016,9 @@ async function regenImage() {
     regenBtn.disabled = true;
     regenBtn.style.opacity = '0.6';
   }
-  if (regenBtnText) regenBtnText.textContent = '재생성 중...';
+  if (regenBtnText) {
+    regenBtnText.innerHTML = '<span class="btn-spinner" style="width:14px;height:14px;border-width:2px;"></span> 재생성 중...';
+  }
   if (regenCounter) regenCounter.textContent = '';
 
   const sessionToken = localStorage.getItem('lookbook_token') || '';
