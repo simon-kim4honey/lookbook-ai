@@ -4,6 +4,319 @@
    =================================================== */
 
 // ─────────────────────────────────────────────────────────
+// i18n — 다국어 번역 테이블
+// ─────────────────────────────────────────────────────────
+const I18N = {
+  ko: {
+    // 공통
+    loading: '불러오는 중...',
+    error: '오류',
+    close: '닫기',
+    cancel: '취소',
+    confirm: '확인',
+    // 인증
+    welcome: (name) => `환영합니다, ${name}님! 🎉`,
+    loginRequired: '로그인이 필요합니다.',
+    loginFailed: '소셜 로그인에 실패했습니다. 다시 시도해주세요.',
+    loggingIn: '로그인 중...',
+    loginBtn: '로그인',
+    loggedOut: '로그아웃 되었습니다.',
+    signingUp: '가입 중...',
+    signupDone: '가입 완료! 무료 크레딧을 드렸어요 🎁',
+    signupBtn: '가입하고 무료 시작 🎁',
+    // 크레딧
+    creditsLeft: (n) => `${n}크레딧 남음`,
+    creditsUnit: (n) => `${n.toLocaleString()} 크레딧`,
+    creditShort: (n) => `${n.toLocaleString()}`,
+    creditInsufficient: (need, have) => `크레딧이 부족합니다. 필요: ${need}크레딧 / 보유: ${have}크레딧`,
+    creditInsufficientDetail: (have) => `크레딧이 부족합니다. (보유: ${have}크레딧 / 필요: 90크레딧) 대시보드에서 충전해 주세요.`,
+    creditDeductDone: (remain) => `다운로드 완료! (90크레딧 차감, 잔액: ${remain}크레딧)`,
+    creditError: '크레딧 처리 중 오류가 발생했습니다.',
+    creditLackPartial: (n, have) => `크레딧 부족으로 ${n}장만 다운로드했습니다. (보유: ${have}크레딧 / 필요: 90크레딧)`,
+    creditErrNum: (n) => `${n}번 이미지 크레딧 처리 오류`,
+    selectPackage: '패키지를 선택하세요',
+    // 업로드
+    uploadFormatErr: 'JPG, PNG, WEBP 형식만 지원합니다.',
+    uploadSizeErr: '파일 크기는 10MB 이하여야 합니다.',
+    uploadDone: (label) => `${label} 업로드 완료`,
+    uploadHint: '상의·하의·전체(원피스/세트) 중 하나 이상 업로드해주세요.',
+    // 모델/배경
+    noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">No models registered</p><p style="font-size:12px;margin-top:4px">Please register models in the admin page</p>',
+    modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load models</p><p style="font-size:13px">Please try again later</p></div>',
+    noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 배경이 없습니다</p><p style="font-size:13px">관리자 페이지에서 배경을 먼저 등록해주세요</p></div>',
+    bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">배경 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
+    skipCard: '선택 없음<br>(랜덤)',
+    randomModel: (name) => `랜덤 모델이 선택됐습니다: ${name}`,
+    randomBg: (name) => `랜덤 배경이 선택됐습니다: ${name}`,
+    randomAssigned: '랜덤 자동 배정',
+    // 생성
+    generating: '준비 중...',
+    genStart: '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작',
+    genError: (msg) => `생성 중 오류: ${msg}`,
+    genDoneDemo: (n) => `${n}장의 이미지가 생성되었습니다. (데모 모드) 🎉`,
+    genDone: (n) => `${n}장의 실사 AI 이미지가 생성되었습니다! 🎉`,
+    genStyleHint: '스타일샷 세트를 추가 생성하려면 아래 버튼을 클릭하세요.',
+    fitLabel: (n) => `피팅컷 (${n})`,
+    regenBtn: '재생성',
+    regenIng: '<span class="btn-spinner" style="width:14px;height:14px;border-width:2px;"></span> 재생성 중...',
+    regenLimitErr: '재생성 한도가 초과하였습니다. 다른 옷으로 시도해주세요.',
+    regenNoInfo: '재생성할 이미지 정보가 없습니다.',
+    regenFail: (msg) => msg || '재생성 요청 실패',
+    regenNoJobId: '재생성 요청 실패: Job ID 없음',
+    regenStart: (n, max) => `재생성 시작! (${n}/${max})`,
+    regenErr: (msg) => `재생성 오류: ${msg}`,
+    // 다운로드
+    downloadStart: (n) => `피팅컷 #${n} 다운로드를 시작합니다.`,
+    downloadNoImg: '다운로드할 이미지가 없습니다.',
+    downloadImgNotFound: '이미지를 찾을 수 없습니다.',
+    downloadMultiStart: (n) => `${n}장 다운로드를 시작합니다. 이미지당 90크레딧이 차감됩니다.`,
+    downloadDone: (n) => `${n}장 다운로드 완료!`,
+    downloadErr: '다운로드 중 오류가 발생했습니다.',
+    downloadIng: '<i class="fas fa-spinner fa-spin"></i> 처리 중...',
+    downloadBtn: '<i class="fas fa-download"></i> 다운로드',
+    downloadSingle: '이미지를 다운로드합니다.',
+    // 즐겨찾기
+    favAdd: '즐겨찾기에 추가되었습니다.',
+    favRemove: '즐겨찾기에서 제거되었습니다.',
+    favIcon: (isFav) => isFav ? '❤️' : '🤍',
+    // 결제
+    payFail: (msg) => msg || '결제 중 오류가 발생했습니다.',
+    paySelectPkg: '패키지를 선택해주세요.',
+    // 프로젝트
+    projectDownload: '이미지를 다운로드합니다.',
+    projectOpen: (name) => `"${name}" 프로젝트를 엽니다.`,
+  },
+  en: {
+    loading: 'Loading...',
+    error: 'Error',
+    close: 'Close',
+    cancel: 'Cancel',
+    confirm: 'OK',
+    welcome: (name) => `Welcome, ${name}! 🎉`,
+    loginRequired: 'Login required.',
+    loginFailed: 'Social login failed. Please try again.',
+    loggingIn: 'Signing in...',
+    loginBtn: 'Sign In',
+    loggedOut: 'You have been logged out.',
+    signingUp: 'Creating account...',
+    signupDone: 'Account created! Free credits added 🎁',
+    signupBtn: 'Start Free 🎁',
+    creditsLeft: (n) => `${n} credits left`,
+    creditsUnit: (n) => `${n.toLocaleString()} credits`,
+    creditShort: (n) => `${n.toLocaleString()}`,
+    creditInsufficient: (need, have) => `Insufficient credits. Need: ${need} / Have: ${have}`,
+    creditInsufficientDetail: (have) => `Insufficient credits. (Have: ${have} / Need: 90) Please top up on the dashboard.`,
+    creditDeductDone: (remain) => `Download complete! (90 credits used, balance: ${remain})`,
+    creditError: 'An error occurred while processing credits.',
+    creditLackPartial: (n, have) => `Only ${n} image(s) downloaded due to insufficient credits. (Have: ${have} / Need: 90)`,
+    creditErrNum: (n) => `Credit processing error for image #${n}`,
+    selectPackage: 'Select a package',
+    uploadFormatErr: 'Only JPG, PNG, WEBP formats are supported.',
+    uploadSizeErr: 'File size must be 10MB or less.',
+    uploadDone: (label) => `${label} uploaded`,
+    uploadHint: 'Please upload at least one of: top, bottom, or full outfit.',
+    noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">No models registered</p><p style="font-size:12px;margin-top:4px">Please register models in the admin page</p>',
+    modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load models</p><p style="font-size:13px">Please try again later</p></div>',
+    noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">No backgrounds registered</p><p style="font-size:13px">Please add backgrounds in the admin page</p></div>',
+    bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load backgrounds</p><p style="font-size:13px">Please try again later</p></div>',
+    skipCard: 'No selection<br>(Random)',
+    randomModel: (name) => `Random model selected: ${name}`,
+    randomBg: (name) => `Random background selected: ${name}`,
+    randomAssigned: 'Randomly assigned',
+    generating: 'Preparing...',
+    genStart: '<i class="fas fa-wand-magic-sparkles"></i> Start AI Generation',
+    genError: (msg) => `Generation error: ${msg}`,
+    genDoneDemo: (n) => `${n} image(s) generated. (Demo mode) 🎉`,
+    genDone: (n) => `${n} AI image(s) generated! 🎉`,
+    genStyleHint: 'Click the button below to generate additional style shots.',
+    fitLabel: (n) => `Fitting Shots (${n})`,
+    regenBtn: 'Regenerate',
+    regenIng: '<span class="btn-spinner" style="width:14px;height:14px;border-width:2px;"></span> Regenerating...',
+    regenLimitErr: 'Regeneration limit reached. Please try different clothes.',
+    regenNoInfo: 'No image info available for regeneration.',
+    regenFail: (msg) => msg || 'Regeneration request failed',
+    regenNoJobId: 'Regeneration failed: No Job ID',
+    regenStart: (n, max) => `Regenerating! (${n}/${max})`,
+    regenErr: (msg) => `Regeneration error: ${msg}`,
+    downloadStart: (n) => `Starting download of fitting shot #${n}.`,
+    downloadNoImg: 'No images to download.',
+    downloadImgNotFound: 'Image not found.',
+    downloadMultiStart: (n) => `Starting download of ${n} image(s). 90 credits per image.`,
+    downloadDone: (n) => `${n} image(s) downloaded!`,
+    downloadErr: 'An error occurred while downloading.',
+    downloadIng: '<i class="fas fa-spinner fa-spin"></i> Processing...',
+    downloadBtn: '<i class="fas fa-download"></i> Download',
+    downloadSingle: 'Downloading image.',
+    favAdd: 'Added to favorites.',
+    favRemove: 'Removed from favorites.',
+    favIcon: (isFav) => isFav ? '❤️' : '🤍',
+    payFail: (msg) => msg || 'An error occurred during payment.',
+    paySelectPkg: 'Please select a package.',
+    projectDownload: 'Downloading images.',
+    projectOpen: (name) => `Opening project "${name}".`,
+  },
+  ja: {
+    loading: '読み込み中...',
+    error: 'エラー',
+    close: '閉じる',
+    cancel: 'キャンセル',
+    confirm: '確認',
+    welcome: (name) => `ようこそ、${name}さん！ 🎉`,
+    loginRequired: 'ログインが必要です。',
+    loginFailed: 'ソーシャルログインに失敗しました。再試行してください。',
+    loggingIn: 'ログイン中...',
+    loginBtn: 'ログイン',
+    loggedOut: 'ログアウトしました。',
+    signingUp: '登録中...',
+    signupDone: '登録完了！無料クレジットをプレゼント 🎁',
+    signupBtn: '無料で始める 🎁',
+    creditsLeft: (n) => `${n}クレジット残り`,
+    creditsUnit: (n) => `${n.toLocaleString()}クレジット`,
+    creditShort: (n) => `${n.toLocaleString()}`,
+    creditInsufficient: (need, have) => `クレジットが不足しています。必要: ${need} / 保有: ${have}`,
+    creditInsufficientDetail: (have) => `クレジットが不足しています。(保有: ${have} / 必要: 90) ダッシュボードでチャージしてください。`,
+    creditDeductDone: (remain) => `ダウンロード完了！(90クレジット消費、残高: ${remain})`,
+    creditError: 'クレジット処理中にエラーが発生しました。',
+    creditLackPartial: (n, have) => `クレジット不足のため${n}枚のみダウンロードしました。(保有: ${have} / 必要: 90)`,
+    creditErrNum: (n) => `画像${n}番のクレジット処理エラー`,
+    selectPackage: 'パッケージを選択',
+    uploadFormatErr: 'JPG、PNG、WEBP形式のみ対応しています。',
+    uploadSizeErr: 'ファイルサイズは10MB以下にしてください。',
+    uploadDone: (label) => `${label}をアップロードしました`,
+    uploadHint: 'トップス・ボトムス・全身のいずれかをアップロードしてください。',
+    noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">モデルが登録されていません</p><p style="font-size:12px;margin-top:4px">管理ページでモデルを登録してください</p>',
+    modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">モデルの読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
+    noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景が登録されていません</p><p style="font-size:13px">管理ページで背景を登録してください</p></div>',
+    bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景の読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
+    skipCard: '選択なし<br>(ランダム)',
+    randomModel: (name) => `ランダムモデルが選択されました: ${name}`,
+    randomBg: (name) => `ランダム背景が選択されました: ${name}`,
+    randomAssigned: 'ランダム自動割り当て',
+    generating: '準備中...',
+    genStart: '<i class="fas fa-wand-magic-sparkles"></i> AI生成スタート',
+    genError: (msg) => `生成エラー: ${msg}`,
+    genDoneDemo: (n) => `${n}枚の画像が生成されました。(デモモード) 🎉`,
+    genDone: (n) => `${n}枚のAI画像が生成されました！ 🎉`,
+    genStyleHint: '下のボタンをクリックして追加スタイルショットを生成してください。',
+    fitLabel: (n) => `フィッティングショット (${n})`,
+    regenBtn: '再生成',
+    regenIng: '<span class="btn-spinner" style="width:14px;height:14px;border-width:2px;"></span> 再生成中...',
+    regenLimitErr: '再生成の上限に達しました。別の服で試してください。',
+    regenNoInfo: '再生成する画像情報がありません。',
+    regenFail: (msg) => msg || '再生成リクエスト失敗',
+    regenNoJobId: '再生成失敗: Job ID なし',
+    regenStart: (n, max) => `再生成スタート！(${n}/${max})`,
+    regenErr: (msg) => `再生成エラー: ${msg}`,
+    downloadStart: (n) => `フィッティングショット #${n} のダウンロードを開始します。`,
+    downloadNoImg: 'ダウンロードする画像がありません。',
+    downloadImgNotFound: '画像が見つかりません。',
+    downloadMultiStart: (n) => `${n}枚のダウンロードを開始します。1枚あたり90クレジット消費。`,
+    downloadDone: (n) => `${n}枚のダウンロード完了！`,
+    downloadErr: 'ダウンロード中にエラーが発生しました。',
+    downloadIng: '<i class="fas fa-spinner fa-spin"></i> 処理中...',
+    downloadBtn: '<i class="fas fa-download"></i> ダウンロード',
+    downloadSingle: '画像をダウンロードします。',
+    favAdd: 'お気に入りに追加しました。',
+    favRemove: 'お気に入りから削除しました。',
+    favIcon: (isFav) => isFav ? '❤️' : '🤍',
+    payFail: (msg) => msg || '決済中にエラーが発生しました。',
+    paySelectPkg: 'パッケージを選択してください。',
+    projectDownload: '画像をダウンロードします。',
+    projectOpen: (name) => `プロジェクト「${name}」を開きます。`,
+  }
+};
+
+// t() — 현재 locale의 번역 키 반환
+// 값이 함수면 인자 전달, 문자열이면 그대로 반환
+let _locale = 'ko'; // 기본값, initLocale()에서 갱신
+function t(key, ...args) {
+  const dict = I18N[_locale] || I18N['en'];
+  const val = dict[key] ?? I18N['en'][key] ?? key;
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+async function initLocale() {
+  try {
+    const res = await fetch('/api/locale');
+    const data = await res.json();
+    _locale = data.locale || 'ko';
+  } catch (e) {
+    _locale = 'ko';
+  }
+  // HTML lang 속성 설정
+  document.documentElement.lang = _locale;
+  // data-i18n 속성 정적 텍스트 교체
+  applyStaticI18n();
+}
+
+// data-i18n 속성 기반 정적 텍스트 교체
+// index.tsx HTML에 data-i18n="key" 지정 시 자동 적용
+const STATIC_I18N = {
+  // 네비게이션
+  'nav-home':        { ko: '홈', en: 'Home', ja: 'ホーム' },
+  'nav-studio':      { ko: '스튜디오', en: 'Studio', ja: 'スタジオ' },
+  'nav-dashboard':   { ko: '대시보드', en: 'Dashboard', ja: 'ダッシュボード' },
+  'nav-login':       { ko: '로그인', en: 'Sign In', ja: 'ログイン' },
+  'nav-signup':      { ko: '무료 시작', en: 'Get Started', ja: '無料で始める' },
+  'nav-logout':      { ko: '로그아웃', en: 'Sign Out', ja: 'ログアウト' },
+  // Step 레이블
+  'step1-label':     { ko: 'Step 1 / 3 · 의상 업로드', en: 'Step 1 / 3 · Upload Clothes', ja: 'Step 1 / 3 · 服をアップロード' },
+  'step2-label':     { ko: 'Step 2 / 3 · 모델 선택', en: 'Step 2 / 3 · Select Model', ja: 'Step 2 / 3 · モデル選択' },
+  'step3-label':     { ko: 'Step 3 / 3 · 배경 선택', en: 'Step 3 / 3 · Select Background', ja: 'Step 3 / 3 · 背景選択' },
+  'step1-title':     { ko: '의상 이미지를 업로드하세요', en: 'Upload your clothing images', ja: '服の画像をアップロード' },
+  'step2-title':     { ko: 'AI 모델을 선택하세요', en: 'Select an AI model', ja: 'AIモデルを選択してください' },
+  'step3-title':     { ko: '배경을 선택하세요', en: 'Select a background', ja: '背景を選択してください' },
+  // 버튼
+  'btn-prev':        { ko: '이전', en: 'Back', ja: '戻る' },
+  'btn-next':        { ko: '다음 단계', en: 'Next', ja: '次へ' },
+  'btn-gen':         { ko: 'AI 생성 시작', en: 'Start AI Generation', ja: 'AI生成スタート' },
+  'btn-regen':       { ko: '재생성', en: 'Regenerate', ja: '再生成' },
+  'btn-download':    { ko: '다운로드', en: 'Download', ja: 'ダウンロード' },
+  'btn-download-all':{ ko: '전체 다운로드', en: 'Download All', ja: '全てダウンロード' },
+  // 업로드 슬롯
+  'slot-top':        { ko: '상의', en: 'Top', ja: 'トップス' },
+  'slot-bottom':     { ko: '하의', en: 'Bottom', ja: 'ボトムス' },
+  'slot-full':       { ko: '전체(원피스/세트)', en: 'Full Outfit', ja: '全身(ワンピース/セット)' },
+  'slot-hint':       { ko: '이미지를 드래그하거나 클릭하여 업로드', en: 'Drag & drop or click to upload', ja: 'ドラッグ＆ドロップまたはクリックしてアップロード' },
+  // 생성 화면
+  'gen-loading':     { ko: '모델 불러오는 중...', en: 'Loading models...', ja: 'モデルを読み込み中...' },
+  'bg-loading':      { ko: '배경 불러오는 중...', en: 'Loading backgrounds...', ja: '背景を読み込み中...' },
+  'gen-status-init': { ko: '시작 중...', en: 'Starting...', ja: '開始中...' },
+  // 결제 패널
+  'charge-title':    { ko: '크레딧 충전', en: 'Top Up Credits', ja: 'クレジットチャージ' },
+  'charge-current':  { ko: '현재 보유 크레딧', en: 'Current Credits', ja: '現在のクレジット' },
+  'pkg-popular':     { ko: '인기', en: 'Popular', ja: '人気' },
+  'pkg-btn':         { ko: '패키지를 선택하세요', en: 'Select a package', ja: 'パッケージを選択' },
+  // 로그인/회원가입
+  'login-title':     { ko: '로그인', en: 'Sign In', ja: 'ログイン' },
+  'signup-title':    { ko: '회원가입', en: 'Create Account', ja: 'アカウント作成' },
+  'agree-all':       { ko: '전체 동의', en: 'Agree to All', ja: '全て同意' },
+  'agree-privacy':   { ko: '개인정보처리방침 동의 (필수)', en: 'Privacy Policy (Required)', ja: 'プライバシーポリシーに同意 (必須)' },
+  'agree-marketing': { ko: '프로모션 이메일 수신 동의 (선택)', en: 'Marketing Emails (Optional)', ja: 'プロモーションメール受信 (任意)' },
+  // 대시보드
+  'dash-title':      { ko: '대시보드', en: 'Dashboard', ja: 'ダッシュボード' },
+  'dash-credits':    { ko: '보유 크레딧', en: 'Your Credits', ja: '保有クレジット' },
+  'dash-history':    { ko: '생성 내역', en: 'Generation History', ja: '生成履歴' },
+  'dash-no-history': { ko: '생성 내역이 없습니다', en: 'No generation history', ja: '生成履歴がありません' },
+};
+
+function applyStaticI18n() {
+  const lang = _locale;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const map = STATIC_I18N[key];
+    if (!map) return;
+    const text = map[lang] || map['en'] || '';
+    // placeholder 속성인지 체크
+    if (el.hasAttribute('placeholder')) {
+      el.setAttribute('placeholder', text);
+    } else {
+      el.innerHTML = text;
+    }
+  });
+}
+
+// ─────────────────────────────────────────────────────────
 // GLOBAL STATE
 // ─────────────────────────────────────────────────────────
 const AppState = {
@@ -54,7 +367,7 @@ const SAMPLE_PROJECTS = [
 // INITIALIZATION
 // ─────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  initPage();
+  initLocale().then(() => initPage());
 });
 
 function initPage() {
@@ -233,7 +546,7 @@ function oauthLogin(provider) {
     localStorage.removeItem('oauth_result');
     updateUserUI();
     closeModal('loginModal');
-    showToast(`환영합니다, ${user.name}님! 🎉`, 'success');
+    showToast(t('welcome', user.name), 'success');
     if (AppState.pendingGeneration) {
       AppState.pendingGeneration = false;
       setTimeout(() => startGeneration(), 300);
@@ -250,7 +563,7 @@ function oauthLogin(provider) {
     } else if (e.data?.type === 'oauth_error') {
       clearInterval(checkClosed);
       window.removeEventListener('message', onMessage);
-      showToast('소셜 로그인에 실패했습니다. 다시 시도해주세요.', 'error');
+      showToast(t('loginFailed'), 'error');
     }
   };
 
@@ -285,7 +598,7 @@ function checkOAuthRedirectResult() {
     const cleanUrl = window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
     localStorage.removeItem('oauth_redirect_pending');
-    showToast('소셜 로그인에 실패했습니다. 다시 시도해주세요.', 'error');
+    showToast(t('loginFailed'), 'error');
     return;
   }
 
@@ -313,7 +626,7 @@ function checkOAuthRedirectResult() {
       localStorage.setItem('lookbook_token', token);
       localStorage.setItem('lookbook_user', JSON.stringify(user));
       updateUserUI();
-      showToast(`환영합니다, ${user.name}님! 🎉`, 'success');
+      showToast(t('welcome', user.name), 'success');
       if (pending.pendingGeneration) {
         AppState.pendingGeneration = false;
         setTimeout(() => startGeneration(), 300);
@@ -321,7 +634,7 @@ function checkOAuthRedirectResult() {
         setTimeout(() => window.location.href = '/dashboard', 800);
       }
     } else if (data?.type === 'oauth_error') {
-      showToast('소셜 로그인에 실패했습니다. 다시 시도해주세요.', 'error');
+      showToast(t('loginFailed'), 'error');
     }
   } catch(e) {
     localStorage.removeItem('oauth_redirect_pending');
@@ -377,7 +690,7 @@ async function handleLogin(e) {
   }
 
   clearAuthError('loginError');
-  btn.innerHTML = '<span class="btn-spinner"></span> 로그인 중...';
+  btn.innerHTML = '<span class="btn-spinner"></span> ' + t('loggingIn');
   btn.disabled = true;
 
   try {
@@ -394,7 +707,7 @@ async function handleLogin(e) {
       localStorage.setItem('lookbook_user', JSON.stringify(data.user));
       updateUserUI();
       closeModal('loginModal');
-      showToast(`환영합니다, ${data.user.name}님! 🎉`, 'success');
+      showToast(t('welcome', data.user.name), 'success');
       // 로그인 후 생성 재개
       if (AppState.pendingGeneration) {
         AppState.pendingGeneration = false;
@@ -415,7 +728,7 @@ async function handleLogin(e) {
   } catch (err) {
     showAuthError('loginError', 'loginErrorText', '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   } finally {
-    btn.innerHTML = '로그인';
+    btn.innerHTML = t('loginBtn');
     btn.disabled = false;
   }
 }
@@ -490,7 +803,7 @@ async function handleSignup(e) {
   }
 
   clearAuthError('signupError');
-  btn.innerHTML = '<span class="btn-spinner"></span> 가입 중...';
+  btn.innerHTML = '<span class="btn-spinner"></span> ' + t('signingUp');
   btn.disabled = true;
 
   try {
@@ -507,7 +820,7 @@ async function handleSignup(e) {
       localStorage.setItem('lookbook_user', JSON.stringify(data.user));
       updateUserUI();
       closeModal('loginModal');
-      showToast(`가입 완료! 무료 크레딧을 드렸어요 🎁`, 'success');
+      showToast(t('signupDone'), 'success');
       // 가입 후 생성 재개
       if (AppState.pendingGeneration) {
         AppState.pendingGeneration = false;
@@ -528,7 +841,7 @@ async function handleSignup(e) {
   } catch (err) {
     showAuthError('signupError', 'signupErrorText', '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
   } finally {
-    btn.innerHTML = '가입하고 무료 시작 🎁';
+    btn.innerHTML = t('signupBtn');
     btn.disabled = false;
   }
 }
@@ -553,7 +866,7 @@ async function handleLogout() {
   localStorage.removeItem('lookbook_token');
   localStorage.removeItem('lookbook_user');
   updateUserUI();
-  showToast('로그아웃 되었습니다.', 'info');
+  showToast(t('loggedOut'), 'info');
   setTimeout(() => window.location.href = '/', 600);
 }
 
@@ -591,7 +904,7 @@ function updateUserUI(partial) {
     const ddCredits = document.getElementById('ddUserCredits');
     if (ddName)    ddName.textContent    = user.name || user.email;
     if (ddEmail)   ddEmail.textContent   = user.email || '';
-    if (ddCredits) ddCredits.textContent = `${user.credits ?? 0}크레딧 남음`;
+    if (ddCredits) ddCredits.textContent = t('creditsLeft', user.credits ?? 0);
 
     // 사이드바 크레딧 표시 업데이트 (dashboard / generator 공통)
     const sidebarAmt = document.getElementById('sidebarCreditAmount');
@@ -723,7 +1036,7 @@ function renderProjects(projects) {
       </div>
       <div class="project-actions">
         ${p.status === 'done' ?
-          `<button class="project-action-btn" onclick="showToast('이미지를 다운로드합니다.', 'success'); event.stopPropagation();">다운로드</button>
+          `<button class="project-action-btn" onclick="showToast(t('downloadSingle'), 'success'); event.stopPropagation();">다운로드</button>
            <button class="project-action-btn primary" onclick="window.location.href='/generator'; event.stopPropagation();">재생성</button>` :
           p.status === 'processing' ?
           `<button class="project-action-btn" disabled>생성중...</button>
@@ -732,7 +1045,7 @@ function renderProjects(projects) {
         }
       </div>
     `;
-    card.addEventListener('click', () => showToast(`"${p.name}" 프로젝트를 엽니다.`, 'info'));
+    card.addEventListener('click', () => showToast(t('projectOpen', p.name), 'info'));
     grid.appendChild(card);
   });
 }
@@ -781,7 +1094,7 @@ async function loadModelsFromAPI() {
     if (AppState.allModels.length === 0) {
       if (loading) {
         loading.style.display = '';
-        loading.innerHTML = '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">등록된 모델이 없습니다</p><p style="font-size:12px;margin-top:4px">관리자 페이지에서 모델을 등록해주세요</p>';
+        loading.innerHTML = t('noModels');
       }
     } else {
       showGrid('modelsLoading', 'modelGrid', () => renderModelGrid(AppState.allModels));
@@ -791,7 +1104,7 @@ async function loadModelsFromAPI() {
     const loading = document.getElementById('modelsLoading');
     if (loading) {
       loading.style.display = '';
-      loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">모델 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>';
+      loading.innerHTML = t('modelLoadFail');
     }
   }
 }
@@ -813,7 +1126,7 @@ async function loadBackgroundsFromAPI() {
     if (AppState.allBackgrounds.length === 0) {
       if (loading) {
         loading.style.display = '';
-        loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 배경이 없습니다</p><p style="font-size:13px">관리자 페이지에서 배경을 먼저 등록해주세요</p></div>';
+        loading.innerHTML = t('noBgs');
       }
     } else {
       showGrid('bgsLoading', 'bgGrid', () => renderBgGrid(AppState.allBackgrounds));
@@ -823,7 +1136,7 @@ async function loadBackgroundsFromAPI() {
     const loading = document.getElementById('bgsLoading');
     if (loading) {
       loading.style.display = '';
-      loading.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">배경 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>';
+      loading.innerHTML = t('bgLoadFail');
     }
   }
 }
@@ -853,7 +1166,7 @@ function nextStep(currentStep) {
   if (currentStep === 1) {
     const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null);
     if (!hasAny) {
-      showToast('상의·하의·전체(원피스/세트) 중 하나 이상 업로드해주세요.', 'warning');
+      showToast(t('uploadHint'), 'warning');
       return;
     }
   }
@@ -863,7 +1176,7 @@ function nextStep(currentStep) {
     if (pool.length > 0) {
       const random = pool[Math.floor(Math.random() * pool.length)];
       AppState.selectedModel = random;
-      showToast(`랜덤 모델이 선택됐습니다: ${random.name || '#' + random.id}`, 'info');
+      showToast(t('randomModel', random.name || '#' + random.id), 'info');
     }
   }
   // Step 3: 배경 미선택 시 랜덤 자동 선택
@@ -872,7 +1185,7 @@ function nextStep(currentStep) {
     if (pool.length > 0) {
       const random = pool[Math.floor(Math.random() * pool.length)];
       AppState.selectedBg = random;
-      showToast(`랜덤 배경이 선택됐습니다: ${random.name}`, 'info');
+      showToast(t('randomBg', random.name), 'info');
     }
   }
 
@@ -1023,11 +1336,11 @@ function handleSlotFileSelect(e, cat) {
 function processSlotFile(file, cat) {
   const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (!validTypes.includes(file.type)) {
-    showToast('JPG, PNG, WEBP 형식만 지원합니다.', 'error');
+    showToast(t('uploadFormatErr'), 'error');
     return;
   }
   if (file.size > 10 * 1024 * 1024) {
-    showToast('파일 크기는 10MB 이하여야 합니다.', 'error');
+    showToast(t('uploadSizeErr'), 'error');
     return;
   }
 
@@ -1037,7 +1350,7 @@ function processSlotFile(file, cat) {
     syncClothingItems();
     renderSlots();
     updateNextBtn1();
-    showToast(`${SLOT_LABEL[cat]} 업로드 완료`, 'success');
+    showToast(t('uploadDone', SLOT_LABEL[cat]), 'success');
   };
   reader.readAsDataURL(file);
 }
@@ -1153,7 +1466,7 @@ function renderModelGrid(models) {
   // 스킵 카드
   const skipCard = document.createElement('div');
   skipCard.className = 'grid-skip-card' + (!AppState.selectedModel ? ' selected' : '');
-  skipCard.innerHTML = `<p>선택 없음<br>(랜덤)</p>`;
+  skipCard.innerHTML = `<p>${t('skipCard')}</p>`;
   skipCard.addEventListener('click', () => {
     AppState.selectedModel = null;
     document.querySelectorAll('#modelGrid .grid-card, #modelGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
@@ -1221,7 +1534,7 @@ function renderBgGrid(bgs) {
   // 스킵 카드
   const skipCard = document.createElement('div');
   skipCard.className = 'grid-skip-card' + (!AppState.selectedBg ? ' selected' : '');
-  skipCard.innerHTML = `<p>선택 없음<br>(랜덤)</p>`;
+  skipCard.innerHTML = `<p>${t('skipCard')}</p>`;
   skipCard.addEventListener('click', () => {
     AppState.selectedBg = null;
     document.querySelectorAll('#bgGrid .grid-card, #bgGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
@@ -1289,7 +1602,7 @@ function updateGenSummary() {
       const imageUrl = `/api/proxy/model-image/${AppState.selectedModel.id}`;
       modelEl.innerHTML = `<img src="${imageUrl}" alt="${displayName}" style="width:32px;height:40px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none'"> ${displayName}`;
     } else {
-      modelEl.innerHTML = `<span style="font-size:18px;vertical-align:middle;margin-right:6px;">🎲</span> 랜덤 자동 배정`;
+      modelEl.innerHTML = t('randomAssigned');
     }
   }
 
@@ -1298,7 +1611,7 @@ function updateGenSummary() {
       const imageUrl = `/api/proxy/bg-image/${AppState.selectedBg.id}`;
       bgEl.innerHTML = `<img src="${imageUrl}" alt="${AppState.selectedBg.name}" style="width:48px;height:32px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px;" onerror="this.style.display='none'"> ${AppState.selectedBg.name}`;
     } else {
-      bgEl.innerHTML = `<span style="font-size:18px;vertical-align:middle;margin-right:6px;">🌄</span> 랜덤 자동 배정`;
+      bgEl.innerHTML = t('randomAssigned');
     }
   }
 }
@@ -1312,14 +1625,14 @@ async function startGeneration() {
   // 생성 버튼 즉각 눌림 피드백
   const nextBtn3 = document.getElementById('nextBtn3');
   if (nextBtn3) {
-    nextBtn3.innerHTML = '<span class="btn-spinner"></span> 준비 중...';
+    nextBtn3.innerHTML = '<span class="btn-spinner"></span> ' + t('generating');
     nextBtn3.disabled = true;
   }
 
   // ── 로그인 체크: 미로그인 시 모달 표시 후 리턴 ──
   if (!AppState.user) {
     AppState.pendingGeneration = true;
-    if (nextBtn3) { nextBtn3.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; nextBtn3.disabled = false; }
+    if (nextBtn3) { nextBtn3.innerHTML = t('genStart'); nextBtn3.disabled = false; }
     openModal('loginModal');
     return;
   }
@@ -1330,7 +1643,7 @@ async function startGeneration() {
     if (pool.length > 0) {
       const random = pool[Math.floor(Math.random() * pool.length)];
       AppState.selectedBg = random;
-      showToast(`랜덤 배경이 선택됐습니다: ${random.name}`, 'info');
+      showToast(t('randomBg', random.name), 'info');
     }
   }
 
@@ -1421,7 +1734,7 @@ async function startGeneration() {
 
     // 로그인/크레딧 오류 처리
     if (startRes.status === 401) {
-      showToast('로그인이 필요합니다.', 'error');
+      showToast(t('loginRequired'), 'error');
       showStep(1);
       return;
     }
@@ -1429,7 +1742,7 @@ async function startGeneration() {
       const errData = await startRes.json();
       const need = errData.required ?? 90;
       const have = errData.available ?? 0;
-      showToast(`크레딧이 부족합니다. 필요: ${need}크레딧 / 보유: ${have}크레딧`, 'error');
+      showToast(t('creditInsufficient', need, have), 'error');
       // 드롭다운 열어서 충전 버튼 유도
       const userArea = document.getElementById('navUserArea');
       if (userArea) userArea.click();
@@ -1484,14 +1797,14 @@ async function startGeneration() {
 
   } catch (err) {
     console.error('Generation error:', err);
-    showToast(`생성 중 오류: ${err.message}`, 'error');
+    showToast(t('genError', err.message), 'error');
     AppState.isGenerating = false;
 
     // UI 복원
     const step3Nav = document.getElementById('step3Nav');
     if (step3Nav) step3Nav.style.display = '';
     const nb3err = document.getElementById('nextBtn3');
-    if (nb3err) { nb3err.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; nb3err.disabled = false; }
+    if (nb3err) { nb3err.innerHTML = t('genStart'); nb3err.disabled = false; }
     const genView = document.getElementById('generatingView');
     if (genView) genView.classList.remove('active');
   }
@@ -1606,7 +1919,7 @@ function completeGeneration(images, isFallback = false) {
   const step3NavEl = document.getElementById('step3Nav');
   if (step3NavEl) step3NavEl.style.display = '';
   const nb3 = document.getElementById('nextBtn3');
-  if (nb3) { nb3.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; nb3.disabled = false; }
+  if (nb3) { nb3.innerHTML = t('genStart'); nb3.disabled = false; }
   // generatingView 숨김
   const genViewEl = document.getElementById('generatingView');
   if (genViewEl) genViewEl.style.display = 'none';
@@ -1615,9 +1928,9 @@ function completeGeneration(images, isFallback = false) {
 
   const count = images.length;
   if (isFallback) {
-    showToast(`${count}장의 이미지가 생성되었습니다. (데모 모드) 🎉`, 'success');
+    showToast(t('genDoneDemo', count), 'success');
   } else {
-    showToast(`${count}장의 실사 AI 이미지가 생성되었습니다! 🎉`, 'success');
+    showToast(t('genDone', count), 'success');
   }
 }
 
@@ -1691,7 +2004,7 @@ function renderResults(images) {
 
   // 결과 탭 텍스트 업데이트
   const firstTab = document.querySelector('.results-tab');
-  if (firstTab) firstTab.textContent = `피팅컷 (${images.length})`;
+  if (firstTab) firstTab.textContent = t('fitLabel', images.length);
 
   images.forEach((img, idx) => {
     const card = document.createElement('div');
@@ -1768,7 +2081,7 @@ function updateRegenUI() {
     regenBtn.disabled = true;
     regenBtn.style.opacity = '0.4';
     regenBtn.style.cursor = 'not-allowed';
-    if (regenBtnText) regenBtnText.textContent = '재생성';
+    if (regenBtnText) regenBtnText.textContent = t('regenBtn');
     if (regenCounter) regenCounter.textContent = `${MAX_REGEN}/${MAX_REGEN}`;
     if (regenLimitMsg) regenLimitMsg.style.display = 'block';
   } else {
@@ -1776,7 +2089,7 @@ function updateRegenUI() {
     regenBtn.disabled = false;
     regenBtn.style.opacity = '1';
     regenBtn.style.cursor = 'pointer';
-    if (regenBtnText) regenBtnText.textContent = '재생성';
+    if (regenBtnText) regenBtnText.textContent = t('regenBtn');
     if (regenCounter) regenCounter.textContent = AppState.regenCount > 0 ? `${AppState.regenCount}/${MAX_REGEN}` : '';
     if (regenLimitMsg) regenLimitMsg.style.display = 'none';
   }
@@ -1786,21 +2099,21 @@ function switchResultsTab(tab, btn) {
   document.querySelectorAll('.results-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   if (tab === 'styleset') {
-    showToast('스타일샷 세트를 추가 생성하려면 아래 버튼을 클릭하세요.', 'info');
+    showToast(t('genStyleHint'), 'info');
   }
 }
 
 function toggleResultFav(btn, e) {
   if (e) e.stopPropagation();
   const isFav = btn.classList.toggle('active');
-  btn.textContent = isFav ? '❤️' : '🤍';
-  showToast(isFav ? '즐겨찾기에 추가되었습니다.' : '즐겨찾기에서 제거되었습니다.', isFav ? 'success' : 'info');
+  btn.textContent = t('favIcon', isFav);
+  showToast(isFav ? t('favAdd') : t('favRemove'), isFav ? 'success' : 'info');
 }
 
 // ─── 실제 파일 다운로드 (크레딧 차감 없이 파일만 저장) ───
 function _doFileDownload(url, num) {
   if (!url) {
-    showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success');
+    showToast(t('downloadStart', num), 'success');
     return;
   }
   const dlUrl = url.includes('/api/proxy/gen-image')
@@ -1817,11 +2130,11 @@ function _doFileDownload(url, num) {
 // ─── 크레딧 차감 후 다운로드 (모든 다운로드 경로의 공통 진입점) ───
 async function downloadWithCreditCheck(idx) {
   const img = AppState.generatedImages[idx];
-  if (!img) { showToast('이미지를 찾을 수 없습니다.', 'error'); return; }
+  if (!img) { showToast(t('downloadImgNotFound'), 'error'); return; }
 
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   if (!sessionToken) {
-    showToast('로그인이 필요합니다.', 'error');
+    showToast(t('loginRequired'), 'error');
     return;
   }
 
@@ -1832,13 +2145,13 @@ async function downloadWithCreditCheck(idx) {
     });
 
     if (deductRes.status === 401) {
-      showToast('로그인이 필요합니다.', 'error');
+      showToast(t('loginRequired'), 'error');
       return;
     }
     if (deductRes.status === 402) {
       const errData = await deductRes.json();
       const have = errData.available ?? 0;
-      showToast(`크레딧이 부족합니다. (보유: ${have}크레딧 / 필요: 90크레딧) 대시보드에서 충전해 주세요.`, 'error');
+      showToast(t('creditInsufficientDetail', have), 'error');
       setTimeout(() => {
         const userArea = document.getElementById('navUserArea');
         if (userArea) userArea.click();
@@ -1846,7 +2159,7 @@ async function downloadWithCreditCheck(idx) {
       return;
     }
     if (!deductRes.ok) {
-      showToast('크레딧 처리 중 오류가 발생했습니다.', 'error');
+      showToast(t('creditError'), 'error');
       return;
     }
 
@@ -1860,32 +2173,32 @@ async function downloadWithCreditCheck(idx) {
     }
     // 파일 다운로드
     _doFileDownload(img.url, idx + 1);
-    showToast(`다운로드 완료! (90크레딧 차감, 잔액: ${deductData.creditsRemaining}크레딧)`, 'success');
+    showToast(t('creditDeductDone', deductData.creditsRemaining), 'success');
   } catch (err) {
     console.error('Download error:', err);
-    showToast('다운로드 중 오류가 발생했습니다.', 'error');
+    showToast(t('downloadErr'), 'error');
   }
 }
 
 // 레거시 — 내부에서만 사용 (크레딧 차감 없이 파일 저장만)
 function downloadSingleImage(url, num) { _doFileDownload(url, num); }
-function downloadSingle(num) { showToast(`피팅컷 #${num} 다운로드를 시작합니다.`, 'success'); }
+function downloadSingle(num) { showToast(t('downloadStart', num), 'success'); }
 
 // ─── 전체 다운로드: 이미지 1장씩 크레딧 차감 후 순차 다운로드 ───
 async function downloadAll() {
   const realImages = AppState.generatedImages.filter(img => img.url);
   if (!realImages.length) {
-    showToast('다운로드할 이미지가 없습니다.', 'error');
+    showToast(t('downloadNoImg'), 'error');
     return;
   }
 
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   if (!sessionToken) {
-    showToast('로그인이 필요합니다.', 'error');
+    showToast(t('loginRequired'), 'error');
     return;
   }
 
-  showToast(`${realImages.length}장 다운로드를 시작합니다. 이미지당 90크레딧이 차감됩니다.`, 'info');
+  showToast(t('downloadMultiStart', realImages.length), 'info');
 
   let successCount = 0;
   for (let i = 0; i < realImages.length; i++) {
@@ -1897,17 +2210,17 @@ async function downloadAll() {
       });
 
       if (deductRes.status === 401) {
-        showToast('로그인이 필요합니다.', 'error');
+        showToast(t('loginRequired'), 'error');
         return;
       }
       if (deductRes.status === 402) {
         const errData = await deductRes.json();
         const have = errData.available ?? 0;
-        showToast(`크레딧 부족으로 ${i}장만 다운로드했습니다. (보유: ${have}크레딧 / 필요: 90크레딧)`, 'error');
+        showToast(t('creditLackPartial', i, have), 'error');
         return;
       }
       if (!deductRes.ok) {
-        showToast(`${i + 1}번 이미지 크레딧 처리 오류`, 'error');
+        showToast(t('creditErrNum', i + 1), 'error');
         continue;
       }
 
@@ -1930,7 +2243,7 @@ async function downloadAll() {
   }
 
   if (successCount > 0) {
-    showToast(`${successCount}장 다운로드 완료!`, 'success');
+    showToast(t('downloadDone', successCount), 'success');
   }
 }
 
@@ -1943,7 +2256,7 @@ async function downloadImage() {
   // 버튼 비활성화 (중복 클릭 방지)
   if (downloadBtn) {
     downloadBtn.disabled = true;
-    downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
+    downloadBtn.innerHTML = t('downloadIng');
   }
 
   try {
@@ -1955,7 +2268,7 @@ async function downloadImage() {
     });
 
     if (deductRes.status === 401) {
-      showToast('로그인이 필요합니다.', 'error');
+      showToast(t('loginRequired'), 'error');
       closeModal('imageModal');
       return;
     }
@@ -1963,7 +2276,7 @@ async function downloadImage() {
     if (deductRes.status === 402) {
       const errData = await deductRes.json();
       const have = errData.available || 0;
-      showToast(`크레딧이 부족합니다. (보유: ${have}크레딧 / 필요: 90크레딧) 대시보드에서 충전해 주세요.`, 'error');
+      showToast(t('creditInsufficientDetail', have), 'error');
       // 모달 닫고 대시보드 충전 페이지로 유도
       setTimeout(() => {
         closeModal('imageModal');
@@ -1975,7 +2288,7 @@ async function downloadImage() {
     }
 
     if (!deductRes.ok) {
-      showToast('크레딧 처리 중 오류가 발생했습니다.', 'error');
+      showToast(t('creditError'), 'error');
       return;
     }
 
@@ -1996,19 +2309,19 @@ async function downloadImage() {
     // 실제 다운로드 실행
     if (img?.url) {
       downloadSingleImage(img.url, idx + 1);
-      showToast(`다운로드 완료! (90크레딧 차감, 잔액: ${deductData.creditsRemaining}크레딧)`, 'success');
+      showToast(t('creditDeductDone', deductData.creditsRemaining), 'success');
     } else {
-      showToast('이미지를 다운로드합니다.', 'success');
+      showToast(t('downloadSingle'), 'success');
     }
     closeModal('imageModal');
 
   } catch (err) {
     console.error('Download error:', err);
-    showToast('다운로드 중 오류가 발생했습니다.', 'error');
+    showToast(t('downloadErr'), 'error');
   } finally {
     if (downloadBtn) {
       downloadBtn.disabled = false;
-      downloadBtn.innerHTML = '<i class="fas fa-download"></i> 다운로드';
+      downloadBtn.innerHTML = t('downloadBtn');
     }
   }
 }
@@ -2017,11 +2330,11 @@ async function downloadImage() {
 function regenFromCard(idx) {
   const MAX_REGEN = 3;
   if (AppState.regenCount >= MAX_REGEN) {
-    showToast('재생성 한도가 초과하였습니다. 다른 옷으로 시도해주세요.', 'error');
+    showToast(t('regenLimitErr'), 'error');
     return;
   }
   if (!AppState.lastGenParams) {
-    showToast('재생성할 이미지 정보가 없습니다.', 'error');
+    showToast(t('regenNoInfo'), 'error');
     return;
   }
   // regenImage와 동일한 로직 사용
@@ -2038,7 +2351,7 @@ async function regenImage() {
   }
 
   if (!AppState.lastGenParams) {
-    showToast('재생성할 이미지 정보가 없습니다.', 'error');
+    showToast(t('regenNoInfo'), 'error');
     return;
   }
 
@@ -2052,7 +2365,7 @@ async function regenImage() {
     regenBtn.style.opacity = '0.6';
   }
   if (regenBtnText) {
-    regenBtnText.innerHTML = '<span class="btn-spinner" style="width:14px;height:14px;border-width:2px;"></span> 재생성 중...';
+    regenBtnText.innerHTML = t('regenIng');
   }
   if (regenCounter) regenCounter.textContent = '';
 
@@ -2074,25 +2387,25 @@ async function regenImage() {
     });
 
     if (res.status === 401) {
-      showToast('로그인이 필요합니다.', 'error');
+      showToast(t('loginRequired'), 'error');
       return;
     }
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
-      showToast(errData.error || '재생성 요청 실패', 'error');
+      showToast(t('regenFail', errData.error), 'error');
       return;
     }
 
     const startData = await res.json();
     if (!startData.jobId) {
-      showToast('재생성 요청 실패: Job ID 없음', 'error');
+      showToast(t('regenNoJobId'), 'error');
       return;
     }
 
     // 재생성 카운트 증가
     AppState.regenCount++;
 
-    showToast(`재생성 시작! (${AppState.regenCount}/${MAX_REGEN})`, 'info');
+    showToast(t('regenStart', AppState.regenCount, MAX_REGEN), 'info');
 
     // ── 재생성 시에도 lastJobId 업데이트 (save-images가 올바른 job에 저장되도록)
     AppState.lastJobId = startData.jobId;
@@ -2116,7 +2429,7 @@ async function regenImage() {
 
   } catch (err) {
     console.error('Regen error:', err);
-    showToast(`재생성 오류: ${err.message}`, 'error');
+    showToast(t('regenErr', err.message), 'error');
   } finally {
     // 버튼 상태 복원은 updateRegenUI에서 처리
     updateRegenUI();
@@ -2221,7 +2534,7 @@ function openChargePanel() {
   const user = AppState.user;
   const credits = user ? (user.credits ?? 0) : 0;
   const el = document.getElementById('chargePanelCredits');
-  if (el) el.textContent = credits.toLocaleString() + ' 크레딧';
+  if (el) el.textContent = t('creditsUnit', credits);
   const panel = document.getElementById('chargePanel');
   if (!panel) return;
   panel.style.display = 'block';
@@ -2255,9 +2568,9 @@ function selectPackage(pkgId, el) {
 }
 
 async function startPayment() {
-  if (!_selectedPkg) { showToast('패키지를 선택해주세요.', 'error'); return; }
+  if (!_selectedPkg) { showToast(t('paySelectPkg'), 'error'); return; }
   const sessionToken = localStorage.getItem('lookbook_token') || '';
-  if (!sessionToken) { showToast('로그인이 필요합니다.', 'error'); return; }
+  if (!sessionToken) { showToast(t('loginRequired'), 'error'); return; }
 
   const cta = document.getElementById('chargeCta');
   try {
@@ -2286,7 +2599,7 @@ async function startPayment() {
   } catch (e) {
     if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
     if (e.code !== 'USER_CANCEL') {
-      showToast(e.message || '결제 중 오류가 발생했습니다.', 'error');
+      showToast(t('payFail', e.message), 'error');
     }
   }
 }

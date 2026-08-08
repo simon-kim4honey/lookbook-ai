@@ -886,6 +886,16 @@ app.get('/api/projects', (c) => {
   return c.json({ projects: sampleProjects })
 })
 
+// ── 국가 기반 locale 감지 ──────────────────────────────
+app.get('/api/locale', (c) => {
+  const cf = (c.req.raw as any).cf
+  const country: string = (cf?.country ?? '').toUpperCase()
+  let locale = 'en'
+  if (country === 'KR') locale = 'ko'
+  else if (country === 'JP') locale = 'ja'
+  return c.json({ locale, country })
+})
+
 // ════════════════════════════════════════════════════
 // Auth System — 이메일 + 카카오 OAuth + 구글 OAuth
 // D1 users / user_sessions 테이블 사용
@@ -2673,11 +2683,11 @@ ${bodyContent}
   <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
       <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
-      <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;margin:0;">크레딧 충전</h2>
+      <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;margin:0;" data-i18n="charge-title">크레딧 충전</h2>
     </div>
     <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
       <div>
-        <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">현재 보유 크레딧</div>
+        <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;" data-i18n="charge-current">현재 보유 크레딧</div>
         <div id="chargePanelCredits" style="font-size:28px;font-weight:800;color:#a78bfa;">-</div>
       </div>
       <div style="font-size:32px;opacity:0.5;">💎</div>
@@ -2697,7 +2707,7 @@ ${bodyContent}
       </div>
       <div class="pkg-card" onclick="selectPackage('pkg_40000',this)" data-pkg="pkg_40000"
            style="background:linear-gradient(135deg,#1e1435,#2a1a50);border:2px solid #6c47ff;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;">
-        <div style="position:absolute;top:0;right:20px;background:linear-gradient(135deg,#6c47ff,#a855f7);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;">인기</div>
+        <div style="position:absolute;top:0;right:20px;background:linear-gradient(135deg,#6c47ff,#a855f7);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;" data-i18n="pkg-popular">인기</div>
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
             <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">2,300 크레딧</div>
@@ -2726,7 +2736,7 @@ ${bodyContent}
     <button id="chargeCta" onclick="startPayment()"
             style="width:100%;padding:16px;background:linear-gradient(135deg,#6c47ff,#a855f7);border:none;border-radius:16px;color:white;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.5;pointer-events:none;transition:all 0.2s;">
       <i class="fas fa-credit-card"></i>
-      <span id="ctaLabel">패키지를 선택하세요</span>
+      <span id="ctaLabel" data-i18n="pkg-btn">패키지를 선택하세요</span>
     </button>
 
   </div>
@@ -3275,7 +3285,7 @@ app.get('/', (c) => {
           <!-- 약관 동의 체크박스 — 에러 바로 아래, 입력필드 위 -->
           <div style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:13px 16px;border-bottom:1px solid var(--border-color,#e8e8e8);background:var(--white,#fff);" onclick="toggleAgreeAll(event)">
-              <input type="checkbox" id="agreeAll" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" />
+              <input type="checkbox" id="agreeAll" data-i18n-next="agree-all" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" />
               <span style="font-size:14px;font-weight:700;color:var(--text-primary,#111);">전체 동의</span>
             </label>
             <div style="display:flex;flex-direction:column;gap:0;padding:10px 16px 12px;">
@@ -3841,8 +3851,8 @@ app.get('/generator', (c) => {
       <!-- STEP 1 · 의류 업로드 -->
       <div class="gslide active" id="step-1">
         <div class="gslide-body">
-          <div class="gstep-label">Step 1 / 3 · 의류 업로드</div>
-          <h2 class="gstep-title">의류를 종류별로 업로드하세요</h2>
+          <div class="gstep-label" data-i18n="step1-label">Step 1 / 3 · 의류 업로드</div>
+          <h2 class="gstep-title" data-i18n="step1-title">의류를 종류별로 업로드하세요</h2>
           <p class="gstep-sub">각 칸에 해당하는 의류를 업로드하세요 · 원하는 칸만 사용해도 됩니다</p>
 
           <!-- 숨겨진 파일 input — label for= 연결용 (슬롯 위에 선언해야 label이 참조 가능) -->
@@ -3911,8 +3921,8 @@ app.get('/generator', (c) => {
         </div>
         <div class="gslide-nav">
           <div class="gslide-nav-inner">
-            <button class="step-nav-back" onclick="prevStep(1)"><i class="fas fa-arrow-left"></i> 이전</button>
-            <button class="step-nav-next" id="nextBtn1" onclick="nextStep(1)" disabled>다음 단계 <i class="fas fa-arrow-right"></i></button>
+            <button class="step-nav-back" onclick="prevStep(1)"><i class="fas fa-arrow-left"></i> <span data-i18n="btn-prev">이전</span></button>
+            <button class="step-nav-next" id="nextBtn1" onclick="nextStep(1)" disabled><span data-i18n="btn-next">다음 단계</span> <i class="fas fa-arrow-right"></i></button>
           </div>
         </div>
       </div>
@@ -3920,8 +3930,8 @@ app.get('/generator', (c) => {
       <!-- STEP 2 · 모델 선택 -->
       <div class="gslide" id="step-2">
         <div class="gslide-header">
-          <div class="gstep-label">Step 2 / 3 · 모델 선택</div>
-          <h2 class="gstep-title">AI 모델을 선택하세요</h2>
+          <div class="gstep-label" data-i18n="step2-label">Step 2 / 3 · 모델 선택</div>
+          <h2 class="gstep-title" data-i18n="step2-title">AI 모델을 선택하세요</h2>
 
         </div>
         <div class="gslide-grid" id="modelGridWrap">
@@ -3932,8 +3942,8 @@ app.get('/generator', (c) => {
         </div>
         <div class="gslide-nav">
           <div class="gslide-nav-inner">
-            <button class="step-nav-back" onclick="prevStep(2)"><i class="fas fa-arrow-left"></i> 이전</button>
-            <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)">다음 단계 <i class="fas fa-arrow-right"></i></button>
+            <button class="step-nav-back" onclick="prevStep(2)"><i class="fas fa-arrow-left"></i> <span data-i18n="btn-prev">이전</span></button>
+            <button class="step-nav-next" id="nextBtn2" onclick="nextStep(2)"><span data-i18n="btn-next">다음 단계</span> <i class="fas fa-arrow-right"></i></button>
           </div>
         </div>
       </div>
@@ -3941,8 +3951,8 @@ app.get('/generator', (c) => {
       <!-- STEP 3 · 배경 선택 -->
       <div class="gslide" id="step-3">
         <div class="gslide-header">
-          <div class="gstep-label">Step 3 / 3 · 배경 선택</div>
-          <h2 class="gstep-title">배경을 선택하세요</h2>
+          <div class="gstep-label" data-i18n="step3-label">Step 3 / 3 · 배경 선택</div>
+          <h2 class="gstep-title" data-i18n="step3-title">배경을 선택하세요</h2>
 
         </div>
         <div class="gslide-grid" id="bgGridWrap">
@@ -3967,8 +3977,8 @@ app.get('/generator', (c) => {
         </div>
         <div class="gslide-nav" id="step3Nav">
           <div class="gslide-nav-inner">
-            <button class="step-nav-back" onclick="prevStep(3)"><i class="fas fa-arrow-left"></i> 이전</button>
-            <button class="step-nav-next" id="nextBtn3" onclick="startGeneration()"><i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작</button>
+            <button class="step-nav-back" onclick="prevStep(3)"><i class="fas fa-arrow-left"></i> <span data-i18n="btn-prev">이전</span></button>
+            <button class="step-nav-next" id="nextBtn3" onclick="startGeneration()"><i class="fas fa-wand-magic-sparkles"></i> <span data-i18n="btn-gen">AI 생성 시작</span></button>
           </div>
         </div>
       </div>
