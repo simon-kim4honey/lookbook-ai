@@ -1153,7 +1153,7 @@ function renderModelGrid(models) {
   // 스킵 카드
   const skipCard = document.createElement('div');
   skipCard.className = 'grid-skip-card' + (!AppState.selectedModel ? ' selected' : '');
-  skipCard.innerHTML = `<span>🎲</span><p>선택 없음<br>(랜덤)</p>`;
+  skipCard.innerHTML = `<p>선택 없음<br>(랜덤)</p>`;
   skipCard.addEventListener('click', () => {
     AppState.selectedModel = null;
     document.querySelectorAll('#modelGrid .grid-card, #modelGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
@@ -1221,7 +1221,7 @@ function renderBgGrid(bgs) {
   // 스킵 카드
   const skipCard = document.createElement('div');
   skipCard.className = 'grid-skip-card' + (!AppState.selectedBg ? ' selected' : '');
-  skipCard.innerHTML = `<span>🌄</span><p>선택 없음<br>(랜덤)</p>`;
+  skipCard.innerHTML = `<p>선택 없음<br>(랜덤)</p>`;
   skipCard.addEventListener('click', () => {
     AppState.selectedBg = null;
     document.querySelectorAll('#bgGrid .grid-card, #bgGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
