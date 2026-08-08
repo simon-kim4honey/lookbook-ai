@@ -1187,19 +1187,26 @@ function renderModelGrid(models) {
 
 }
 
-let modelFilterState = { gender: null };
+let modelFilterState = { gender: null, age: null, mood: null };
 
-function filterModels(value, btn) {
-  document.querySelectorAll('#modelFilters .filter-tag').forEach(b => b.classList.remove('active'));
+function filterModels(type, value, btn) {
+  // 해당 필터 행의 active 해제
+  const barId = type === 'gender' ? '#modelFilters' : type === 'age' ? '#modelAgeFilters' : '#modelMoodFilters';
+  document.querySelectorAll(barId + ' .filter-tag').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  if (value === 'all') {
-    modelFilterState.gender = null;
-    renderModelGrid(AppState.allModels);
-  } else {
-    modelFilterState.gender = value;
-    const filtered = AppState.allModels.filter(m => (m.gender || '여성') === value);
-    renderModelGrid(filtered.length > 0 ? filtered : AppState.allModels);
-  }
+  modelFilterState[type] = (value === 'all') ? null : value;
+
+  // 3가지 필터 동시 적용
+  const filtered = AppState.allModels.filter(m => {
+    const g = m.gender || '미분류';
+    const a = m.age    || '미분류';
+    const mo = m.mood  || '미분류';
+    if (modelFilterState.gender && g !== modelFilterState.gender) return false;
+    if (modelFilterState.age    && a !== modelFilterState.age)    return false;
+    if (modelFilterState.mood   && mo !== modelFilterState.mood)  return false;
+    return true;
+  });
+  renderModelGrid(filtered.length > 0 ? filtered : (value === 'all' ? AppState.allModels : []));
 }
 
 // ─────────────────────────────────────────────────────────
@@ -2243,7 +2250,7 @@ function selectPackage(pkgId, el) {
   const cta = document.getElementById('chargeCta');
   const lbl = document.getElementById('ctaLabel');
   if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-  const map = { pkg_20000: '20,000원 결제 (1,000크레딧)', pkg_40000: '40,000원 결제 (2,300크레딧)', pkg_60000: '60,000원 결제 (4,000크레딧)' };
+  const map = { pkg_20000: '20,000원 결제', pkg_40000: '40,000원 결제', pkg_60000: '60,000원 결제' };
   if (lbl) lbl.textContent = map[pkgId] || '결제하기';
 }
 

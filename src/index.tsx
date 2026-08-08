@@ -112,6 +112,9 @@ interface CustomModel {
   id: string
   name: string
   desc: string
+  gender: string   // 여성 | 남성 | 미분류
+  age: string      // 10대 | 20대 | 30대 | 40대 | 미분류
+  mood: string     // 로맨틱 | 보이시 | 캐주얼 | 시크 | 내추럴 | 미분류
   createdAt: string
 }
 interface CustomBg {
@@ -180,19 +183,29 @@ async function d1NextId(db: D1Database): Promise<string> {
   return String(row?.value ?? 1000)
 }
 async function d1GetModels(db: D1Database): Promise<CustomModel[]> {
-  const { results } = await db.prepare(`SELECT id, name, desc_text, created_at FROM custom_models ORDER BY created_at ASC`).all()
-  return (results as any[]).map(r => ({ id: r.id, name: r.name, desc: r.desc_text, createdAt: r.created_at }))
+  const { results } = await db.prepare(`SELECT id, name, desc_text, gender, age, mood, created_at FROM custom_models ORDER BY created_at ASC`).all()
+  return (results as any[]).map(r => ({
+    id: r.id, name: r.name, desc: r.desc_text,
+    gender: r.gender || '미분류', age: r.age || '미분류', mood: r.mood || '미분류',
+    createdAt: r.created_at
+  }))
 }
-async function d1AddModels(db: D1Database, items: Array<{ name: string; desc?: string; imageBase64: string }>): Promise<CustomModel[]> {
+async function d1AddModels(db: D1Database, items: Array<{ name: string; desc?: string; gender?: string; age?: string; mood?: string; imageBase64: string }>): Promise<CustomModel[]> {
   const results: CustomModel[] = []
   for (const item of items) {
-    const { name, desc, imageBase64 } = item
+    const { name, desc, gender, age, mood, imageBase64 } = item
     if (!name || !imageBase64) continue
     const id = await d1NextId(db)
     const createdAt = new Date().toISOString()
-    await db.prepare(`INSERT INTO custom_models (id, name, desc_text, image_b64, created_at) VALUES (?,?,?,?,?)`)
-      .bind(id, name, desc || name, imageBase64, createdAt).run()
-    results.push({ id, name, desc: desc || name, createdAt })
+    // gender/age/mood 컬럼이 없을 경우(구 스키마) 대비 try-catch
+    try {
+      await db.prepare(`INSERT INTO custom_models (id, name, desc_text, gender, age, mood, image_b64, created_at) VALUES (?,?,?,?,?,?,?,?)`)
+        .bind(id, name, desc || name, gender || '미분류', age || '미분류', mood || '미분류', imageBase64, createdAt).run()
+    } catch {
+      await db.prepare(`INSERT INTO custom_models (id, name, desc_text, image_b64, created_at) VALUES (?,?,?,?,?)`)
+        .bind(id, name, desc || name, imageBase64, createdAt).run()
+    }
+    results.push({ id, name, desc: desc || name, gender: gender || '미분류', age: age || '미분류', mood: mood || '미분류', createdAt })
   }
   return results
 }
@@ -275,6 +288,153 @@ app.post('/api/admin/models', adminAuth, async (c) => {
       }
     }
     return c.json({ success: true, models: results, count: results.length })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
+// POST /api/admin/auto-label — 모델/배경 이미지 AI 자동 라벨링
+app.post('/api/admin/auto-label', adminAuth, async (c) => {
+  try {
+    const body: any = await c.req.json()
+    const { type, imageBase64 } = body  // type: 'model' | 'background'
+    if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
+
+    const atlasKey = (c.env as any)?.ATLAS_API_KEY || ''
+    if (!atlasKey) return c.json({ success: false, message: 'ATLAS_API_KEY 미설정' }, 500)
+
+    const ATLAS_BASE = 'https://api.atlascloud.ai'
+
+    if (type === 'model') {
+      // 모델 이미지 → 성별/연령대/무드 분류
+      const prompt = `You are an AI fashion model classifier. Analyze this model photo and return ONLY a JSON object with these exact fields:
+{
+  "gender": "여성" or "남성",
+  "age": "10대" or "20대" or "30대" or "40대",
+  "mood": one of ["로맨틱", "보이시", "캐주얼", "시크", "내추럴"]
+}
+Rules:
+- gender: female face/body = "여성", male = "남성"  
+- age: estimate from face
+- mood: overall vibe of the person/styling
+Return ONLY the JSON, no explanation.`
+
+      const res = await fetch(`${ATLAS_BASE}/api/v1/model/run`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${atlasKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          input: {
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}` } },
+                { type: 'text', text: prompt }
+              ]
+            }]
+          }
+        })
+      })
+      const data: any = await res.json()
+      const jobId = data?.data?.id
+      if (!jobId) return c.json({ success: false, message: '라벨링 작업 시작 실패' }, 500)
+
+      // 폴링 (최대 15초)
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 1000))
+        const poll: any = await fetch(`${ATLAS_BASE}/api/v1/model/prediction/${jobId}`, {
+          headers: { 'Authorization': `Bearer ${atlasKey}` }
+        }).then(r => r.json())
+        const st = poll?.data?.status
+        if (st === 'completed' || st === 'succeeded') {
+          const raw = poll?.data?.outputs?.[0] || poll?.data?.output || ''
+          try {
+            const jsonMatch = raw.match(/\{[\s\S]*\}/)
+            const labels = JSON.parse(jsonMatch?.[0] || raw)
+            return c.json({ success: true, labels: {
+              gender: labels.gender || '미분류',
+              age: labels.age || '미분류',
+              mood: labels.mood || '미분류',
+            }})
+          } catch {
+            return c.json({ success: false, message: '응답 파싱 실패', raw })
+          }
+        }
+        if (st === 'failed' || st === 'error') break
+      }
+      return c.json({ success: false, message: '라벨링 타임아웃' })
+
+    } else if (type === 'background') {
+      // 배경 이미지 → 카테고리/분위기 분류
+      const prompt = `You are a fashion photography background classifier. Analyze this background image and return ONLY a JSON object:
+{
+  "category": one of ["스튜디오", "야외/자연", "도심/거리", "인테리어", "컨셉/특수"],
+  "mood": one of ["미니멀", "내추럴", "모던", "빈티지", "럭셔리", "스트릿"],
+  "name_ko": short Korean name for this background (5-10 chars)
+}
+Return ONLY the JSON, no explanation.`
+
+      const res = await fetch(`${ATLAS_BASE}/api/v1/model/run`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${atlasKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          input: {
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image_url', image_url: { url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}` } },
+                { type: 'text', text: prompt }
+              ]
+            }]
+          }
+        })
+      })
+      const data: any = await res.json()
+      const jobId = data?.data?.id
+      if (!jobId) return c.json({ success: false, message: '라벨링 작업 시작 실패' }, 500)
+
+      for (let i = 0; i < 15; i++) {
+        await new Promise(r => setTimeout(r, 1000))
+        const poll: any = await fetch(`${ATLAS_BASE}/api/v1/model/prediction/${jobId}`, {
+          headers: { 'Authorization': `Bearer ${atlasKey}` }
+        }).then(r => r.json())
+        const st = poll?.data?.status
+        if (st === 'completed' || st === 'succeeded') {
+          const raw = poll?.data?.outputs?.[0] || poll?.data?.output || ''
+          try {
+            const jsonMatch = raw.match(/\{[\s\S]*\}/)
+            const labels = JSON.parse(jsonMatch?.[0] || raw)
+            return c.json({ success: true, labels: {
+              category: labels.category || '스튜디오',
+              mood: labels.mood || '미니멀',
+              name_ko: labels.name_ko || '',
+            }})
+          } catch {
+            return c.json({ success: false, message: '응답 파싱 실패', raw })
+          }
+        }
+        if (st === 'failed' || st === 'error') break
+      }
+      return c.json({ success: false, message: '라벨링 타임아웃' })
+    }
+
+    return c.json({ success: false, message: 'type은 model 또는 background 이어야 합니다.' }, 400)
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
+// PATCH /api/admin/models/:id/labels — 라벨 저장
+app.patch('/api/admin/models/:id/labels', adminAuth, async (c) => {
+  try {
+    const id = c.req.param('id')
+    const { gender, age, mood } = await c.req.json() as any
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+    if (!db) return c.json({ success: false, message: 'D1 없음' }, 500)
+    await db.prepare(`UPDATE custom_models SET gender=?, age=?, mood=? WHERE id=?`)
+      .bind(gender || '미분류', age || '미분류', mood || '미분류', id).run()
+    return c.json({ success: true })
   } catch (e: any) {
     return c.json({ success: false, message: e.message }, 500)
   }
@@ -631,7 +791,11 @@ app.get('/api/presets/models', async (c) => {
     customRaw = _memModels.map(m => ({ id: m.id, name: m.name, desc: m.desc, createdAt: m.createdAt }))
   }
   const customList = customRaw.map(m => ({
-    id: Number(m.id), name: m.name, gender: '커스텀', age: '-', body: '-', mood: '-', skin: '-',
+    id: Number(m.id), name: m.name,
+    gender: m.gender || '미분류',
+    age: m.age || '미분류',
+    mood: m.mood || '미분류',
+    body: '-', skin: '-',
     desc: m.desc, unsplashId: null, isCustom: true, customId: m.id,
   }))
   return c.json({ models: customList })
@@ -2528,7 +2692,6 @@ ${bodyContent}
           </div>
           <div style="text-align:right;">
             <div style="font-size:22px;font-weight:800;color:#6c47ff;">20,000원</div>
-            <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,818원</div>
           </div>
         </div>
       </div>
@@ -2543,7 +2706,6 @@ ${bodyContent}
           </div>
           <div style="text-align:right;">
             <div style="font-size:22px;font-weight:800;color:#6c47ff;">40,000원</div>
-            <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,600원</div>
           </div>
         </div>
       </div>
@@ -2557,7 +2719,6 @@ ${bodyContent}
           </div>
           <div style="text-align:right;">
             <div style="font-size:22px;font-weight:800;color:#6c47ff;">60,000원</div>
-            <div style="font-size:11px;color:#6b6b85;margin-top:2px;">장당 약 1,364원</div>
           </div>
         </div>
       </div>
@@ -2567,10 +2728,7 @@ ${bodyContent}
       <i class="fas fa-credit-card"></i>
       <span id="ctaLabel">패키지를 선택하세요</span>
     </button>
-    <div style="margin-top:16px;font-size:11px;color:#5a5a7a;text-align:center;line-height:1.7;">
-      토스페이먼츠를 통한 안전한 결제 · 카드/계좌이체 지원<br>
-      결제 완료 즉시 크레딧 지급 · 환불은 카톡 문의로 접수
-    </div>
+
   </div>
 </div>
 
@@ -3113,24 +3271,13 @@ app.get('/', (c) => {
       <div id="authFormSignup" style="display:none;">
         <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
           <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
-          <div class="form-group">
-            <input type="text" class="form-input" id="signupName" placeholder="이름" autocomplete="name" />
-          </div>
-          <div class="form-group">
-            <input type="email" class="form-input" id="signupEmail" placeholder="이메일" autocomplete="email" />
-          </div>
-          <div class="form-group">
-            <input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" />
-          </div>
 
-          <!-- 약관 동의 체크박스 -->
-          <div style="display:flex;flex-direction:column;gap:0;margin-top:8px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
-            <!-- 전체 동의 -->
+          <!-- 약관 동의 체크박스 — 에러 바로 아래, 입력필드 위 -->
+          <div style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:13px 16px;border-bottom:1px solid var(--border-color,#e8e8e8);background:var(--white,#fff);" onclick="toggleAgreeAll(event)">
               <input type="checkbox" id="agreeAll" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" />
               <span style="font-size:14px;font-weight:700;color:var(--text-primary,#111);">전체 동의</span>
             </label>
-            <!-- 개별 항목 -->
             <div style="display:flex;flex-direction:column;gap:0;padding:10px 16px 12px;">
               <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-secondary,#555);line-height:1.5;padding:6px 0;">
                 <input type="checkbox" id="agreePrivacy" style="margin-top:2px;width:16px;height:16px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" onchange="syncAgreeAll()" />
@@ -3141,6 +3288,16 @@ app.get('/', (c) => {
                 <span>가끔 프로모션 이메일 및 알림을 수신합니다. 언제든지 수신 거부할 수 있습니다. <span style="color:var(--text-muted,#999);">(선택)</span></span>
               </label>
             </div>
+          </div>
+
+          <div class="form-group">
+            <input type="text" class="form-input" id="signupName" placeholder="이름" autocomplete="name" />
+          </div>
+          <div class="form-group">
+            <input type="email" class="form-input" id="signupEmail" placeholder="이메일" autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" />
           </div>
 
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:12px;">가입하고 무료 시작 🎁</button>
@@ -3765,10 +3922,28 @@ app.get('/generator', (c) => {
         <div class="gslide-header">
           <div class="gstep-label">Step 2 / 3 · 모델 선택</div>
           <h2 class="gstep-title">AI 모델을 선택하세요</h2>
-          <div class="gfilter-bar model-filters" id="modelFilters">
-            <button class="filter-tag active" onclick="filterModels('all',this)">전체</button>
-            <button class="filter-tag" onclick="filterModels('여성',this)">여성</button>
-            <button class="filter-tag" onclick="filterModels('남성',this)">남성</button>
+          <!-- 필터 행 1: 성별 -->
+          <div class="gfilter-bar model-filters" id="modelFilters" style="margin-bottom:6px;">
+            <button class="filter-tag active" onclick="filterModels('gender','all',this)">전체</button>
+            <button class="filter-tag" onclick="filterModels('gender','여성',this)">여성</button>
+            <button class="filter-tag" onclick="filterModels('gender','남성',this)">남성</button>
+          </div>
+          <!-- 필터 행 2: 연령대 -->
+          <div class="gfilter-bar" id="modelAgeFilters" style="margin-bottom:6px;">
+            <button class="filter-tag active" onclick="filterModels('age','all',this)">전체</button>
+            <button class="filter-tag" onclick="filterModels('age','10대',this)">10대</button>
+            <button class="filter-tag" onclick="filterModels('age','20대',this)">20대</button>
+            <button class="filter-tag" onclick="filterModels('age','30대',this)">30대</button>
+            <button class="filter-tag" onclick="filterModels('age','40대',this)">40대</button>
+          </div>
+          <!-- 필터 행 3: 무드 -->
+          <div class="gfilter-bar" id="modelMoodFilters">
+            <button class="filter-tag active" onclick="filterModels('mood','all',this)">전체</button>
+            <button class="filter-tag" onclick="filterModels('mood','로맨틱',this)">로맨틱</button>
+            <button class="filter-tag" onclick="filterModels('mood','보이시',this)">보이시</button>
+            <button class="filter-tag" onclick="filterModels('mood','캐주얼',this)">캐주얼</button>
+            <button class="filter-tag" onclick="filterModels('mood','시크',this)">시크</button>
+            <button class="filter-tag" onclick="filterModels('mood','내추럴',this)">내추럴</button>
           </div>
         </div>
         <div class="gslide-grid" id="modelGridWrap">
@@ -3793,11 +3968,10 @@ app.get('/generator', (c) => {
           <div class="gfilter-bar bg-categories" id="bgCategories">
             <button class="bg-cat active" onclick="filterBg('전체',this)">전체</button>
             <button class="bg-cat" onclick="filterBg('스튜디오',this)">스튜디오</button>
-            <button class="bg-cat" onclick="filterBg('실내',this)">실내</button>
-            <button class="bg-cat" onclick="filterBg('야외',this)">야외</button>
-            <button class="bg-cat" onclick="filterBg('스트리트',this)">스트리트</button>
-            <button class="bg-cat" onclick="filterBg('카페',this)">카페</button>
-            <button class="bg-cat" onclick="filterBg('럭셔리',this)">럭셔리</button>
+            <button class="bg-cat" onclick="filterBg('야외/자연',this)">야외/자연</button>
+            <button class="bg-cat" onclick="filterBg('도심/거리',this)">도심/거리</button>
+            <button class="bg-cat" onclick="filterBg('인테리어',this)">인테리어</button>
+            <button class="bg-cat" onclick="filterBg('컨셉/특수',this)">컨셉/특수</button>
           </div>
         </div>
         <div class="gslide-grid" id="bgGridWrap">
@@ -4665,18 +4839,30 @@ function readFileAsBase64(file) {
 // ══════════════════════════════════════════════
 //  모델 관리 — 다중 업로드
 // ══════════════════════════════════════════════
-let modelStagingList = []  // [{ file, base64, name }]
+let modelStagingList = []  // [{ file, base64, name, gender, age, mood }]
 
 async function onModelFilesSelect(e) {
   const files = Array.from(e.target.files || [])
   if (!files.length) return
+  const status = document.getElementById('modelUploadStatus')
+  status.textContent = 'AI 자동 라벨링 중...'; status.className = 'save-status'
   for (const file of files) {
     const base64 = await readFileAsBase64(file)
     const defaultName = file.name.replace(/\.[^.]+$/, '')
-    modelStagingList.push({ file, base64, name: defaultName })
+    let gender = '미분류', age = '미분류', mood = '미분류'
+    try {
+      const lr = await fetch('/api/admin/auto-label', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Admin-Password':adminPassword},
+        body:JSON.stringify({ type:'model', imageBase64: base64 })
+      })
+      const ld = await lr.json()
+      if (ld.success && ld.labels) { gender=ld.labels.gender; age=ld.labels.age; mood=ld.labels.mood }
+    } catch(err) { console.warn('auto-label 실패:', err) }
+    modelStagingList.push({ file, base64, name: defaultName, gender, age, mood })
   }
-  // input 초기화(같은 파일 재선택 허용)
   e.target.value = ''
+  status.textContent = ''; status.className = 'save-status'
   renderModelStaging()
 }
 
@@ -4686,17 +4872,20 @@ function renderModelStaging() {
   if (!modelStagingList.length) { grid.style.display = 'none'; return }
   grid.style.display = 'block'
   document.getElementById('modelUploadZone').style.borderColor = '#6c47ff'
+  const mkOpts = (list, sel) => list.map(v => '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>').join('')
   container.innerHTML = modelStagingList.map((item, i) =>
     '<div style="width:160px;flex-shrink:0;">' +
     '<div style="position:relative;width:160px;height:160px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
     '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
     '<button onclick="removeModelStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:22px;text-align:center;padding:0;">✕</button>' +
     '</div>' +
-    '<input class="form-input" value="' + escHtml(item.name) + '" oninput="modelStagingList[' + i + '].name=this.value" placeholder="이름 입력" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 8px;"/>' +
+    '<input class="form-input" value="' + escHtml(item.name) + '" oninput="modelStagingList[' + i + '].name=this.value" placeholder="이름" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:11px;padding:4px 7px;"/>' +
+    '<select class="form-input" onchange="modelStagingList['+i+'].gender=this.value" style="margin-top:3px;width:100%;font-size:11px;padding:3px 6px;">' + mkOpts(['미분류','여성','남성'], item.gender) + '</select>' +
+    '<select class="form-input" onchange="modelStagingList['+i+'].age=this.value" style="margin-top:3px;width:100%;font-size:11px;padding:3px 6px;">' + mkOpts(['미분류','10대','20대','30대','40대'], item.age) + '</select>' +
+    '<select class="form-input" onchange="modelStagingList['+i+'].mood=this.value" style="margin-top:3px;width:100%;font-size:11px;padding:3px 6px;">' + mkOpts(['미분류','로맨틱','보이시','캐주얼','시크','내추럴'], item.mood) + '</select>' +
     '</div>'
   ).join('')
 }
-
 function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;') }
 
 function removeModelStaging(idx) {
@@ -4718,7 +4907,13 @@ async function uploadModels() {
   if (missing.length) { status.textContent = '이름이 비어있는 항목이 있습니다'; status.className = 'save-status err'; return }
   status.textContent = '등록 중...'; status.className = 'save-status'
   try {
-    const payload = modelStagingList.map(i => ({ name: i.name.trim(), desc: i.name.trim(), imageBase64: i.base64 }))
+    const payload = modelStagingList.map(i => ({
+      name: i.name.trim(), desc: i.name.trim(),
+      gender: i.gender || '미분류',
+      age: i.age || '미분류',
+      mood: i.mood || '미분류',
+      imageBase64: i.base64
+    }))
     const res = await fetch('/api/admin/models', {
       method: 'POST',
       headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
@@ -4764,18 +4959,34 @@ async function loadCustomModels() {
 // ══════════════════════════════════════════════
 //  배경 관리 — 다중 업로드
 // ══════════════════════════════════════════════
-let bgStagingList = []  // [{ file, base64, name, category }]
+let bgStagingList = []  // [{ file, base64, name, category, mood }]
 
 async function onBgFilesSelect(e) {
   const files = Array.from(e.target.files || [])
   if (!files.length) return
-  const defaultCat = (document.getElementById('bgDefaultCategory').value || '커스텀').trim()
+  const status = document.getElementById('bgUploadStatus')
+  status.textContent = 'AI 자동 라벨링 중...'; status.className = 'save-status'
   for (const file of files) {
     const base64 = await readFileAsBase64(file)
     const defaultName = file.name.replace(/\.[^.]+$/, '')
-    bgStagingList.push({ file, base64, name: defaultName, category: defaultCat })
+    let category = '스튜디오', mood = '미니멀', autoName = defaultName
+    try {
+      const lr = await fetch('/api/admin/auto-label', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Admin-Password':adminPassword},
+        body:JSON.stringify({ type:'background', imageBase64: base64 })
+      })
+      const ld = await lr.json()
+      if (ld.success && ld.labels) {
+        category = ld.labels.category || '스튜디오'
+        mood     = ld.labels.mood || '미니멀'
+        if (ld.labels.name_ko) autoName = ld.labels.name_ko
+      }
+    } catch(err) { console.warn('bg auto-label 실패:', err) }
+    bgStagingList.push({ file, base64, name: autoName, category, mood })
   }
   e.target.value = ''
+  status.textContent = ''; status.className = 'save-status'
   renderBgStaging()
 }
 
@@ -4785,14 +4996,18 @@ function renderBgStaging() {
   if (!bgStagingList.length) { grid.style.display = 'none'; return }
   grid.style.display = 'block'
   document.getElementById('bgUploadZone').style.borderColor = '#6c47ff'
+  const mkOpts = (list, sel) => list.map(v => '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>').join('')
+  const catList = ['스튜디오','야외/자연','도심/거리','인테리어','컨셉/특수']
+  const moodList = ['미니멀','내추럴','모던','빈티지','럭셔리','스트릿']
   container.innerHTML = bgStagingList.map((item, i) =>
     '<div style="width:160px;flex-shrink:0;">' +
     '<div style="position:relative;width:160px;height:120px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
     '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
     '<button onclick="removeBgStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:22px;text-align:center;padding:0;">✕</button>' +
     '</div>' +
-    '<input class="form-input" value="' + escHtml(item.name) + '" oninput="bgStagingList[' + i + '].name=this.value" placeholder="배경 이름" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 8px;"/>' +
-    '<input class="form-input" value="' + escHtml(item.category) + '" oninput="bgStagingList[' + i + '].category=this.value" placeholder="카테고리" style="margin-top:4px;width:100%;box-sizing:border-box;font-size:12px;padding:5px 8px;color:#888;"/>' +
+    '<input class="form-input" value="' + escHtml(item.name) + '" oninput="bgStagingList[' + i + '].name=this.value" placeholder="배경 이름" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:11px;padding:4px 7px;"/>' +
+    '<select class="form-input" onchange="bgStagingList['+i+'].category=this.value" style="margin-top:3px;width:100%;font-size:11px;padding:3px 6px;">' + mkOpts(catList, item.category) + '</select>' +
+    '<select class="form-input" onchange="bgStagingList['+i+'].mood=this.value" style="margin-top:3px;width:100%;font-size:11px;padding:3px 6px;">' + mkOpts(moodList, item.mood) + '</select>' +
     '</div>'
   ).join('')
 }
