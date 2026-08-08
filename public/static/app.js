@@ -1577,7 +1577,8 @@ function completeGeneration(images, isFallback = false) {
   AppState.generatedImages = proxiedImages;
 
   // 생성된 이미지 URL을 서버에 저장 (썸네일 미리보기용, 14일 보관)
-  if (!isFallback && AppState.lastJobId) {
+  // fallback 포함 — 실제 URL이 있으면 무조건 저장 시도
+  if (AppState.lastJobId) {
     const realUrls = images
       .filter(img => img.url && img.url.startsWith('http'))
       .map(img => img.url);
@@ -1589,6 +1590,7 @@ function completeGeneration(images, isFallback = false) {
         body: JSON.stringify({ job_id: AppState.lastJobId, image_urls: realUrls }),
       }).catch(e => console.warn('[SaveImages] 저장 실패(무시):', e));
     }
+    // 실제 URL 없음(placeholder 전용) → 히스토리 썸네일 없이 저장됨 (정상)
   }
 
   renderResults(proxiedImages);
@@ -2084,6 +2086,9 @@ async function regenImage() {
     AppState.regenCount++;
 
     showToast(`재생성 시작! (${AppState.regenCount}/${MAX_REGEN})`, 'info');
+
+    // ── 재생성 시에도 lastJobId 업데이트 (save-images가 올바른 job에 저장되도록)
+    AppState.lastJobId = startData.jobId;
 
     // 모달 닫고 step-3 (생성 진행 화면)으로 전환
     closeModal('imageModal');

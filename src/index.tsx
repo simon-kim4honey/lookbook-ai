@@ -3596,7 +3596,10 @@ app.get('/dashboard', (c) => {
                 </div>
               </div>\`;
             }).join('')}
-          </div>\` : \`<div style="height:4px;"></div>\`;
+          </div>\` : \`<div style="margin-top:10px;padding:14px;background:#16162a;border-radius:10px;text-align:center;font-size:12px;color:#5a5a7a;border:1px dashed rgba(255,255,255,0.06);">
+            <i class="fas fa-image" style="opacity:0.3;font-size:18px;margin-bottom:6px;display:block;"></i>
+            이미지 준비 중이거나 저장 전 세션이 종료되었습니다
+          </div>\`;
 
         const expColor  = expLabel === '만료됨' ? '#6b7280' : (expLabel?.includes('⚠️') ? '#fbbf24' : '#6b7280');
 
