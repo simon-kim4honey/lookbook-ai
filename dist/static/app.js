@@ -420,6 +420,32 @@ async function handleLogin(e) {
   }
 }
 
+/** 전체 동의 토글 */
+function toggleAgreeAll(e) {
+  // label 클릭 → checkbox 자동 toggle 이후 syncAgreeAll 호출
+  // label 내부의 checkbox 직접 클릭 시 중복 toggle 방지
+  const allChk = document.getElementById('agreeAll');
+  if (!allChk) return;
+  // setTimeout으로 checkbox 상태가 바뀐 뒤에 처리
+  setTimeout(() => {
+    const checked = allChk.checked;
+    const privacy   = document.getElementById('agreePrivacy');
+    const marketing = document.getElementById('agreeMarketing');
+    if (privacy)   privacy.checked   = checked;
+    if (marketing) marketing.checked = checked;
+  }, 0);
+}
+
+/** 개별 체크박스 변경 시 전체 동의 체크 상태 동기화 */
+function syncAgreeAll() {
+  const privacy   = document.getElementById('agreePrivacy');
+  const marketing = document.getElementById('agreeMarketing');
+  const allChk    = document.getElementById('agreeAll');
+  if (!allChk) return;
+  const allChecked = (!privacy || privacy.checked) && (!marketing || marketing.checked);
+  allChk.checked = allChecked;
+}
+
 /** 이메일 회원가입 */
 async function handleSignup(e) {
   e.preventDefault();
