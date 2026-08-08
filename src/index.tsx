@@ -887,9 +887,15 @@ app.get('/api/projects', (c) => {
 })
 
 // ── 국가 기반 locale 감지 ──────────────────────────────
+// Workers for Platform dispatch 환경에서는 c.req.raw.cf가 전달되지 않으므로
+// Cloudflare가 모든 요청에 주입하는 CF-IPCountry 헤더를 우선 사용
 app.get('/api/locale', (c) => {
-  const cf = (c.req.raw as any).cf
-  const country: string = (cf?.country ?? '').toUpperCase()
+  const country = (
+    c.req.header('CF-IPCountry') ??
+    c.req.header('cf-ipcountry') ??
+    (c.req.raw as any).cf?.country ??
+    ''
+  ).toUpperCase()
   let locale = 'en'
   if (country === 'KR') locale = 'ko'
   else if (country === 'JP') locale = 'ja'
