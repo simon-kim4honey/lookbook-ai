@@ -3922,29 +3922,7 @@ app.get('/generator', (c) => {
         <div class="gslide-header">
           <div class="gstep-label">Step 2 / 3 · 모델 선택</div>
           <h2 class="gstep-title">AI 모델을 선택하세요</h2>
-          <!-- 필터 행 1: 성별 -->
-          <div class="gfilter-bar model-filters" id="modelFilters" style="margin-bottom:6px;">
-            <button class="filter-tag active" onclick="filterModels('gender','all',this)">전체</button>
-            <button class="filter-tag" onclick="filterModels('gender','여성',this)">여성</button>
-            <button class="filter-tag" onclick="filterModels('gender','남성',this)">남성</button>
-          </div>
-          <!-- 필터 행 2: 연령대 -->
-          <div class="gfilter-bar" id="modelAgeFilters" style="margin-bottom:6px;">
-            <button class="filter-tag active" onclick="filterModels('age','all',this)">전체</button>
-            <button class="filter-tag" onclick="filterModels('age','10대',this)">10대</button>
-            <button class="filter-tag" onclick="filterModels('age','20대',this)">20대</button>
-            <button class="filter-tag" onclick="filterModels('age','30대',this)">30대</button>
-            <button class="filter-tag" onclick="filterModels('age','40대',this)">40대</button>
-          </div>
-          <!-- 필터 행 3: 무드 -->
-          <div class="gfilter-bar" id="modelMoodFilters">
-            <button class="filter-tag active" onclick="filterModels('mood','all',this)">전체</button>
-            <button class="filter-tag" onclick="filterModels('mood','로맨틱',this)">로맨틱</button>
-            <button class="filter-tag" onclick="filterModels('mood','보이시',this)">보이시</button>
-            <button class="filter-tag" onclick="filterModels('mood','캐주얼',this)">캐주얼</button>
-            <button class="filter-tag" onclick="filterModels('mood','시크',this)">시크</button>
-            <button class="filter-tag" onclick="filterModels('mood','내추럴',this)">내추럴</button>
-          </div>
+
         </div>
         <div class="gslide-grid" id="modelGridWrap">
           <div id="modelsLoading" class="grid-loading">
@@ -3965,14 +3943,7 @@ app.get('/generator', (c) => {
         <div class="gslide-header">
           <div class="gstep-label">Step 3 / 3 · 배경 선택</div>
           <h2 class="gstep-title">배경을 선택하세요</h2>
-          <div class="gfilter-bar bg-categories" id="bgCategories">
-            <button class="bg-cat active" onclick="filterBg('전체',this)">전체</button>
-            <button class="bg-cat" onclick="filterBg('스튜디오',this)">스튜디오</button>
-            <button class="bg-cat" onclick="filterBg('야외/자연',this)">야외/자연</button>
-            <button class="bg-cat" onclick="filterBg('도심/거리',this)">도심/거리</button>
-            <button class="bg-cat" onclick="filterBg('인테리어',this)">인테리어</button>
-            <button class="bg-cat" onclick="filterBg('컨셉/특수',this)">컨셉/특수</button>
-          </div>
+
         </div>
         <div class="gslide-grid" id="bgGridWrap">
           <div id="bgsLoading" class="grid-loading">
