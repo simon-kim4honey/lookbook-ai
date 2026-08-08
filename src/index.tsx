@@ -2698,7 +2698,7 @@ ${bodyContent}
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
             <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">1,000 크레딧</div>
-            <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능</div>
+            <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-11">이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능</div>
           </div>
           <div style="text-align:right;">
             <div style="font-size:22px;font-weight:800;color:#6c47ff;">20,000원</div>
@@ -2711,8 +2711,8 @@ ${bodyContent}
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
             <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">2,300 크레딧</div>
-            <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">25장</strong> 다운로드 가능</div>
-            <div style="font-size:11px;color:#a78bfa;margin-top:4px;">✨ 기본 대비 15% 더 받기</div>
+            <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-25">이미지 <strong style="color:#a78bfa;">25장</strong> 다운로드 가능</div>
+            <div style="font-size:11px;color:#a78bfa;margin-top:4px;" data-i18n="pkg-bonus15">✨ 기본 대비 15% 더 받기</div>
           </div>
           <div style="text-align:right;">
             <div style="font-size:22px;font-weight:800;color:#6c47ff;">40,000원</div>
@@ -2724,8 +2724,8 @@ ${bodyContent}
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
             <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">4,000 크레딧</div>
-            <div style="font-size:13px;color:#8b8ba0;">이미지 <strong style="color:#a78bfa;">44장</strong> 다운로드 가능</div>
-            <div style="font-size:11px;color:#a78bfa;margin-top:4px;">🚀 기본 대비 33% 더 받기</div>
+            <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-44">이미지 <strong style="color:#a78bfa;">44장</strong> 다운로드 가능</div>
+            <div style="font-size:11px;color:#a78bfa;margin-top:4px;" data-i18n="pkg-bonus33">🚀 기본 대비 33% 더 받기</div>
           </div>
           <div style="text-align:right;">
             <div style="font-size:22px;font-weight:800;color:#6c47ff;">60,000원</div>
@@ -2902,8 +2902,8 @@ app.get('/', (c) => {
         <a href="/dashboard">대시보드</a>
       </div>
       <div class="navbar-actions" style="position:relative;">
-        <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')">로그인</button>
-        <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')">무료 시작</button>
+        <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')" data-i18n="nav-login">로그인</button>
+        <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')" data-i18n="nav-signup">무료 시작</button>
         <!-- 로그인 후 프로필 아이콘만 표시 -->
         <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
           <span id="navUserCredits" style="display:none;"></span>
@@ -2916,13 +2916,13 @@ app.get('/', (c) => {
               <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <button onclick="openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </div>
-            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
         </div>
       </div>
@@ -3241,8 +3241,8 @@ app.get('/', (c) => {
 
       <!-- 탭 전환 -->
       <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid var(--border);">
-        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;">로그인</button>
-        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:600;color:var(--text-muted);cursor:pointer;">회원가입</button>
+        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;" data-i18n="nav-login">로그인</button>
+        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:600;color:var(--text-muted);cursor:pointer;" data-i18n="nav-signup2">회원가입</button>
       </div>
 
       <!-- 소셜 로그인 버튼 -->
@@ -3273,7 +3273,7 @@ app.get('/', (c) => {
           <div class="form-group">
             <input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" />
           </div>
-          <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;">로그인</button>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;" data-i18n="nav-login">로그인</button>
         </form>
       </div>
 
@@ -3310,7 +3310,7 @@ app.get('/', (c) => {
             <input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" />
           </div>
 
-          <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:12px;">가입하고 무료 시작 🎁</button>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:12px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
         </form>
       </div>
 
@@ -3542,7 +3542,7 @@ app.get('/dashboard', (c) => {
           <div class="db-credit-val" id="dbCredits">-</div>
           <div class="db-credit-sub">이미지 1장 = 90크레딧</div>
         </div>
-        <button class="db-charge-btn" onclick="openChargePanel()">충전</button>
+        <button class="db-charge-btn" onclick="openChargePanel()" data-i18n="nav-charge">충전</button>
       </div>
 
       <!-- 생성 내역 -->
@@ -3833,13 +3833,13 @@ app.get('/generator', (c) => {
               <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <button onclick="openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </div>
-            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
         </div>
       </div>
@@ -3936,7 +3936,7 @@ app.get('/generator', (c) => {
         </div>
         <div class="gslide-grid" id="modelGridWrap">
           <div id="modelsLoading" class="grid-loading">
-            <div style="font-size:32px;">⏳</div><p>모델 불러오는 중...</p>
+            <div style="font-size:32px;">⏳</div><p data-i18n="gen-loading">모델 불러오는 중...</p>
           </div>
           <div class="select-grid" id="modelGrid"></div>
         </div>
@@ -3957,7 +3957,7 @@ app.get('/generator', (c) => {
         </div>
         <div class="gslide-grid" id="bgGridWrap">
           <div id="bgsLoading" class="grid-loading">
-            <div style="font-size:32px;">⏳</div><p>배경 불러오는 중...</p>
+            <div style="font-size:32px;">⏳</div><p data-i18n="bg-loading">배경 불러오는 중...</p>
           </div>
           <div class="select-grid" id="bgGrid"></div>
         </div>
@@ -3966,7 +3966,7 @@ app.get('/generator', (c) => {
           <div class="gen-spinner"></div>
           <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;">AI가 이미지를 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
-          <div class="gen-status-text" id="genStatusText">시작 중...</div>
+          <div class="gen-status-text" id="genStatusText" data-i18n="gen-status-init">시작 중...</div>
           <div class="gen-status-msgs">
             <div class="gen-msg current" id="msg1"><div class="dot"></div> 의류 이미지 분석 중...</div>
             <div class="gen-msg" id="msg2"><div class="dot"></div> AI 모델 피팅 적용 중...</div>
@@ -4044,8 +4044,8 @@ app.get('/generator', (c) => {
         <p style="font-size:13px;color:var(--text-muted);">가입 즉시 무료 크레딧을 드려요!</p>
       </div>
       <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
-        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;">로그인</button>
-        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:600;color:var(--text-muted);cursor:pointer;">회원가입</button>
+        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;" data-i18n="nav-login">로그인</button>
+        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:600;color:var(--text-muted);cursor:pointer;" data-i18n="nav-signup2">회원가입</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
         <button onclick="oauthLogin('kakao')" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#FEE500;border:none;border-radius:10px;font-size:15px;font-weight:700;color:#3C1E1E;cursor:pointer;">
@@ -4067,7 +4067,7 @@ app.get('/generator', (c) => {
           <div id="loginError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="loginErrorText"></span></div>
           <div class="form-group"><input type="email" class="form-input" id="loginEmail" placeholder="이메일" autocomplete="email" /></div>
           <div class="form-group"><input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" /></div>
-          <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;">로그인</button>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;" data-i18n="nav-login">로그인</button>
         </form>
       </div>
       <div id="authFormSignup" style="display:none;">
@@ -4076,7 +4076,7 @@ app.get('/generator', (c) => {
           <div class="form-group"><input type="text" class="form-input" id="signupName" placeholder="이름" autocomplete="name" /></div>
           <div class="form-group"><input type="email" class="form-input" id="signupEmail" placeholder="이메일" autocomplete="email" /></div>
           <div class="form-group"><input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" /></div>
-          <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;">가입하고 무료 시작 🎁</button>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
         </form>
       </div>
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 이용약관 및 개인정보처리방침에 동의합니다.</p>
