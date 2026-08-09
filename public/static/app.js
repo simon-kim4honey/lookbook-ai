@@ -1496,7 +1496,6 @@ function renderModelGrid(models) {
       <img src="${imgSrc}" alt="${displayName}"
         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="grid-card-fallback">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>
-      <div class="grid-card-label">${displayName}</div>
       <div class="grid-card-check"><i class="fas fa-check"></i></div>`;
 
     card.addEventListener('click', () => {
