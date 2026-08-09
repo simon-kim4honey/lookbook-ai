@@ -2299,7 +2299,7 @@ app.post('/api/generation/start', async (c) => {
         `COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,
 
         clothingRoleDesc,
-        `Image ${modelImgIdx} = IDENTITY DONOR. This image provides ONLY the person's identity: facial bone structure/features (jawline, eye socket, nose, lips, cheekbones), eye details (shape/iris/lash), hair (color/volume/cut/style), and skin undertone (hue/warmth/texture). Everything else about this image — body shape, clothing, pose, head angle, camera angle, gaze direction — must be IGNORED and NOT copied.`,
+        `Image ${modelImgIdx} = IDENTITY DONOR. This image provides ONLY the person's identity: facial bone structure/features (jawline, eye socket, nose, lips, cheekbones), eye details (shape/iris/lash), hair (color/volume/cut/style), and skin undertone (hue/warmth/texture). Everything else about this image — body shape, clothing, pose, head angle, camera angle, gaze direction — must be IGNORED and NOT copied — this exact individual's identity must be perfectly preserved and instantly recognizable in the output.`,
         `Image ${bgImgIdx} = SCENE ANCHOR. This scene defines: background environment, all objects, scene lighting direction/color-temperature/intensity, color grade, and mood. LOCKED: background, all scene objects.`,
 
         `CLOTHING REPLACEMENT:`,
@@ -2307,6 +2307,7 @@ app.post('/api/generation/start', async (c) => {
         `Body pose may shift slightly so the new clothing fits naturally (minor arm/stance adjustments only).`,
 
         `IDENTITY TRANSPLANT (from Image ${modelImgIdx} — identity only, not orientation):`,
+        `  · CRITICAL — SAME EXACT PERSON: The output face must be the SAME SPECIFIC INDIVIDUAL as Image ${modelImgIdx}, 100% recognizable as this exact person — NOT a similar-looking substitute, NOT a different model, NOT an average/generic face. Every feature (eye shape, nose, lips, jawline, cheekbone position, face width, skin tone) must match Image ${modelImgIdx} precisely — only the head angle/tilt/gaze direction may differ to fit the new pose. If someone who knows this person looked at the result, they must immediately recognize them.`,
         `  · Facial identity: transplant the exact bone structure/features — jawline, cheekbone position, eye socket shape, nose bridge/tip, lip shape, overall facial proportions, eye shape, iris color, lash density.`,
         `  · Hair: transplant exactly — color (root-to-tip gradient), volume, texture, cut, style.`,
         `  · Skin undertone: apply this person's warm/cool/neutral base hue to ALL exposed skin uniformly — face, neck, décolletage, shoulders, arms, hands — zero tone mismatch across the body.`,
