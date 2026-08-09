@@ -72,7 +72,6 @@ let adminPromptConfig: AdminPromptConfig = {
     'COLOR GRADE MATCH: The background scene carries a specific color grade and tonal mood (e.g. warm golden, cool blue, high-contrast, soft pastel, moody dark). Render all composited elements under this exact color cast — do NOT render clothing or skin under a neutral white balance if the scene is warm or cool-toned.',
     'MOOD AND ATMOSPHERE MATCH: Preserve the scene\'s overall visual mood and atmosphere. The final image must feel tonally coherent — bright and airy scenes stay bright, moody scenes stay moody, editorial high-contrast stays high-contrast.',
     'FABRIC LIGHT INTERACTION: Simulate realistic light interaction with the new fabric — specular sheen on satin/silk, soft diffuse on cotton/knit, translucency on chiffon/voile — all under the scene\'s lighting conditions.',
-    'SKIN-SCENE MATCH: The model\'s face and skin must be RE-LIT to match the scene. Preserve facial geometry and identity exactly, but ADJUST brightness, color temperature, and shadow direction to match the scene\'s lighting. Do NOT preserve the face\'s original lighting from the reference image — re-render it under the scene\'s physical light. Face-to-neck and face-to-arm skin tone must be seamlessly consistent.',
     'Fashion editorial quality: magazine cover level seamless compositing, physically grounded.',
   ].join(' '),
   technicalSpec: [
@@ -81,8 +80,6 @@ let adminPromptConfig: AdminPromptConfig = {
     '의류에 선명한 포커스. 배경과 동일한 심도 및 렌즈 특성 유지.',
     '배경 씬의 색감·무드·조명 톤을 인물과 의류에 완전히 통합. 합성 아티팩트 없음.',
     '참조 이미지에 없는 의류, 액세서리, 소품 절대 추가 금지.',
-    'ABSOLUTE PROHIBITION: NO text, NO letters, NO numbers, NO logos, NO watermarks, NO brand marks, NO typographic elements of any kind anywhere in the image.',
-    'ABSOLUTE PROHIBITION: DO NOT alter the model\'s facial geometry, eye/nose/lip shape, or hair style. HOWEVER: skin brightness, color temperature, and lighting on the face MUST be adjusted to match the scene — this is not a violation, it is required.',
     'ABSOLUTE PROHIBITION: DO NOT modify, redesign, or alter any detail of the uploaded clothing item.',
   ].join(' '),
   updatedAt: new Date().toISOString(),
