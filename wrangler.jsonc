@@ -10,7 +10,7 @@
     {
       "binding": "LOOKBOOK_DB",
       "database_name": "lookbook-ai-production",
-      "database_id": "a9b679d1-2604-47cb-8155-825d2fd0cd10"
+      "database_id": "9df3606b-81a1-426f-875c-e1577f948419"
     }
   ],
   "kv_namespaces": [
