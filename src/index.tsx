@@ -2328,6 +2328,7 @@ app.post('/api/generation/start', async (c) => {
         `  · FACE-TO-NECK SEAM: The face-to-neck boundary must be seamless — same lighting falloff, same color temperature, no hard edge or tone jump.`,
         `  · HAIR INTEGRATION: Hair receives the scene's ambient + key light. Rim/backlight if present in the scene. Flyaways lit naturally.`,
 
+        `FACE-TO-BODY SEAM: The transition from face to neck to shoulders must be completely seamless — identical skin micro-texture (pores, fine hairs, grain), identical sharpness and depth-of-field, identical noise/blur level between face and body. This must read as ONE continuous photograph of ONE real person, never a cutout, collage, sticker, or composite.`,
         `FINAL OUTPUT: One seamless, ultra-photorealistic fashion photograph. The new clothing is worn by Image ${modelImgIdx}'s identity — face, hair, and full-body skin re-lit under Image ${bgImgIdx}'s scene. Result looks like this person was photographed in the original scene wearing the specified outfit — zero compositing artifacts.`,
         `8K resolution, magazine editorial quality.`,
         HARD_CONSTRAINTS,
@@ -2400,7 +2401,7 @@ app.post('/api/generation/start', async (c) => {
       prompt,
       aspect_ratio: aspectRatio,
       resolution: nbResolution,
-      thinking_level: 'default',
+      thinking_level: 'high',
       output_format: 'jpeg',
     }
     // images가 있을 때만 포함 (없으면 text-to-image 모드로 동작)
