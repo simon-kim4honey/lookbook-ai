@@ -2230,7 +2230,7 @@ app.post('/api/generation/start', async (c) => {
     const HARD_CONSTRAINTS = [
       `ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,
       `1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,
-      `2. DO NOT alter the model's facial geometry, facial bone structure, eye shape, nose shape, lip shape, or hair style. NOTE: skin brightness and color temperature MAY be adjusted to match the scene's lighting — this is required for natural integration.`,
+      `2. Preserve the model's facial IDENTITY exactly — bone structure, eye shape, nose shape, lip shape, hair style must stay the same recognizable person. HOWEVER, the head angle, tilt, and gaze direction MUST be re-rendered to match the new body pose and scene (do not copy the reference photo's head orientation), and skin brightness/color-temperature MUST be adjusted to match the scene's lighting — these are required for natural integration, not violations of this rule.`,
       `3. DO NOT change, redesign, or substitute ANY detail of the clothing: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown in the reference.`,
       `4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,
       `Ultra-photorealistic, 8K quality, professional fashion editorial, magazine cover quality.`,
@@ -2298,26 +2298,22 @@ app.post('/api/generation/start', async (c) => {
       prompt = [
         `COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,
 
-        // 이미지 역할 정의
         clothingRoleDesc,
-        `Image ${modelImgIdx} = IDENTITY DONOR. Extract: facial geometry (jawline, eye socket, nose, lips, cheekbones), eye details (shape/iris/lash), hair (color/volume/cut/style), and full-body skin undertone (hue + warmth + texture). DO NOT use body shape, clothing, or pose from this image.`,
+        `Image ${modelImgIdx} = IDENTITY DONOR. This image provides ONLY the person's identity: facial bone structure/features (jawline, eye socket, nose, lips, cheekbones), eye details (shape/iris/lash), hair (color/volume/cut/style), and skin undertone (hue/warmth/texture). Everything else about this image — body shape, clothing, pose, head angle, camera angle, gaze direction — must be IGNORED and NOT copied.`,
         `Image ${bgImgIdx} = SCENE ANCHOR. This scene defines: background environment, all objects, scene lighting direction/color-temperature/intensity, color grade, and mood. LOCKED: background, all scene objects.`,
 
-        // 의상 교체
         `CLOTHING REPLACEMENT:`,
         clothingReplaceInstructions,
         `Body pose may shift slightly so the new clothing fits naturally (minor arm/stance adjustments only).`,
 
-        // 신원 교체
-        `IDENTITY & FACE TRANSPLANT (from Image ${modelImgIdx}):`,
-        `  · Transplant the FACIAL GEOMETRY exactly: jawline, cheekbone position, eye socket shape, nose bridge/tip, lip shape, overall facial proportions.`,
-        `  · Transplant EYE DETAILS exactly: eye shape, lid type, iris color, lash density.`,
-        `  · Transplant HAIR exactly: color (root-to-tip gradient), volume, texture, cut, style.`,
-        `  · Apply the skin UNDERTONE (warm/cool/neutral base hue) from Image ${modelImgIdx} to ALL exposed skin uniformly — face, neck, décolletage, shoulders, arms, hands — ZERO tone mismatch across the body.`,
+        `IDENTITY TRANSPLANT (from Image ${modelImgIdx} — identity only, not orientation):`,
+        `  · Facial identity: transplant the exact bone structure/features — jawline, cheekbone position, eye socket shape, nose bridge/tip, lip shape, overall facial proportions, eye shape, iris color, lash density.`,
+        `  · Hair: transplant exactly — color (root-to-tip gradient), volume, texture, cut, style.`,
+        `  · Skin undertone: apply this person's warm/cool/neutral base hue to ALL exposed skin uniformly — face, neck, décolletage, shoulders, arms, hands — zero tone mismatch across the body.`,
+        `  · HEAD ANGLE & POSE — DO NOT COPY: the head tilt, camera angle, and gaze direction from Image ${modelImgIdx} must NOT be copied. Re-render this person's face and head at the NEW angle required by the body's new pose and the scene's camera perspective. A different head angle than the reference photo is REQUIRED and CORRECT — only the facial identity (bone structure/features) carries over, never the original photo's head orientation.`,
 
-        // 씬 조명 통합 (핵심)
         `SCENE LIGHTING INTEGRATION (from Image ${bgImgIdx} — critical for photorealism):`,
-        `  Re-light ALL elements (clothing, face, skin) under Image ${bgImgIdx}'s physical lighting environment:`,
+        `  Re-light ALL elements (clothing, face, skin, hair) under Image ${bgImgIdx}'s physical lighting environment:`,
         `  · BRIGHTNESS: Match face and skin brightness to the scene's ambient light level. Bright scene → bright face; moody/dim scene → face lit accordingly.`,
         `  · LIGHT DIRECTION: Apply the scene's key light direction. Highlights land on the correct side of the face (forehead, cheekbone, nose bridge), shadows fall on the opposite side.`,
         `  · COLOR TEMPERATURE: Tint face, skin, and clothing under the scene's color temperature (warm golden-hour tint, cool blue shade, neutral studio white, etc.). Do NOT render any element under a different white balance from the scene.`,
@@ -2325,11 +2321,10 @@ app.post('/api/generation/start', async (c) => {
         `  · CATCH-LIGHTS: Eyes must reflect Image ${bgImgIdx}'s light source position and shape.`,
         `  · FABRIC RENDERING: Simulate specular highlights on shiny fabrics, soft diffuse on matte, translucency on thin materials — all under the scene's light.`,
         `  · SUBSURFACE SCATTERING: Realistic skin SSS under scene light (warm ears/nose in backlit; strong SSS in diffuse light).`,
-        `  · FACE-TO-NECK SEAM: The face-to-neck boundary must be seamless — same lighting falloff, same color temperature, no hard edge or tone jump.`,
+        `  · SEAMLESS INTEGRATION: The face-to-neck-to-body transition must be completely seamless — same lighting falloff, same color temperature, no hard edge or tone jump, identical skin micro-texture/sharpness/grain between face and body. This must read as ONE continuous photograph of ONE real person, never a cutout, collage, sticker, or composite.`,
         `  · HAIR INTEGRATION: Hair receives the scene's ambient + key light. Rim/backlight if present in the scene. Flyaways lit naturally.`,
 
-        `FACE-TO-BODY SEAM: The transition from face to neck to shoulders must be completely seamless — identical skin micro-texture (pores, fine hairs, grain), identical sharpness and depth-of-field, identical noise/blur level between face and body. This must read as ONE continuous photograph of ONE real person, never a cutout, collage, sticker, or composite.`,
-        `FINAL OUTPUT: One seamless, ultra-photorealistic fashion photograph. The new clothing is worn by Image ${modelImgIdx}'s identity — face, hair, and full-body skin re-lit under Image ${bgImgIdx}'s scene. Result looks like this person was photographed in the original scene wearing the specified outfit — zero compositing artifacts.`,
+        `FINAL OUTPUT: One seamless, ultra-photorealistic fashion photograph. The new clothing is worn by Image ${modelImgIdx}'s identity, re-posed and re-angled to fit the new body pose, with face/hair/skin fully re-lit under Image ${bgImgIdx}'s scene. Result looks like this person was actually photographed fresh in the original scene wearing the specified outfit — zero compositing artifacts, zero visible seams, zero cut-and-paste look.`,
         `8K resolution, magazine editorial quality.`,
         HARD_CONSTRAINTS,
       ].join(' ')
