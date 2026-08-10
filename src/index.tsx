@@ -4630,10 +4630,10 @@ function renderUserTable(users) {
       + '<td style="padding:12px 16px;">' + (providerBadge[u.provider] || u.provider) + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">'
       +   '<span style="font-size:14px;font-weight:700;color:#9b7cff;">' + credits + '</span>'
-      +   '<span style="font-size:10px;color:#8b8ba0;"> 크레딧</span>'\
-      +   '<div style="margin-top:4px;display:flex;gap:4px;justify-content:center;">'\
-      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="grant" style="font-size:10px;padding:2px 8px;background:#6c47ff33;border:1px solid #6c47ff66;border-radius:6px;color:#9b7cff;cursor:pointer;font-weight:600;">지급</button>'\
-      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="credits" style="font-size:10px;padding:2px 8px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">설정</button>'\
+      +   '<span style="font-size:10px;color:#8b8ba0;"> 크레딧</span>'
+      +   '<div style="margin-top:4px;display:flex;gap:4px;justify-content:center;">'
+      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="grant" style="font-size:10px;padding:2px 8px;background:#6c47ff33;border:1px solid #6c47ff66;border-radius:6px;color:#9b7cff;cursor:pointer;font-weight:600;">지급</button>'
+      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="credits" style="font-size:10px;padding:2px 8px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">설정</button>'
       +   '</div>'
       + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">' + (statusBadge[u.status] || u.status) + '</td>'
