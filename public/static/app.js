@@ -1133,6 +1133,12 @@ async function loadBackgroundsFromAPI() {
     const data = await res.json();
 
     AppState.allBackgrounds = data.backgrounds || [];
+
+    // 배경 노출 순서 랜덤화
+    for (let i = AppState.allBackgrounds.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [AppState.allBackgrounds[i], AppState.allBackgrounds[j]] = [AppState.allBackgrounds[j], AppState.allBackgrounds[i]];
+    }
     AppState.filteredBackgrounds = [...AppState.allBackgrounds];
 
     const wrap = document.getElementById('bgGridWrap');
