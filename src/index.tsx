@@ -427,8 +427,17 @@ app.patch('/api/admin/models/:id/labels', adminAuth, async (c) => {
   try {
     const id = c.req.param('id')
     const { gender, age, mood } = await c.req.json() as any
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
     const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
-    if (!db) return c.json({ success: false, message: 'D1 없음' }, 500)
+    if (kv) {
+      const list = await kvGetModels(kv)
+      const idx = list.findIndex(m => m.id === id)
+      if (idx === -1) return c.json({ success: false, message: '모델을 찾을 수 없습니다.' }, 404)
+      list[idx] = { ...list[idx], gender: gender || '미분류', age: age || '미분류', mood: mood || '미분류' }
+      await kvSaveModels(kv, list)
+      return c.json({ success: true })
+    }
+    if (!db) return c.json({ success: false, message: 'D1/KV 없음' }, 500)
     await db.prepare(`UPDATE custom_models SET gender=?, age=?, mood=? WHERE id=?`)
       .bind(gender || '미분류', age || '미분류', mood || '미분류', id).run()
     return c.json({ success: true })
