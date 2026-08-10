@@ -2194,20 +2194,32 @@ app.post('/api/generation/start', async (c) => {
     const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
     // db는 위의 세션 인증 블록에서 이미 선언됨
 
+    let modelGender: string | null = null
     if (modelId) {
       const mid = String(modelId)
       if (kv) {
         const stored = await kv.get(`model_img:${mid}`)
         if (stored) { modelImageBase64 = stored; console.log('KV custom model: OK') }
+        const kvModels = await kvGetModels(kv)
+        modelGender = kvModels.find(m => m.id === mid)?.gender || null
       } else if (db) {
         const stored = await d1GetModelImg(db, mid)
         if (stored) { modelImageBase64 = stored; console.log('D1 custom model: OK') }
+        const genderRow: any = await db.prepare(`SELECT gender FROM custom_models WHERE id = ?`).bind(mid).first()
+        modelGender = genderRow?.gender || null
       } else {
         const m = _memModels.find(m => m.id === mid)
         if (m?.imageBase64) { modelImageBase64 = m.imageBase64; console.log('Mem custom model: OK') }
+        modelGender = (m as any)?.gender || null
       }
       if (!modelImageBase64) console.log('Custom model image not found for id:', mid)
     }
+
+    // 남성 모델 선택 시에만 체형 지시 추가. 여성/미지정은 기존 프롬프트 그대로 유지.
+    // ⚠️ 앞으로 성별 언급 없는 프롬프트 보완 요청은 이 변수와 무관하게 공통 프롬프트 쪽에 적용할 것.
+    const modelBodyTypeNote = modelGender === '남성'
+      ? `MALE BODY TYPE: Render the body/physique as a MALE body type — broader shoulders, flatter chest, straighter waist-to-hip line, masculine posture and build. The clothing must fit and drape as menswear on a male body, not a female body shape.`
+      : ''
     if (bgId) {
       const bid = String(bgId)
       if (kv) {
@@ -2304,6 +2316,7 @@ app.post('/api/generation/start', async (c) => {
 
         `IDENTITY (from Image ${modelImgIdx}) — READ THIS ONCE, IT IS THE ONLY IDENTITY RULE:`,
         `This is Image ${modelImgIdx}'s exact face, physically rotated to a new head angle and relit under Image ${bgImgIdx}'s scene — the SAME face asset transformed, never a newly generated or substitute face. KEEP UNCHANGED: bone structure, eye shape/spacing, iris color, nose shape, lip shape, jawline, cheekbones, face width, hair (color/volume/cut/style), and skin undertone — these must be pixel-consistent with Image ${modelImgIdx} when mentally rotated back to its original angle. Head/face size relative to the body must stay in natural human proportion, matching Image ${modelImgIdx}'s scale — do not enlarge or shrink it. CHANGE ONLY what a camera and lighting change: head angle, tilt, gaze direction, expression, perspective, brightness, shadows, color temperature, saturation. Do NOT copy Image ${modelImgIdx}'s original angle, expression, or lighting — they must update to match Image ${bgImgIdx}'s scene. Do NOT use body shape, clothing, or pose from Image ${modelImgIdx}.`,
+        modelBodyTypeNote,
 
         `SCENE LIGHTING INTEGRATION (from Image ${bgImgIdx} — critical for photorealism):`,
         `  Re-light ALL elements (clothing, face, skin, hair) under Image ${bgImgIdx}'s physical lighting environment:`,
@@ -2331,6 +2344,7 @@ app.post('/api/generation/start', async (c) => {
         `Create a hyper-realistic professional fashion lookbook photograph.`,
         clothingRoleDesc,
         `Image ${modelImgIdx} = MODEL IDENTITY — preserve this exact person's face, hair, skin tone, body proportions exactly.`,
+        modelBodyTypeNote,
         clothingReplaceInstructions,
         `Show a ${poseTypeText}, ${poseStyleText}.`,
         `Background: ${bgDesc} (${bgName}). Create a photorealistic environment. Integrate the model naturally with correct lighting and shadows.`,
