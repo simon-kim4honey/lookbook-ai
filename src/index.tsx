@@ -4968,15 +4968,38 @@ async function loadCustomModels() {
       return
     }
     grid.innerHTML = '<div style="font-size:14px;font-weight:600;margin:20px 0 12px;">커스텀 모델 (' + data.models.length + '개)</div><div class="media-grid">' +
-      data.models.map(m =>
+      data.models.map(m => {
+        const g = m.gender || '미분류'
+        return (
         '<div class="media-card">' +
         '<img src="/api/proxy/custom-model/' + m.id + '" alt="' + m.name + '" loading="lazy"/>' +
         '<span class="custom-badge">커스텀</span>' +
         '<button class="del-btn" onclick="event.stopPropagation();deleteModel(' + "'" + m.id + "'" + ')"><i class="fas fa-times"></i></button>' +
-        '<div class="meta"><div class="name">' + m.name + '</div><div class="desc">' + (m.desc || '-') + '</div></div>' +
+        '<div class="meta">' +
+          '<div class="name">' + m.name + '</div>' +
+          '<div class="desc">' + (m.desc || '-') + '</div>' +
+          '<div style="display:flex;gap:6px;margin-top:6px;">' +
+            '<button onclick="event.stopPropagation();setModelGender(' + "'" + m.id + "'" + ',\'여성\')" style="flex:1;padding:5px;border-radius:6px;border:1px solid ' + (g==='여성'?'#6366f1':'#444') + ';background:' + (g==='여성'?'#6366f1':'transparent') + ';color:#fff;font-size:12px;cursor:pointer;">여성</button>' +
+            '<button onclick="event.stopPropagation();setModelGender(' + "'" + m.id + "'" + ',\'남성\')" style="flex:1;padding:5px;border-radius:6px;border:1px solid ' + (g==='남성'?'#6366f1':'#444') + ';background:' + (g==='남성'?'#6366f1':'transparent') + ';color:#fff;font-size:12px;cursor:pointer;">남성</button>' +
+          '</div>' +
+        '</div>' +
         '</div>'
-      ).join('') + '</div>'
+        )
+      }).join('') + '</div>'
   } catch(e) { console.error('loadCustomModels error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+async function setModelGender(id, gender) {
+  try {
+    const res = await fetch('/api/admin/models/' + id + '/labels', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+      body: JSON.stringify({ gender, age: '미분류', mood: '미분류' })
+    })
+    const data = await res.json()
+    if (!data.success) { alert('저장 실패: ' + (data.message || '알 수 없는 오류')); return }
+    await loadCustomModels()
+  } catch (e) { alert('오류: ' + e.message) }
 }
 
 // ══════════════════════════════════════════════
