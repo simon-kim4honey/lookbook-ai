@@ -3930,6 +3930,11 @@ app.get('/generator', (c) => {
           <h2 class="gstep-title" data-i18n="step2-title">AI 모델을 선택하세요</h2>
 
         </div>
+        <div class="gfilter-bar" id="modelFilters" style="display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap;">
+          <button class="filter-tag active" onclick="filterModels('gender','all',this)">전체</button>
+          <button class="filter-tag" onclick="filterModels('gender','여성',this)">여성</button>
+          <button class="filter-tag" onclick="filterModels('gender','남성',this)">남성</button>
+        </div>
         <div class="gslide-grid" id="modelGridWrap">
           <div id="modelsLoading" class="grid-loading">
             <div style="font-size:32px;">⏳</div><p data-i18n="gen-loading">모델 불러오는 중...</p>

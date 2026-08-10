@@ -1096,6 +1096,11 @@ async function loadModelsFromAPI() {
     const data = await res.json();
 
     AppState.allModels = data.models || [];
+    // 모델 노출 순서 랜덤화
+    for (let i = AppState.allModels.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [AppState.allModels[i], AppState.allModels[j]] = [AppState.allModels[j], AppState.allModels[i]];
+    }
     AppState.filteredModels = [...AppState.allModels];
 
     const wrap = document.getElementById('modelGridWrap');
