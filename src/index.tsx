@@ -613,6 +613,31 @@ app.get('/api/proxy/custom-bg/:id', async (c) => {
   })
 })
 
+// GET /api/proxy/clothing/:jobId/:idx — 공유 페이지용 원본 의상 이미지 서빙 (14일 KV 보관)
+app.get('/api/proxy/clothing/:jobId/:idx', async (c) => {
+  const jobId = c.req.param('jobId')
+  const idx = parseInt(c.req.param('idx') || '0', 10)
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.notFound()
+
+  const stored = await kv.get(`clothing_img:${jobId}`)
+  if (!stored) return c.notFound()
+
+  let urls: string[] = []
+  try { urls = JSON.parse(stored) } catch {}
+  const dataUrl = urls[idx]
+  if (!dataUrl) return c.notFound()
+
+  const [header, b64] = dataUrl.split(',')
+  const mime = (header.match(/data:([^;]+)/) || [])[1] || 'image/jpeg'
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new Response(bytes.buffer, {
+    headers: { 'Content-Type': mime, 'Cache-Control': 'public, max-age=3600' },
+  })
+})
+
 // Atlas Cloud 헤더 생성
 const atlasHeaders = (apiKey: string) => ({
   'Authorization': `Bearer ${apiKey}`,
@@ -2472,8 +2497,8 @@ app.post('/api/generation/start', async (c) => {
         const nextSeq = (lastSeq?.last_seq || 0) + 1
 
         await db.prepare(
-          `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))`
+          `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, model_id, bg_id, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+14 days'))`
         ).bind(
           sessionUser.user_id,
           combinedJobId,
@@ -2481,11 +2506,27 @@ app.post('/api/generation/start', async (c) => {
           modelName || '패션 모델',
           bgName || '스튜디오',
           ratio || '3:4',
-          nextSeq
+          nextSeq,
+          modelId ? String(modelId) : null,
+          bgId ? String(bgId) : null,
         ).run()
         console.log(`[GenLog] seq_no=${nextSeq} 기록 완료`)
       } catch (logErr) {
         console.warn('[GenLog] 생성 내역 기록 실패 (무시):', logErr)
+      }
+    }
+
+    // 공유 페이지에서 원본 의상 이미지를 보여주기 위해 KV에 14일간 보관
+    // (의상 이미지는 다른 곳에 저장되지 않는 요청 단발성 데이터라 여기서만 백업)
+    if (kv && sortedClothing.length > 0) {
+      try {
+        await kv.put(
+          `clothing_img:${combinedJobId}`,
+          JSON.stringify(sortedClothing.map(ci => ci.dataUrl)),
+          { expirationTtl: 14 * 24 * 60 * 60 }
+        )
+      } catch (kvErr) {
+        console.warn('[GenLog] 의상 이미지 KV 저장 실패 (무시):', kvErr)
       }
     }
 
@@ -2778,19 +2819,32 @@ app.get('/share/:jobId/:idx', async (c) => {
   const jobId = c.req.param('jobId')
   const idx = parseInt(c.req.param('idx') || '0', 10)
 
-  const renderSharePage = (opts: { state: 'ok' | 'expired' | 'notfound'; imageUrl?: string }) => {
+  const renderSharePage = (opts: { state: 'ok' | 'expired' | 'notfound'; imageUrl?: string; tabs?: { label: string; url: string }[] }) => {
     const origin = getOrigin(c)
     const pageUrl = `${origin}/share/${jobId}/${idx}`
     let body = ''
     if (opts.state === 'ok') {
+      const tabs = opts.tabs || []
+      const tabsHtml = tabs.length > 1 ? `
+          <div class="share-tabs">
+            ${tabs.map((t, i) => `<button class="share-tab${i === 0 ? ' active' : ''}" data-url="${t.url}" onclick="_switchShareTab(this)">${t.label}</button>`).join('')}
+          </div>` : ''
       body = `
         <div class="share-card">
-          <img src="${opts.imageUrl}" alt="AI 패션 룩북 스튜디오 생성 이미지" class="share-img" />
+          ${tabsHtml}
+          <img id="shareMainImg" src="${opts.imageUrl}" alt="AI 패션 룩북 스튜디오 생성 이미지" class="share-img" />
           <div class="share-info">
             <p class="share-desc">AI 패션 룩북 스튜디오로 만든 피팅컷이에요 ✨</p>
             <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 해보기</a>
           </div>
-        </div>`
+        </div>
+        <script>
+          function _switchShareTab(btn) {
+            document.querySelectorAll('.share-tab').forEach(function(b){ b.classList.remove('active'); });
+            btn.classList.add('active');
+            document.getElementById('shareMainImg').src = btn.getAttribute('data-url');
+          }
+        </script>`
     } else if (opts.state === 'expired') {
       body = `
         <div class="share-card share-message">
@@ -2824,7 +2878,10 @@ app.get('/share/:jobId/:idx', async (c) => {
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; background: #0d0d1a; font-family: 'Pretendard', -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; padding: 24px; }
     .share-card { max-width: 420px; width: 100%; background: #17172b; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
-    .share-img { width: 100%; display: block; }
+    .share-tabs { display: flex; gap: 6px; padding: 14px 14px 0; flex-wrap: wrap; }
+    .share-tab { flex: 1; min-width: 64px; background: #23233d; color: #a0a0c0; border: none; border-radius: 10px; padding: 9px 6px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; }
+    .share-tab.active { background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; }
+    .share-img { width: 100%; display: block; margin-top: 12px; }
     .share-info { padding: 20px 20px 24px; text-align: center; }
     .share-desc { color: #e0e0f0; font-size: 15px; font-weight: 600; margin: 0 0 16px; }
     .share-cta { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 14px; }
@@ -2843,7 +2900,7 @@ app.get('/share/:jobId/:idx', async (c) => {
 
   try {
     const log = await db.prepare(
-      `SELECT image_urls, expires_at FROM generation_logs WHERE job_id = ? ORDER BY id DESC LIMIT 1`
+      `SELECT image_urls, expires_at, model_id, bg_id FROM generation_logs WHERE job_id = ? ORDER BY id DESC LIMIT 1`
     ).bind(jobId).first() as any
 
     if (!log || !log.image_urls) return c.html(renderSharePage({ state: 'notfound' }), 404)
@@ -2858,8 +2915,30 @@ app.get('/share/:jobId/:idx', async (c) => {
     const url = urls[idx]
     if (!url) return c.html(renderSharePage({ state: 'notfound' }), 404)
 
-    const proxiedUrl = `${getOrigin(c)}/api/proxy/gen-image?url=${encodeURIComponent(url)}`
-    return c.html(renderSharePage({ state: 'ok', imageUrl: proxiedUrl }))
+    const origin = getOrigin(c)
+    const proxiedUrl = `${origin}/api/proxy/gen-image?url=${encodeURIComponent(url)}`
+
+    // 공유 화면 상단 탭 — 생성결과 + 원본 의상/모델/배경
+    const tabs: { label: string; url: string }[] = [{ label: '생성결과', url: proxiedUrl }]
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    if (kv) {
+      const clothingStored = await kv.get(`clothing_img:${jobId}`)
+      if (clothingStored) {
+        try {
+          const clothingUrls: string[] = JSON.parse(clothingStored)
+          clothingUrls.forEach((_, i) => {
+            tabs.push({
+              label: clothingUrls.length > 1 ? `의상${i + 1}` : '의상',
+              url: `${origin}/api/proxy/clothing/${jobId}/${i}`,
+            })
+          })
+        } catch {}
+      }
+    }
+    if (log.model_id) tabs.push({ label: '모델', url: `${origin}/api/proxy/custom-model/${log.model_id}` })
+    if (log.bg_id) tabs.push({ label: '배경', url: `${origin}/api/proxy/custom-bg/${log.bg_id}` })
+
+    return c.html(renderSharePage({ state: 'ok', imageUrl: proxiedUrl, tabs }))
   } catch (err: any) {
     console.error('Share page error:', err)
     return c.html(renderSharePage({ state: 'notfound' }), 500)
