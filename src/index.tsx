@@ -16,6 +16,8 @@ type Bindings = {
   KAKAO_CLIENT_SECRET: string
   GOOGLE_CLIENT_ID: string
   GOOGLE_CLIENT_SECRET: string
+  // 카카오톡 공유하기 (카카오 로그인과 별개 — JavaScript 키)
+  KAKAO_JS_KEY: string
   // 어드민
   ADMIN_PASSWORD: string
   // 토스페이먼츠
@@ -906,6 +908,11 @@ app.get('/api/locale', (c) => {
   if (country === 'KR') locale = 'ko'
   else if (country === 'JP') locale = 'ja'
   return c.json({ locale, country })
+})
+
+// ── 카카오톡 공유하기용 JS 키 조회 (공개 정보 — 카카오 로그인 REST 키와 무관) ──
+app.get('/api/config/kakao-js-key', (c) => {
+  return c.json({ key: c.env.KAKAO_JS_KEY || '' })
 })
 
 // ════════════════════════════════════════════════════
@@ -2764,6 +2771,101 @@ ${bodyContent}
 </body>
 </html>`
 
+// ─── 공유된 생성 이미지 보기 (링크복사 / 카카오톡 공유로 전달되는 공개 페이지) ───
+// 별도 테이블 없이 기존 generation_logs.image_urls + expires_at(14일)을 그대로 재사용
+app.get('/share/:jobId/:idx', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  const jobId = c.req.param('jobId')
+  const idx = parseInt(c.req.param('idx') || '0', 10)
+
+  const renderSharePage = (opts: { state: 'ok' | 'expired' | 'notfound'; imageUrl?: string }) => {
+    const origin = getOrigin(c)
+    const pageUrl = `${origin}/share/${jobId}/${idx}`
+    let body = ''
+    if (opts.state === 'ok') {
+      body = `
+        <div class="share-card">
+          <img src="${opts.imageUrl}" alt="AI 패션 룩북 스튜디오 생성 이미지" class="share-img" />
+          <div class="share-info">
+            <p class="share-desc">AI 패션 룩북 스튜디오로 만든 피팅컷이에요 ✨</p>
+            <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 해보기</a>
+          </div>
+        </div>`
+    } else if (opts.state === 'expired') {
+      body = `
+        <div class="share-card share-message">
+          <span class="share-emoji">⏰</span>
+          <p class="share-msg-text">다운로드 기간 14일이 만료되어 파일을 불러올 수 없어요.</p>
+          <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
+        </div>`
+    } else {
+      body = `
+        <div class="share-card share-message">
+          <span class="share-emoji">🔍</span>
+          <p class="share-msg-text">이미지를 찾을 수 없어요.</p>
+          <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
+        </div>`
+    }
+
+    return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI 패션 룩북 스튜디오 - 공유된 피팅컷</title>
+  <meta property="og:title" content="AI 패션 룩북 스튜디오로 만든 피팅컷" />
+  <meta property="og:description" content="나도 내 옷으로 AI 피팅컷을 만들어볼까?" />
+  ${opts.state === 'ok' ? `<meta property="og:image" content="${opts.imageUrl}" />` : ''}
+  <meta property="og:url" content="${pageUrl}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: #0d0d1a; font-family: 'Pretendard', -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .share-card { max-width: 420px; width: 100%; background: #17172b; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+    .share-img { width: 100%; display: block; }
+    .share-info { padding: 20px 20px 24px; text-align: center; }
+    .share-desc { color: #e0e0f0; font-size: 15px; font-weight: 600; margin: 0 0 16px; }
+    .share-cta { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 14px; }
+    .share-message { padding: 48px 28px; text-align: center; }
+    .share-emoji { font-size: 40px; display: block; margin-bottom: 16px; }
+    .share-msg-text { color: #e0e0f0; font-size: 15px; font-weight: 600; line-height: 1.6; margin: 0 0 24px; }
+  </style>
+</head>
+<body>
+  ${body}
+</body>
+</html>`
+  }
+
+  if (!jobId || isNaN(idx)) return c.html(renderSharePage({ state: 'notfound' }), 404)
+
+  try {
+    const log = await db.prepare(
+      `SELECT image_urls, expires_at FROM generation_logs WHERE job_id = ? ORDER BY id DESC LIMIT 1`
+    ).bind(jobId).first() as any
+
+    if (!log || !log.image_urls) return c.html(renderSharePage({ state: 'notfound' }), 404)
+
+    if (log.expires_at) {
+      const exp = new Date(String(log.expires_at).replace(' ', 'T') + 'Z')
+      if (exp.getTime() <= Date.now()) return c.html(renderSharePage({ state: 'expired' }))
+    }
+
+    let urls: string[] = []
+    try { urls = JSON.parse(log.image_urls) } catch {}
+    const url = urls[idx]
+    if (!url) return c.html(renderSharePage({ state: 'notfound' }), 404)
+
+    const proxiedUrl = `${getOrigin(c)}/api/proxy/gen-image?url=${encodeURIComponent(url)}`
+    return c.html(renderSharePage({ state: 'ok', imageUrl: proxiedUrl }))
+  } catch (err: any) {
+    console.error('Share page error:', err)
+    return c.html(renderSharePage({ state: 'notfound' }), 500)
+  }
+})
+
 // ─── 이용약관 페이지 ───
 app.get('/terms', (c) => {
   return c.html(`<!DOCTYPE html>
@@ -4040,13 +4142,13 @@ app.get('/generator', (c) => {
         <!-- 버튼 영역: 재생성 + 다운로드 -->
         <div id="modalButtonArea" style="position:absolute;bottom:16px;right:16px;z-index:20;display:flex;align-items:center;gap:8px;">
           <!-- 재생성 버튼 -->
-          <button id="regenBtn" onclick="regenImage()" style="display:flex;align-items:center;gap:6px;padding:10px 16px;background:rgba(99,102,241,0.85);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,1)'" onmouseout="this.style.background='rgba(99,102,241,0.85)'">
+          <button id="regenBtn" onclick="regenImage()" style="display:flex;align-items:center;gap:6px;padding:10px 16px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.85)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">
             <i class="fas fa-redo-alt"></i>
             <span id="regenBtnText">재생성</span>
             <span id="regenCounter" style="font-size:12px;opacity:0.8;"></span>
           </button>
           <!-- 다운로드 버튼 -->
-          <button id="downloadBtn" onclick="downloadImage()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.85)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">
+          <button id="downloadBtn" onclick="downloadImage()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:rgba(99,102,241,0.85);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,1)'" onmouseout="this.style.background='rgba(99,102,241,0.85)'">
             <i class="fas fa-download"></i> 다운로드
           </button>
         </div>
@@ -4055,6 +4157,24 @@ app.get('/generator', (c) => {
           재생성 한도가 초과하였습니다. 다른 옷으로 시도해주세요.
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Action Progress Modal (다운로드/재생성 진행 중 + 완료 팝업) -->
+  <div class="modal-overlay" id="actionProgressModal" style="z-index:10500;">
+    <div class="action-progress-box">
+      <div id="actionProgressSpinner" class="action-progress-spinner"></div>
+      <div id="actionProgressCheck" class="action-progress-check" style="display:none;"><i class="fas fa-check"></i></div>
+      <div id="actionProgressText" class="action-progress-text">처리 중...</div>
+      <div id="actionProgressShare" class="action-progress-share" style="display:none;">
+        <button class="action-progress-share-btn link" onclick="copyShareLink()">
+          <i class="fas fa-link"></i> 링크복사
+        </button>
+        <button id="actionProgressKakaoBtn" class="action-progress-share-btn kakao" onclick="shareToKakao()" style="display:none;">
+          <i class="fas fa-comment"></i> 카카오톡 공유
+        </button>
+      </div>
+      <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
   </div>
 

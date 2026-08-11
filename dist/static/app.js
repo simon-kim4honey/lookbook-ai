@@ -456,6 +456,132 @@ function switchModal(from, to) {
   setTimeout(() => openModal(to), 150);
 }
 
+// ─────────────────────────────────────────────────────────
+// ACTION PROGRESS MODAL (다운로드 / 재생성 진행 + 완료 팝업)
+// ─────────────────────────────────────────────────────────
+let _shareCtx = { jobId: null, idx: null, imageUrl: null };
+let _kakaoJsKey = null;
+
+function openActionProgress(text) {
+  const spinner = document.getElementById('actionProgressSpinner');
+  const check = document.getElementById('actionProgressCheck');
+  const textEl = document.getElementById('actionProgressText');
+  const share = document.getElementById('actionProgressShare');
+  const closeBtn = document.getElementById('actionProgressCloseBtn');
+  if (spinner) spinner.style.display = '';
+  if (check) check.style.display = 'none';
+  if (textEl) textEl.textContent = text;
+  if (share) share.style.display = 'none';
+  if (closeBtn) closeBtn.style.display = 'none';
+  openModal('actionProgressModal');
+}
+
+function setActionComplete(text, opts) {
+  opts = opts || {};
+  const spinner = document.getElementById('actionProgressSpinner');
+  const check = document.getElementById('actionProgressCheck');
+  const textEl = document.getElementById('actionProgressText');
+  const share = document.getElementById('actionProgressShare');
+  const closeBtn = document.getElementById('actionProgressCloseBtn');
+  const kakaoBtn = document.getElementById('actionProgressKakaoBtn');
+  if (spinner) spinner.style.display = 'none';
+  if (check) check.style.display = 'flex';
+  if (textEl) textEl.textContent = text;
+  if (closeBtn) closeBtn.style.display = '';
+  if (opts.showShare && opts.jobId && opts.idx != null && opts.idx >= 0) {
+    _shareCtx = { jobId: opts.jobId, idx: opts.idx, imageUrl: opts.imageUrl || '' };
+    if (share) share.style.display = 'flex';
+    if (kakaoBtn) kakaoBtn.style.display = _kakaoJsKey ? '' : 'none';
+  } else if (share) {
+    share.style.display = 'none';
+  }
+}
+
+function closeActionProgress() {
+  closeModal('actionProgressModal');
+}
+
+function _shareUrlFor(jobId, idx) {
+  return `${location.origin}/share/${jobId}/${idx}`;
+}
+
+// 생성 이미지 배열 내 idx → 실제 저장된 image_urls 배열 내 인덱스로 변환
+function getShareIndex(idx) {
+  const img = AppState.generatedImages[idx];
+  if (!img || !img.originalUrl) return -1;
+  const realOnly = AppState.generatedImages.filter(im => im.originalUrl);
+  return realOnly.indexOf(img);
+}
+
+function copyShareLink() {
+  if (!_shareCtx.jobId || _shareCtx.idx == null || _shareCtx.idx < 0) {
+    showToast('공유 가능한 이미지가 없습니다.', 'error');
+    return;
+  }
+  const url = _shareUrlFor(_shareCtx.jobId, _shareCtx.idx);
+  const done = () => showToast('공유 링크가 복사되었습니다. (14일간 유효)', 'success');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(() => _fallbackCopy(url, done));
+  } else {
+    _fallbackCopy(url, done);
+  }
+}
+
+function _fallbackCopy(text, onDone) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    onDone();
+  } catch (e) {
+    showToast('링크 복사에 실패했습니다.', 'error');
+  }
+  document.body.removeChild(ta);
+}
+
+// ─── 카카오톡 공유 SDK 로드 (JS 키가 설정된 경우에만) ───
+(function loadKakaoConfig() {
+  fetch('/api/config/kakao-js-key').then(r => r.json()).then(d => {
+    if (d && d.key) {
+      _kakaoJsKey = d.key;
+      const s = document.createElement('script');
+      s.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js';
+      s.onload = () => {
+        if (window.Kakao && !Kakao.isInitialized()) Kakao.init(_kakaoJsKey);
+      };
+      document.head.appendChild(s);
+    }
+  }).catch(() => {});
+})();
+
+function shareToKakao() {
+  if (!window.Kakao || !Kakao.isInitialized()) {
+    showToast('카카오톡 공유 기능을 사용할 수 없습니다.', 'error');
+    return;
+  }
+  if (!_shareCtx.jobId || _shareCtx.idx == null || _shareCtx.idx < 0) {
+    showToast('공유 가능한 이미지가 없습니다.', 'error');
+    return;
+  }
+  const shareUrl = _shareUrlFor(_shareCtx.jobId, _shareCtx.idx);
+  Kakao.Share.sendDefault({
+    objectType: 'feed',
+    content: {
+      title: 'AI 패션 룩북 스튜디오로 만든 피팅컷',
+      description: '나도 내 옷으로 AI 피팅컷을 만들어볼까?',
+      imageUrl: _shareCtx.imageUrl,
+      link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
+    },
+    buttons: [
+      { title: '나도 해보기', link: { mobileWebUrl: shareUrl, webUrl: shareUrl } },
+    ],
+  });
+}
+
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('modal-overlay')) {
     e.target.classList.remove('active');
@@ -1096,6 +1222,11 @@ async function loadModelsFromAPI() {
     const data = await res.json();
 
     AppState.allModels = data.models || [];
+    // 모델 노출 순서 랜덤화
+    for (let i = AppState.allModels.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [AppState.allModels[i], AppState.allModels[j]] = [AppState.allModels[j], AppState.allModels[i]];
+    }
     AppState.filteredModels = [...AppState.allModels];
 
     const wrap = document.getElementById('modelGridWrap');
@@ -1128,6 +1259,12 @@ async function loadBackgroundsFromAPI() {
     const data = await res.json();
 
     AppState.allBackgrounds = data.backgrounds || [];
+
+    // 배경 노출 순서 랜덤화
+    for (let i = AppState.allBackgrounds.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [AppState.allBackgrounds[i], AppState.allBackgrounds[j]] = [AppState.allBackgrounds[j], AppState.allBackgrounds[i]];
+    }
     AppState.filteredBackgrounds = [...AppState.allBackgrounds];
 
     const wrap = document.getElementById('bgGridWrap');
@@ -1496,7 +1633,6 @@ function renderModelGrid(models) {
       <img src="${imgSrc}" alt="${displayName}"
         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="grid-card-fallback">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>
-      <div class="grid-card-label">${displayName}</div>
       <div class="grid-card-check"><i class="fas fa-check"></i></div>`;
 
     card.addEventListener('click', () => {
@@ -2147,6 +2283,8 @@ async function downloadWithCreditCheck(idx) {
     return;
   }
 
+  openActionProgress(t('downloadIng').replace(/<[^>]*>/g, '').trim() || '다운로드 중...');
+
   try {
     const deductRes = await fetch('/api/credits/deduct', {
       method: 'POST',
@@ -2154,10 +2292,12 @@ async function downloadWithCreditCheck(idx) {
     });
 
     if (deductRes.status === 401) {
+      closeActionProgress();
       showToast(t('loginRequired'), 'error');
       return;
     }
     if (deductRes.status === 402) {
+      closeActionProgress();
       const errData = await deductRes.json();
       const have = errData.available ?? 0;
       showToast(t('creditInsufficientDetail', have), 'error');
@@ -2168,6 +2308,7 @@ async function downloadWithCreditCheck(idx) {
       return;
     }
     if (!deductRes.ok) {
+      closeActionProgress();
       showToast(t('creditError'), 'error');
       return;
     }
@@ -2182,9 +2323,15 @@ async function downloadWithCreditCheck(idx) {
     }
     // 파일 다운로드
     _doFileDownload(img.url, idx + 1);
-    showToast(t('creditDeductDone', deductData.creditsRemaining), 'success');
+    setActionComplete(t('creditDeductDone', deductData.creditsRemaining), {
+      showShare: true,
+      jobId: AppState.lastJobId,
+      idx: getShareIndex(idx),
+      imageUrl: img.originalUrl || img.url,
+    });
   } catch (err) {
     console.error('Download error:', err);
+    closeActionProgress();
     showToast(t('downloadErr'), 'error');
   }
 }
@@ -2268,6 +2415,9 @@ async function downloadImage() {
     downloadBtn.innerHTML = t('downloadIng');
   }
 
+  closeModal('imageModal');
+  openActionProgress(t('downloadIng').replace(/<[^>]*>/g, '').trim() || '다운로드 중...');
+
   try {
     // 크레딧 차감 API 호출
     const sessionToken = localStorage.getItem('lookbook_token') || '';
@@ -2277,19 +2427,17 @@ async function downloadImage() {
     });
 
     if (deductRes.status === 401) {
+      closeActionProgress();
       showToast(t('loginRequired'), 'error');
-      closeModal('imageModal');
       return;
     }
 
     if (deductRes.status === 402) {
+      closeActionProgress();
       const errData = await deductRes.json();
       const have = errData.available || 0;
       showToast(t('creditInsufficientDetail', have), 'error');
-      // 모달 닫고 대시보드 충전 페이지로 유도
       setTimeout(() => {
-        closeModal('imageModal');
-        // 네비 드롭다운 열기 (충전 버튼 노출)
         const userArea = document.getElementById('navUserArea');
         if (userArea) userArea.click();
       }, 1500);
@@ -2297,6 +2445,7 @@ async function downloadImage() {
     }
 
     if (!deductRes.ok) {
+      closeActionProgress();
       showToast(t('creditError'), 'error');
       return;
     }
@@ -2318,14 +2467,19 @@ async function downloadImage() {
     // 실제 다운로드 실행
     if (img?.url) {
       downloadSingleImage(img.url, idx + 1);
-      showToast(t('creditDeductDone', deductData.creditsRemaining), 'success');
+      setActionComplete(t('creditDeductDone', deductData.creditsRemaining), {
+        showShare: true,
+        jobId: AppState.lastJobId,
+        idx: getShareIndex(idx),
+        imageUrl: img.originalUrl || img.url,
+      });
     } else {
-      showToast(t('downloadSingle'), 'success');
+      setActionComplete(t('downloadSingle'), { showShare: false });
     }
-    closeModal('imageModal');
 
   } catch (err) {
     console.error('Download error:', err);
+    closeActionProgress();
     showToast(t('downloadErr'), 'error');
   } finally {
     if (downloadBtn) {
@@ -2378,6 +2532,8 @@ async function regenImage() {
   }
   if (regenCounter) regenCounter.textContent = '';
 
+  openActionProgress(t('regenIng').replace(/<[^>]*>/g, '').trim() || '재생성 중...');
+
   const sessionToken = localStorage.getItem('lookbook_token') || '';
 
   try {
@@ -2396,10 +2552,12 @@ async function regenImage() {
     });
 
     if (res.status === 401) {
+      closeActionProgress();
       showToast(t('loginRequired'), 'error');
       return;
     }
     if (!res.ok) {
+      closeActionProgress();
       const errData = await res.json().catch(() => ({}));
       showToast(t('regenFail', errData.error), 'error');
       return;
@@ -2407,6 +2565,7 @@ async function regenImage() {
 
     const startData = await res.json();
     if (!startData.jobId) {
+      closeActionProgress();
       showToast(t('regenNoJobId'), 'error');
       return;
     }
@@ -2414,12 +2573,11 @@ async function regenImage() {
     // 재생성 카운트 증가
     AppState.regenCount++;
 
-    showToast(t('regenStart', AppState.regenCount, MAX_REGEN), 'info');
-
     // ── 재생성 시에도 lastJobId 업데이트 (save-images가 올바른 job에 저장되도록)
     AppState.lastJobId = startData.jobId;
 
     // 모달 닫고 step-3 (생성 진행 화면)으로 전환
+    closeActionProgress();
     closeModal('imageModal');
 
     // step-3으로 되돌아가서 generatingView 표시 (step-4 → step-3 → step-4 흐름)
@@ -2438,6 +2596,7 @@ async function regenImage() {
 
   } catch (err) {
     console.error('Regen error:', err);
+    closeActionProgress();
     showToast(t('regenErr', err.message), 'error');
   } finally {
     // 버튼 상태 복원은 updateRegenUI에서 처리
