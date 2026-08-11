@@ -2836,10 +2836,10 @@ app.get('/share/:jobId/:idx', async (c) => {
       body = `
         <div class="share-card">
           ${topTabsHtml}
+          ${bottomTabHtml}
           <div class="share-img-wrap">
             <img id="shareMainImg" src="${opts.imageUrl}" alt="EZlook 생성 이미지" class="share-img" />
           </div>
-          ${bottomTabHtml}
           <div class="share-info">
             <p class="share-title">상품 이미지로 모델컷 만들기</p>
             <p class="share-desc">클릭4번으로 AI모델컷이 무료로 만들어 진다고?</p>
