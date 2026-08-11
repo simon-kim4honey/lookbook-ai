@@ -4029,14 +4029,7 @@ app.get('/generator', (c) => {
 
     <!-- ── 상단 바 (고정) ── -->
     <header id="gapp-header">
-      <a href="/" class="gapp-logo">✨ EZlook</a>
-      <div id="gapp-steps">
-        <span class="gstep" id="gs1">1</span>
-        <span class="gstep-line" id="gl1"></span>
-        <span class="gstep" id="gs2">2</span>
-        <span class="gstep-line" id="gl2"></span>
-        <span class="gstep" id="gs3">3</span>
-      </div>
+      <a href="/" class="gapp-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
       <!-- 로그인 상태 표시 -->
       <div style="display:flex;align-items:center;gap:8px;position:relative;">
         <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:12px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>

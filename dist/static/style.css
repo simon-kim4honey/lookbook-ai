@@ -1078,54 +1078,13 @@ footer {
   z-index: 10;
 }
 .gapp-logo {
-  font-size: 15px;
-  font-weight: 800;
-  color: #a78bfa;
+  font-size: 17px;
   text-decoration: none;
   white-space: nowrap;
   letter-spacing: -0.3px;
 }
-.gapp-logo span { color: rgba(255,255,255,0.5); font-weight: 400; }
-
-/* step 진행 표시 */
-#gapp-steps {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-.gstep {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(255,255,255,0.15);
-  background: transparent;
-  color: rgba(255,255,255,0.3);
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.2s;
-}
-.gstep.active {
-  border-color: #a78bfa;
-  background: #a78bfa;
-  color: #fff;
-  box-shadow: 0 0 12px rgba(167,139,250,0.5);
-}
-.gstep.done {
-  border-color: #34d399;
-  background: #34d399;
-  color: #fff;
-}
-.gstep-line {
-  width: 16px;
-  height: 1.5px;
-  background: rgba(255,255,255,0.1);
-  transition: background 0.2s;
-}
-.gstep-line.done { background: #34d399; }
+.gapp-logo-ez { color: #a78bfa; font-weight: 800; }
+.gapp-logo-look { color: #a78bfa; font-weight: 300; }
 
 /* ── 슬라이드 컨테이너 ── */
 #gapp-slides {
@@ -1224,14 +1183,18 @@ footer {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
-/* nav 내부 컨테이너: 최대 480px, 버튼 양쪽 배치 */
+/* nav 내부 컨테이너: 최대 480px, 이전/다음 버튼이 상단 슬롯 두 칸과 동일한 폭으로 맞춰짐 */
 .gslide-nav-inner {
   width: 100%;
   max-width: 480px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 10px;
+}
+.gslide-nav-inner .step-nav-back,
+.gslide-nav-inner .step-nav-next {
+  flex: 1;
+  justify-content: center;
 }
 /* 네비 버튼 다크 테마 오버라이드 */
 .gslide-nav .step-nav-back {
@@ -1418,7 +1381,7 @@ footer {
 /* Step1: clothing-slots가 gslide-body 남은 공간을 꽉 채우도록 */
 #step-1 .gslide-body {
   overflow: hidden;  /* 스크롤 제거 → flex로 꽉 채움 */
-  padding: 12px 12px 0;  /* 하단 여백은 clothing-slots margin-bottom으로 처리 */
+  padding: 16px 16px 0;  /* 좌우 여백을 헤더/하단 네비와 동일하게(16px) 맞춤 — 하단 여백은 clothing-slots margin-bottom으로 처리 */
 }
 #step-1 .clothing-slots {
   flex: 1;
