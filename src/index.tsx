@@ -2819,20 +2819,27 @@ app.get('/share/:jobId/:idx', async (c) => {
   const jobId = c.req.param('jobId')
   const idx = parseInt(c.req.param('idx') || '0', 10)
 
-  const renderSharePage = (opts: { state: 'ok' | 'expired' | 'notfound'; imageUrl?: string; tabs?: { label: string; url: string }[] }) => {
+  const renderSharePage = (opts: { state: 'ok' | 'expired' | 'notfound'; imageUrl?: string; sourceTabs?: { label: string; url: string }[]; resultTab?: { label: string; url: string } }) => {
     const origin = getOrigin(c)
     const pageUrl = `${origin}/share/${jobId}/${idx}`
     let body = ''
     if (opts.state === 'ok') {
-      const tabs = opts.tabs || []
-      const tabsHtml = tabs.length > 1 ? `
+      const sourceTabs = opts.sourceTabs || []
+      const topTabsHtml = sourceTabs.length > 0 ? `
           <div class="share-tabs">
-            ${tabs.map((t, i) => `<button class="share-tab${i === 0 ? ' active' : ''}" data-url="${t.url}" onclick="_switchShareTab(this)">${t.label}</button>`).join('')}
+            ${sourceTabs.map(t => `<button class="share-tab" data-url="${t.url}" onclick="_switchShareTab(this)">${t.label}</button>`).join('')}
+          </div>` : ''
+      const bottomTabHtml = (opts.resultTab && sourceTabs.length > 0) ? `
+          <div class="share-tabs share-tabs-bottom">
+            <button class="share-tab active" data-url="${opts.resultTab.url}" onclick="_switchShareTab(this)">${opts.resultTab.label}</button>
           </div>` : ''
       body = `
         <div class="share-card">
-          ${tabsHtml}
-          <img id="shareMainImg" src="${opts.imageUrl}" alt="EZlook 생성 이미지" class="share-img" />
+          ${topTabsHtml}
+          <div class="share-img-wrap">
+            <img id="shareMainImg" src="${opts.imageUrl}" alt="EZlook 생성 이미지" class="share-img" />
+          </div>
+          ${bottomTabHtml}
           <div class="share-info">
             <p class="share-title">상품 이미지로 모델컷 만들기</p>
             <p class="share-desc">클릭4번으로 AI모델컷이 무료로 만들어 진다고?</p>
@@ -2866,7 +2873,7 @@ app.get('/share/:jobId/:idx', async (c) => {
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>EZlook - 공유된 피팅컷</title>
   <meta property="og:title" content="상품 이미지로 모델컷 만들기" />
   <meta property="og:description" content="클릭4번으로 AI모델컷이 무료로 만들어 진다고?" />
@@ -2877,16 +2884,19 @@ app.get('/share/:jobId/:idx', async (c) => {
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
   <style>
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: #0d0d1a; font-family: 'Pretendard', -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; padding: 24px; }
-    .share-card { max-width: 420px; width: 100%; background: #17172b; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
-    .share-tabs { display: flex; gap: 6px; padding: 14px 14px 0; flex-wrap: wrap; }
-    .share-tab { flex: 1; min-width: 64px; background: #23233d; color: #a0a0c0; border: none; border-radius: 10px; padding: 9px 6px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; }
+    html, body { height: 100%; }
+    body { margin: 0; height: 100dvh; background: #0d0d1a; font-family: 'Pretendard', -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; padding: 12px; overflow: hidden; }
+    .share-card { width: 100%; max-width: 420px; height: 100%; max-height: 760px; background: #17172b; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4); display: flex; flex-direction: column; }
+    .share-tabs { flex: 0 0 auto; display: flex; gap: 6px; padding: 10px 10px 0; flex-wrap: wrap; }
+    .share-tabs-bottom { padding: 8px 10px 0; }
+    .share-tab { flex: 1; min-width: 60px; background: #23233d; color: #a0a0c0; border: none; border-radius: 10px; padding: 8px 4px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; }
     .share-tab.active { background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; }
-    .share-img { width: 100%; display: block; margin-top: 12px; }
-    .share-info { padding: 20px 20px 24px; text-align: center; }
-    .share-title { color: #fff; font-size: 17px; font-weight: 800; margin: 0 0 6px; }
-    .share-desc { color: #a0a0c0; font-size: 14px; font-weight: 600; margin: 0 0 18px; }
-    .share-cta { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 14px; }
+    .share-img-wrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-top: 8px; background: #000; }
+    .share-img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; display: block; }
+    .share-info { flex: 0 0 auto; padding: 12px 18px 16px; text-align: center; }
+    .share-title { color: #fff; font-size: 14px; font-weight: 800; margin: 0 0 4px; }
+    .share-desc { color: #a0a0c0; font-size: 12px; font-weight: 600; margin: 0 0 10px; }
+    .share-cta { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 10px 22px; border-radius: 12px; }
     .share-message { padding: 48px 28px; text-align: center; }
     .share-emoji { font-size: 40px; display: block; margin-bottom: 16px; }
     .share-msg-text { color: #e0e0f0; font-size: 15px; font-weight: 600; line-height: 1.6; margin: 0 0 24px; }
@@ -2920,8 +2930,8 @@ app.get('/share/:jobId/:idx', async (c) => {
     const origin = getOrigin(c)
     const proxiedUrl = `${origin}/api/proxy/gen-image?url=${encodeURIComponent(url)}`
 
-    // 공유 화면 상단 탭 — 생성결과 + 원본 의상/모델/배경
-    const tabs: { label: string; url: string }[] = [{ label: '생성결과', url: proxiedUrl }]
+    // 공유 화면 상단 탭 — 원본 의상/모델/배경, 하단 탭 — 생성결과
+    const sourceTabs: { label: string; url: string }[] = []
     const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
     if (kv) {
       const clothingStored = await kv.get(`clothing_img:${jobId}`)
@@ -2929,7 +2939,7 @@ app.get('/share/:jobId/:idx', async (c) => {
         try {
           const clothingUrls: string[] = JSON.parse(clothingStored)
           clothingUrls.forEach((_, i) => {
-            tabs.push({
+            sourceTabs.push({
               label: clothingUrls.length > 1 ? `의상${i + 1}` : '의상',
               url: `${origin}/api/proxy/clothing/${jobId}/${i}`,
             })
@@ -2937,10 +2947,15 @@ app.get('/share/:jobId/:idx', async (c) => {
         } catch {}
       }
     }
-    if (log.model_id) tabs.push({ label: '모델', url: `${origin}/api/proxy/custom-model/${log.model_id}` })
-    if (log.bg_id) tabs.push({ label: '배경', url: `${origin}/api/proxy/custom-bg/${log.bg_id}` })
+    if (log.model_id) sourceTabs.push({ label: '모델', url: `${origin}/api/proxy/custom-model/${log.model_id}` })
+    if (log.bg_id) sourceTabs.push({ label: '배경', url: `${origin}/api/proxy/custom-bg/${log.bg_id}` })
 
-    return c.html(renderSharePage({ state: 'ok', imageUrl: proxiedUrl, tabs }))
+    return c.html(renderSharePage({
+      state: 'ok',
+      imageUrl: proxiedUrl,
+      sourceTabs,
+      resultTab: { label: '생성결과', url: proxiedUrl },
+    }))
   } catch (err: any) {
     console.error('Share page error:', err)
     return c.html(renderSharePage({ state: 'notfound' }), 500)
