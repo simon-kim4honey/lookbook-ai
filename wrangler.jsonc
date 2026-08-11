@@ -10,14 +10,15 @@
     {
       "binding": "LOOKBOOK_DB",
       "database_name": "lookbook-ai-production",
-      "database_id": "9df3606b-81a1-426f-875c-e1577f948419"
+      "database_id": "9df3606b-81a1-426f-875c-e1577f948419",
+      "preview_database_id": "be2a980f-aa0d-4631-9a87-717281028129"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "LOOKBOOK_KV",
       "id": "2aab8e4e250840e0b3327d4a8e776ed9",
-      "preview_id": "6a8c336e82d346039bad45e071eaad66"
+      "preview_id": "6a5dcf373bfb43aea55c958a2b7e7886"
     }
   ]
 }
