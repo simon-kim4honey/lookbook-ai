@@ -649,19 +649,79 @@ function isMobileDevice() {
 }
 
 /** OAuth 소셜 로그인 — 모바일: 리다이렉트 / PC: 팝업 */
-function oauthLogin(provider) {
+// 진행 중인 위저드 상태(의류/모델/배경/옵션)를 직렬화 — 로그인 후 생성 재개용
+function _captureGenState() {
+  return {
+    clothingItems: (AppState.clothingItems || []).map(ci => ({
+      dataUrl: ci.dataUrl, category: ci.category, label: ci.label || '',
+    })),
+    uploadedImageUrl: AppState.uploadedImageUrl || null,
+    selectedModel: AppState.selectedModel || null,
+    selectedBg: AppState.selectedBg || null,
+    genOptions: AppState.genOptions || null,
+  };
+}
+
+function _restoreGenState(genState) {
+  if (!genState) return;
+  if (genState.clothingItems) AppState.clothingItems = genState.clothingItems;
+  if (genState.uploadedImageUrl) AppState.uploadedImageUrl = genState.uploadedImageUrl;
+  if (genState.selectedModel) AppState.selectedModel = genState.selectedModel;
+  if (genState.selectedBg) AppState.selectedBg = genState.selectedBg;
+  if (genState.genOptions) AppState.genOptions = genState.genOptions;
+  changeStep(3);
+  updateGenSummary();
+}
+
+// 로그인 모달의 카카오/구글 버튼 전체 — 클릭 즉시 로딩 상태로 전환
+function _setAuthButtonsBusy(busy, activeBtn) {
+  const buttons = document.querySelectorAll('#loginModal button[onclick^="oauthLogin"]');
+  buttons.forEach(b => {
+    if (busy) {
+      if (!b.dataset.originalHtml) b.dataset.originalHtml = b.innerHTML;
+      b.disabled = true;
+      if (b === activeBtn) {
+        b.innerHTML = '<span class="btn-spinner" style="width:16px;height:16px;border-width:2px;"></span> 이동 중...';
+      } else {
+        b.style.opacity = '0.5';
+      }
+    } else {
+      b.disabled = false;
+      b.style.opacity = '';
+      if (b.dataset.originalHtml) {
+        b.innerHTML = b.dataset.originalHtml;
+        delete b.dataset.originalHtml;
+      }
+    }
+  });
+}
+
+function oauthLogin(provider, btn) {
   // 이전 oauth_result 잔여 데이터 제거
   localStorage.removeItem('oauth_result');
+  // 클릭 즉시 반응 피드백 (버튼 로딩 상태)
+  _setAuthButtonsBusy(true, btn);
 
   if (isMobileDevice()) {
     // ── 모바일: 현재 탭에서 OAuth 제공자로 이동 (팝업 차단 우회) ──
     // 콜백 복귀 후 처리할 정보 저장
-    localStorage.setItem('oauth_redirect_pending', JSON.stringify({
+    const pending = {
       provider,
       returnPath: window.location.pathname,
       pendingGeneration: AppState.pendingGeneration || false,
       ts: Date.now(),
-    }));
+    };
+    if (AppState.pendingGeneration) {
+      pending.genState = _captureGenState();
+    }
+    try {
+      localStorage.setItem('oauth_redirect_pending', JSON.stringify(pending));
+    } catch (e) {
+      // 저장 용량 초과 등 — genState 없이라도 기본 정보는 저장 시도
+      console.warn('oauth_redirect_pending 저장 실패, genState 제외 후 재시도:', e);
+      delete pending.genState;
+      try { localStorage.setItem('oauth_redirect_pending', JSON.stringify(pending)); } catch (e2) {}
+    }
     window.location.href = `/api/auth/${provider}?mode=redirect`;
     return;
   }
@@ -679,6 +739,7 @@ function oauthLogin(provider) {
     localStorage.setItem('lookbook_token', token);
     localStorage.setItem('lookbook_user', JSON.stringify(user));
     localStorage.removeItem('oauth_result');
+    _setAuthButtonsBusy(false);
     updateUserUI();
     closeModal('loginModal');
     showToast(t('welcome', user.name), 'success');
@@ -698,6 +759,7 @@ function oauthLogin(provider) {
     } else if (e.data?.type === 'oauth_error') {
       clearInterval(checkClosed);
       window.removeEventListener('message', onMessage);
+      _setAuthButtonsBusy(false);
       showToast(t('loginFailed'), 'error');
     }
   };
@@ -719,6 +781,8 @@ function oauthLogin(provider) {
           }
         }
       } catch(e) {}
+      // 성공 데이터 없이 팝업만 닫힘 — 사용자가 취소한 것으로 간주하고 버튼 복원
+      _setAuthButtonsBusy(false);
     }
   }, 500);
 }
@@ -764,6 +828,8 @@ function checkOAuthRedirectResult() {
       showToast(t('welcome', user.name), 'success');
       if (pending.pendingGeneration) {
         AppState.pendingGeneration = false;
+        // 전체 페이지 리다이렉트로 날아간 의류/모델/배경 선택 상태 복원 후 생성 재개
+        _restoreGenState(pending.genState);
         setTimeout(() => startGeneration(), 300);
       } else if (window.location.pathname === '/') {
         setTimeout(() => window.location.href = '/dashboard', 800);
@@ -1490,15 +1556,56 @@ function processSlotFile(file, cat) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    slotData[cat] = { file, dataUrl: ev.target.result };
+  const onReady = (dataUrl) => {
+    slotData[cat] = { file, dataUrl };
     syncClothingItems();
     renderSlots();
     updateNextBtn1();
     showToast(t('uploadDone', SLOT_LABEL[cat]), 'success');
   };
-  reader.readAsDataURL(file);
+
+  // 원본 해상도가 크면(특히 "전체" 등 풀샷) base64 payload가 너무 커져
+  // AI 생성 요청이 간헐적으로 실패하는 원인이 됨 — 업로드 시 다운스케일 압축
+  _resizeImageFile(file, 1600, 0.85).then(onReady).catch((err) => {
+    console.warn('이미지 리사이즈 실패, 원본으로 대체:', err);
+    const reader = new FileReader();
+    reader.onload = (ev) => onReady(ev.target.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+// 업로드 이미지를 캔버스로 다운스케일 + JPEG 재압축 (Atlas Cloud 전송 payload 절감)
+function _resizeImageFile(file, maxDim, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let { width, height } = img;
+        if (width <= maxDim && height <= maxDim) {
+          // 이미 충분히 작으면 원본 화질 유지
+          resolve(ev.target.result);
+          return;
+        }
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        // 투명 PNG 대비 흰 배경 채우기
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // ── 슬롯 삭제 ──
@@ -1908,6 +2015,7 @@ async function startGeneration() {
 
     // Fallback 처리 (즉시 완료)
     if (startData.isFallback) {
+      console.warn('[Generation] Atlas Cloud 요청 실패 — 데모 이미지로 대체:', startData.error);
       updateProgress(30, 'AI 모델 피팅 적용 중...');
       setMsgState('msg1', 'done');
       setMsgState('msg2', 'current');
@@ -1927,9 +2035,9 @@ async function startGeneration() {
       setMsgState('msg4', 'done');
       setMsgState('msg5', 'done');
 
-      // 폴백 결과 표시
+      // 폴백 결과 표시 — Atlas Cloud가 이미지를 받지 못했거나 요청 실패 시 (isFallback: true 필수 전달)
       const fallbackImages = generateFallbackImages(count);
-      completeGeneration(fallbackImages);
+      completeGeneration(fallbackImages, true);
       return;
     }
 
