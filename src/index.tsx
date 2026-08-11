@@ -2733,7 +2733,7 @@ const htmlShell = (title: string, bodyContent: string) => `<!DOCTYPE html>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${title} | AI Fashion Lookbook Studio</title>
+  <title>${title} | EZlook</title>
   <meta name="description" content="의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -2832,9 +2832,10 @@ app.get('/share/:jobId/:idx', async (c) => {
       body = `
         <div class="share-card">
           ${tabsHtml}
-          <img id="shareMainImg" src="${opts.imageUrl}" alt="AI 패션 룩북 스튜디오 생성 이미지" class="share-img" />
+          <img id="shareMainImg" src="${opts.imageUrl}" alt="EZlook 생성 이미지" class="share-img" />
           <div class="share-info">
-            <p class="share-desc">AI 패션 룩북 스튜디오로 만든 피팅컷이에요 ✨</p>
+            <p class="share-title">상품 이미지로 모델컷 만들기</p>
+            <p class="share-desc">클릭4번으로 AI모델컷이 무료로 만들어 진다고?</p>
             <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 해보기</a>
           </div>
         </div>
@@ -2866,9 +2867,9 @@ app.get('/share/:jobId/:idx', async (c) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI 패션 룩북 스튜디오 - 공유된 피팅컷</title>
-  <meta property="og:title" content="AI 패션 룩북 스튜디오로 만든 피팅컷" />
-  <meta property="og:description" content="나도 내 옷으로 AI 피팅컷을 만들어볼까?" />
+  <title>EZlook - 공유된 피팅컷</title>
+  <meta property="og:title" content="상품 이미지로 모델컷 만들기" />
+  <meta property="og:description" content="클릭4번으로 AI모델컷이 무료로 만들어 진다고?" />
   ${opts.state === 'ok' ? `<meta property="og:image" content="${opts.imageUrl}" />` : ''}
   <meta property="og:url" content="${pageUrl}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -2883,7 +2884,8 @@ app.get('/share/:jobId/:idx', async (c) => {
     .share-tab.active { background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; }
     .share-img { width: 100%; display: block; margin-top: 12px; }
     .share-info { padding: 20px 20px 24px; text-align: center; }
-    .share-desc { color: #e0e0f0; font-size: 15px; font-weight: 600; margin: 0 0 16px; }
+    .share-title { color: #fff; font-size: 17px; font-weight: 800; margin: 0 0 6px; }
+    .share-desc { color: #a0a0c0; font-size: 14px; font-weight: 600; margin: 0 0 18px; }
     .share-cta { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 14px 28px; border-radius: 14px; }
     .share-message { padding: 48px 28px; text-align: center; }
     .share-emoji { font-size: 40px; display: block; margin-bottom: 16px; }
@@ -2952,7 +2954,7 @@ app.get('/terms', (c) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>서비스 이용약관 - LookbookAI Studio</title>
+  <title>서비스 이용약관 - EZlook</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #333; line-height: 1.8; }
     h1 { font-size: 28px; border-bottom: 2px solid #eee; padding-bottom: 16px; }
@@ -2967,10 +2969,10 @@ app.get('/terms', (c) => {
   <p class="date">시행일: 2025년 1월 1일 | 최종 수정일: 2025년 1월 1일</p>
 
   <h2>제1조 (목적)</h2>
-  <p>본 약관은 LookbookAI Studio(이하 "서비스")가 제공하는 AI 패션 룩북 생성 서비스의 이용에 관한 조건 및 절차, 회사와 이용자의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</p>
+  <p>본 약관은 EZlook(이하 "서비스")이 제공하는 AI 패션 룩북 생성 서비스의 이용에 관한 조건 및 절차, 회사와 이용자의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</p>
 
   <h2>제2조 (정의)</h2>
-  <p>① "서비스"란 LookbookAI Studio가 제공하는 AI 기반 패션 이미지 생성 플랫폼을 의미합니다.</p>
+  <p>① "서비스"란 EZlook이 제공하는 AI 기반 패션 이미지 생성 플랫폼을 의미합니다.</p>
   <p>② "이용자"란 본 약관에 동의하고 서비스를 이용하는 자를 의미합니다.</p>
   <p>③ "크레딧"이란 서비스 내 AI 이미지 생성에 사용되는 가상 화폐를 의미합니다.</p>
 
@@ -3014,7 +3016,7 @@ app.get('/privacy', (c) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>개인정보처리방침 - LookbookAI Studio</title>
+  <title>개인정보처리방침 - EZlook</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #333; line-height: 1.8; }
     h1 { font-size: 28px; border-bottom: 2px solid #eee; padding-bottom: 16px; }
@@ -3031,7 +3033,7 @@ app.get('/privacy', (c) => {
   <h1>개인정보처리방침</h1>
   <p class="date">시행일: 2025년 1월 1일 | 최종 수정일: 2025년 1월 1일</p>
 
-  <p>LookbookAI Studio(이하 "서비스")는 이용자의 개인정보를 소중히 여기며, 개인정보 보호법 등 관련 법령을 준수합니다.</p>
+  <p>EZlook(이하 "서비스")은 이용자의 개인정보를 소중히 여기며, 개인정보 보호법 등 관련 법령을 준수합니다.</p>
 
   <h2>1. 수집하는 개인정보 항목</h2>
   <table>
@@ -3093,7 +3095,7 @@ app.get('/', (c) => {
     <div class="navbar-inner">
       <a href="/" class="navbar-logo">
         <div class="logo-icon">✨</div>
-        <span>LookbookAI</span>
+        <span>EZlook</span>
       </a>
       <div class="navbar-nav">
         <a href="#features">기능</a>
@@ -3376,7 +3378,7 @@ app.get('/', (c) => {
         <div class="footer-brand">
           <div class="navbar-logo">
             <div class="logo-icon">✨</div>
-            <span>LookbookAI</span>
+            <span>EZlook</span>
           </div>
           <p>AI 기술로 패션 이커머스 촬영의<br />새로운 기준을 만들어갑니다.</p>
         </div>
@@ -3720,7 +3722,7 @@ app.get('/dashboard', (c) => {
     <!-- 로고 -->
     <a href="/" class="db-logo">
       <div class="db-logo-icon">✨</div>
-      <span class="db-logo-text">LookbookAI</span>
+      <span class="db-logo-text">EZlook</span>
     </a>
 
     <!-- 메인 카드 -->
@@ -4012,7 +4014,7 @@ app.get('/generator', (c) => {
 
     <!-- ── 상단 바 (고정) ── -->
     <header id="gapp-header">
-      <a href="/" class="gapp-logo">✨ LookbookAI</a>
+      <a href="/" class="gapp-logo">✨ EZlook</a>
       <div id="gapp-steps">
         <span class="gstep" id="gs1">1</span>
         <span class="gstep-line" id="gl1"></span>
@@ -4336,7 +4338,7 @@ app.get('/admin02', (c) => {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Admin | LookbookAI</title>
+  <title>Admin | EZlook</title>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/>
   <style>
@@ -4445,7 +4447,7 @@ app.get('/admin02', (c) => {
   <div class="login-card">
     <div class="logo">🛡️</div>
     <h2>Admin 로그인</h2>
-    <p>LookbookAI 관리자 페이지</p>
+    <p>EZlook 관리자 페이지</p>
     <input type="password" id="pwInput" placeholder="비밀번호 입력" onkeydown="if(event.key==='Enter')doLogin()"/>
     <div class="err" id="loginErr"></div>
     <button class="btn-save" style="width:100%" onclick="doLogin()">로그인</button>
@@ -4455,7 +4457,7 @@ app.get('/admin02', (c) => {
 <!-- 어드민 메인 -->
 <div id="adminMain">
   <header class="admin-header">
-    <span class="logo">✨ LookbookAI</span>
+    <span class="logo">✨ EZlook</span>
     <span class="badge">Admin</span>
     <button class="logout" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i> 로그아웃</button>
   </header>

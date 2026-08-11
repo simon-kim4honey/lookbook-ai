@@ -1,5 +1,5 @@
 /* ===================================================
-   AI Fashion Lookbook Studio - Frontend Logic
+   EZlook - Frontend Logic
    aifashion.co.kr + Atlas Cloud AI 실API 연동
    =================================================== */
 
@@ -571,8 +571,8 @@ function shareToKakao() {
   Kakao.Share.sendDefault({
     objectType: 'feed',
     content: {
-      title: 'AI 패션 룩북 스튜디오로 만든 피팅컷',
-      description: '나도 내 옷으로 AI 피팅컷을 만들어볼까?',
+      title: '상품 이미지로 모델컷 만들기',
+      description: '클릭4번으로 AI모델컷이 무료로 만들어 진다고?',
       imageUrl: _shareCtx.imageUrl,
       link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
     },
