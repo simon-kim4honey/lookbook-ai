@@ -134,6 +134,7 @@ interface CustomBg {
   bgDesc: string
   category: string
   createdAt: string
+  hasGenImage?: boolean  // 얼굴-마스킹된 "생성용" 이미지가 별도로 등록되어 있는지
 }
 
 // ── KV 헬퍼 (BYOK) ──
@@ -179,6 +180,7 @@ async function d1EnsureSchema(db: D1Database) {
     category TEXT NOT NULL DEFAULT '기타',
     bg_desc TEXT NOT NULL DEFAULT '',
     image_b64 TEXT NOT NULL,
+    gen_image_b64 TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`).run()
   // 어드민 프롬프트 설정 영속화 테이블
@@ -229,8 +231,8 @@ async function d1GetModelImg(db: D1Database, id: string): Promise<string | null>
   return row?.image_b64 ?? null
 }
 async function d1GetBgs(db: D1Database): Promise<CustomBg[]> {
-  const { results } = await db.prepare(`SELECT id, name, category, bg_desc, created_at FROM custom_bgs ORDER BY created_at ASC`).all()
-  return (results as any[]).map(r => ({ id: r.id, name: r.name, bgDesc: r.bg_desc, category: r.category, createdAt: r.created_at }))
+  const { results } = await db.prepare(`SELECT id, name, category, bg_desc, created_at, CASE WHEN gen_image_b64 IS NOT NULL AND gen_image_b64 != '' THEN 1 ELSE 0 END AS has_gen_image FROM custom_bgs ORDER BY created_at ASC`).all()
+  return (results as any[]).map(r => ({ id: r.id, name: r.name, bgDesc: r.bg_desc, category: r.category, createdAt: r.created_at, hasGenImage: !!r.has_gen_image }))
 }
 async function d1AddBgs(db: D1Database, items: Array<{ name: string; bgDesc?: string; category?: string; imageBase64: string }>): Promise<CustomBg[]> {
   const results: CustomBg[] = []
@@ -252,6 +254,16 @@ async function d1DeleteBg(db: D1Database, id: string): Promise<boolean> {
 async function d1GetBgImg(db: D1Database, id: string): Promise<string | null> {
   const row: any = await db.prepare(`SELECT image_b64 FROM custom_bgs WHERE id = ?`).bind(id).first()
   return row?.image_b64 ?? null
+}
+// 생성(AtlasCloud 전달)용 이미지 — gen_image_b64(얼굴 마스킹본)가 있으면 그걸, 없으면 전시용 원본을 폴백으로 사용
+async function d1GetBgGenImg(db: D1Database, id: string): Promise<string | null> {
+  const row: any = await db.prepare(`SELECT image_b64, gen_image_b64 FROM custom_bgs WHERE id = ?`).bind(id).first()
+  if (!row) return null
+  return (row.gen_image_b64 && String(row.gen_image_b64).trim()) ? row.gen_image_b64 : row.image_b64
+}
+async function d1SetBgGenImg(db: D1Database, id: string, imageBase64: string): Promise<boolean> {
+  const r = await db.prepare(`UPDATE custom_bgs SET gen_image_b64 = ? WHERE id = ?`).bind(imageBase64, id).run()
+  return (r.meta?.changes ?? 0) > 0
 }
 
 // ── 메모리 폴백 (로컬 개발) ──
@@ -577,7 +589,7 @@ app.get('/api/admin/backgrounds', adminAuth, async (c) => {
     const list = await d1GetBgs(db)
     return c.json({ success: true, backgrounds: list })
   }
-  const list = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
+  const list = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt, hasGenImage: !!(b as any).genImageBase64 }))
   return c.json({ success: true, backgrounds: list })
 })
 
@@ -590,6 +602,7 @@ app.delete('/api/admin/backgrounds/:id', adminAuth, async (c) => {
     const newList = list.filter(b => b.id !== id)
     await kvSaveBgs(kv, newList)
     await kv.delete(`bg_img:${id}`)
+    await kv.delete(`bg_gen_img:${id}`)
     return c.json({ success: list.length > newList.length })
   }
   if (db) {
@@ -599,6 +612,41 @@ app.delete('/api/admin/backgrounds/:id', adminAuth, async (c) => {
   const before = _memBgs.length
   _memBgs = _memBgs.filter(b => b.id !== id)
   return c.json({ success: _memBgs.length < before })
+})
+
+// PUT /api/admin/backgrounds/:id/gen-image — "생성용"(얼굴 마스킹) 이미지 등록/교체
+// 사용자 화면 전시용 원본(image_b64)은 그대로 두고, AtlasCloud 생성 요청에만 쓰일 이미지를 별도 저장
+app.put('/api/admin/backgrounds/:id/gen-image', adminAuth, async (c) => {
+  const id = c.req.param('id')
+  try {
+    const body: any = await c.req.json()
+    const imageBase64: string = body?.imageBase64 || ''
+    if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
+
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+
+    if (kv) {
+      const list = await kvGetBgs(kv)
+      const target = list.find(b => b.id === id)
+      if (!target) return c.json({ success: false, message: '배경을 찾을 수 없습니다.' }, 404)
+      await kv.put(`bg_gen_img:${id}`, imageBase64)
+      target.hasGenImage = true
+      await kvSaveBgs(kv, list)
+      return c.json({ success: true })
+    }
+    if (db) {
+      const ok = await d1SetBgGenImg(db, id, imageBase64)
+      if (!ok) return c.json({ success: false, message: '배경을 찾을 수 없습니다.' }, 404)
+      return c.json({ success: true })
+    }
+    const target = _memBgs.find(b => b.id === id) as any
+    if (!target) return c.json({ success: false, message: '배경을 찾을 수 없습니다.' }, 404)
+    target.genImageBase64 = imageBase64
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
 })
 
 app.get('/api/proxy/custom-bg/:id', async (c) => {
@@ -2326,15 +2374,17 @@ app.post('/api/generation/start', async (c) => {
       : ''
     if (bgId) {
       const bid = String(bgId)
+      // 생성(AtlasCloud 전달)에는 얼굴-마스킹된 "생성용" 이미지를 우선 사용 (없으면 전시용 원본 폴백)
+      // 사용자 화면 썸네일(/api/proxy/custom-bg/:id)은 항상 전시용 원본을 그대로 보여줌 — 여기와 무관
       if (kv) {
-        const stored = await kv.get(`bg_img:${bid}`)
+        const stored = (await kv.get(`bg_gen_img:${bid}`)) || (await kv.get(`bg_img:${bid}`))
         if (stored) { bgImageBase64 = stored; console.log('KV custom bg: OK') }
       } else if (db) {
-        const stored = await d1GetBgImg(db, bid)
+        const stored = await d1GetBgGenImg(db, bid)
         if (stored) { bgImageBase64 = stored; console.log('D1 custom bg: OK') }
       } else {
-        const b = _memBgs.find(b => b.id === bid)
-        if (b?.imageBase64) { bgImageBase64 = b.imageBase64; console.log('Mem custom bg: OK') }
+        const b = _memBgs.find(b => b.id === bid) as any
+        if (b?.genImageBase64 || b?.imageBase64) { bgImageBase64 = b.genImageBase64 || b.imageBase64; console.log('Mem custom bg: OK') }
       }
       if (!bgImageBase64) console.log('Custom bg image not found for id:', bid)
     }
@@ -5496,10 +5546,51 @@ async function loadCustomBgs() {
         '<img src="/api/proxy/custom-bg/' + b.id + '" alt="' + b.name + '" loading="lazy"/>' +
         '<span class="custom-badge">커스텀</span>' +
         '<button class="del-btn" onclick="event.stopPropagation();deleteBg(' + "'" + b.id + "'" + ')"><i class="fas fa-times"></i></button>' +
-        '<div class="meta"><div class="name">' + b.name + '</div><div class="desc">' + b.category + ' · ' + (b.bgDesc || '-') + '</div></div>' +
+        '<div class="meta"><div class="name">' + b.name + '</div><div class="desc">' + b.category + ' · ' + (b.bgDesc || '-') + '</div>' +
+        '<div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
+        (b.hasGenImage
+          ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#dcfce7;color:#15803d;font-weight:600;">생성용 이미지 등록됨</span>'
+          : '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fef3c7;color:#92400e;font-weight:600;">생성용 미등록 (원본 사용)</span>') +
+        '<button onclick="event.stopPropagation();pickBgGenImage(' + "'" + b.id + "'" + ')" style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid #ccc;background:#fff;cursor:pointer;">' +
+        (b.hasGenImage ? '생성용 이미지 교체' : '생성용 이미지 등록') + '</button>' +
+        '</div></div>' +
         '</div>'
       ).join('') + '</div>'
   } catch(e) { console.error('loadCustomBgs error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+// ─── 배경 "생성용"(얼굴 마스킹) 이미지 등록/교체 ───
+let _pendingGenImageBgId = null
+function pickBgGenImage(id) {
+  _pendingGenImageBgId = id
+  let input = document.getElementById('bgGenImageInput')
+  if (!input) {
+    input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.id = 'bgGenImageInput'
+    input.style.display = 'none'
+    input.addEventListener('change', onBgGenImageSelect)
+    document.body.appendChild(input)
+  }
+  input.value = ''
+  input.click()
+}
+async function onBgGenImageSelect(e) {
+  const file = (e.target.files || [])[0]
+  const id = _pendingGenImageBgId
+  if (!file || !id) return
+  try {
+    const base64 = await readFileAsBase64(file)
+    const res = await fetch('/api/admin/backgrounds/' + id + '/gen-image', {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ imageBase64: base64 }),
+    })
+    const data = await res.json()
+    if (!data.success) { alert('등록 실패: ' + (data.message || '알 수 없는 오류')); return }
+    await loadCustomBgs()
+  } catch(err) { alert('오류: ' + err.message) }
 }
 
 // ─── 드래그앤드롭 (다중) ───
