@@ -2798,6 +2798,7 @@ const htmlShell = (title: string, bodyContent: string) => `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title} | EZlook</title>
   <meta name="description" content="의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요." />
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=${BUILD_VERSION}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
@@ -3168,11 +3169,75 @@ app.get('/', (c) => {
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
+  <!-- ════════════════════════════════════════
+       홈페이지 전용 흑백(Black & White) 테마 오버라이드
+       — 이 페이지(/)에서만 적용됨. 생성화면/대시보드 등
+       다른 페이지의 공통 style.css 색상에는 영향 없음.
+  ════════════════════════════════════════ -->
+  <style>
+    #navbar .btn-primary,
+    #hero .btn-primary,
+    #how-it-works .btn-primary,
+    #pricing .btn-primary,
+    #cta-section .btn-primary {
+      background: #000 !important;
+      box-shadow: none !important;
+    }
+    #navbar .btn-primary:hover,
+    #hero .btn-primary:hover,
+    #how-it-works .btn-primary:hover,
+    #pricing .btn-primary:hover,
+    #cta-section .btn-primary:hover { background: #222 !important; }
+    #pricing .btn-secondary { color: #000 !important; border-color: #000 !important; }
+    #pricing .btn-secondary:hover { background: #f0f0f0 !important; }
+
+    #navUserAvatar { background: #000 !important; box-shadow: none !important; }
+    #ddUserCredits { color: #000 !important; }
+    #userDropdownMenu button[onclick*="openChargePanel"] { background: #000 !important; }
+
+    /* Hero */
+    #hero { background: linear-gradient(135deg, #000 0%, #1a1a1a 50%, #000 100%) !important; }
+    #hero .hero-bg-grid {
+      background-image:
+        linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px) !important;
+    }
+    #hero .hero-glow-1 { background: radial-gradient(circle, rgba(255,255,255,0.10) 0%, transparent 70%) !important; }
+    #hero .hero-glow-2 { background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%) !important; }
+    #hero .hero-tag { background: rgba(255,255,255,0.1) !important; border-color: rgba(255,255,255,0.3) !important; color: #fff !important; }
+    #hero .hero-title .highlight { background: none !important; -webkit-text-fill-color: #fff !important; color: #fff !important; }
+    #hero .hero-stat-num { background: none !important; -webkit-text-fill-color: #fff !important; color: #fff !important; }
+    #hero .hero-showcase { filter: grayscale(1); }
+    #hero .showcase-badge { background: rgba(0,0,0,0.75) !important; }
+
+    /* Features */
+    #features .section-tag { background: #f0f0f0 !important; color: #000 !important; }
+    #features .feature-card:hover { border-color: #000 !important; }
+    #features .feature-icon { background: #f0f0f0 !important; }
+    #features .feature-icon i { color: #000 !important; }
+
+    /* How it works */
+    #how-it-works .steps-grid { grid-template-columns: repeat(3, 1fr) !important; max-width: 720px; margin: 0 auto; }
+    #how-it-works .steps-grid::before { background: #ddd !important; }
+    #how-it-works .step-card:hover .step-num { background: #f0f0f0 !important; border-color: #000 !important; }
+    #how-it-works .step-num i { color: #000 !important; }
+
+    /* Pricing */
+    #pricing .pricing-plan { color: #000 !important; }
+    #pricing .pricing-card.featured { border-color: #000 !important; }
+    #pricing .pricing-popular { background: #000 !important; color: #fff !important; }
+    #pricing .pricing-features li .check { color: #000 !important; }
+
+    /* CTA */
+    #cta-section { background: linear-gradient(135deg, #000 0%, #111 100%) !important; }
+    #cta-section::before { background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%) !important; }
+    #cta-section .cta-title .highlight { background: none !important; -webkit-text-fill-color: #fff !important; color: #fff !important; }
+  </style>
+
   <!-- Navbar -->
   <nav id="navbar">
     <div class="navbar-inner">
       <a href="/" class="navbar-logo">
-        <div class="logo-icon">✨</div>
         <span>EZlook</span>
       </a>
       <div class="navbar-nav">
@@ -3219,7 +3284,7 @@ app.get('/', (c) => {
       <div class="hero-left">
         <div class="hero-tag">
           <i class="fas fa-sparkles"></i>
-          AI 패션 이미지 자동화 플랫폼
+          국내 최소 클릭 · AI 패션 이미지 자동화 플랫폼
         </div>
         <h1 class="hero-title">
           옷 사진 한 장으로<br />
@@ -3227,7 +3292,7 @@ app.get('/', (c) => {
         </h1>
         <p class="hero-desc">
           촬영 없이도 전문 모델 피팅컷과 고품질 룩북을 즉시 제작하세요.<br />
-          스튜디오 비용 제로, 결과물은 프로급.
+          누구나 최소한의 클릭으로 쉽게 쓸 수 있도록 만들었습니다.
         </p>
         <div class="hero-stats">
           <div class="hero-stat">
@@ -3244,7 +3309,7 @@ app.get('/', (c) => {
           </div>
         </div>
         <div class="hero-cta">
-          <button class="btn btn-primary btn-lg" onclick="openModal('signupModal')">
+          <button class="btn btn-primary btn-lg" onclick="location.href='/generator'">
             <i class="fas fa-bolt"></i>
             무료로 시작하기
           </button>
@@ -3281,7 +3346,7 @@ app.get('/', (c) => {
       <div class="section-header">
         <div class="section-tag"><i class="fas fa-star"></i> 핵심 기능</div>
         <h2 class="section-title">프로 촬영을 대체하는<br />AI 기술</h2>
-        <p class="section-desc">단 몇 번의 클릭으로 전문 패션 사진을 완성하세요.</p>
+        <p class="section-desc">패션 디렉터, 디자이너, AI 전문가가 함께 만들어 결과물의 완성도가 다릅니다.</p>
       </div>
       <div class="features-grid">
         <div class="feature-card">
@@ -3323,34 +3388,24 @@ app.get('/', (c) => {
     <div class="container">
       <div class="section-header">
         <div class="section-tag"><i class="fas fa-route"></i> 이용 방법</div>
-        <h2 class="section-title">5단계로 완성되는<br />AI 룩북 제작</h2>
-        <p class="section-desc">복잡한 촬영 과정을 단 5단계로 간소화했습니다.</p>
+        <h2 class="section-title">3단계로 완성되는<br />AI 룩북 제작</h2>
+        <p class="section-desc">국내에서 가장 적은 클릭으로 상품 이미지를 모델컷으로 바꿔드립니다.</p>
       </div>
       <div class="steps-grid">
         <div class="step-card">
-          <div class="step-num">📤</div>
-          <div class="step-title">Step 1. 의류 업로드</div>
-          <div class="step-desc">의류 이미지를 업로드합니다. 여러 장일수록 좋아요!</div>
+          <div class="step-num"><i class="fas fa-shirt"></i></div>
+          <div class="step-title">Step 1. 옷 사진 업로드</div>
+          <div class="step-desc">가지고 있는 상품 이미지 한 장만 올리면 끝</div>
         </div>
         <div class="step-card">
-          <div class="step-num">🧍</div>
-          <div class="step-title">Step 2. 모델 선택</div>
-          <div class="step-desc">성별, 체형, 피부톤으로 AI 모델을 선택합니다</div>
+          <div class="step-num"><i class="fas fa-person"></i></div>
+          <div class="step-title">Step 2. AI 모델 선택</div>
+          <div class="step-desc">성별, 체형, 무드에 맞는 모델을 선택합니다</div>
         </div>
         <div class="step-card">
-          <div class="step-num">🏙️</div>
-          <div class="step-title">Step 3. 배경 선택</div>
-          <div class="step-desc">브랜드에 맞는 배경을 카테고리별로 선택합니다</div>
-        </div>
-        <div class="step-card">
-          <div class="step-num">⚡</div>
-          <div class="step-title">Step 4. 생성 실행</div>
-          <div class="step-desc">수량, 구도, 포즈를 설정하고 AI 생성을 시작합니다</div>
-        </div>
-        <div class="step-card">
-          <div class="step-num">✅</div>
-          <div class="step-title">Step 5. 결과 확인</div>
-          <div class="step-desc">생성된 이미지를 확인하고 다운로드합니다</div>
+          <div class="step-num"><i class="fas fa-wand-magic-sparkles"></i></div>
+          <div class="step-title">Step 3. 배경 선택 → 자동 생성</div>
+          <div class="step-desc">배경만 고르면 AI가 알아서 완성해드려요</div>
         </div>
       </div>
       <div style="text-align:center;margin-top:48px;">
@@ -3367,64 +3422,58 @@ app.get('/', (c) => {
     <div class="container">
       <div class="section-header">
         <div class="section-tag"><i class="fas fa-tags"></i> 요금제</div>
-        <h2 class="section-title">합리적인 가격으로<br />시작하세요</h2>
-        <p class="section-desc">촬영비의 1/10 비용으로 더 많은 결과물을 만들어보세요.</p>
+        <h2 class="section-title">쓴 만큼만 내는<br />크레딧 충전제</h2>
+        <p class="section-desc">월정액 없이, 필요한 만큼만 충전해서 쓰세요. 가입 즉시 무료 크레딧이 지급됩니다.<br />이미지 1장 다운로드 시 90크레딧이 차감됩니다.</p>
       </div>
       <div class="pricing-grid">
         <div class="pricing-card">
-          <div class="pricing-plan">Free</div>
+          <div class="pricing-plan">스타터</div>
           <div class="pricing-price">
-            <span class="amount">₩0</span>
-            <span class="period">/월</span>
+            <span class="amount">₩20,000</span>
+            <span class="period">1회 충전</span>
           </div>
-          <p class="pricing-desc">처음 시작하는 분들을 위한 플랜</p>
+          <p class="pricing-desc">1,000 크레딧 · 이미지 최대 11장</p>
           <hr class="pricing-divider" />
           <ul class="pricing-features">
-            <li><span class="check">✓</span> 월 5크레딧 무료 제공</li>
-            <li><span class="check">✓</span> 기본 모델 10종</li>
-            <li><span class="check">✓</span> 기본 배경 5종</li>
-            <li><span class="check">✓</span> 1회 4장 생성</li>
-            <li><span class="x">✗</span> <span style="opacity:0.5">스타일샷 세트</span></li>
-            <li><span class="x">✗</span> <span style="opacity:0.5">일괄 다운로드</span></li>
+            <li><span class="check">✓</span> 전체 AI 모델 100종+</li>
+            <li><span class="check">✓</span> 전체 배경 15종+</li>
+            <li><span class="check">✓</span> 스타일샷 세트 생성</li>
+            <li><span class="check">✓</span> 일괄 다운로드</li>
           </ul>
-          <button class="btn btn-secondary btn-full" onclick="openModal('signupModal')">무료로 시작</button>
+          <button class="btn btn-secondary btn-full" onclick="location.href='/generator'">충전하고 시작하기</button>
         </div>
         <div class="pricing-card featured">
           <div class="pricing-popular">가장 인기</div>
-          <div class="pricing-plan">Pro</div>
+          <div class="pricing-plan">인기 충전권</div>
           <div class="pricing-price">
-            <span class="amount">₩49,000</span>
-            <span class="period">/월</span>
+            <span class="amount">₩40,000</span>
+            <span class="period">1회 충전</span>
           </div>
-          <p class="pricing-desc">활발하게 판매하는 셀러를 위한 플랜</p>
+          <p class="pricing-desc">2,300 크레딧 · 이미지 최대 25장<br />✨ 기본 대비 15% 더 받기</p>
           <hr class="pricing-divider" />
           <ul class="pricing-features">
-            <li><span class="check">✓</span> 월 100크레딧 제공</li>
-            <li><span class="check">✓</span> 전체 모델 50종+</li>
-            <li><span class="check">✓</span> 전체 배경 30종+</li>
-            <li><span class="check">✓</span> 1회 최대 8장 생성</li>
-            <li><span class="check">✓</span> 스타일샷 세트</li>
+            <li><span class="check">✓</span> 전체 AI 모델 100종+</li>
+            <li><span class="check">✓</span> 전체 배경 15종+</li>
+            <li><span class="check">✓</span> 스타일샷 세트 생성</li>
             <li><span class="check">✓</span> 일괄 다운로드</li>
           </ul>
-          <button class="btn btn-primary btn-full" onclick="openModal('signupModal')">Pro 시작하기</button>
+          <button class="btn btn-primary btn-full" onclick="location.href='/generator'">지금 시작하기</button>
         </div>
         <div class="pricing-card">
-          <div class="pricing-plan">Business</div>
+          <div class="pricing-plan">베스트 밸류</div>
           <div class="pricing-price">
-            <span class="amount">₩149,000</span>
-            <span class="period">/월</span>
+            <span class="amount">₩60,000</span>
+            <span class="period">1회 충전</span>
           </div>
-          <p class="pricing-desc">브랜드 & 에이전시를 위한 플랜</p>
+          <p class="pricing-desc">4,000 크레딧 · 이미지 최대 44장<br />🚀 기본 대비 33% 더 받기</p>
           <hr class="pricing-divider" />
           <ul class="pricing-features">
-            <li><span class="check">✓</span> 월 400크레딧 제공</li>
-            <li><span class="check">✓</span> 전체 모델/배경 무제한</li>
-            <li><span class="check">✓</span> 커스텀 모델 등록</li>
-            <li><span class="check">✓</span> 팀 계정 5인</li>
-            <li><span class="check">✓</span> API 접근</li>
-            <li><span class="check">✓</span> 전담 CS 지원</li>
+            <li><span class="check">✓</span> 전체 AI 모델 100종+</li>
+            <li><span class="check">✓</span> 전체 배경 15종+</li>
+            <li><span class="check">✓</span> 스타일샷 세트 생성</li>
+            <li><span class="check">✓</span> 일괄 다운로드</li>
           </ul>
-          <button class="btn btn-secondary btn-full" onclick="openModal('signupModal')">Business 시작</button>
+          <button class="btn btn-secondary btn-full" onclick="location.href='/generator'">충전하고 시작하기</button>
         </div>
       </div>
     </div>
@@ -3437,14 +3486,10 @@ app.get('/', (c) => {
         <h2 class="cta-title">지금 바로 <span class="highlight">무료로 체험</span>하세요</h2>
         <p class="cta-desc">신용카드 없이 5크레딧을 무료로 받고<br />AI 룩북 제작을 경험해보세요.</p>
         <div class="cta-actions">
-          <button class="btn btn-primary btn-lg" onclick="openModal('signupModal')">
+          <button class="btn btn-primary btn-lg" onclick="location.href='/generator'">
             <i class="fas fa-rocket"></i>
             무료로 시작하기 →
           </button>
-          <a href="/generator" class="btn btn-lg" style="background:rgba(255,255,255,0.1);color:white;border:2px solid rgba(255,255,255,0.3);">
-            <i class="fas fa-eye"></i>
-            데모 체험하기
-          </a>
         </div>
       </div>
     </div>
@@ -3456,7 +3501,6 @@ app.get('/', (c) => {
       <div class="footer-grid">
         <div class="footer-brand">
           <div class="navbar-logo">
-            <div class="logo-icon">✨</div>
             <span>EZlook</span>
           </div>
           <p>AI 기술로 패션 이커머스 촬영의<br />새로운 기준을 만들어갑니다.</p>
