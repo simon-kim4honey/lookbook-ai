@@ -31,6 +31,7 @@ const I18N = {
     creditInsufficient: (need, have) => `크레딧이 부족합니다. 필요: ${need}크레딧 / 보유: ${have}크레딧`,
     creditInsufficientDetail: (have) => `크레딧이 부족합니다. (보유: ${have}크레딧 / 필요: 90크레딧) 대시보드에서 충전해 주세요.`,
     creditDeductDone: (remain) => `다운로드 완료! (90크레딧 차감, 잔액: ${remain}크레딧)`,
+    creditRedownloadDone: '재다운로드 완료! (크레딧 차감 없음)',
     creditError: '크레딧 처리 중 오류가 발생했습니다.',
     creditLackPartial: (n, have) => `크레딧 부족으로 ${n}장만 다운로드했습니다. (보유: ${have}크레딧 / 필요: 90크레딧)`,
     creditErrNum: (n) => `${n}번 이미지 크레딧 처리 오류`,
@@ -53,7 +54,7 @@ const I18N = {
     generating: '준비 중...',
     genStart: '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작',
     genError: (msg) => `생성 중 오류: ${msg}`,
-    genDoneDemo: (n) => `${n}장의 이미지가 생성되었습니다. (데모 모드) 🎉`,
+    genDoneDemo: '이미지 분석 오류, 상품 업로드를 다시해주세요.',
     genDone: (n) => `${n}장의 실사 AI 이미지가 생성되었습니다! 🎉`,
     genStyleHint: '스타일샷 세트를 추가 생성하려면 아래 버튼을 클릭하세요.',
     fitLabel: (n) => `피팅컷 (${n})`,
@@ -107,6 +108,7 @@ const I18N = {
     creditInsufficient: (need, have) => `Insufficient credits. Need: ${need} / Have: ${have}`,
     creditInsufficientDetail: (have) => `Insufficient credits. (Have: ${have} / Need: 90) Please top up on the dashboard.`,
     creditDeductDone: (remain) => `Download complete! (90 credits used, balance: ${remain})`,
+    creditRedownloadDone: 'Re-download complete! (no credits charged)',
     creditError: 'An error occurred while processing credits.',
     creditLackPartial: (n, have) => `Only ${n} image(s) downloaded due to insufficient credits. (Have: ${have} / Need: 90)`,
     creditErrNum: (n) => `Credit processing error for image #${n}`,
@@ -126,7 +128,7 @@ const I18N = {
     generating: 'Preparing...',
     genStart: '<i class="fas fa-wand-magic-sparkles"></i> Start AI Generation',
     genError: (msg) => `Generation error: ${msg}`,
-    genDoneDemo: (n) => `${n} image(s) generated. (Demo mode) 🎉`,
+    genDoneDemo: 'Image analysis error. Please re-upload your product photo.',
     genDone: (n) => `${n} AI image(s) generated! 🎉`,
     genStyleHint: 'Click the button below to generate additional style shots.',
     fitLabel: (n) => `Fitting Shots (${n})`,
@@ -176,6 +178,7 @@ const I18N = {
     creditInsufficient: (need, have) => `クレジットが不足しています。必要: ${need} / 保有: ${have}`,
     creditInsufficientDetail: (have) => `クレジットが不足しています。(保有: ${have} / 必要: 90) ダッシュボードでチャージしてください。`,
     creditDeductDone: (remain) => `ダウンロード完了！(90クレジット消費、残高: ${remain})`,
+    creditRedownloadDone: '再ダウンロード完了！(クレジット消費なし)',
     creditError: 'クレジット処理中にエラーが発生しました。',
     creditLackPartial: (n, have) => `クレジット不足のため${n}枚のみダウンロードしました。(保有: ${have} / 必要: 90)`,
     creditErrNum: (n) => `画像${n}番のクレジット処理エラー`,
@@ -195,7 +198,7 @@ const I18N = {
     generating: '準備中...',
     genStart: '<i class="fas fa-wand-magic-sparkles"></i> AI生成スタート',
     genError: (msg) => `生成エラー: ${msg}`,
-    genDoneDemo: (n) => `${n}枚の画像が生成されました。(デモモード) 🎉`,
+    genDoneDemo: '画像解析エラー。商品画像を再アップロードしてください。',
     genDone: (n) => `${n}枚のAI画像が生成されました！ 🎉`,
     genStyleHint: '下のボタンをクリックして追加スタイルショットを生成してください。',
     fitLabel: (n) => `フィッティングショット (${n})`,
@@ -420,13 +423,13 @@ function showToast(message, type = 'info', duration = 4000) {
   toast.innerHTML = `
     <span style="font-size:18px;">${icons[type] || 'ℹ️'}</span>
     <span style="flex:1;">${message}</span>
-    <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-muted);padding:0;margin-left:8px;">×</button>
+    <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:18px;padding:0;margin-left:8px;">×</button>
   `;
   container.appendChild(toast);
 
   setTimeout(() => {
     toast.style.opacity = '0';
-    toast.style.transform = 'translateX(100%)';
+    toast.style.transform = 'translateY(100%)';
     toast.style.transition = 'all 0.3s ease';
     setTimeout(() => toast.remove(), 300);
   }, duration);
@@ -1561,7 +1564,6 @@ function processSlotFile(file, cat) {
     syncClothingItems();
     renderSlots();
     updateNextBtn1();
-    showToast(t('uploadDone', SLOT_LABEL[cat]), 'success');
   };
 
   // 원본 해상도가 크면(특히 "전체" 등 풀샷) base64 payload가 너무 커져
@@ -2181,7 +2183,7 @@ function completeGeneration(images, isFallback = false) {
 
   const count = images.length;
   if (isFallback) {
-    showToast(t('genDoneDemo', count), 'success');
+    showToast(t('genDoneDemo'), 'error');
   } else {
     showToast(t('genDone', count), 'success');
   }
@@ -2396,7 +2398,8 @@ async function downloadWithCreditCheck(idx) {
   try {
     const deductRes = await fetch('/api/credits/deduct', {
       method: 'POST',
-      headers: { 'X-Session-Token': sessionToken },
+      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: AppState.lastJobId, idx: getShareIndex(idx) }),
     });
 
     if (deductRes.status === 401) {
@@ -2431,7 +2434,8 @@ async function downloadWithCreditCheck(idx) {
     }
     // 파일 다운로드
     _doFileDownload(img.url, idx + 1);
-    setActionComplete(t('creditDeductDone', deductData.creditsRemaining), {
+    const completeMsg = deductData.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', deductData.creditsRemaining);
+    setActionComplete(completeMsg, {
       showShare: true,
       jobId: AppState.lastJobId,
       idx: getShareIndex(idx),
@@ -2531,7 +2535,8 @@ async function downloadImage() {
     const sessionToken = localStorage.getItem('lookbook_token') || '';
     const deductRes = await fetch('/api/credits/deduct', {
       method: 'POST',
-      headers: { 'X-Session-Token': sessionToken },
+      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: AppState.lastJobId, idx: getShareIndex(idx) }),
     });
 
     if (deductRes.status === 401) {
@@ -2575,7 +2580,8 @@ async function downloadImage() {
     // 실제 다운로드 실행
     if (img?.url) {
       downloadSingleImage(img.url, idx + 1);
-      setActionComplete(t('creditDeductDone', deductData.creditsRemaining), {
+      const completeMsg = deductData.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', deductData.creditsRemaining);
+      setActionComplete(completeMsg, {
         showShare: true,
         jobId: AppState.lastJobId,
         idx: getShareIndex(idx),

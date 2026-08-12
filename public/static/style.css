@@ -1196,11 +1196,12 @@ footer {
   flex: 1;
   justify-content: center;
 }
-/* 네비 버튼 다크 테마 오버라이드 */
+/* 네비 버튼 다크 테마 오버라이드 — 모서리를 의상 슬롯(cslot)과 동일한 14px로 통일 */
 .gslide-nav .step-nav-back {
   background: rgba(255,255,255,0.07) !important;
   border-color: rgba(255,255,255,0.1) !important;
   color: rgba(255,255,255,0.7) !important;
+  border-radius: 14px !important;
 }
 .gslide-nav .step-nav-back:hover {
   background: rgba(255,255,255,0.12) !important;
@@ -1211,6 +1212,7 @@ footer {
   border: none !important;
   color: #fff !important;
   box-shadow: 0 4px 16px rgba(124,58,237,0.4) !important;
+  border-radius: 14px !important;
 }
 .gslide-nav .step-nav-next:hover {
   background: linear-gradient(135deg, #6d28d9, #8b5cf6) !important;
@@ -1251,14 +1253,14 @@ footer {
   margin: 0 0 12px;
 }
 
-/* ── 필터바 ── */
+/* ── 필터바 — 좌우 여백을 헤더/그리드와 동일한 16px로 통일 ── */
 .gfilter-bar {
   display: flex;
   gap: 6px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  padding-bottom: 10px;
+  padding: 0 16px 10px;
   flex-wrap: nowrap;
 }
 .gfilter-bar::-webkit-scrollbar { display: none; }
@@ -1300,7 +1302,7 @@ footer {
 }
 
 /* ── 그리드 카드 다크 테마 ── */
-.gslide-grid .select-grid { padding: 8px 12px 16px; }
+.gslide-grid .select-grid { padding: 8px 16px 16px; }
 .gslide-grid .grid-card { background: #1e1e2a; }
 .gslide-grid .grid-skip-card {
   background: #1e1e2a !important;
@@ -1320,7 +1322,7 @@ footer {
   font-size: 12px;
   line-height: 1.6;
   margin: -8px 0 14px;
-  text-align: center;
+  text-align: left;
 }
 
 /* ─────────────────────────────────────────────
@@ -2159,13 +2161,18 @@ footer {
 /* Toast Notifications */
 .toast-container {
   position: fixed;
-  top: 80px;
-  right: 24px;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 420px;
   z-index: 99999;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  pointer-events: none;
 }
+.toast-container .toast { pointer-events: auto; }
 
 /* 모달 내 인라인 에러/성공 메시지 박스 */
 .auth-message {
@@ -2199,21 +2206,24 @@ footer {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 20px;
-  background: var(--white);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
-  min-width: 300px;
-  border-left: 4px solid var(--primary);
-  animation: slideIn 0.3s ease;
-  font-size: 14px;
+  padding: 14px 16px;
+  background: #1e1e35;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  width: 100%;
+  border-left: 4px solid #a78bfa;
+  animation: toastSlideUp 0.3s cubic-bezier(0.4,0,0.2,1);
+  font-size: 13px;
+  color: #e0e0f0;
 }
-.toast.success { border-left-color: var(--success); }
-.toast.error { border-left-color: var(--error); }
-.toast.warning { border-left-color: var(--warning); }
-@keyframes slideIn {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+.toast.success { border-left-color: #34d399; }
+.toast.error { border-left-color: #f87171; }
+.toast.warning { border-left-color: #fbbf24; }
+.toast button { color: rgba(255,255,255,0.5) !important; }
+@keyframes toastSlideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 /* Placeholder gradient images */
@@ -2731,3 +2741,79 @@ button, a { touch-action: manipulation; }
     margin: 0 auto;
   }
 }
+
+/* ── 생성 내역 (대시보드) — 채팅 목록 스타일 리스트 ── */
+.hist-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: #1e1e35;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+.hist-row--expired { opacity: 0.6; }
+.hist-thumb {
+  flex-shrink: 0;
+  width: 64px;
+  height: 80px;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #16162a;
+}
+.hist-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.hist-thumb--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5a5a7a;
+  font-size: 20px;
+  cursor: default;
+}
+.hist-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.hist-meta {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a78bfa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hist-meta-sub {
+  font-size: 11px;
+  color: #5a5a7a;
+  line-height: 1.4;
+}
+.hist-actions {
+  display: flex;
+  gap: 6px;
+}
+.hist-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: none;
+  background: #2a2a45;
+  color: #c4c4d8;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.hist-action-btn:hover { background: #33334f; }
+.hist-action-btn.primary { background: linear-gradient(135deg,#7c3aed,#a78bfa); color: #fff; }
+.hist-action-btn.primary:hover { filter: brightness(1.08); }
+.hist-action-btn.danger { color: #f87171; }
+.hist-action-btn.danger:hover { background: rgba(239,68,68,0.15); }

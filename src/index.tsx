@@ -1572,7 +1572,7 @@ app.get('/api/generation/history', async (c) => {
 
     const logs = await db.prepare(
       `SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
-              image_urls, expires_at, created_at
+              image_urls, expires_at, created_at, downloaded_indices
        FROM generation_logs
        WHERE user_id = ?
        ORDER BY created_at DESC
@@ -1633,6 +1633,27 @@ app.post('/api/credits/deduct', async (c) => {
     ).bind(sessionToken).first() as any
     if (!sess) return c.json({ error: '세션이 만료되었습니다.', code: 'UNAUTHORIZED' }, 401)
 
+    const body: any = await c.req.json().catch(() => ({}))
+    const jobId: string | undefined = body?.job_id
+    const imgIdx: number | undefined = Number.isInteger(body?.idx) ? body.idx : undefined
+
+    // job 하나가 여러 장의 이미지를 포함할 수 있으므로, job_id 단위가 아니라
+    // job_id + 이미지 인덱스 단위로 다운로드 이력을 추적한다 (배치 내 다른 이미지가
+    // 함께 무료 처리되는 것을 방지)
+    let genLog: any = null
+    let downloadedIndices: number[] = []
+    if (jobId) {
+      genLog = await db.prepare(
+        `SELECT id, downloaded_indices FROM generation_logs WHERE job_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1`
+      ).bind(jobId, sess.user_id).first() as any
+      if (genLog?.downloaded_indices) {
+        try { downloadedIndices = JSON.parse(genLog.downloaded_indices) } catch {}
+      }
+      if (genLog && imgIdx !== undefined && downloadedIndices.includes(imgIdx)) {
+        return c.json({ success: true, creditsUsed: 0, creditsRemaining: sess.credits, alreadyDownloaded: true })
+      }
+    }
+
     const COST = CREDITS_PER_IMAGE  // 90크레딧
     if (sess.credits < COST) {
       return c.json({
@@ -1653,9 +1674,39 @@ app.post('/api/credits/deduct', async (c) => {
        VALUES (?, 'deduct', ?, ?, 'image_download', ?)`
     ).bind(sess.user_id, -COST, newBalance, `dl_${Date.now()}`).run()
 
+    if (genLog && imgIdx !== undefined) {
+      downloadedIndices.push(imgIdx)
+      await db.prepare(
+        `UPDATE generation_logs SET downloaded_indices = ? WHERE id = ?`
+      ).bind(JSON.stringify(downloadedIndices), genLog.id).run()
+    }
+
     console.log(`[Credits] Download deduct: ${sess.name} ${sess.credits} → ${newBalance} (-${COST})`)
 
-    return c.json({ success: true, creditsUsed: COST, creditsRemaining: newBalance })
+    return c.json({ success: true, creditsUsed: COST, creditsRemaining: newBalance, alreadyDownloaded: false })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// Generation History Delete API — 생성 내역 삭제
+// ────────────────────────────────────────────────────
+app.delete('/api/generation/history/:id', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
+
+    const id = c.req.param('id')
+    await db.prepare(`DELETE FROM generation_logs WHERE id = ? AND user_id = ?`).bind(id, sess.user_id).run()
+
+    return c.json({ success: true })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -2556,7 +2607,7 @@ app.get('/api/generation/:jobId/status', async (c) => {
 
   // Fallback 처리
   if (rawJobId.startsWith('fallback_')) {
-    const placeholderImages = generatePlaceholderImages(4)
+    const placeholderImages = generatePlaceholderImages(1)
     return c.json({ status: 'completed', progress: 100, images: placeholderImages, isFallback: true })
   }
 
@@ -2609,7 +2660,7 @@ app.get('/api/generation/:jobId/status', async (c) => {
     if (resultImages.length === 0) {
       // 전부 실패 → fallback placeholder
       console.error('All jobs failed:', pollResults.map(r => r.data?.status).join(', '))
-      const placeholderImages = generatePlaceholderImages(4)
+      const placeholderImages = generatePlaceholderImages(1)
       return c.json({ status: 'completed', progress: 100, images: placeholderImages, isFallback: true, error: 'All jobs failed' })
     }
 
@@ -2617,7 +2668,7 @@ app.get('/api/generation/:jobId/status', async (c) => {
 
   } catch (err: any) {
     console.error('Poll error:', err)
-    const placeholderImages = generatePlaceholderImages(4)
+    const placeholderImages = generatePlaceholderImages(1)
     return c.json({ status: 'completed', progress: 100, images: placeholderImages, isFallback: true, error: err.message })
   }
 })
@@ -3802,7 +3853,7 @@ app.get('/dashboard', (c) => {
       <!-- 14일 보관 안내 -->
       <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
         <span style="font-size:15px;">⏰</span>
-        <span style="font-size:12px;color:#fca5a5;line-height:1.5;">이미지는 <strong>14일 동안만 보관</strong>됩니다. 제때 다운로드하시기 바랍니다.</span>
+        <span style="font-size:12px;color:#fca5a5;line-height:1.5;">이미지는 <strong>14일 동안만 보관</strong>됩니다. 제때 다운로드하시기 바랍니다.<br/>재다운로드시 크레딧은 차감되지 않습니다.</span>
       </div>
       <div id="historyList" style="display:flex;flex-direction:column;gap:16px;">
         <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
@@ -3813,15 +3864,30 @@ app.get('/dashboard', (c) => {
     </div>
   </div>
 
-  <!-- 이미지 확대 다운로드 모달 (히스토리 전용) -->
+  <!-- 이미지 확대 보기 모달 (히스토리 전용 — 다시보기) -->
   <div id="histImgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1000;align-items:center;justify-content:center;flex-direction:column;padding:20px;">
     <button onclick="closeHistModal()" style="position:absolute;top:16px;right:16px;width:36px;height:36px;border:none;background:rgba(255,255,255,0.1);border-radius:50%;color:#fff;font-size:20px;cursor:pointer;">×</button>
     <img id="histModalImg" src="" alt="생성 이미지"
       style="max-width:min(420px,90vw);max-height:calc(100dvh - 140px);object-fit:contain;border-radius:14px;display:block;" />
     <div id="histModalExpiry" style="font-size:11px;color:#f87171;margin-top:8px;text-align:center;"></div>
-    <button id="histModalDlBtn" onclick="histModalDownload()" style="margin-top:14px;padding:12px 28px;background:linear-gradient(135deg,#7c3aed,#a855f7);border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;">
-      <i class="fas fa-download"></i> 다운로드 (90크레딧)
-    </button>
+  </div>
+
+  <!-- Action Progress Modal (다운로드 진행 중 + 완료 팝업 — generator 페이지와 동일 구조 공유) -->
+  <div class="modal-overlay" id="actionProgressModal" style="z-index:10500;">
+    <div class="action-progress-box">
+      <div id="actionProgressSpinner" class="action-progress-spinner"></div>
+      <div id="actionProgressCheck" class="action-progress-check" style="display:none;"><i class="fas fa-check"></i></div>
+      <div id="actionProgressText" class="action-progress-text">처리 중...</div>
+      <div id="actionProgressShare" class="action-progress-share" style="display:none;">
+        <button class="action-progress-share-btn link" onclick="copyShareLink()">
+          <i class="fas fa-link"></i> 링크복사
+        </button>
+        <button id="actionProgressKakaoBtn" class="action-progress-share-btn kakao" onclick="shareToKakao()" style="display:none;">
+          <i class="fas fa-comment"></i> 카카오톡 공유
+        </button>
+      </div>
+      <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
+    </div>
   </div>
 
   <script>
@@ -3881,7 +3947,6 @@ app.get('/dashboard', (c) => {
 
   // ── 히스토리 이미지 모달 상태 ──
   let _histModalUrl = null;
-  let _histModalJobId = null;
 
   function openHistModal(imgUrl, expiresAt) {
     _histModalUrl = imgUrl;
@@ -3895,48 +3960,6 @@ app.get('/dashboard', (c) => {
     document.getElementById('histImgModal').style.display = 'none';
     _histModalUrl = null;
   }
-  async function histModalDownload() {
-    if (!_histModalUrl) return;
-    const btn = document.getElementById('histModalDlBtn');
-    const token = localStorage.getItem('lookbook_token') || '';
-    if (!token) { showToast('로그인이 필요합니다.', 'error'); return; }
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 처리 중...';
-    try {
-      const deductRes = await fetch('/api/credits/deduct', {
-        method: 'POST', headers: { 'X-Session-Token': token }
-      });
-      if (deductRes.status === 401) { showToast('로그인이 필요합니다.', 'error'); return; }
-      if (deductRes.status === 402) {
-        const errData = await deductRes.json();
-        showToast(\`크레딧 부족 (보유: \${errData.available ?? 0}크레딧 / 필요: 90크레딧)\`, 'error');
-        return;
-      }
-      if (!deductRes.ok) { showToast('크레딧 처리 오류', 'error'); return; }
-      const deductData = await deductRes.json();
-      // 크레딧 UI 갱신
-      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
-      if (cachedUser) { cachedUser.credits = deductData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
-      if (AppState.user) AppState.user.credits = deductData.creditsRemaining;
-      const dbCredEl = document.getElementById('dbCredits');
-      if (dbCredEl) dbCredEl.textContent = (deductData.creditsRemaining ?? 0).toLocaleString();
-      // 파일 다운로드
-      const dlUrl = _histModalUrl.includes('/api/proxy/gen-image')
-        ? _histModalUrl + (_histModalUrl.includes('?') ? '&' : '?') + 'download=1'
-        : \`/api/proxy/gen-image?url=\${encodeURIComponent(_histModalUrl)}&download=1\`;
-      const a = document.createElement('a');
-      a.href = dlUrl; a.download = \`lookbook_ai_\${Date.now()}.jpg\`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      showToast(\`다운로드 완료! (잔액: \${deductData.creditsRemaining}크레딧)\`, 'success');
-      closeHistModal();
-    } catch (err) {
-      showToast('다운로드 중 오류가 발생했습니다.', 'error');
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-download"></i> 다운로드 (90크레딧)';
-    }
-  }
-
   async function loadHistory() {
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
@@ -3951,59 +3974,139 @@ app.get('/dashboard', (c) => {
         return;
       }
 
-      list.innerHTML = logs.map((log, i) => {
+      const rows = [];
+      logs.forEach((log, i) => {
         const seqLabel  = formatHistSeq(log.created_at, log.seq_no || (logs.length - i));
         const dateStr   = log.created_at ? log.created_at.slice(0,16).replace('T',' ') : '';
         const expLabel  = expiryLabel(log.expires_at);
         const expired   = expLabel === '만료됨';
-        const countLabel = log.image_count || 1;
+        const expEsc    = (log.expires_at || '').replace(/'/g,"\\\\'");
 
         // image_urls 파싱 (JSON 배열 문자열)
         let urls = [];
         try { urls = log.image_urls ? JSON.parse(log.image_urls) : []; } catch(e) { urls = []; }
+        // 이미지 인덱스별 다운로드 이력 (JSON 배열, 예: [0,2])
+        let downloadedIdx = [];
+        try { downloadedIdx = log.downloaded_indices ? JSON.parse(log.downloaded_indices) : []; } catch(e) { downloadedIdx = []; }
 
-        // 썸네일 그리드 (최대 4장)
-        const thumbsHtml = urls.length > 0 ? \`
-          <div style="display:grid;grid-template-columns:repeat(\${Math.min(urls.length,4)},1fr);gap:4px;margin-top:10px;border-radius:10px;overflow:hidden;">
-            \${urls.slice(0,4).map((u, ti) => {
-              const proxyUrl = u.startsWith('/api/proxy') ? u : \`/api/proxy/gen-image?url=\${encodeURIComponent(u)}\`;
-              const expiresAtEsc = (log.expires_at || '').replace(/'/g,"\\\\'");
-              if (expired) {
-                return \`<div style="aspect-ratio:3/4;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#5a5a7a;">만료됨</div>\`;
-              }
-              return \`<div style="aspect-ratio:3/4;overflow:hidden;cursor:pointer;position:relative;" onclick="openHistModal('\${proxyUrl}','\${expiresAtEsc}')">
-                <img src="\${proxyUrl}" alt="생성 이미지 \${ti+1}"
-                  style="width:100%;height:100%;object-fit:cover;display:block;"
-                  onerror="this.parentNode.innerHTML='<div style=\\"width:100%;height:100%;background:#1e1e35;display:flex;align-items:center;justify-content:center;font-size:10px;color:#5a5a7a;\\">로드 실패</div>'" />
-                <div style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);border-radius:4px;padding:2px 5px;font-size:10px;color:#fff;">
-                  <i class="fas fa-expand-alt"></i>
+        if (urls.length === 0) {
+          rows.push(\`<div class="hist-row">
+            <div class="hist-thumb hist-thumb--empty"><i class="fas fa-image"></i></div>
+            <div class="hist-body">
+              <div class="hist-meta">#\${seqLabel} · \${dateStr}</div>
+              <div class="hist-meta-sub">이미지 준비 중이거나 저장 전 세션이 종료되었습니다</div>
+              <div class="hist-actions">
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+              </div>
+            </div>
+          </div>\`);
+          return;
+        }
+
+        urls.forEach((u, ui) => {
+          const rowSeq = urls.length > 1 ? \`\${seqLabel}-\${ui+1}\` : seqLabel;
+          const proxyUrl = u.startsWith('/api/proxy') ? u : \`/api/proxy/gen-image?url=\${encodeURIComponent(u)}\`;
+          const urlEsc = proxyUrl.replace(/'/g,"\\\\'");
+          const origEsc = u.replace(/'/g,"\\\\'");
+          const jobIdEsc = (log.job_id || '').replace(/'/g,"\\\\'");
+
+          if (expired) {
+            rows.push(\`<div class="hist-row hist-row--expired">
+              <div class="hist-thumb hist-thumb--empty"><i class="fas fa-clock"></i></div>
+              <div class="hist-body">
+                <div class="hist-meta">#\${rowSeq} · \${dateStr} · 만료됨</div>
+                <div class="hist-actions">
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
                 </div>
-              </div>\`;
-            }).join('')}
-          </div>\` : \`<div style="margin-top:10px;padding:14px;background:#16162a;border-radius:10px;text-align:center;font-size:12px;color:#5a5a7a;border:1px dashed rgba(255,255,255,0.06);">
-            <i class="fas fa-image" style="opacity:0.3;font-size:18px;margin-bottom:6px;display:block;"></i>
-            이미지 준비 중이거나 저장 전 세션이 종료되었습니다
-          </div>\`;
+              </div>
+            </div>\`);
+            return;
+          }
 
-        const expColor  = expLabel === '만료됨' ? '#6b7280' : (expLabel?.includes('⚠️') ? '#fbbf24' : '#6b7280');
+          const dlLabel = downloadedIdx.includes(ui) ? '재다운로드' : '다운로드';
 
-        return \`<div style="background:#1e1e35;border-radius:16px;padding:14px 16px;border:1px solid rgba(255,255,255,0.04);">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:11px;font-weight:700;color:#9b7cff;letter-spacing:0.5px;margin-bottom:3px;">#\${seqLabel}</div>
-              <div style="font-size:13px;font-weight:600;color:#e0e0f0;">\${countLabel}장 생성</div>
-              <div style="font-size:11px;color:#5a5a7a;margin-top:2px;">\${dateStr}</div>
+          rows.push(\`<div class="hist-row">
+            <div class="hist-thumb" onclick="openHistModal('\${urlEsc}','\${expEsc}')">
+              <img src="\${proxyUrl}" alt="생성 이미지" onerror="this.parentNode.innerHTML='<i class=\\"fas fa-image\\"></i>'" />
             </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:11px;color:\${expColor};">\${expLabel || ''}</div>
-              <div style="font-size:11px;color:#5a5a7a;margin-top:2px;">\${log.ratio || '3:4'}</div>
+            <div class="hist-body">
+              <div class="hist-meta">#\${rowSeq} · \${dateStr} · \${expLabel || ''}</div>
+              <div class="hist-actions">
+                <button class="hist-action-btn" onclick="openHistModal('\${urlEsc}','\${expEsc}')"><i class="fas fa-eye"></i> 다시보기</button>
+                <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)"><i class="fas fa-download"></i> \${dlLabel}</button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+              </div>
             </div>
-          </div>
-          \${thumbsHtml}
-        </div>\`;
-      }).join('');
+          </div>\`);
+        });
+      });
+
+      list.innerHTML = rows.join('');
     } catch (e) {
       list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
+    }
+  }
+
+  async function histRowDownload(jobId, originalUrl, imgIdx, btn) {
+    const token = localStorage.getItem('lookbook_token') || '';
+    if (!token) { showToast('로그인이 필요합니다.', 'error'); return; }
+
+    openActionProgress('다운로드 중...');
+    try {
+      const deductRes = await fetch('/api/credits/deduct', {
+        method: 'POST',
+        headers: { 'X-Session-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_id: jobId, idx: imgIdx }),
+      });
+      if (deductRes.status === 401) { closeActionProgress(); showToast('로그인이 필요합니다.', 'error'); return; }
+      if (deductRes.status === 402) {
+        closeActionProgress();
+        const errData = await deductRes.json();
+        showToast(\`크레딧 부족 (보유: \${errData.available ?? 0}크레딧 / 필요: 90크레딧)\`, 'error');
+        return;
+      }
+      if (!deductRes.ok) { closeActionProgress(); showToast('크레딧 처리 오류', 'error'); return; }
+
+      const deductData = await deductRes.json();
+      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+      if (cachedUser) { cachedUser.credits = deductData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+      if (AppState.user) AppState.user.credits = deductData.creditsRemaining;
+      const dbCredEl = document.getElementById('dbCredits');
+      if (dbCredEl) dbCredEl.textContent = (deductData.creditsRemaining ?? 0).toLocaleString();
+
+      // 파일 다운로드
+      const dlUrl = originalUrl.includes('/api/proxy/gen-image')
+        ? originalUrl + (originalUrl.includes('?') ? '&' : '?') + 'download=1'
+        : \`/api/proxy/gen-image?url=\${encodeURIComponent(originalUrl)}&download=1\`;
+      const a = document.createElement('a');
+      a.href = dlUrl; a.download = \`lookbook_ai_\${Date.now()}.jpg\`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+      const completeMsg = deductData.alreadyDownloaded
+        ? '재다운로드 완료! (크레딧 차감 없음)'
+        : \`다운로드 완료! (잔액: \${deductData.creditsRemaining}크레딧)\`;
+      setActionComplete(completeMsg, { showShare: true, jobId: jobId, idx: imgIdx, imageUrl: originalUrl });
+
+      if (btn) btn.innerHTML = '<i class="fas fa-download"></i> 재다운로드';
+    } catch (err) {
+      closeActionProgress();
+      showToast('다운로드 중 오류가 발생했습니다.', 'error');
+    }
+  }
+
+  async function deleteHistItem(logId) {
+    if (!confirm('이 생성 내역을 삭제할까요? 삭제하면 복구할 수 없어요.')) return;
+    const token = localStorage.getItem('lookbook_token') || '';
+    try {
+      const res = await fetch(\`/api/generation/history/\${logId}\`, {
+        method: 'DELETE',
+        headers: { 'X-Session-Token': token },
+      });
+      if (!res.ok) { showToast('삭제에 실패했습니다.', 'error'); return; }
+      showToast('삭제되었습니다.', 'success');
+      loadHistory();
+    } catch (err) {
+      showToast('삭제 중 오류가 발생했습니다.', 'error');
     }
   }
 
