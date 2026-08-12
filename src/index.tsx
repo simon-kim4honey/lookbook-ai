@@ -3067,7 +3067,14 @@ app.get('/terms', (c) => {
   <p>① 서비스는 AI가 생성한 콘텐츠의 정확성, 완전성에 대해 보증하지 않습니다.</p>
   <p>② 서비스는 이용자의 귀책사유로 인한 손해에 대해 책임을 지지 않습니다.</p>
 
-  <h2>제8조 (분쟁 해결)</h2>
+  <h2 id="refund">제8조 (청약철회 및 환불)</h2>
+  <p>① 이용자는 크레딧 결제일로부터 7일 이내에는 「전자상거래 등에서의 소비자보호에 관한 법률」 제17조에 따라 청약철회를 요청할 수 있습니다. 단, 해당 크레딧을 일부라도 사용(이미지 생성)한 경우에는 사용분을 제외한 잔여 크레딧에 한해 환불이 가능합니다.</p>
+  <p>② 크레딧을 전부 사용한 경우, 또는 결제일로부터 7일이 경과한 경우에는 원칙적으로 청약철회 및 환불이 제한됩니다.</p>
+  <p>③ 서비스 오류(AI 생성 실패, 결제 중복 등) 등 회사의 귀책사유로 정상적인 서비스 제공이 불가능한 경우, 이용자는 사용 여부와 관계없이 전액 환불을 요청할 수 있습니다.</p>
+  <p>④ 환불 신청은 아래 문의처로 결제 정보(주문번호, 결제일시, 결제수단)와 함께 요청해 주시기 바랍니다. 환불은 신청 접수 후 3영업일 이내에 결제 수단과 동일한 방법으로 처리됩니다.</p>
+  <p>⑤ 이용자의 단순 변심에 의한 환불 시, 이미 사용한 크레딧에 해당하는 금액은 환불 대상에서 제외됩니다.</p>
+
+  <h2>제9조 (분쟁 해결)</h2>
   <p>본 약관과 관련한 분쟁은 대한민국 법률을 적용하며, 관할 법원은 민사소송법에 따릅니다.</p>
 
   <p style="margin-top:40px; color:#888; font-size:13px;">문의: <a href="mailto:kim4honey@gmail.com">kim4honey@gmail.com</a></p>
@@ -3144,14 +3151,11 @@ app.get('/_home_old', (c) => {
 
 app.get('/', (c) => {
   const host = c.req.header('host') || ''
-  // studiob.aifashion.co.kr → /generator 리다이렉트
+  // studiob.aifashion.co.kr → /generator 리다이렉트 (앱 전용 도메인)
   if (host.includes('studiob.aifashion.co.kr')) {
     return c.redirect('/generator', 302)
   }
-  // www.aifashion.co.kr / aifashion.co.kr → studiob.aifashion.co.kr 리다이렉트
-  if (host === 'www.aifashion.co.kr' || host === 'aifashion.co.kr') {
-    return c.redirect('https://studiob.aifashion.co.kr', 302)
-  }
+  // www.aifashion.co.kr / aifashion.co.kr — 마케팅 홈페이지(이용약관·개인정보처리방침·사업자정보 포함)를 직접 서빙
   return c.html(htmlShell('홈', `
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
@@ -3189,6 +3193,7 @@ app.get('/', (c) => {
             </div>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/#siteFooter" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
@@ -3438,7 +3443,7 @@ app.get('/', (c) => {
   </section>
 
   <!-- Footer -->
-  <footer>
+  <footer id="siteFooter">
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
@@ -3470,8 +3475,8 @@ app.get('/', (c) => {
           <h4>법적 고지</h4>
           <ul class="footer-links">
             <li><a href="/terms">이용약관</a></li>
+            <li><a href="/terms#refund">환불정책</a></li>
             <li><a href="/privacy">개인정보처리방침</a></li>
-            <li><a href="#">쿠키 정책</a></li>
           </ul>
         </div>
       </div>
@@ -3825,6 +3830,12 @@ app.get('/dashboard', (c) => {
         <span class="db-menu-arrow">›</span>
       </a>
 
+      <!-- 서비스소개 -->
+      <a href="https://www.aifashion.co.kr/#siteFooter" class="db-menu-item">
+        <span class="db-menu-label">서비스소개</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
     </div>
 
     <!-- 로그아웃 카드 -->
@@ -4151,6 +4162,7 @@ app.get('/generator', (c) => {
             </div>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/#siteFooter" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
