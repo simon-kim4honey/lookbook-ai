@@ -2412,7 +2412,7 @@ app.post('/api/generation/start', async (c) => {
         `COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,
 
         clothingRoleDesc,
-        `Image ${bgImgIdx} = SCENE ANCHOR. This scene defines: background environment, all objects, scene lighting direction/color-temperature/intensity/saturation, color grade, and mood. LOCKED: background, all scene objects.`,
+        `Image ${bgImgIdx} = SCENE ANCHOR. This scene defines: background environment, scene lighting direction/color-temperature/intensity/saturation, color grade, and mood. LOCKED: background.`,
 
         `CLOTHING REPLACEMENT:`,
         clothingReplaceInstructions,
