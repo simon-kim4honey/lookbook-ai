@@ -31,6 +31,18 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.use('/api/*', cors())
 app.use('/static/*', serveStatic({ root: './public' }))
 
+// studiob.aifashion.co.kr → www.aifashion.co.kr 전체 경로 리다이렉트
+// studiob 도메인은 더 이상 별도 서비스로 쓰지 않고, www 하나로 통합 (경로/쿼리 그대로 유지)
+// 진행 중인 API 요청(세션 유지 등)은 리다이렉트에서 제외
+app.use('*', async (c, next) => {
+  const host = c.req.header('host') || ''
+  if (host.includes('studiob.aifashion.co.kr') && !c.req.path.startsWith('/api/')) {
+    const url = new URL(c.req.url)
+    return c.redirect(`https://www.aifashion.co.kr${url.pathname}${url.search}`, 302)
+  }
+  await next()
+})
+
 // ────────────────────────────────────────────────────
 // Constants
 // ────────────────────────────────────────────────────
@@ -3150,12 +3162,8 @@ app.get('/_home_old', (c) => {
 })
 
 app.get('/', (c) => {
-  const host = c.req.header('host') || ''
-  // studiob.aifashion.co.kr → /generator 리다이렉트 (앱 전용 도메인)
-  if (host.includes('studiob.aifashion.co.kr')) {
-    return c.redirect('/generator', 302)
-  }
-  // www.aifashion.co.kr / aifashion.co.kr — 마케팅 홈페이지(이용약관·개인정보처리방침·사업자정보 포함)를 직접 서빙
+  // studiob.aifashion.co.kr는 상단 전역 미들웨어에서 이미 www로 리다이렉트됨
+  // 마케팅 홈페이지(이용약관·개인정보처리방침·사업자정보 포함)를 직접 서빙
   return c.html(htmlShell('홈', `
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
@@ -5492,19 +5500,8 @@ document.addEventListener('DOMContentLoaded', () => {
 </html>`)
 })
 
-// ── /admin: 도메인별 분기 ──
-// aifashion.co.kr/admin → studiob.aifashion.co.kr/admin 으로 리다이렉트
-// www.aifashion.co.kr/admin → 삭제 (404)
-// studiob.aifashion.co.kr/admin → /admin02 로 내부 포워드
+// ── /admin → /admin02 포워드 (도메인이 www 하나로 통합됨) ──
 app.get('/admin', (c) => {
-  const host = c.req.header('host') || ''
-  if (host === 'www.aifashion.co.kr') {
-    return c.text('Not Found', 404)
-  }
-  if (host === 'aifashion.co.kr') {
-    return c.redirect('https://studiob.aifashion.co.kr/admin', 302)
-  }
-  // studiob.aifashion.co.kr 또는 vip.gensparksite.com → 실제 어드민
   return c.redirect('/admin02', 302)
 })
 
