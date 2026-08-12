@@ -749,8 +749,6 @@ function oauthLogin(provider, btn) {
     if (AppState.pendingGeneration) {
       AppState.pendingGeneration = false;
       setTimeout(() => startGeneration(), 300);
-    } else if (window.location.pathname === '/') {
-      setTimeout(() => window.location.href = '/dashboard', 800);
     }
   }
 
@@ -834,8 +832,6 @@ function checkOAuthRedirectResult() {
         // 전체 페이지 리다이렉트로 날아간 의류/모델/배경 선택 상태 복원 후 생성 재개
         _restoreGenState(pending.genState);
         setTimeout(() => startGeneration(), 300);
-      } else if (window.location.pathname === '/') {
-        setTimeout(() => window.location.href = '/dashboard', 800);
       }
     } else if (data?.type === 'oauth_error') {
       showToast(t('loginFailed'), 'error');
@@ -916,8 +912,6 @@ async function handleLogin(e) {
       if (AppState.pendingGeneration) {
         AppState.pendingGeneration = false;
         setTimeout(() => startGeneration(), 300);
-      } else if (window.location.pathname === '/') {
-        setTimeout(() => window.location.href = '/dashboard', 800);
       }
     } else {
       // 서버 오류 메시지를 모달 안에 표시
@@ -1029,8 +1023,6 @@ async function handleSignup(e) {
       if (AppState.pendingGeneration) {
         AppState.pendingGeneration = false;
         setTimeout(() => startGeneration(), 300);
-      } else if (window.location.pathname === '/') {
-        setTimeout(() => window.location.href = '/dashboard', 800);
       }
     } else {
       // 서버 오류 메시지를 모달 안에 표시
@@ -1071,7 +1063,6 @@ async function handleLogout() {
   localStorage.removeItem('lookbook_user');
   updateUserUI();
   showToast(t('loggedOut'), 'info');
-  setTimeout(() => window.location.href = '/', 600);
 }
 
 /** 헤더/네비바 사용자 UI 업데이트 */
