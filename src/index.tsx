@@ -2377,14 +2377,25 @@ app.post('/api/generation/start', async (c) => {
       // 생성(AtlasCloud 전달)에는 얼굴-마스킹된 "생성용" 이미지를 우선 사용 (없으면 전시용 원본 폴백)
       // 사용자 화면 썸네일(/api/proxy/custom-bg/:id)은 항상 전시용 원본을 그대로 보여줌 — 여기와 무관
       if (kv) {
-        const stored = (await kv.get(`bg_gen_img:${bid}`)) || (await kv.get(`bg_img:${bid}`))
-        if (stored) { bgImageBase64 = stored; console.log('KV custom bg: OK') }
+        const genStored = await kv.get(`bg_gen_img:${bid}`)
+        const stored = genStored || (await kv.get(`bg_img:${bid}`))
+        if (stored) {
+          bgImageBase64 = stored
+          console.log(`KV custom bg: OK | bgId=${bid} | source=${genStored ? 'GEN(masked)' : 'ORIGINAL(fallback, no gen image registered)'}`)
+        }
       } else if (db) {
-        const stored = await d1GetBgGenImg(db, bid)
-        if (stored) { bgImageBase64 = stored; console.log('D1 custom bg: OK') }
+        const row: any = await db.prepare(`SELECT image_b64, gen_image_b64 FROM custom_bgs WHERE id = ?`).bind(bid).first()
+        if (row) {
+          const hasGen = !!(row.gen_image_b64 && String(row.gen_image_b64).trim())
+          bgImageBase64 = hasGen ? row.gen_image_b64 : row.image_b64
+          console.log(`D1 custom bg: OK | bgId=${bid} | source=${hasGen ? 'GEN(masked)' : 'ORIGINAL(fallback, no gen image registered)'}`)
+        }
       } else {
         const b = _memBgs.find(b => b.id === bid) as any
-        if (b?.genImageBase64 || b?.imageBase64) { bgImageBase64 = b.genImageBase64 || b.imageBase64; console.log('Mem custom bg: OK') }
+        if (b?.genImageBase64 || b?.imageBase64) {
+          bgImageBase64 = b.genImageBase64 || b.imageBase64
+          console.log(`Mem custom bg: OK | bgId=${bid} | source=${b?.genImageBase64 ? 'GEN(masked)' : 'ORIGINAL(fallback, no gen image registered)'}`)
+        }
       }
       if (!bgImageBase64) console.log('Custom bg image not found for id:', bid)
     }
