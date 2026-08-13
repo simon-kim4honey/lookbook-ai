@@ -1272,6 +1272,27 @@ function initGenerator() {
   loadBackgroundsFromAPI();
 }
 
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// 앞 FRONT_RESERVE자리는 남성 모델 제외(여성 선호 사용자가 다수라 초반 이탈 방지),
+// 그 다음 자리부터는 (남은 여성 + 전체 남성)을 완전 랜덤으로 섞음 — 남성도 너무
+// 뒤로 밀리지 않고 5번째 자리부터는 자연스럽게 랜덤 등장.
+function shuffleModelsGenderFrontReserve(models) {
+  const FRONT_RESERVE = 4
+  const male = models.filter(m => m.gender === '남성')
+  const rest = shuffleArray(models.filter(m => m.gender !== '남성'))
+  const front = rest.slice(0, FRONT_RESERVE)
+  const remaining = shuffleArray([...rest.slice(FRONT_RESERVE), ...male])
+  return [...front, ...remaining]
+}
+
 // ─────────────────────────────────────────────────────────
 // API: 모델 로드 (aifashion.co.kr)
 // ─────────────────────────────────────────────────────────
@@ -1282,11 +1303,8 @@ async function loadModelsFromAPI() {
     const data = await res.json();
 
     AppState.allModels = data.models || [];
-    // 모델 노출 순서 랜덤화
-    for (let i = AppState.allModels.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [AppState.allModels[i], AppState.allModels[j]] = [AppState.allModels[j], AppState.allModels[i]];
-    }
+    // 모델 노출 순서 랜덤화 — 앞 4자리는 남성 제외(여성 선호 사용자 다수), 5번째 자리부터는 랜덤 혼합
+    AppState.allModels = shuffleModelsGenderFrontReserve(AppState.allModels);
     AppState.filteredModels = [...AppState.allModels];
 
     const wrap = document.getElementById('modelGridWrap');
