@@ -2248,6 +2248,9 @@ function buildClothingRoleDesc(
     }[item.category] || 'CLOTHING ITEM'
     roleLines.push(`Image ${imgNum} = ${catLabel}${item.label ? ` — ${item.label}` : ''}.`)
   })
+  roleLines.push(
+    `Clothing reference images may show their own background, room, street, or setting (e.g. a lifestyle/model photo). COMPLETELY IGNORE AND DISCARD that background from every clothing image — extract ONLY the garment itself (fabric, color, pattern, cut, texture, design details). A clothing reference photo's background, environment, lighting, or any person/scene visible in it must NEVER appear in or influence the final output.`
+  )
   return roleLines.join(' ')
 }
 
@@ -2500,7 +2503,7 @@ app.post('/api/generation/start', async (c) => {
         `COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,
 
         clothingRoleDesc,
-        `Image ${bgImgIdx} = SCENE ANCHOR. This scene defines: background environment, scene lighting direction/color-temperature/intensity/saturation, color grade, and mood. LOCKED: background.`,
+        `Image ${bgImgIdx} = SCENE ANCHOR. This scene defines: background environment, scene lighting direction/color-temperature/intensity/saturation, color grade, and mood. LOCKED: background. The output background must come EXCLUSIVELY from Image ${bgImgIdx} — never from any clothing reference image's own background.`,
 
         `CLOTHING REPLACEMENT:`,
         clothingReplaceInstructions,
