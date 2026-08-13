@@ -321,16 +321,29 @@ app.post('/api/admin/models', adminAuth, async (c) => {
 // POST /api/validate/clothing — 사용자가 업로드한 이미지가 의류 사진인지 AI로 검증
 // (강아지, 풍경 등 옷이 아닌 이미지를 올려 이상한 결과가 나오는 것을 사전 차단)
 // 검증 자체가 실패/타임아웃 나면 사용자 플로우를 막지 않도록 fail-open으로 통과 처리
+const CLOTHING_SLOT_PROMPTS: Record<string, string> = {
+  TOP: `You are an image classifier for a fashion shopping app upload slot labeled "상의" (TOP). Does this image show a TOP garment (shirt, blouse, t-shirt, jacket, coat, sweater, hoodie, etc.) as its clearly identifiable main subject — whether laid flat, on a hanger, or worn by a person?
+Answer NO if: the image has no clothing at all; the main garment shown is a BOTTOM only (pants, skirt, shorts) with no top visible; or it's a full-outfit/full-body shot where a top AND a bottom are BOTH clearly staged/visible together as a complete look (that belongs in the "전체" slot, not here).
+Respond with ONLY one word: YES or NO.`,
+  BOTTOM: `You are an image classifier for a fashion shopping app upload slot labeled "하의" (BOTTOM). Does this image show a BOTTOM garment (pants, jeans, skirt, shorts, etc.) as its clearly identifiable main subject — whether laid flat, on a hanger, or worn by a person?
+Answer NO if: the image has no clothing at all; the main garment shown is a TOP only (shirt, jacket, sweater) with no bottom visible; or it's a full-outfit/full-body shot where a top AND a bottom are BOTH clearly staged/visible together as a complete look (that belongs in the "전체" slot, not here).
+Respond with ONLY one word: YES or NO.`,
+  DRESS: `You are an image classifier for a fashion shopping app upload slot labeled "전체" (FULL OUTFIT). Does this image show a FULL OUTFIT as its clearly identifiable main subject — either (a) a one-piece garment (dress, jumpsuit, overalls), or (b) a photo where a TOP and a BOTTOM are BOTH clearly visible/identifiable together as a complete styled look?
+Answer NO if: the image has no clothing at all; or it shows only a single separate garment piece (just a top with no bottom visible, or just a bottom with no top visible).
+Respond with ONLY one word: YES or NO.`,
+}
+
 app.post('/api/validate/clothing', async (c) => {
   try {
     const body: any = await c.req.json()
     const imageBase64: string = body?.imageBase64 || ''
+    const cat: string = body?.cat || ''
     if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
 
     const openaiKey = (c.env as any)?.OPENAI_API_KEY || ''
     if (!openaiKey) return c.json({ success: true, isClothing: true })
 
-    const prompt = `You are an image classifier for a fashion shopping app. Does this image show a wearable clothing garment (e.g. shirt, blouse, t-shirt, pants, skirt, dress, jacket, coat, sweater) as its main subject — whether laid flat, on a hanger, or worn by a person? Animals, landscapes, objects, food, random photos, or anything that is not primarily a clothing item should be NO. Respond with ONLY one word: YES or NO.`
+    const prompt = CLOTHING_SLOT_PROMPTS[cat] || CLOTHING_SLOT_PROMPTS.DRESS
 
     const content = await openaiChatVision(openaiKey, imageBase64, prompt)
     if (content === null) return c.json({ success: true, isClothing: true })
