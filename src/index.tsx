@@ -328,42 +328,11 @@ app.post('/api/validate/clothing', async (c) => {
     const atlasKey = (c.env as any)?.ATLAS_API_KEY || ''
     if (!atlasKey) return c.json({ success: true, isClothing: true })
 
-    const ATLAS_BASE = 'https://api.atlascloud.ai'
     const prompt = `You are an image classifier for a fashion shopping app. Does this image show a wearable clothing garment (e.g. shirt, blouse, t-shirt, pants, skirt, dress, jacket, coat, sweater) as its main subject — whether laid flat, on a hanger, or worn by a person? Animals, landscapes, objects, food, random photos, or anything that is not primarily a clothing item should be NO. Respond with ONLY one word: YES or NO.`
 
-    const res = await fetch(`${ATLAS_BASE}/api/v1/model/run`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${atlasKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'openai/gpt-4o-mini-developer',
-        input: {
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'image_url', image_url: { url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}` } },
-              { type: 'text', text: prompt }
-            ]
-          }]
-        }
-      })
-    })
-    const data: any = await res.json()
-    const jobId = data?.data?.id
-    if (!jobId) return c.json({ success: true, isClothing: true })
-
-    for (let i = 0; i < 10; i++) {
-      await new Promise(r => setTimeout(r, 1000))
-      const poll: any = await fetch(`${ATLAS_BASE}/api/v1/model/prediction/${jobId}`, {
-        headers: { 'Authorization': `Bearer ${atlasKey}` }
-      }).then(r => r.json())
-      const st = poll?.data?.status
-      if (st === 'completed' || st === 'succeeded') {
-        const raw = String(poll?.data?.outputs?.[0] || poll?.data?.output || '').trim().toUpperCase()
-        return c.json({ success: true, isClothing: raw.startsWith('YES') })
-      }
-      if (st === 'failed' || st === 'error') break
-    }
-    return c.json({ success: true, isClothing: true })
+    const content = await atlasChatVision(atlasKey, imageBase64, prompt)
+    if (content === null) return c.json({ success: true, isClothing: true })
+    return c.json({ success: true, isClothing: content.trim().toUpperCase().startsWith('YES') })
   } catch (e: any) {
     console.error('validate/clothing error:', e)
     return c.json({ success: true, isClothing: true })
@@ -380,7 +349,10 @@ app.post('/api/admin/auto-label', adminAuth, async (c) => {
     const atlasKey = (c.env as any)?.ATLAS_API_KEY || ''
     if (!atlasKey) return c.json({ success: false, message: 'ATLAS_API_KEY 미설정' }, 500)
 
-    const ATLAS_BASE = 'https://api.atlascloud.ai'
+    const parseJsonLabels = (raw: string) => {
+      const jsonMatch = raw.match(/\{[\s\S]*\}/)
+      return JSON.parse(jsonMatch?.[0] || raw)
+    }
 
     if (type === 'model') {
       // 모델 이미지 → 성별/연령대/무드 분류
@@ -391,55 +363,23 @@ app.post('/api/admin/auto-label', adminAuth, async (c) => {
   "mood": one of ["로맨틱", "보이시", "캐주얼", "시크", "내추럴"]
 }
 Rules:
-- gender: female face/body = "여성", male = "남성"  
+- gender: female face/body = "여성", male = "남성"
 - age: estimate from face
 - mood: overall vibe of the person/styling
 Return ONLY the JSON, no explanation.`
 
-      const res = await fetch(`${ATLAS_BASE}/api/v1/model/run`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${atlasKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'openai/gpt-4o-mini-developer',
-          input: {
-            messages: [{
-              role: 'user',
-              content: [
-                { type: 'image_url', image_url: { url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}` } },
-                { type: 'text', text: prompt }
-              ]
-            }]
-          }
-        })
-      })
-      const data: any = await res.json()
-      const jobId = data?.data?.id
-      if (!jobId) return c.json({ success: false, message: '라벨링 작업 시작 실패' }, 500)
-
-      // 폴링 (최대 15초)
-      for (let i = 0; i < 15; i++) {
-        await new Promise(r => setTimeout(r, 1000))
-        const poll: any = await fetch(`${ATLAS_BASE}/api/v1/model/prediction/${jobId}`, {
-          headers: { 'Authorization': `Bearer ${atlasKey}` }
-        }).then(r => r.json())
-        const st = poll?.data?.status
-        if (st === 'completed' || st === 'succeeded') {
-          const raw = poll?.data?.outputs?.[0] || poll?.data?.output || ''
-          try {
-            const jsonMatch = raw.match(/\{[\s\S]*\}/)
-            const labels = JSON.parse(jsonMatch?.[0] || raw)
-            return c.json({ success: true, labels: {
-              gender: labels.gender || '미분류',
-              age: labels.age || '미분류',
-              mood: labels.mood || '미분류',
-            }})
-          } catch {
-            return c.json({ success: false, message: '응답 파싱 실패', raw })
-          }
-        }
-        if (st === 'failed' || st === 'error') break
+      const content = await atlasChatVision(atlasKey, imageBase64, prompt)
+      if (content === null) return c.json({ success: false, message: '라벨링 요청 실패' }, 500)
+      try {
+        const labels = parseJsonLabels(content)
+        return c.json({ success: true, labels: {
+          gender: labels.gender || '미분류',
+          age: labels.age || '미분류',
+          mood: labels.mood || '미분류',
+        }})
+      } catch {
+        return c.json({ success: false, message: '응답 파싱 실패', raw: content })
       }
-      return c.json({ success: false, message: '라벨링 타임아웃' })
 
     } else if (type === 'background') {
       // 배경 이미지 → 카테고리/분위기 분류
@@ -451,49 +391,18 @@ Return ONLY the JSON, no explanation.`
 }
 Return ONLY the JSON, no explanation.`
 
-      const res = await fetch(`${ATLAS_BASE}/api/v1/model/run`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${atlasKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'openai/gpt-4o-mini-developer',
-          input: {
-            messages: [{
-              role: 'user',
-              content: [
-                { type: 'image_url', image_url: { url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}` } },
-                { type: 'text', text: prompt }
-              ]
-            }]
-          }
-        })
-      })
-      const data: any = await res.json()
-      const jobId = data?.data?.id
-      if (!jobId) return c.json({ success: false, message: '라벨링 작업 시작 실패' }, 500)
-
-      for (let i = 0; i < 15; i++) {
-        await new Promise(r => setTimeout(r, 1000))
-        const poll: any = await fetch(`${ATLAS_BASE}/api/v1/model/prediction/${jobId}`, {
-          headers: { 'Authorization': `Bearer ${atlasKey}` }
-        }).then(r => r.json())
-        const st = poll?.data?.status
-        if (st === 'completed' || st === 'succeeded') {
-          const raw = poll?.data?.outputs?.[0] || poll?.data?.output || ''
-          try {
-            const jsonMatch = raw.match(/\{[\s\S]*\}/)
-            const labels = JSON.parse(jsonMatch?.[0] || raw)
-            return c.json({ success: true, labels: {
-              category: labels.category || '스튜디오',
-              mood: labels.mood || '미니멀',
-              name_ko: labels.name_ko || '',
-            }})
-          } catch {
-            return c.json({ success: false, message: '응답 파싱 실패', raw })
-          }
-        }
-        if (st === 'failed' || st === 'error') break
+      const content = await atlasChatVision(atlasKey, imageBase64, prompt)
+      if (content === null) return c.json({ success: false, message: '라벨링 요청 실패' }, 500)
+      try {
+        const labels = parseJsonLabels(content)
+        return c.json({ success: true, labels: {
+          category: labels.category || '스튜디오',
+          mood: labels.mood || '미니멀',
+          name_ko: labels.name_ko || '',
+        }})
+      } catch {
+        return c.json({ success: false, message: '응답 파싱 실패', raw: content })
       }
-      return c.json({ success: false, message: '라벨링 타임아웃' })
     }
 
     return c.json({ success: false, message: 'type은 model 또는 background 이어야 합니다.' }, 400)
@@ -757,6 +666,37 @@ const atlasHeaders = (apiKey: string) => ({
   'Authorization': `Bearer ${apiKey}`,
   'Content-Type': 'application/json',
 })
+
+// Atlas Cloud 텍스트/비전 분류 헬퍼 — OpenAI 호환 chat completions 엔드포인트 사용
+// (이미지 생성용 /api/v1/model/run + 폴링 방식과는 별개. 채팅형 모델은 즉시 동기 응답)
+async function atlasChatVision(atlasKey: string, imageBase64: string, prompt: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${ATLAS_API_BASE}/api/v1/chat/completions`, {
+      method: 'POST',
+      headers: atlasHeaders(atlasKey),
+      body: JSON.stringify({
+        model: 'openai/gpt-4o-mini-developer',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}` } },
+            { type: 'text', text: prompt }
+          ]
+        }]
+      })
+    })
+    const data: any = await res.json()
+    const content = data?.choices?.[0]?.message?.content
+    if (typeof content !== 'string') {
+      console.warn('atlasChatVision: 예상치 못한 응답 형식:', JSON.stringify(data).slice(0, 300))
+      return null
+    }
+    return content
+  } catch (e: any) {
+    console.error('atlasChatVision error:', e)
+    return null
+  }
+}
 
 // ────────────────────────────────────────────────────
 // Atlas API 단일 이미지 생성 → 완료까지 동기 대기 헬퍼

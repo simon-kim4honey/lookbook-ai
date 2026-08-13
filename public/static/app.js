@@ -43,7 +43,7 @@ const I18N = {
     uploadHint: '상의·하의·전체(원피스/세트) 중 하나 이상 업로드해주세요.',
     notClothingErr: '의류(옷) 이미지가 아닌 것 같아요. 상품 사진을 업로드해주세요.',
     validatingClothing: '이미지 확인 중...',
-    genAnalysisErr: '이미지 분석 오류입니다. 제품을 다시 업로드해주세요.',
+    genAnalysisErr: '이미지 분석 오류입니다. 상품을 다시 업로드해주세요.',
     // 모델/배경
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">등록된 모델이 없습니다</p><p style="font-size:12px;margin-top:4px">관리자 페이지에서 모델을 등록해주세요</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">모델 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
