@@ -1089,11 +1089,11 @@ app.post('/api/auth/signup', async (c) => {
     const marketingFlag = agreeMarketing ? 1 : 0
     await db.prepare(`
       INSERT INTO users (id, email, name, password_hash, provider, status, credits, role, agree_marketing)
-      VALUES (?, ?, ?, ?, 'email', 'active', 1000, 'user', ?)
+      VALUES (?, ?, ?, ?, 'email', 'active', 200, 'user', ?)
     `).bind(id, email.toLowerCase(), name, hash, marketingFlag).run()
 
     const token = await createSession(db, id)
-    const user = { id, name, email: email.toLowerCase(), role: 'user', credits: 1000, avatar_url: null, provider: 'email' }
+    const user = { id, name, email: email.toLowerCase(), role: 'user', credits: 200, avatar_url: null, provider: 'email' }
     return c.json({ success: true, user, token })
   } catch (err: any) {
     console.error('signup error:', err)
@@ -1237,7 +1237,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
         await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(providerId, kakaoAvatar, user.id).run()
       } else {
         const id = genUserId()
-        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 1000, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
+        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 200, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
       }
     }
@@ -1379,7 +1379,7 @@ app.get('/api/auth/google/callback', async (c) => {
         await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(providerId, googleAvatar, user.id).run()
       } else {
         const id = genUserId()
-        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 1000, 'user')`).bind(id, googleEmail, googleName, providerId, googleAvatar).run()
+        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 200, 'user')`).bind(id, googleEmail, googleName, providerId, googleAvatar).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
       }
     }
@@ -3546,7 +3546,7 @@ app.get('/', (c) => {
     <div class="container">
       <div class="cta-content">
         <h2 class="cta-title">지금 바로 <span class="highlight">무료로 체험</span>하세요</h2>
-        <p class="cta-desc">신용카드 없이 5크레딧을 무료로 받고<br />AI 룩북 제작을 경험해보세요.</p>
+        <p class="cta-desc">신용카드 없이 200크레딧을 무료로 받고<br />AI 룩북 제작을 경험해보세요.</p>
         <div class="cta-actions">
           <button class="btn btn-primary btn-lg" onclick="location.href='/generator'">
             <i class="fas fa-rocket"></i>
