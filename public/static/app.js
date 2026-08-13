@@ -43,7 +43,7 @@ const I18N = {
     uploadHint: '상의·하의·전체(원피스/세트) 중 하나 이상 업로드해주세요.',
     notClothingErr: (cat) => {
       const label = { TOP: '상의', BOTTOM: '하의', DRESS: '전체' }[cat] || '의류';
-      return `${label} 의류(옷)이 아닌거 같아요. ${label} 상품 사진을 업로드해주세요.`;
+      return `장난치지 마세요. ${label} 상품 사진을 업로드해주세요.`;
     },
     validatingClothing: '이미지 확인 중...',
     genAnalysisErr: '이미지 분석 오류입니다. 상품을 다시 업로드해주세요.',
@@ -125,7 +125,7 @@ const I18N = {
     uploadHint: 'Please upload at least one of: top, bottom, or full outfit.',
     notClothingErr: (cat) => {
       const label = { TOP: 'top', BOTTOM: 'bottom', DRESS: 'full outfit' }[cat] || 'clothing';
-      return `This doesn't look like a ${label} clothing image. Please upload a ${label} product photo.`;
+      return `Nice try. Please upload an actual ${label} product photo.`;
     },
     validatingClothing: 'Checking image...',
     genAnalysisErr: 'Image analysis error. Please re-upload your product photo.',
@@ -201,7 +201,7 @@ const I18N = {
     uploadHint: 'トップス・ボトムス・全身のいずれかをアップロードしてください。',
     notClothingErr: (cat) => {
       const label = { TOP: 'トップス', BOTTOM: 'ボトムス', DRESS: 'ワンピース/セット' }[cat] || '衣類';
-      return `${label}の衣類画像ではないようです。${label}の商品写真をアップロードしてください。`;
+      return `ふざけないでください。${label}の商品写真をアップロードしてください。`;
     },
     validatingClothing: '画像を確認中...',
     genAnalysisErr: '画像分析エラーです。商品画像を再アップロードしてください。',
@@ -1598,7 +1598,7 @@ function processSlotFile(file, cat) {
       const vr = await fetch('/api/validate/clothing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: dataUrl }),
+        body: JSON.stringify({ imageBase64: dataUrl, cat }),
       });
       const vd = await vr.json();
       if (vd && vd.isClothing === false) isClothing = false;
