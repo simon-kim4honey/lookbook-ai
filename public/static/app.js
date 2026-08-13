@@ -43,6 +43,7 @@ const I18N = {
     uploadHint: '상의·하의·전체(원피스/세트) 중 하나 이상 업로드해주세요.',
     notClothingErr: '의류(옷) 이미지가 아닌 것 같아요. 상품 사진을 업로드해주세요.',
     validatingClothing: '이미지 확인 중...',
+    genAnalysisErr: '이미지 분석 오류입니다. 제품을 다시 업로드해주세요.',
     // 모델/배경
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">등록된 모델이 없습니다</p><p style="font-size:12px;margin-top:4px">관리자 페이지에서 모델을 등록해주세요</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">모델 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
@@ -121,6 +122,7 @@ const I18N = {
     uploadHint: 'Please upload at least one of: top, bottom, or full outfit.',
     notClothingErr: "This doesn't look like a clothing image. Please upload a product photo.",
     validatingClothing: 'Checking image...',
+    genAnalysisErr: 'Image analysis error. Please re-upload your product photo.',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">No models registered</p><p style="font-size:12px;margin-top:4px">Please register models in the admin page</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load models</p><p style="font-size:13px">Please try again later</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">No backgrounds registered</p><p style="font-size:13px">Please add backgrounds in the admin page</p></div>',
@@ -193,6 +195,7 @@ const I18N = {
     uploadHint: 'トップス・ボトムス・全身のいずれかをアップロードしてください。',
     notClothingErr: '衣類の画像ではないようです。商品写真をアップロードしてください。',
     validatingClothing: '画像を確認中...',
+    genAnalysisErr: '画像分析エラーです。商品画像を再アップロードしてください。',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">モデルが登録されていません</p><p style="font-size:12px;margin-top:4px">管理ページでモデルを登録してください</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">モデルの読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景が登録されていません</p><p style="font-size:13px">管理ページで背景を登録してください</p></div>',
@@ -2190,6 +2193,11 @@ function completeGeneration(images, isFallback = false) {
   AppState.isGenerating = false;
 
   console.log('completeGeneration called — isFallback:', isFallback, '| images count:', images.length, '| images:', JSON.stringify(images.map(i => ({id:i.id, url: i.url ? i.url.substring(0,80) : null, placeholder: i.placeholder}))));
+
+  // 실제 생성이 실패해서 임시 이미지로 대체된 경우, 사용자에게 명확히 알림
+  if (isFallback) {
+    showToast(t('genAnalysisErr'), 'error');
+  }
 
   // Atlas Cloud 이미지 URL을 서버사이드 프록시로 변환 (CORS 우회)
   const proxiedImages = images.map(img => {

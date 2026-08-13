@@ -335,7 +335,7 @@ app.post('/api/validate/clothing', async (c) => {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${atlasKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'openai/gpt-4o-mini-developer',
         input: {
           messages: [{
             role: 'user',
@@ -400,7 +400,7 @@ Return ONLY the JSON, no explanation.`
         method: 'POST',
         headers: { 'Authorization': `Bearer ${atlasKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'openai/gpt-4o-mini-developer',
           input: {
             messages: [{
               role: 'user',
@@ -455,7 +455,7 @@ Return ONLY the JSON, no explanation.`
         method: 'POST',
         headers: { 'Authorization': `Bearer ${atlasKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'openai/gpt-4o-mini-developer',
           input: {
             messages: [{
               role: 'user',
