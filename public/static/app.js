@@ -41,7 +41,10 @@ const I18N = {
     uploadSizeErr: '파일 크기는 10MB 이하여야 합니다.',
     uploadDone: (label) => `${label} 업로드 완료`,
     uploadHint: '상의·하의·전체(원피스/세트) 중 하나 이상 업로드해주세요.',
-    notClothingErr: '의류(옷) 이미지가 아닌 것 같아요. 상품 사진을 업로드해주세요.',
+    notClothingErr: (cat) => {
+      const label = { TOP: '상의', BOTTOM: '하의', DRESS: '전체' }[cat] || '의류';
+      return `${label} 의류(옷)이 아닌거 같아요. ${label} 상품 사진을 업로드해주세요.`;
+    },
     validatingClothing: '이미지 확인 중...',
     genAnalysisErr: '이미지 분석 오류입니다. 상품을 다시 업로드해주세요.',
     // 모델/배경
@@ -120,7 +123,10 @@ const I18N = {
     uploadSizeErr: 'File size must be 10MB or less.',
     uploadDone: (label) => `${label} uploaded`,
     uploadHint: 'Please upload at least one of: top, bottom, or full outfit.',
-    notClothingErr: "This doesn't look like a clothing image. Please upload a product photo.",
+    notClothingErr: (cat) => {
+      const label = { TOP: 'top', BOTTOM: 'bottom', DRESS: 'full outfit' }[cat] || 'clothing';
+      return `This doesn't look like a ${label} clothing image. Please upload a ${label} product photo.`;
+    },
     validatingClothing: 'Checking image...',
     genAnalysisErr: 'Image analysis error. Please re-upload your product photo.',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">No models registered</p><p style="font-size:12px;margin-top:4px">Please register models in the admin page</p>',
@@ -193,7 +199,10 @@ const I18N = {
     uploadSizeErr: 'ファイルサイズは10MB以下にしてください。',
     uploadDone: (label) => `${label}をアップロードしました`,
     uploadHint: 'トップス・ボトムス・全身のいずれかをアップロードしてください。',
-    notClothingErr: '衣類の画像ではないようです。商品写真をアップロードしてください。',
+    notClothingErr: (cat) => {
+      const label = { TOP: 'トップス', BOTTOM: 'ボトムス', DRESS: 'ワンピース/セット' }[cat] || '衣類';
+      return `${label}の衣類画像ではないようです。${label}の商品写真をアップロードしてください。`;
+    },
     validatingClothing: '画像を確認中...',
     genAnalysisErr: '画像分析エラーです。商品画像を再アップロードしてください。',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">モデルが登録されていません</p><p style="font-size:12px;margin-top:4px">管理ページでモデルを登録してください</p>',
@@ -1598,7 +1607,7 @@ function processSlotFile(file, cat) {
     }
     slotValidating[cat] = false;
     if (!isClothing) {
-      showToast(t('notClothingErr'), 'error');
+      showToast(t('notClothingErr', cat), 'error');
       renderSlots();
       updateNextBtn1();
       return;
