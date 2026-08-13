@@ -670,8 +670,9 @@ const atlasHeaders = (apiKey: string) => ({
 // Atlas Cloud 텍스트/비전 분류 헬퍼 — OpenAI 호환 chat completions 엔드포인트 사용
 // (이미지 생성용 /api/v1/model/run + 폴링 방식과는 별개. 채팅형 모델은 즉시 동기 응답)
 async function atlasChatVision(atlasKey: string, imageBase64: string, prompt: string): Promise<string | null> {
+  const url = `${ATLAS_API_BASE}/api/v1/chat/completions`
   try {
-    const res = await fetch(`${ATLAS_API_BASE}/api/v1/chat/completions`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: atlasHeaders(atlasKey),
       body: JSON.stringify({
@@ -685,7 +686,20 @@ async function atlasChatVision(atlasKey: string, imageBase64: string, prompt: st
         }]
       })
     })
-    const data: any = await res.json()
+    // 응답을 text로 먼저 읽어서, JSON이 아닌 에러 응답(404 HTML 등)도 그대로 로그에 남김
+    const rawText = await res.text()
+    console.log(`atlasChatVision: POST ${url} → HTTP ${res.status} | body(첫 500자): ${rawText.slice(0, 500)}`)
+    if (!res.ok) {
+      console.error(`atlasChatVision: 요청 실패 (HTTP ${res.status})`)
+      return null
+    }
+    let data: any
+    try {
+      data = JSON.parse(rawText)
+    } catch {
+      console.error('atlasChatVision: JSON 파싱 실패, 원문:', rawText.slice(0, 300))
+      return null
+    }
     const content = data?.choices?.[0]?.message?.content
     if (typeof content !== 'string') {
       console.warn('atlasChatVision: 예상치 못한 응답 형식:', JSON.stringify(data).slice(0, 300))
@@ -693,7 +707,7 @@ async function atlasChatVision(atlasKey: string, imageBase64: string, prompt: st
     }
     return content
   } catch (e: any) {
-    console.error('atlasChatVision error:', e)
+    console.error('atlasChatVision error:', e?.message || e)
     return null
   }
 }
