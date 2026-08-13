@@ -22,8 +22,10 @@ type Bindings = {
   ADMIN_PASSWORD: string
   // 토스페이먼츠
   TOSS_SECRET_KEY: string
-  // Atlas Cloud AI
+  // Atlas Cloud AI (이미지 생성 전용)
   ATLAS_API_KEY: string
+  // OpenAI (이미지 분류/라벨링 전용 — gpt-4o-mini, AtlasCloud엔 없는 모델)
+  OPENAI_API_KEY: string
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -325,12 +327,12 @@ app.post('/api/validate/clothing', async (c) => {
     const imageBase64: string = body?.imageBase64 || ''
     if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
 
-    const atlasKey = (c.env as any)?.ATLAS_API_KEY || ''
-    if (!atlasKey) return c.json({ success: true, isClothing: true })
+    const openaiKey = (c.env as any)?.OPENAI_API_KEY || ''
+    if (!openaiKey) return c.json({ success: true, isClothing: true })
 
     const prompt = `You are an image classifier for a fashion shopping app. Does this image show a wearable clothing garment (e.g. shirt, blouse, t-shirt, pants, skirt, dress, jacket, coat, sweater) as its main subject — whether laid flat, on a hanger, or worn by a person? Animals, landscapes, objects, food, random photos, or anything that is not primarily a clothing item should be NO. Respond with ONLY one word: YES or NO.`
 
-    const content = await atlasChatVision(atlasKey, imageBase64, prompt)
+    const content = await openaiChatVision(openaiKey, imageBase64, prompt)
     if (content === null) return c.json({ success: true, isClothing: true })
     return c.json({ success: true, isClothing: content.trim().toUpperCase().startsWith('YES') })
   } catch (e: any) {
@@ -346,8 +348,8 @@ app.post('/api/admin/auto-label', adminAuth, async (c) => {
     const { type, imageBase64 } = body  // type: 'model' | 'background'
     if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
 
-    const atlasKey = (c.env as any)?.ATLAS_API_KEY || ''
-    if (!atlasKey) return c.json({ success: false, message: 'ATLAS_API_KEY 미설정' }, 500)
+    const openaiKey = (c.env as any)?.OPENAI_API_KEY || ''
+    if (!openaiKey) return c.json({ success: false, message: 'OPENAI_API_KEY 미설정' }, 500)
 
     const parseJsonLabels = (raw: string) => {
       const jsonMatch = raw.match(/\{[\s\S]*\}/)
@@ -368,7 +370,7 @@ Rules:
 - mood: overall vibe of the person/styling
 Return ONLY the JSON, no explanation.`
 
-      const content = await atlasChatVision(atlasKey, imageBase64, prompt)
+      const content = await openaiChatVision(openaiKey, imageBase64, prompt)
       if (content === null) return c.json({ success: false, message: '라벨링 요청 실패' }, 500)
       try {
         const labels = parseJsonLabels(content)
@@ -391,7 +393,7 @@ Return ONLY the JSON, no explanation.`
 }
 Return ONLY the JSON, no explanation.`
 
-      const content = await atlasChatVision(atlasKey, imageBase64, prompt)
+      const content = await openaiChatVision(openaiKey, imageBase64, prompt)
       if (content === null) return c.json({ success: false, message: '라벨링 요청 실패' }, 500)
       try {
         const labels = parseJsonLabels(content)
@@ -667,16 +669,20 @@ const atlasHeaders = (apiKey: string) => ({
   'Content-Type': 'application/json',
 })
 
-// Atlas Cloud 텍스트/비전 분류 헬퍼 — OpenAI 호환 chat completions 엔드포인트 사용
-// (이미지 생성용 /api/v1/model/run + 폴링 방식과는 별개. 채팅형 모델은 즉시 동기 응답)
-async function atlasChatVision(atlasKey: string, imageBase64: string, prompt: string): Promise<string | null> {
-  const url = `${ATLAS_API_BASE}/api/v1/chat/completions`
+// OpenAI 텍스트/비전 분류 헬퍼 — gpt-4o-mini 직접 호출 (AtlasCloud엔 분류용 모델이 없어 별도 연결)
+// (이미지 생성은 여전히 AtlasCloud. 이 함수는 분류/라벨링 전용)
+const OPENAI_API_BASE = 'https://api.openai.com'
+async function openaiChatVision(openaiKey: string, imageBase64: string, prompt: string): Promise<string | null> {
+  const url = `${OPENAI_API_BASE}/v1/chat/completions`
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: atlasHeaders(atlasKey),
+      headers: {
+        'Authorization': `Bearer ${openaiKey}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({
-        model: 'openai/gpt-4o-mini-developer',
+        model: 'gpt-4o-mini',
         messages: [{
           role: 'user',
           content: [
@@ -686,28 +692,28 @@ async function atlasChatVision(atlasKey: string, imageBase64: string, prompt: st
         }]
       })
     })
-    // 응답을 text로 먼저 읽어서, JSON이 아닌 에러 응답(404 HTML 등)도 그대로 로그에 남김
+    // 응답을 text로 먼저 읽어서, JSON이 아닌 에러 응답도 그대로 로그에 남김
     const rawText = await res.text()
-    console.log(`atlasChatVision: POST ${url} → HTTP ${res.status} | body(첫 500자): ${rawText.slice(0, 500)}`)
+    console.log(`openaiChatVision: POST ${url} → HTTP ${res.status} | body(첫 500자): ${rawText.slice(0, 500)}`)
     if (!res.ok) {
-      console.error(`atlasChatVision: 요청 실패 (HTTP ${res.status})`)
+      console.error(`openaiChatVision: 요청 실패 (HTTP ${res.status})`)
       return null
     }
     let data: any
     try {
       data = JSON.parse(rawText)
     } catch {
-      console.error('atlasChatVision: JSON 파싱 실패, 원문:', rawText.slice(0, 300))
+      console.error('openaiChatVision: JSON 파싱 실패, 원문:', rawText.slice(0, 300))
       return null
     }
     const content = data?.choices?.[0]?.message?.content
     if (typeof content !== 'string') {
-      console.warn('atlasChatVision: 예상치 못한 응답 형식:', JSON.stringify(data).slice(0, 300))
+      console.warn('openaiChatVision: 예상치 못한 응답 형식:', JSON.stringify(data).slice(0, 300))
       return null
     }
     return content
   } catch (e: any) {
-    console.error('atlasChatVision error:', e?.message || e)
+    console.error('openaiChatVision error:', e?.message || e)
     return null
   }
 }
