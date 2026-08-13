@@ -1379,6 +1379,16 @@ footer {
   border-color: rgba(139,92,246,0.6);
   background: rgba(255,255,255,0.03);
 }
+/* 상의/하의 ↔ 전체 상호 배타: 반대쪽 그룹이 채워지면 비활성화 */
+.cslot--disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+  border-style: dashed;
+}
+.cslot--disabled:hover {
+  border-color: rgba(255,255,255,0.13);
+  background: rgba(255,255,255,0.03);
+}
 
 /* Step1: clothing-slots가 gslide-body 남은 공간을 꽉 채우도록 */
 #step-1 .gslide-body {
