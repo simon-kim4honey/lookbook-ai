@@ -41,6 +41,8 @@ const I18N = {
     uploadSizeErr: '파일 크기는 10MB 이하여야 합니다.',
     uploadDone: (label) => `${label} 업로드 완료`,
     uploadHint: '상의·하의·전체(원피스/세트) 중 하나 이상 업로드해주세요.',
+    notClothingErr: '의류(옷) 이미지가 아닌 것 같아요. 상품 사진을 업로드해주세요.',
+    validatingClothing: '이미지 확인 중...',
     // 모델/배경
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">등록된 모델이 없습니다</p><p style="font-size:12px;margin-top:4px">관리자 페이지에서 모델을 등록해주세요</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">모델 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
@@ -117,6 +119,8 @@ const I18N = {
     uploadSizeErr: 'File size must be 10MB or less.',
     uploadDone: (label) => `${label} uploaded`,
     uploadHint: 'Please upload at least one of: top, bottom, or full outfit.',
+    notClothingErr: "This doesn't look like a clothing image. Please upload a product photo.",
+    validatingClothing: 'Checking image...',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">No models registered</p><p style="font-size:12px;margin-top:4px">Please register models in the admin page</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load models</p><p style="font-size:13px">Please try again later</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">No backgrounds registered</p><p style="font-size:13px">Please add backgrounds in the admin page</p></div>',
@@ -187,6 +191,8 @@ const I18N = {
     uploadSizeErr: 'ファイルサイズは10MB以下にしてください。',
     uploadDone: (label) => `${label}をアップロードしました`,
     uploadHint: 'トップス・ボトムス・全身のいずれかをアップロードしてください。',
+    notClothingErr: '衣類の画像ではないようです。商品写真をアップロードしてください。',
+    validatingClothing: '画像を確認中...',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">モデルが登録されていません</p><p style="font-size:12px;margin-top:4px">管理ページでモデルを登録してください</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">モデルの読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景が登録されていません</p><p style="font-size:13px">管理ページで背景を登録してください</p></div>',
@@ -1508,14 +1514,16 @@ const SLOT_LABEL = { TOP: '상의', BOTTOM: '하의', DRESS: '전체' };
 
 // 슬롯별 데이터 저장 (null = 비어 있음)
 const slotData = { TOP: null, BOTTOM: null, DRESS: null };
+// 슬롯별 AI 의류 검증 진행 중 여부
+const slotValidating = { TOP: false, BOTTOM: false, DRESS: false };
 
 // ── label for= 방식: 이미 채워진 슬롯이면 파일선택창 열기 차단 ──
 // label 클릭 시 호출. 이미 이미지가 있으면 false 반환 → label의 for= 동작 억제
 function handleSlotLabelClick(e, cat) {
   // ✕ 버튼 클릭은 removeSlot()에서 처리 → label 기본동작 억제
   if (e.target.closest('.cslot-remove')) return false;
-  // 이미 채워진 슬롯: 파일 선택창 열지 않음
-  if (slotData[cat]) return false;
+  // 이미 채워진 슬롯 또는 검증 중인 슬롯: 파일 선택창 열지 않음
+  if (slotData[cat] || slotValidating[cat]) return false;
   // 비어 있으면 label for= 연결로 파일 선택창 열림 (브라우저 네이티브 동작)
   return true;
 }
@@ -1531,7 +1539,7 @@ function triggerSlotInput(cat) {
 function handleSlotDragOver(e, cat) {
   e.preventDefault();
   e.stopPropagation();
-  if (slotData[cat]) return; // 이미 채워진 슬롯은 무시
+  if (slotData[cat] || slotValidating[cat]) return; // 이미 채워졌거나 검증 중인 슬롯은 무시
   document.getElementById(`slot-${cat}`)?.classList.add('drag-over');
 }
 function handleSlotDragLeave(e, cat) {
@@ -1544,7 +1552,7 @@ function handleSlotDrop(e, cat) {
   e.preventDefault();
   e.stopPropagation();
   document.getElementById(`slot-${cat}`)?.classList.remove('drag-over');
-  if (slotData[cat]) return; // 이미 채워진 슬롯 무시
+  if (slotData[cat] || slotValidating[cat]) return; // 이미 채워졌거나 검증 중인 슬롯 무시
   const file = e.dataTransfer.files?.[0];
   if (file) processSlotFile(file, cat);
 }
@@ -1568,7 +1576,30 @@ function processSlotFile(file, cat) {
     return;
   }
 
-  const onReady = (dataUrl) => {
+  const onReady = async (dataUrl) => {
+    // 옷이 아닌 이미지(강아지, 풍경 등)를 올려 이상한 결과가 나오는 것을 사전 차단
+    slotValidating[cat] = true;
+    renderSlots();
+    updateNextBtn1();
+    let isClothing = true;
+    try {
+      const vr = await fetch('/api/validate/clothing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: dataUrl }),
+      });
+      const vd = await vr.json();
+      if (vd && vd.isClothing === false) isClothing = false;
+    } catch (err) {
+      console.warn('의류 이미지 검증 실패, 통과 처리:', err); // 검증 자체가 실패하면 업로드는 막지 않음
+    }
+    slotValidating[cat] = false;
+    if (!isClothing) {
+      showToast(t('notClothingErr'), 'error');
+      renderSlots();
+      updateNextBtn1();
+      return;
+    }
     slotData[cat] = { file, dataUrl };
     syncClothingItems();
     renderSlots();
@@ -1656,7 +1687,16 @@ function renderSlots() {
 
     const data = slotData[cat];
 
-    if (data) {
+    if (slotValidating[cat]) {
+      // AI 의류 검증 중 → 스피너 표시
+      slot.classList.remove('cslot--filled');
+      body.innerHTML = `
+        <span class="cslot-empty">
+          <span class="btn-spinner dark"></span>
+          <span class="cslot-hint">${t('validatingClothing')}</span>
+        </span>`;
+      if (removeBtn) removeBtn.classList.add('hidden');
+    } else if (data) {
       // 이미지 있음 → 썸네일 표시 + label for= 비활성화 (pointer-events:none 로 파일창 방지)
       slot.classList.add('cslot--filled');
       body.innerHTML = `<img src="${data.dataUrl}" alt="${SLOT_LABEL[cat]}" class="cslot-img" />`;
@@ -1679,7 +1719,8 @@ function updateNextBtn1() {
   const btn = document.getElementById('nextBtn1');
   if (!btn) return;
   const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null);
-  btn.disabled = !hasAny;
+  const validating = SLOT_CATS.some(cat => slotValidating[cat]);
+  btn.disabled = !hasAny || validating;
 }
 
 // ── 전체 초기화 (레거시 resetUpload 호환) ──

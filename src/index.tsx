@@ -316,6 +316,60 @@ app.post('/api/admin/models', adminAuth, async (c) => {
   }
 })
 
+// POST /api/validate/clothing — 사용자가 업로드한 이미지가 의류 사진인지 AI로 검증
+// (강아지, 풍경 등 옷이 아닌 이미지를 올려 이상한 결과가 나오는 것을 사전 차단)
+// 검증 자체가 실패/타임아웃 나면 사용자 플로우를 막지 않도록 fail-open으로 통과 처리
+app.post('/api/validate/clothing', async (c) => {
+  try {
+    const body: any = await c.req.json()
+    const imageBase64: string = body?.imageBase64 || ''
+    if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
+
+    const atlasKey = (c.env as any)?.ATLAS_API_KEY || ''
+    if (!atlasKey) return c.json({ success: true, isClothing: true })
+
+    const ATLAS_BASE = 'https://api.atlascloud.ai'
+    const prompt = `You are an image classifier for a fashion shopping app. Does this image show a wearable clothing garment (e.g. shirt, blouse, t-shirt, pants, skirt, dress, jacket, coat, sweater) as its main subject — whether laid flat, on a hanger, or worn by a person? Animals, landscapes, objects, food, random photos, or anything that is not primarily a clothing item should be NO. Respond with ONLY one word: YES or NO.`
+
+    const res = await fetch(`${ATLAS_BASE}/api/v1/model/run`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${atlasKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        input: {
+          messages: [{
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: imageBase64.startsWith('data:') ? imageBase64 : `data:image/jpeg;base64,${imageBase64}` } },
+              { type: 'text', text: prompt }
+            ]
+          }]
+        }
+      })
+    })
+    const data: any = await res.json()
+    const jobId = data?.data?.id
+    if (!jobId) return c.json({ success: true, isClothing: true })
+
+    for (let i = 0; i < 10; i++) {
+      await new Promise(r => setTimeout(r, 1000))
+      const poll: any = await fetch(`${ATLAS_BASE}/api/v1/model/prediction/${jobId}`, {
+        headers: { 'Authorization': `Bearer ${atlasKey}` }
+      }).then(r => r.json())
+      const st = poll?.data?.status
+      if (st === 'completed' || st === 'succeeded') {
+        const raw = String(poll?.data?.outputs?.[0] || poll?.data?.output || '').trim().toUpperCase()
+        return c.json({ success: true, isClothing: raw.startsWith('YES') })
+      }
+      if (st === 'failed' || st === 'error') break
+    }
+    return c.json({ success: true, isClothing: true })
+  } catch (e: any) {
+    console.error('validate/clothing error:', e)
+    return c.json({ success: true, isClothing: true })
+  }
+})
+
 // POST /api/admin/auto-label — 모델/배경 이미지 AI 자동 라벨링
 app.post('/api/admin/auto-label', adminAuth, async (c) => {
   try {
