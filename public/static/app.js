@@ -45,6 +45,12 @@ const I18N = {
       const label = { TOP: '상의', BOTTOM: '하의', DRESS: '전체' }[cat] || '의류';
       return `장난치지 마세요. ${label} 상품 사진을 업로드해주세요.`;
     },
+    slotLockedErr: (cat) => {
+      return cat === 'DRESS'
+        ? '상의/하의를 이미 업로드해서 전체는 사용할 수 없어요. 전체를 쓰려면 상의/하의를 먼저 삭제해주세요.'
+        : '전체를 이미 업로드해서 상의/하의는 사용할 수 없어요. 상의/하의를 쓰려면 전체를 먼저 삭제해주세요.';
+    },
+    slotLockedHint: (cat) => cat === 'DRESS' ? '상의/하의 업로드 시 사용 불가' : '전체 업로드 시 사용 불가',
     validatingClothing: '이미지 확인 중...',
     genAnalysisErr: '이미지 분석 오류입니다. 상품을 다시 업로드해주세요.',
     // 모델/배경
@@ -127,6 +133,12 @@ const I18N = {
       const label = { TOP: 'top', BOTTOM: 'bottom', DRESS: 'full outfit' }[cat] || 'clothing';
       return `Nice try. Please upload an actual ${label} product photo.`;
     },
+    slotLockedErr: (cat) => {
+      return cat === 'DRESS'
+        ? "You've already uploaded a top/bottom, so full outfit is unavailable. Remove the top/bottom first to use this slot."
+        : "You've already uploaded a full outfit, so top/bottom are unavailable. Remove the full outfit first to use this slot.";
+    },
+    slotLockedHint: (cat) => cat === 'DRESS' ? 'Unavailable while top/bottom is uploaded' : 'Unavailable while full outfit is uploaded',
     validatingClothing: 'Checking image...',
     genAnalysisErr: 'Image analysis error. Please re-upload your product photo.',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">No models registered</p><p style="font-size:12px;margin-top:4px">Please register models in the admin page</p>',
@@ -203,6 +215,12 @@ const I18N = {
       const label = { TOP: 'トップス', BOTTOM: 'ボトムス', DRESS: 'ワンピース/セット' }[cat] || '衣類';
       return `ふざけないでください。${label}の商品写真をアップロードしてください。`;
     },
+    slotLockedErr: (cat) => {
+      return cat === 'DRESS'
+        ? 'トップス/ボトムスを既にアップロードしているため、ワンピース/セットは使用できません。先にトップス/ボトムスを削除してください。'
+        : 'ワンピース/セットを既にアップロードしているため、トップス/ボトムスは使用できません。先にワンピース/セットを削除してください。';
+    },
+    slotLockedHint: (cat) => cat === 'DRESS' ? 'トップス/ボトムスアップロード時は使用不可' : 'ワンピース/セットアップロード時は使用不可',
     validatingClothing: '画像を確認中...',
     genAnalysisErr: '画像分析エラーです。商品画像を再アップロードしてください。',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">モデルが登録されていません</p><p style="font-size:12px;margin-top:4px">管理ページでモデルを登録してください</p>',
@@ -1529,6 +1547,18 @@ const slotData = { TOP: null, BOTTOM: null, DRESS: null };
 // 슬롯별 AI 의류 검증 진행 중 여부
 const slotValidating = { TOP: false, BOTTOM: false, DRESS: false };
 
+// ── 상의/하의 ↔ 전체 상호 배타 ──
+// 상의 또는 하의를 먼저 올리면 전체는 잠기고, 전체를 먼저 올리면 상의/하의가 잠김.
+// (부분 조합과 전체를 동시에 올리면 생성 시 뒤섞여 오류 이미지가 나오는 문제 방지)
+function getDisabledSlotCats() {
+  if (slotData.DRESS !== null) return ['TOP', 'BOTTOM'];
+  if (slotData.TOP !== null || slotData.BOTTOM !== null) return ['DRESS'];
+  return [];
+}
+function isSlotDisabled(cat) {
+  return getDisabledSlotCats().includes(cat);
+}
+
 // ── label for= 방식: 이미 채워진 슬롯이면 파일선택창 열기 차단 ──
 // label 클릭 시 호출. 이미 이미지가 있으면 false 반환 → label의 for= 동작 억제
 function handleSlotLabelClick(e, cat) {
@@ -1536,6 +1566,11 @@ function handleSlotLabelClick(e, cat) {
   if (e.target.closest('.cslot-remove')) return false;
   // 이미 채워진 슬롯 또는 검증 중인 슬롯: 파일 선택창 열지 않음
   if (slotData[cat] || slotValidating[cat]) return false;
+  // 상의/하의 ↔ 전체 상호 배타로 잠긴 슬롯: 이유 안내 후 차단
+  if (isSlotDisabled(cat)) {
+    showToast(t('slotLockedErr', cat), 'error');
+    return false;
+  }
   // 비어 있으면 label for= 연결로 파일 선택창 열림 (브라우저 네이티브 동작)
   return true;
 }
@@ -1551,7 +1586,7 @@ function triggerSlotInput(cat) {
 function handleSlotDragOver(e, cat) {
   e.preventDefault();
   e.stopPropagation();
-  if (slotData[cat] || slotValidating[cat]) return; // 이미 채워졌거나 검증 중인 슬롯은 무시
+  if (slotData[cat] || slotValidating[cat] || isSlotDisabled(cat)) return; // 이미 채워졌거나 검증 중이거나 잠긴 슬롯은 무시
   document.getElementById(`slot-${cat}`)?.classList.add('drag-over');
 }
 function handleSlotDragLeave(e, cat) {
@@ -1565,6 +1600,7 @@ function handleSlotDrop(e, cat) {
   e.stopPropagation();
   document.getElementById(`slot-${cat}`)?.classList.remove('drag-over');
   if (slotData[cat] || slotValidating[cat]) return; // 이미 채워졌거나 검증 중인 슬롯 무시
+  if (isSlotDisabled(cat)) { showToast(t('slotLockedErr', cat), 'error'); return; }
   const file = e.dataTransfer.files?.[0];
   if (file) processSlotFile(file, cat);
 }
@@ -1578,6 +1614,7 @@ function handleSlotFileSelect(e, cat) {
 
 // ── 공통: 파일 유효성 검사 + 슬롯에 저장 ──
 function processSlotFile(file, cat) {
+  if (isSlotDisabled(cat)) { showToast(t('slotLockedErr', cat), 'error'); return; }
   const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (!validTypes.includes(file.type)) {
     showToast(t('uploadFormatErr'), 'error');
@@ -1713,6 +1750,17 @@ function renderSlots() {
       slot.classList.add('cslot--filled');
       body.innerHTML = `<img src="${data.dataUrl}" alt="${SLOT_LABEL[cat]}" class="cslot-img" />`;
       if (removeBtn) removeBtn.classList.remove('hidden');
+    } else if (isSlotDisabled(cat)) {
+      // 상의/하의 ↔ 전체 상호 배타로 잠김 → 비활성 플레이스홀더
+      slot.classList.remove('cslot--filled');
+      slot.classList.add('cslot--disabled');
+      body.innerHTML = `
+        <span class="cslot-empty">
+          <span class="cslot-plus">🔒</span>
+          <span class="cslot-hint">${t('slotLockedHint', cat)}</span>
+        </span>`;
+      if (removeBtn) removeBtn.classList.add('hidden');
+      return;
     } else {
       // 비어 있음 → 플레이스홀더 (span 태그 — label 내부에서도 block처럼 동작)
       slot.classList.remove('cslot--filled');
@@ -1723,6 +1771,7 @@ function renderSlots() {
         </span>`;
       if (removeBtn) removeBtn.classList.add('hidden');
     }
+    slot.classList.remove('cslot--disabled');
   });
 }
 
