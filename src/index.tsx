@@ -4493,7 +4493,7 @@ app.get('/dashboard', (c) => {
               <div class="hist-meta">#\${seqLabel} · \${dateStr} · \${expLabel || ''} · 영상</div>
               <div class="hist-actions">
                 <button class="hist-action-btn" onclick="openHistModal('\${vUrlEsc}','\${expEsc}',true)"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}')"><i class="fas fa-download"></i> 다운로드</button>
+                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this)"><i class="fas fa-download"></i> 다운로드</button>
                 <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
               </div>
             </div>
@@ -4613,7 +4613,7 @@ app.get('/dashboard', (c) => {
     }
   }
 
-  function downloadHistVideo(videoUrl, jobId) {
+  function downloadHistVideo(videoUrl, jobId, btn) {
     const dlUrl = videoUrl.includes('/api/proxy/gen-image')
       ? videoUrl + (videoUrl.includes('?') ? '&' : '?') + 'download=1'
       : \`/api/proxy/gen-image?url=\${encodeURIComponent(videoUrl)}&download=1\`;
@@ -4627,6 +4627,8 @@ app.get('/dashboard', (c) => {
       openModal('actionProgressModal');
       setActionComplete('영상 다운로드가 시작되었습니다.', { showShare: true, jobId: jobId, idx: 0, imageUrl: videoUrl });
     }
+
+    if (btn) btn.innerHTML = '<i class="fas fa-download"></i> 재다운로드';
   }
 
   async function deleteHistItem(logId) {
