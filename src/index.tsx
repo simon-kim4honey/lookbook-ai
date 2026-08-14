@@ -940,6 +940,119 @@ app.get('/api/presets/backgrounds', async (c) => {
   return c.json({ backgrounds: customBgList })
 })
 
+// ────────────────────────────────────────────────────
+// 홈페이지 컨텐츠 관리 — 히어로 쇼케이스 캐러셀 + 기능 박스 배경 이미지
+// (KV 저장, D1 불필요 — 마케팅 홈페이지 전용 콘텐츠)
+// ────────────────────────────────────────────────────
+const HOME_SHOWCASE_KV_KEY = 'home_showcase_images'
+const HOME_FEATURE_BG_SLOTS = [1, 2, 3, 4, 5, 6]
+
+type ShowcaseImage = { id: string; imageBase64: string; createdAt: string }
+
+async function kvGetShowcaseImages(kv: KVNamespace): Promise<ShowcaseImage[]> {
+  const raw = await kv.get(HOME_SHOWCASE_KV_KEY)
+  if (!raw) return []
+  try { return JSON.parse(raw) } catch { return [] }
+}
+async function kvSetShowcaseImages(kv: KVNamespace, list: ShowcaseImage[]): Promise<void> {
+  await kv.put(HOME_SHOWCASE_KV_KEY, JSON.stringify(list))
+}
+
+// GET /api/home/showcase — 홈페이지 히어로 캐러셀용 공개 엔드포인트
+app.get('/api/home/showcase', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ images: [] })
+  const list = await kvGetShowcaseImages(kv)
+  return c.json({ images: list.map(i => ({ id: i.id, imageBase64: i.imageBase64 })) })
+})
+
+// GET /api/admin/home-showcase — 관리자 목록 조회
+app.get('/api/admin/home-showcase', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const list = await kvGetShowcaseImages(kv)
+  return c.json({ success: true, images: list })
+})
+
+// POST /api/admin/home-showcase — 이미지 추가 (여러 장)
+app.post('/api/admin/home-showcase', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  try {
+    const body: any = await c.req.json()
+    const images: string[] = Array.isArray(body?.images) ? body.images : []
+    if (!images.length) return c.json({ success: false, message: '이미지가 필요합니다.' }, 400)
+    const list = await kvGetShowcaseImages(kv)
+    const added: ShowcaseImage[] = images.map((imageBase64: string) => ({
+      id: crypto.randomUUID(),
+      imageBase64,
+      createdAt: new Date().toISOString(),
+    }))
+    const updated = [...list, ...added]
+    await kvSetShowcaseImages(kv, updated)
+    return c.json({ success: true, count: added.length, images: updated })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
+// DELETE /api/admin/home-showcase/:id — 이미지 삭제
+app.delete('/api/admin/home-showcase/:id', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const id = c.req.param('id')
+  const list = await kvGetShowcaseImages(kv)
+  const updated = list.filter(i => i.id !== id)
+  await kvSetShowcaseImages(kv, updated)
+  return c.json({ success: true })
+})
+
+// ── 기능 박스 배경 이미지 (고정 6슬롯) ──
+async function kvGetFeatureBg(kv: KVNamespace, slot: number): Promise<string | null> {
+  return await kv.get(`home_feature_bg_${slot}`)
+}
+
+// GET /api/home/feature-bgs — 홈페이지에서 쓰는 공개 엔드포인트
+app.get('/api/home/feature-bgs', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const result: Record<string, string | null> = {}
+  if (kv) {
+    for (const slot of HOME_FEATURE_BG_SLOTS) {
+      result[slot] = await kvGetFeatureBg(kv, slot)
+    }
+  } else {
+    HOME_FEATURE_BG_SLOTS.forEach(slot => { result[slot] = null })
+  }
+  return c.json({ backgrounds: result })
+})
+
+// PUT /api/admin/home-feature-bg/:slot — 슬롯별 배경 이미지 설정
+app.put('/api/admin/home-feature-bg/:slot', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const slot = Number(c.req.param('slot'))
+  if (!HOME_FEATURE_BG_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  try {
+    const body: any = await c.req.json()
+    const imageBase64 = body?.imageBase64 || ''
+    if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
+    await kv.put(`home_feature_bg_${slot}`, imageBase64)
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
+// DELETE /api/admin/home-feature-bg/:slot — 슬롯 배경 제거
+app.delete('/api/admin/home-feature-bg/:slot', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const slot = Number(c.req.param('slot'))
+  if (!HOME_FEATURE_BG_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  await kv.delete(`home_feature_bg_${slot}`)
+  return c.json({ success: true })
+})
+
 // /api/proxy/model-image/:id — 기본 Unsplash 모델 제거로 404 반환
 app.get('/api/proxy/model-image/:id', (c) => c.notFound())
 
@@ -3284,7 +3397,8 @@ app.get('/', (c) => {
     #pricing .btn-secondary:hover { background: #f0f0f0 !important; }
 
     #navUserAvatar { background: #000 !important; box-shadow: none !important; }
-    #ddUserCredits { color: #000 !important; }
+    /* 드롭다운 자체는 어두운 배경(#1e1e35)이라 크레딧 텍스트는 밝은 색 유지 — 검정으로 바꾸면 안 보임 */
+    #ddUserCredits { color: #a78bfa !important; }
     #userDropdownMenu button[onclick*="openChargePanel"] { background: #000 !important; }
 
     /* Hero */
@@ -3299,20 +3413,16 @@ app.get('/', (c) => {
     #hero .hero-tag { background: rgba(255,255,255,0.1) !important; border-color: rgba(255,255,255,0.3) !important; color: #fff !important; }
     #hero .hero-title .highlight { background: none !important; -webkit-text-fill-color: #fff !important; color: #fff !important; }
     #hero .hero-stat-num { background: none !important; -webkit-text-fill-color: #fff !important; color: #fff !important; }
-    #hero .hero-showcase { filter: grayscale(1); }
-    #hero .showcase-badge { background: rgba(0,0,0,0.75) !important; }
+    #hero .hero-showcase-single { filter: grayscale(1); }
 
     /* Features */
     #features .section-tag { background: #f0f0f0 !important; color: #000 !important; }
     #features .feature-card:hover { border-color: #000 !important; }
-    #features .feature-icon { background: #f0f0f0 !important; }
-    #features .feature-icon i { color: #000 !important; }
 
     /* How it works */
     #how-it-works .steps-grid { grid-template-columns: repeat(3, 1fr) !important; max-width: 720px; margin: 0 auto; }
     #how-it-works .steps-grid::before { background: #ddd !important; }
-    #how-it-works .step-card:hover .step-num { background: #f0f0f0 !important; border-color: #000 !important; }
-    #how-it-works .step-num i { color: #000 !important; }
+    #how-it-works .step-card:hover .step-shot { border-color: #000 !important; }
 
     /* Pricing */
     #pricing .pricing-plan { color: #000 !important; }
@@ -3412,21 +3522,9 @@ app.get('/', (c) => {
         </div>
       </div>
       <div class="hero-visual">
-        <div class="hero-showcase">
-          <div class="showcase-card">
-            <div style="width:100%;height:100%;background:linear-gradient(135deg,#FF6B9D,#FF8C42);display:flex;align-items:center;justify-content:center;font-size:72px;">👗</div>
-            <div class="showcase-badge">원본 의류</div>
-          </div>
-          <div class="showcase-card">
-            <div style="width:100%;height:100%;background:linear-gradient(135deg,#6C47FF,#00D4AA);display:flex;align-items:center;justify-content:center;font-size:72px;">🧍‍♀️</div>
-            <div class="showcase-badge">AI 생성 피팅컷</div>
-          </div>
-          <div class="showcase-card" style="grid-column:span 2;aspect-ratio:16/9;margin-top:0">
-            <div style="width:100%;height:100%;background:linear-gradient(135deg,#1A1A3E,#6C47FF);display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;padding:20px;">
-              <span style="font-size:48px;">👗</span><span style="font-size:32px;color:#A78BFF;">→</span><span style="font-size:48px;">🧍‍♀️</span><span style="font-size:32px;color:#A78BFF;">→</span><span style="font-size:48px;">📸</span>
-            </div>
-            <div class="showcase-badge">스타일샷 세트</div>
-          </div>
+        <div class="hero-showcase-single" id="heroShowcase">
+          <img id="heroShowcaseImg" alt="AI 생성 룩북" style="display:none;" />
+          <div id="heroShowcasePlaceholder" style="width:100%;height:100%;background:linear-gradient(135deg,#1A1A3E,#6C47FF);display:flex;align-items:center;justify-content:center;font-size:72px;">✨</div>
         </div>
       </div>
     </div>
@@ -3441,33 +3539,27 @@ app.get('/', (c) => {
         <p class="section-desc">패션 디렉터, 디자이너, AI 전문가가 함께 만들어 결과물의 완성도가 다릅니다.</p>
       </div>
       <div class="features-grid">
-        <div class="feature-card">
-          <div class="feature-icon purple"><i class="fas fa-shirt"></i></div>
+        <div class="feature-card" data-feature-slot="1">
           <h3 class="feature-title">원클릭 의류 업로드</h3>
           <p class="feature-desc">JPG, PNG, WEBP 형식의 의류 이미지를 드래그앤드롭으로 간편하게 업로드하고 앞/뒤 방향을 설정하세요.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon pink"><i class="fas fa-person"></i></div>
+        <div class="feature-card" data-feature-slot="2">
           <h3 class="feature-title">100+ AI 모델 프리셋</h3>
           <p class="feature-desc">성별, 연령대, 체형, 피부톤, 무드를 필터링하여 브랜드에 딱 맞는 AI 모델을 선택하세요.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon teal"><i class="fas fa-image"></i></div>
+        <div class="feature-card" data-feature-slot="3">
           <h3 class="feature-title">다양한 배경 프리셋</h3>
           <p class="feature-desc">스튜디오, 스트리트, 카페, 자연 등 15가지+ 배경을 제공합니다. 무드에 맞는 배경으로 분위기를 완성하세요.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon amber"><i class="fas fa-bolt"></i></div>
+        <div class="feature-card" data-feature-slot="4">
           <h3 class="feature-title">30초 내 AI 생성</h3>
           <p class="feature-desc">최대 90초 이내에 고품질 온모델 피팅컷을 생성합니다. 전신/반신/상반신 구도와 다양한 포즈를 선택하세요.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon blue"><i class="fas fa-layer-group"></i></div>
+        <div class="feature-card" data-feature-slot="5">
           <h3 class="feature-title">룩북 세트 자동 생성</h3>
           <p class="feature-desc">상세용, 광고용, SNS용, 룩북용 이미지 세트를 한 번에 생성하여 모든 채널의 크리에이티브를 해결하세요.</p>
         </div>
-        <div class="feature-card">
-          <div class="feature-icon green"><i class="fas fa-download"></i></div>
+        <div class="feature-card" data-feature-slot="6">
           <h3 class="feature-title">일괄 다운로드</h3>
           <p class="feature-desc">생성된 이미지를 개별 또는 ZIP 파일로 일괄 다운로드하고, 즐겨찾기로 관리하세요.</p>
         </div>
@@ -3485,17 +3577,17 @@ app.get('/', (c) => {
       </div>
       <div class="steps-grid">
         <div class="step-card">
-          <div class="step-num"><i class="fas fa-shirt"></i></div>
+          <div class="step-shot"><img src="/static/screenshots/how-step1.png" alt="Step 1 화면" loading="lazy"/></div>
           <div class="step-title">Step 1. 옷 사진 업로드</div>
           <div class="step-desc">가지고 있는 상품 이미지 한 장만 올리면 끝</div>
         </div>
         <div class="step-card">
-          <div class="step-num"><i class="fas fa-person"></i></div>
+          <div class="step-shot"><img src="/static/screenshots/how-step2.png" alt="Step 2 화면" loading="lazy"/></div>
           <div class="step-title">Step 2. AI 모델 선택</div>
           <div class="step-desc">성별, 체형, 무드에 맞는 모델을 선택합니다</div>
         </div>
         <div class="step-card">
-          <div class="step-num"><i class="fas fa-wand-magic-sparkles"></i></div>
+          <div class="step-shot"><img src="/static/screenshots/how-step3.png" alt="Step 3 화면" loading="lazy"/></div>
           <div class="step-title">Step 3. 배경 선택 → 자동 생성</div>
           <div class="step-desc">배경만 고르면 AI가 알아서 완성해드려요</div>
         </div>
@@ -4321,7 +4413,13 @@ app.get('/generator', (c) => {
       <!-- STEP 1 · 의류 업로드 -->
       <div class="gslide active" id="step-1">
         <div class="gslide-body">
-          <div class="gstep-label" data-i18n="step1-label">Step 1 / 3 · 의류 업로드</div>
+          <div class="gstep-nav">
+            <span class="gstep-item active"><span class="gstep-circle">1</span><span class="gstep-text" data-i18n="stepnav-1">상품 업로드</span></span>
+            <span class="gstep-sep">›</span>
+            <span class="gstep-item"><span class="gstep-circle">2</span><span class="gstep-text" data-i18n="stepnav-2">모델 선택</span></span>
+            <span class="gstep-sep">›</span>
+            <span class="gstep-item"><span class="gstep-circle">3</span><span class="gstep-text" data-i18n="stepnav-3">배경선택</span></span>
+          </div>
           <h2 class="gstep-title" data-i18n="step1-title">의류를 종류별로 업로드하세요</h2>
           <p class="gstep-sub">각 칸에 해당하는 의류를 업로드하세요 · 원하는 칸만 사용해도 됩니다</p>
 
@@ -4400,7 +4498,13 @@ app.get('/generator', (c) => {
       <!-- STEP 2 · 모델 선택 -->
       <div class="gslide" id="step-2">
         <div class="gslide-header">
-          <div class="gstep-label" data-i18n="step2-label">Step 2 / 3 · 모델 선택</div>
+          <div class="gstep-nav">
+            <span class="gstep-item"><span class="gstep-circle">1</span><span class="gstep-text" data-i18n="stepnav-1">상품 업로드</span></span>
+            <span class="gstep-sep">›</span>
+            <span class="gstep-item active"><span class="gstep-circle">2</span><span class="gstep-text" data-i18n="stepnav-2">모델 선택</span></span>
+            <span class="gstep-sep">›</span>
+            <span class="gstep-item"><span class="gstep-circle">3</span><span class="gstep-text" data-i18n="stepnav-3">배경선택</span></span>
+          </div>
           <h2 class="gstep-title" data-i18n="step2-title">AI 모델을 선택하세요</h2>
 
         </div>
@@ -4426,7 +4530,13 @@ app.get('/generator', (c) => {
       <!-- STEP 3 · 배경 선택 -->
       <div class="gslide" id="step-3">
         <div class="gslide-header">
-          <div class="gstep-label" data-i18n="step3-label">Step 3 / 3 · 배경 선택</div>
+          <div class="gstep-nav">
+            <span class="gstep-item"><span class="gstep-circle">1</span><span class="gstep-text" data-i18n="stepnav-1">상품 업로드</span></span>
+            <span class="gstep-sep">›</span>
+            <span class="gstep-item"><span class="gstep-circle">2</span><span class="gstep-text" data-i18n="stepnav-2">모델 선택</span></span>
+            <span class="gstep-sep">›</span>
+            <span class="gstep-item active"><span class="gstep-circle">3</span><span class="gstep-text" data-i18n="stepnav-3">배경선택</span></span>
+          </div>
           <h2 class="gstep-title" data-i18n="step3-title">배경을 선택하세요</h2>
 
         </div>
@@ -4735,6 +4845,7 @@ app.get('/admin02', (c) => {
     <button class="tab-btn active" onclick="switchTab('prompt')"><i class="fas fa-magic"></i> 프롬프트</button>
     <button class="tab-btn" onclick="switchTab('models')"><i class="fas fa-user-circle"></i> 모델 관리</button>
     <button class="tab-btn" onclick="switchTab('bgs')"><i class="fas fa-image"></i> 배경 관리</button>
+    <button class="tab-btn" onclick="switchTab('home')"><i class="fas fa-home"></i> 홈페이지 관리</button>
     <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
   </div>
 
@@ -4890,6 +5001,42 @@ app.get('/admin02', (c) => {
     </div>
   </div>
 
+  <!-- ▼ 탭: 홈페이지 관리 -->
+  <div class="tab-panel" id="tabHome">
+    <div class="admin-body">
+      <div class="page-title">🏠 홈페이지 관리</div>
+      <div class="page-sub">홈페이지(www.aifashion.co.kr)에 노출되는 이미지를 관리합니다.</div>
+
+      <!-- 히어로 쇼케이스 캐러셀 -->
+      <div class="upload-form">
+        <h3><i class="fas fa-images" style="color:#6c47ff;"></i> 히어로 쇼케이스 이미지 <span style="font-size:13px;font-weight:400;color:#888;">(홈 상단 박스에서 자동으로 롤링됩니다 · 여러 장 등록 가능)</span></h3>
+
+        <div class="upload-zone multi-zone" id="showcaseUploadZone" onclick="document.getElementById('showcaseFileInput').click()">
+          <div class="icon"><i class="fas fa-images"></i></div>
+          <p>클릭하거나 이미지를 드래그하세요<br/><span>여러 파일 선택 가능</span> (JPG, PNG, WEBP)</p>
+        </div>
+        <input type="file" id="showcaseFileInput" accept="image/*" multiple style="display:none" onchange="onShowcaseFilesSelect(event)"/>
+
+        <div id="showcaseStagingGrid" style="display:none;margin-top:16px;">
+          <div id="showcaseStagingItems" style="display:flex;flex-wrap:wrap;gap:14px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+            <button class="btn-save" onclick="uploadShowcaseImages()"><i class="fas fa-upload"></i> 전체 등록</button>
+            <button class="btn-cancel" onclick="clearShowcaseStaging()"><i class="fas fa-times"></i> 초기화</button>
+            <span class="save-status" id="showcaseUploadStatus"></span>
+          </div>
+        </div>
+
+        <div id="showcaseGrid" style="margin-top:16px;"></div>
+      </div>
+
+      <!-- 기능 박스 배경 이미지 -->
+      <div class="upload-form">
+        <h3><i class="fas fa-th-large" style="color:#00d4aa;"></i> 기능 소개 박스 배경 이미지 <span style="font-size:13px;font-weight:400;color:#888;">(박스별 1장, 미등록 시 기본 배경 유지)</span></h3>
+        <div id="featureBgGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ▼ 탭: 회원 관리 -->
   <div class="tab-panel" id="tabUsers">
     <div class="admin-body">
@@ -4992,15 +5139,17 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs','users']
+    const names = ['prompt','models','bgs','home','users']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
   document.getElementById('tabModels').classList.toggle('active', name === 'models')
   document.getElementById('tabBgs').classList.toggle('active', name === 'bgs')
+  document.getElementById('tabHome').classList.toggle('active', name === 'home')
   document.getElementById('tabUsers').classList.toggle('active', name === 'users')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
+  if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs() }
   if (name === 'users')  loadUsers()
 }
 
@@ -5599,6 +5748,163 @@ async function loadCustomBgs() {
         '</div>'
       ).join('') + '</div>'
   } catch(e) { console.error('loadCustomBgs error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+// ══════════════════════════════════════════════
+//  홈페이지 관리 — 히어로 쇼케이스 캐러셀
+// ══════════════════════════════════════════════
+let showcaseStagingList = []  // [{ file, base64 }]
+
+async function onShowcaseFilesSelect(e) {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  for (const file of files) {
+    const base64 = await readFileAsBase64(file)
+    showcaseStagingList.push({ file, base64 })
+  }
+  e.target.value = ''
+  renderShowcaseStaging()
+}
+
+function renderShowcaseStaging() {
+  const grid = document.getElementById('showcaseStagingGrid')
+  const container = document.getElementById('showcaseStagingItems')
+  if (!showcaseStagingList.length) { grid.style.display = 'none'; return }
+  grid.style.display = 'block'
+  container.innerHTML = showcaseStagingList.map((item, i) =>
+    '<div style="position:relative;width:140px;height:140px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
+    '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
+    '<button onclick="removeShowcaseStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:22px;text-align:center;padding:0;">✕</button>' +
+    '</div>'
+  ).join('')
+}
+
+function removeShowcaseStaging(idx) {
+  showcaseStagingList.splice(idx, 1)
+  renderShowcaseStaging()
+}
+
+function clearShowcaseStaging() {
+  showcaseStagingList = []
+  document.getElementById('showcaseStagingGrid').style.display = 'none'
+  document.getElementById('showcaseUploadStatus').textContent = ''
+}
+
+async function uploadShowcaseImages() {
+  const status = document.getElementById('showcaseUploadStatus')
+  if (!showcaseStagingList.length) { status.textContent = '이미지를 선택하세요'; status.className = 'save-status err'; return }
+  status.textContent = '등록 중...'; status.className = 'save-status'
+  try {
+    const res = await fetch('/api/admin/home-showcase', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ images: showcaseStagingList.map(i => i.base64) }),
+    })
+    const data = await res.json()
+    if (data.success) {
+      status.textContent = data.count + '개 등록 완료!'; status.className = 'save-status ok'
+      clearShowcaseStaging()
+      loadShowcaseImages()
+    } else { status.textContent = data.message || '등록 실패'; status.className = 'save-status err' }
+  } catch(e) { status.textContent = '오류: ' + e.message; status.className = 'save-status err' }
+}
+
+async function deleteShowcaseImage(id) {
+  if (!confirm('이 이미지를 삭제하시겠습니까?')) return
+  const res = await fetch('/api/admin/home-showcase/' + id, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+  const data = await res.json()
+  if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
+  await loadShowcaseImages()
+}
+
+async function loadShowcaseImages() {
+  const grid = document.getElementById('showcaseGrid')
+  try {
+    const res = await fetch('/api/admin/home-showcase', {headers:{'X-Admin-Password':adminPassword}})
+    const data = await res.json()
+    if (!data.images || data.images.length === 0) {
+      grid.innerHTML = '<div class="empty-state"><p>등록된 쇼케이스 이미지가 없습니다.</p></div>'
+      return
+    }
+    grid.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:14px;">' +
+      data.images.map(img =>
+        '<div style="position:relative;width:140px;height:140px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
+        '<img src="' + img.imageBase64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
+        '<button class="del-btn" onclick="deleteShowcaseImage(' + "'" + img.id + "'" + ')" style="position:absolute;top:4px;right:4px;"><i class="fas fa-times"></i></button>' +
+        '</div>'
+      ).join('') + '</div>'
+  } catch(e) { console.error('loadShowcaseImages error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+// ══════════════════════════════════════════════
+//  홈페이지 관리 — 기능 소개 박스 배경 (고정 6슬롯)
+// ══════════════════════════════════════════════
+const FEATURE_BG_LABELS = {
+  1: '원클릭 의류 업로드', 2: '100+ AI 모델 프리셋', 3: '다양한 배경 프리셋',
+  4: '30초 내 AI 생성', 5: '룩북 세트 자동 생성', 6: '일괄 다운로드',
+}
+
+async function loadFeatureBgs() {
+  const grid = document.getElementById('featureBgGrid')
+  try {
+    const res = await fetch('/api/home/feature-bgs')
+    const data = await res.json()
+    const bgs = data.backgrounds || {}
+    grid.innerHTML = Object.keys(FEATURE_BG_LABELS).map(slot => {
+      const img = bgs[slot]
+      return '<div style="border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden;">' +
+        '<div style="position:relative;width:100%;aspect-ratio:16/10;background:' + (img ? 'url(' + img + ') center/cover' : '#f2f2f5') + ';display:flex;align-items:center;justify-content:center;">' +
+        (img ? '' : '<i class="fas fa-image" style="color:#ccc;font-size:24px;"></i>') +
+        '</div>' +
+        '<div style="padding:8px;">' +
+        '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + FEATURE_BG_LABELS[slot] + '</div>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<button onclick="pickFeatureBg(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (img ? '교체' : '업로드') + '</button>' +
+        (img ? '<button onclick="deleteFeatureBg(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
+        '</div></div></div>'
+    }).join('')
+  } catch(e) { console.error('loadFeatureBgs error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+let _pendingFeatureBgSlot = null
+function pickFeatureBg(slot) {
+  _pendingFeatureBgSlot = slot
+  let input = document.getElementById('featureBgInput')
+  if (!input) {
+    input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/*'
+    input.id = 'featureBgInput'
+    input.style.display = 'none'
+    input.addEventListener('change', onFeatureBgSelect)
+    document.body.appendChild(input)
+  }
+  input.value = ''
+  input.click()
+}
+
+async function onFeatureBgSelect(e) {
+  const file = e.target.files?.[0]
+  if (!file || !_pendingFeatureBgSlot) return
+  const base64 = await readFileAsBase64(file)
+  try {
+    const res = await fetch('/api/admin/home-feature-bg/' + _pendingFeatureBgSlot, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ imageBase64: base64 }),
+    })
+    const data = await res.json()
+    if (!data.success) { alert('업로드 실패: ' + (data.message || '알 수 없는 오류')); return }
+    await loadFeatureBgs()
+  } catch(err) { alert('오류: ' + err.message) }
+}
+
+async function deleteFeatureBg(slot) {
+  if (!confirm('이 박스의 배경 이미지를 삭제하시겠습니까?')) return
+  const res = await fetch('/api/admin/home-feature-bg/' + slot, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+  const data = await res.json()
+  if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
+  await loadFeatureBgs()
 }
 
 // ─── 배경 "생성용"(얼굴 마스킹) 이미지 등록/교체 ───
