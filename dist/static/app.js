@@ -2996,6 +2996,10 @@ async function startPayment() {
       buyerName: data.customerName,
       buyerEmail: data.customerEmail,
       returnUrl: location.origin + '/payment/return',
+      fnError: function (result) {
+        if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
+        showToast(t('payFail', result && result.errorMsg || ''), 'error');
+      },
     });
   } catch (e) {
     if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
