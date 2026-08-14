@@ -1074,17 +1074,19 @@ app.get('/api/proxy/gen-image', async (c) => {
       return c.json({ error: 'Only HTTPS URLs allowed' }, 400)
     }
 
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; LookbookAI/1.0)',
-      },
-    })
+    // 영상 재생을 위해 브라우저의 Range 요청을 그대로 원본에 전달 (스트리밍/탐색 지원)
+    const rangeHeader = c.req.header('Range')
+    const upstreamHeaders: Record<string, string> = {
+      'User-Agent': 'Mozilla/5.0 (compatible; LookbookAI/1.0)',
+    }
+    if (rangeHeader) upstreamHeaders['Range'] = rangeHeader
 
-    if (!res.ok) {
+    const res = await fetch(url, { headers: upstreamHeaders })
+
+    if (!res.ok && res.status !== 206) {
       return c.json({ error: `Upstream error: ${res.status}` }, res.status as any)
     }
 
-    const buffer = await res.arrayBuffer()
     const contentType = res.headers.get('Content-Type') || 'image/jpeg'
 
     // 파일명 생성 (다운로드 시) — 이미지/영상 공용 프록시라 컨텐츠 타입에 따라 확장자 결정
@@ -1095,13 +1097,19 @@ app.get('/api/proxy/gen-image', async (c) => {
       'Content-Type': contentType,
       'Cache-Control': 'public, max-age=3600',
       'Access-Control-Allow-Origin': '*',
+      'Accept-Ranges': 'bytes',
     }
+    const contentRange = res.headers.get('Content-Range')
+    if (contentRange) headers['Content-Range'] = contentRange
+    const contentLength = res.headers.get('Content-Length')
+    if (contentLength) headers['Content-Length'] = contentLength
     // download=1 이면 브라우저가 바로 저장 대화상자 띄움
     if (isDownload) {
       headers['Content-Disposition'] = `attachment; filename="${filename}"`
     }
 
-    return new Response(buffer, { headers })
+    // 응답 본문을 버퍼링하지 않고 그대로 스트리밍 (대용량 영상 대응)
+    return new Response(res.body, { status: res.status, headers })
   } catch (err: any) {
     console.error('Gen image proxy error:', err)
     return c.json({ error: err.message }, 500)
@@ -4859,8 +4867,9 @@ app.get('/generator', (c) => {
               <span class="rnb-sub"><i class="fas fa-coins"></i> 90</span>
             </button>
             <button class="result-nav-btn primary" id="videoActionBtn" onclick="startVideoGeneration()">
+              <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-film"></i> 영상 생성</span>
-              <span class="rnb-sub" id="videoActionSub">5초 · <i class="fas fa-coins"></i> 600</span>
+              <span class="rnb-sub" id="videoActionSub">5초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
             </button>
             <button class="result-nav-btn" onclick="window.location.href='/generator'">
               <span class="rnb-main"><i class="fas fa-plus"></i> 새 프로젝트</span>

@@ -2442,7 +2442,7 @@ function renderResults(images) {
     if (main) main.innerHTML = '<i class="fas fa-film"></i> 영상 생성';
   }
   const videoSub = document.getElementById('videoActionSub');
-  if (videoSub) videoSub.innerHTML = '5초 · <i class="fas fa-coins"></i> 600';
+  if (videoSub) videoSub.innerHTML = '5초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600';
 
   grid.innerHTML = '';
 
