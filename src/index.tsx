@@ -4912,21 +4912,6 @@ app.get('/generator', (c) => {
     </div>
   </div>
 
-  <!-- Video Preview Modal (영상 생성 완료 후 다운로드 전 미리보기) -->
-  <div class="modal-overlay image-modal" id="videoPreviewModal">
-    <div class="modal-box">
-      <button class="modal-close" style="background:rgba(0,0,0,0.5);color:white;top:12px;right:12px;z-index:20;" onclick="closeVideoPreview()">×</button>
-      <div style="position:relative;display:block;width:100%;">
-        <video id="videoPreviewPlayer" src="" autoplay loop muted playsinline controls style="width:100%;display:block;"></video>
-        <div style="position:absolute;bottom:16px;right:16px;z-index:20;display:flex;align-items:center;gap:8px;">
-          <button onclick="downloadVideo()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:rgba(99,102,241,0.85);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,1)'" onmouseout="this.style.background='rgba(99,102,241,0.85)'">
-            <i class="fas fa-download"></i> 다운로드
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Action Progress Modal (다운로드/재생성 진행 중 + 완료 팝업) -->
   <div class="modal-overlay" id="actionProgressModal" style="z-index:10500;">
     <div class="action-progress-box">

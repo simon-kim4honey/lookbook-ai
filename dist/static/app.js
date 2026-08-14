@@ -2771,19 +2771,6 @@ function _onVideoReady(videoUrl) {
   }
 }
 
-// ─── 영상 완성 후 다운로드 전 미리보기 모달 ───
-function openVideoPreview(videoUrl) {
-  const player = document.getElementById('videoPreviewPlayer');
-  if (player) player.src = videoUrl;
-  openModal('videoPreviewModal');
-}
-
-function closeVideoPreview() {
-  const player = document.getElementById('videoPreviewPlayer');
-  if (player) { player.pause(); player.removeAttribute('src'); player.load(); }
-  closeModal('videoPreviewModal');
-}
-
 function downloadVideo() {
   if (!_videoState.videoUrl) {
     showToast('다운로드할 영상이 없습니다.', 'error');
@@ -2797,8 +2784,8 @@ function downloadVideo() {
   a.click();
   document.body.removeChild(a);
   showToast('영상 다운로드를 시작합니다.', 'success');
-  closeVideoPreview();
 
+  // 다운로드 후 이미지와 동일하게 공유(링크복사/카카오톡) 옵션 노출
   setActionComplete('영상 다운로드가 시작되었습니다.', {
     showShare: true,
     jobId: _videoState.jobId,
