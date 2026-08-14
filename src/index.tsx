@@ -3009,7 +3009,7 @@ app.post('/api/video/start', async (c) => {
     // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 5초 영상
     // (공식 API 문서 기준 파라미터 — resolution은 480p/720p/*-esr만 지원,
     //  ratio는 'adaptive' 고정으로 원본 이미지 비율을 그대로 따라감)
-    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements: gentle weight shifts, a slow turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion. Keep the face, outfit, and background unchanged throughout the video.'
+    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements: gentle weight shifts, a slow turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion. Keep the face, outfit, and background unchanged throughout the video. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
@@ -3022,7 +3022,7 @@ app.post('/api/video/start', async (c) => {
         resolution: '1080p-esr',
         ratio: 'adaptive',
         output_format: 'mp4',
-        generate_audio: false,
+        generate_audio: true,
         watermark: false,
       }),
     })

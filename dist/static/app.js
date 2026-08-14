@@ -2468,7 +2468,7 @@ function renderResults(images) {
          </div>`;
 
     card.innerHTML = `
-      <div class="result-thumb">${thumbContent}</div>
+      <div class="result-thumb" id="resultThumb-${idx}">${thumbContent}</div>
     `;
 
     grid.appendChild(card);
@@ -2759,7 +2759,16 @@ function _onVideoReady(videoUrl) {
   if (sub) sub.textContent = '다운로드 준비 완료';
 
   closeActionProgress();
-  openVideoPreview(videoUrl);
+
+  // 결과 화면(첫 번째 카드)을 영상 재생 화면으로 교체
+  // AtlasCloud 원본 저장소가 Content-Disposition: attachment로 강제 다운로드
+  // 설정돼 있어 원본 URL을 그대로 쓰면 브라우저가 재생 대신 다운로드로 튐 —
+  // 프록시를 거쳐야 이 헤더가 제거되어 인라인 재생이 됨
+  const thumb = document.getElementById('resultThumb-0');
+  if (thumb) {
+    const proxiedVideoUrl = `/api/proxy/gen-image?url=${encodeURIComponent(videoUrl)}`;
+    thumb.innerHTML = `<video src="${proxiedVideoUrl}" autoplay loop muted playsinline controls style="width:100%;height:auto;display:block;"></video>`;
+  }
 }
 
 // ─── 영상 완성 후 다운로드 전 미리보기 모달 ───
