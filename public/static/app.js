@@ -2442,7 +2442,7 @@ function renderResults(images) {
     if (main) main.innerHTML = '<i class="fas fa-film"></i> 영상 생성';
   }
   const videoSub = document.getElementById('videoActionSub');
-  if (videoSub) videoSub.textContent = '5초 · 600 크레딧';
+  if (videoSub) videoSub.innerHTML = '5초 · <i class="fas fa-coins"></i> 600';
 
   grid.innerHTML = '';
 
@@ -2639,7 +2639,7 @@ function _resetVideoBtn() {
   const btn = document.getElementById('videoActionBtn');
   const sub = document.getElementById('videoActionSub');
   if (btn) btn.disabled = false;
-  if (sub) sub.textContent = '5초 · 600 크레딧';
+  if (sub) sub.innerHTML = '5초 · <i class="fas fa-coins"></i> 600';
 }
 
 async function startVideoGeneration() {
