@@ -3048,10 +3048,11 @@ app.post('/api/video/start', async (c) => {
     ).bind(sess.user_id).first() as any
     const nextSeq = (lastSeq?.last_seq || 0) + 1
 
+    // image_urls에 영상의 소스(첫 프레임) 이미지 URL 저장 — 카카오톡 공유 카드 썸네일 등에 사용
     await db.prepare(
-      `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, kind, expires_at)
-       VALUES (?, ?, 1, ?, ?, '9:16', ?, 'video', datetime('now', '+14 days'))`
-    ).bind(sess.user_id, jobId, modelName || '패션 모델', bgName || '스튜디오', nextSeq).run()
+      `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, kind, expires_at, image_urls)
+       VALUES (?, ?, 1, ?, ?, '9:16', ?, 'video', datetime('now', '+14 days'), ?)`
+    ).bind(sess.user_id, jobId, modelName || '패션 모델', bgName || '스튜디오', nextSeq, JSON.stringify([imageUrl])).run()
 
     return c.json({ success: true, jobId, creditsRemaining: newBalance })
   } catch (err: any) {
@@ -4484,6 +4485,11 @@ app.get('/dashboard', (c) => {
           const vProxyUrl = \`/api/proxy/gen-image?url=\${encodeURIComponent(log.video_url)}\`;
           const vUrlEsc = vProxyUrl.replace(/'/g,"\\\\'");
           const vJobIdEsc = (log.job_id || '').replace(/'/g,"\\\\'");
+          // 카카오톡 공유 카드 썸네일용 — 영상의 소스(첫 프레임) 정지 이미지
+          let vThumbUrls = [];
+          try { vThumbUrls = log.image_urls ? JSON.parse(log.image_urls) : []; } catch(e) { vThumbUrls = []; }
+          const vThumbProxy = vThumbUrls[0] ? \`/api/proxy/gen-image?url=\${encodeURIComponent(vThumbUrls[0])}\` : vProxyUrl;
+          const vThumbEsc = vThumbProxy.replace(/'/g,"\\\\'");
           rows.push(\`<div class="hist-row">
             <div class="hist-thumb hist-thumb--video" onclick="openHistModal('\${vUrlEsc}','\${expEsc}',true)">
               <video src="\${vProxyUrl}" muted preload="metadata" onerror="this.parentNode.innerHTML='<i class=\\"fas fa-film\\"></i>'"></video>
@@ -4493,7 +4499,7 @@ app.get('/dashboard', (c) => {
               <div class="hist-meta">#\${seqLabel} · \${dateStr} · \${expLabel || ''} · 영상</div>
               <div class="hist-actions">
                 <button class="hist-action-btn" onclick="openHistModal('\${vUrlEsc}','\${expEsc}',true)"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this)"><i class="fas fa-download"></i> 다운로드</button>
+                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')"><i class="fas fa-download"></i> 다운로드</button>
                 <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
               </div>
             </div>
@@ -4613,7 +4619,7 @@ app.get('/dashboard', (c) => {
     }
   }
 
-  function downloadHistVideo(videoUrl, jobId, btn) {
+  function downloadHistVideo(videoUrl, jobId, btn, thumbUrl) {
     const dlUrl = videoUrl.includes('/api/proxy/gen-image')
       ? videoUrl + (videoUrl.includes('?') ? '&' : '?') + 'download=1'
       : \`/api/proxy/gen-image?url=\${encodeURIComponent(videoUrl)}&download=1\`;
@@ -4623,9 +4629,10 @@ app.get('/dashboard', (c) => {
     showToast('영상 다운로드를 시작합니다.', 'success');
 
     // 이미지 다운로드와 동일하게 공유(링크복사/카카오톡) 팝업 노출
+    // 카카오톡 카드는 영상을 미리보기로 못 그리므로 정지 이미지(첫 프레임)를 사용
     if (jobId) {
       openModal('actionProgressModal');
-      setActionComplete('영상 다운로드가 시작되었습니다.', { showShare: true, jobId: jobId, idx: 0, imageUrl: videoUrl });
+      setActionComplete('영상 다운로드가 시작되었습니다.', { showShare: true, jobId: jobId, idx: 0, imageUrl: thumbUrl || videoUrl });
     }
 
     if (btn) btn.innerHTML = '<i class="fas fa-download"></i> 재다운로드';
