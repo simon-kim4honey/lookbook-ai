@@ -2999,8 +2999,8 @@ app.post('/api/video/start', async (c) => {
     }
 
     // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 5초 영상
-    // "reference-to-video"는 존재하지 않는/불일치하는 모델 경로였던 것으로 확인되어
-    // 문서화된 단일 이미지 첫 프레임 입력 방식인 image-to-video로 전환 (image: 단일 URL)
+    // (공식 API 문서 기준 파라미터 — resolution은 480p/720p/*-esr만 지원,
+    //  ratio는 'adaptive' 고정으로 원본 이미지 비율을 그대로 따라감)
     const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements: gentle weight shifts, a slow turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion. Keep the face, outfit, and background unchanged throughout the video.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
@@ -3011,8 +3011,11 @@ app.post('/api/video/start', async (c) => {
         prompt,
         image: imageUrl,
         duration: 5,
-        resolution: '1080p-sr',
-        ratio: '9:16',
+        resolution: '1080p-esr',
+        ratio: 'adaptive',
+        output_format: 'mp4',
+        generate_audio: false,
+        watermark: false,
       }),
     })
     const startData: any = await startRes.json()
