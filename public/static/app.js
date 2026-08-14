@@ -2761,10 +2761,13 @@ function _onVideoReady(videoUrl) {
   closeActionProgress();
 
   // 결과 화면(첫 번째 카드)을 영상 재생 화면으로 교체
-  // 다운로드용 프록시가 아니라 AtlasCloud 원본 URL을 직접 재생 (재생 안정성)
+  // AtlasCloud 원본 저장소가 Content-Disposition: attachment로 강제 다운로드
+  // 설정돼 있어 원본 URL을 그대로 쓰면 브라우저가 재생 대신 다운로드로 튐 —
+  // 프록시를 거쳐야 이 헤더가 제거되어 인라인 재생이 됨
   const thumb = document.getElementById('resultThumb-0');
   if (thumb) {
-    thumb.innerHTML = `<video src="${videoUrl}" autoplay loop muted playsinline controls style="width:100%;height:auto;display:block;"></video>`;
+    const proxiedVideoUrl = `/api/proxy/gen-image?url=${encodeURIComponent(videoUrl)}`;
+    thumb.innerHTML = `<video src="${proxiedVideoUrl}" autoplay loop muted playsinline controls style="width:100%;height:auto;display:block;"></video>`;
   }
 }
 
