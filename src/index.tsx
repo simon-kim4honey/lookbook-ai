@@ -3477,7 +3477,8 @@ app.get('/', (c) => {
     /* How it works */
     #how-it-works .steps-grid { grid-template-columns: repeat(3, 1fr) !important; max-width: 720px; margin: 0 auto; }
     #how-it-works .steps-grid::before { background: #ddd !important; }
-    #how-it-works .step-card:hover .step-shot { border-color: #000 !important; }
+    #how-it-works .step-card:hover .step-num { background: #f0f0f0 !important; border-color: #000 !important; }
+    #how-it-works .step-num i { color: #000 !important; }
 
     /* Pricing */
     #pricing .pricing-plan { color: #000 !important; }
@@ -3632,17 +3633,17 @@ app.get('/', (c) => {
       </div>
       <div class="steps-grid">
         <div class="step-card">
-          <div class="step-shot"><img src="/static/screenshots/how-step1.png" alt="Step 1 화면" loading="lazy"/></div>
+          <div class="step-num"><i class="fas fa-shirt"></i></div>
           <div class="step-title">Step 1. 옷 사진 업로드</div>
           <div class="step-desc">가지고 있는 상품 이미지 한 장만 올리면 끝</div>
         </div>
         <div class="step-card">
-          <div class="step-shot"><img src="/static/screenshots/how-step2.png" alt="Step 2 화면" loading="lazy"/></div>
+          <div class="step-num"><i class="fas fa-person"></i></div>
           <div class="step-title">Step 2. AI 모델 선택</div>
           <div class="step-desc">성별, 체형, 무드에 맞는 모델을 선택합니다</div>
         </div>
         <div class="step-card">
-          <div class="step-shot"><img src="/static/screenshots/how-step3.png" alt="Step 3 화면" loading="lazy"/></div>
+          <div class="step-num"><i class="fas fa-wand-magic-sparkles"></i></div>
           <div class="step-title">Step 3. 배경 선택 → 자동 생성</div>
           <div class="step-desc">배경만 고르면 AI가 알아서 완성해드려요</div>
         </div>
