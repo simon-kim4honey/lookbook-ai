@@ -3009,7 +3009,7 @@ app.post('/api/video/start', async (c) => {
         prompt,
         images: [imageUrl],
         duration: 5,
-        resolution: '1080p',
+        resolution: '1080p-sr',
         ratio: '9:16',
       }),
     })
