@@ -20,8 +20,10 @@ type Bindings = {
   KAKAO_JS_KEY: string
   // 어드민
   ADMIN_PASSWORD: string
-  // 토스페이먼츠
-  TOSS_SECRET_KEY: string
+  // 나이스페이먼츠 (샌드박스: https://sandbox-api.nicepay.co.kr, 운영: https://api.nicepay.co.kr)
+  NICEPAY_CLIENT_ID: string
+  NICEPAY_SECRET_KEY: string
+  NICEPAY_API_BASE: string
   // Atlas Cloud AI (이미지 생성 전용)
   ATLAS_API_KEY: string
   // OpenAI (이미지 분류/라벨링 전용 — gpt-4o-mini, AtlasCloud엔 없는 모델)
@@ -1913,7 +1915,7 @@ app.delete('/api/generation/history/:id', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
-// Payments API — 토스페이먼츠 연동
+// Payments API — 나이스페이먼츠 연동 (서버 승인 모델)
 // ────────────────────────────────────────────────────
 
 // 크레딧 패키지 정의
@@ -1948,7 +1950,7 @@ app.post('/api/payments/prepare', async (c) => {
 
     // ── M-7: 중복 orderId 방지 ─────────────────────────────
     // 동일 유저가 5분 이내 동일 패키지로 pending 레코드를 이미 생성했으면
-    // 새 orderId를 발급하지 않고 기존 것을 재사용 (토스 위젯 중복 호출 방어)
+    // 새 orderId를 발급하지 않고 기존 것을 재사용 (결제창 중복 호출 방어)
     const existing = await db.prepare(
       `SELECT order_id FROM payment_logs
        WHERE user_id = ? AND amount = ? AND status = 'pending'
@@ -1965,6 +1967,7 @@ app.post('/api/payments/prepare', async (c) => {
         orderName: pkg.label,
         customerName: sess.name,
         customerEmail: sess.email,
+        clientId: c.env.NICEPAY_CLIENT_ID || '',
       })
     }
     // ─────────────────────────────────────────────────────────
@@ -1988,71 +1991,99 @@ app.post('/api/payments/prepare', async (c) => {
       orderName: pkg.label,
       customerName: sess.name,
       customerEmail: sess.email,
+      clientId: c.env.NICEPAY_CLIENT_ID || '',
     })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
 })
 
-// POST /api/payments/confirm — 토스 서버사이드 confirm + 크레딧 지급
-app.post('/api/payments/confirm', async (c) => {
-  try {
-    const db: D1Database = c.env.LOOKBOOK_DB
-    const { paymentKey, orderId, amount } = await c.req.json() as any
+// SHA-256 hex 다이제스트 (나이스페이먼츠 서명 검증/생성용)
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
 
-    if (!paymentKey || !orderId || !amount) {
-      return c.json({ error: 'paymentKey, orderId, amount 필수' }, 400)
+// POST /payment/return — 나이스페이먼츠 returnUrl (결제창이 브라우저를 통해 이 주소로 직접 POST)
+// 서버 승인 모델: 여기서 위변조 서명 검증 후 승인 API를 호출해야 실제 결제(승인)가 완료됨
+app.post('/payment/return', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const body = await c.req.parseBody()
+    const authResultCode = String(body.authResultCode || '')
+    const authResultMsg  = String(body.authResultMsg || '')
+    const tid       = String(body.tid || '')
+    const clientId  = String(body.clientId || '')
+    const orderId   = String(body.orderId || '')
+    const amount    = String(body.amount || '')
+    const authToken = String(body.authToken || '')
+    const signature = String(body.signature || '')
+
+    if (authResultCode !== '0000') {
+      return c.redirect(`/payment/fail?message=${encodeURIComponent(authResultMsg || '결제 인증에 실패했습니다.')}&code=${encodeURIComponent(authResultCode)}`, 302)
     }
 
-    // 1) payment_logs 에서 pending 레코드 조회
+    const secretKey = c.env.NICEPAY_SECRET_KEY || ''
+
+    // 위변조 검증: signature === hex(sha256(authToken + clientId + amount + SecretKey))
+    const expectedSig = await sha256Hex(authToken + clientId + amount + secretKey)
+    if (expectedSig !== signature) {
+      console.error('나이스페이먼츠 서명 불일치 — 위변조 의심:', orderId)
+      return c.redirect(`/payment/fail?message=${encodeURIComponent('결제 검증에 실패했습니다.')}`, 302)
+    }
+
+    // payment_logs pending 레코드 조회 + 금액 검증
     const log = await db.prepare(
       `SELECT id, user_id, amount, credits, status FROM payment_logs
        WHERE order_id = ? AND status = 'pending'`
     ).bind(orderId).first() as any
-    if (!log) return c.json({ error: '결제 정보를 찾을 수 없거나 이미 처리되었습니다.' }, 404)
-
-    // 2) 금액 검증
+    if (!log) {
+      return c.redirect(`/payment/fail?message=${encodeURIComponent('결제 정보를 찾을 수 없거나 이미 처리되었습니다.')}`, 302)
+    }
     if (Number(amount) !== Number(log.amount)) {
-      return c.json({ error: '결제 금액이 일치하지 않습니다.' }, 400)
+      return c.redirect(`/payment/fail?message=${encodeURIComponent('결제 금액이 일치하지 않습니다.')}`, 302)
     }
 
-    // 3) 토스페이먼츠 서버사이드 confirm
-    const secretKey = c.env.TOSS_SECRET_KEY || 'test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R'
-    const encoded = btoa(secretKey + ':')
-    const tossResp = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
+    // 승인 API 호출 — 여기서 호출해야 실제 결제가 확정됨
+    const apiBase = c.env.NICEPAY_API_BASE || 'https://sandbox-api.nicepay.co.kr'
+    const ediDate = new Date().toISOString()
+    const signData = await sha256Hex(tid + amount + ediDate + secretKey)
+    const authHeader = 'Basic ' + btoa(`${clientId}:${secretKey}`)
+
+    const approveResp = await fetch(`${apiBase}/v1/payments/${tid}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${encoded}`,
+        'Authorization': authHeader,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) }),
+      body: JSON.stringify({ amount: Number(amount), ediDate, signData }),
     })
+    const approveData = await approveResp.json() as any
 
-    const tossData = await tossResp.json() as any
-
-    if (!tossResp.ok) {
-      // 토스 에러 → payment_logs failed 업데이트
+    if (!approveResp.ok || approveData.resultCode !== '0000') {
+      // 승인 실패 → payment_logs failed 업데이트
       await db.prepare(
         `UPDATE payment_logs
-         SET status='failed', toss_raw=?, paid_at=datetime('now')
+         SET status='failed', pg_raw=?, paid_at=datetime('now')
          WHERE order_id=?`
-      ).bind(JSON.stringify(tossData), orderId).run()
-      return c.json({ error: tossData.message || '결제 승인 실패', code: tossData.code }, 400)
+      ).bind(JSON.stringify(approveData), orderId).run()
+      return c.redirect(`/payment/fail?message=${encodeURIComponent(approveData.resultMsg || '결제 승인 실패')}&code=${encodeURIComponent(approveData.resultCode || '')}`, 302)
     }
 
-    // 4) payment_logs paid 업데이트
+    // payment_logs paid 업데이트
     await db.prepare(
       `UPDATE payment_logs
-       SET status='paid', payment_key=?, toss_method=?, toss_raw=?, paid_at=datetime('now')
+       SET status='paid', payment_key=?, pg_method=?, pg_raw=?, paid_at=datetime('now')
        WHERE order_id=?`
     ).bind(
-      tossData.paymentKey,
-      tossData.method || '',
-      JSON.stringify(tossData),
+      approveData.tid,
+      approveData.payMethod || '',
+      JSON.stringify(approveData),
       orderId
     ).run()
 
-    // 5) users.credits 증가
+    // users.credits 증가
     const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(log.user_id).first() as any
     const prevBal = userRow?.credits ?? 0
     const newBal  = prevBal + Number(log.credits)
@@ -2060,19 +2091,43 @@ app.post('/api/payments/confirm', async (c) => {
       `UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`
     ).bind(newBal, log.user_id).run()
 
-    // 6) credit_logs grant 기록
+    // credit_logs grant 기록
     await db.prepare(
       `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
        VALUES (?, 'grant', ?, ?, 'payment', ?)`
     ).bind(log.user_id, log.credits, newBal, orderId).run()
 
-    return c.json({
-      success: true,
-      credits: log.credits,
-      creditsTotal: newBal,
-      method: tossData.method,
-      orderId,
-    })
+    return c.redirect(`/payment/success?orderId=${encodeURIComponent(orderId)}`, 302)
+  } catch (err: any) {
+    console.error('payment/return error:', err)
+    return c.redirect(`/payment/fail?message=${encodeURIComponent('결제 처리 중 오류가 발생했습니다.')}`, 302)
+  }
+})
+
+// GET /api/payments/status — 결제 결과 페이지에서 승인 결과 조회 (세션 인증)
+app.get('/api/payments/status', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
+
+    const orderId = c.req.query('orderId') || ''
+    if (!orderId) return c.json({ error: 'orderId 필수' }, 400)
+
+    const log = await db.prepare(
+      `SELECT status, credits FROM payment_logs WHERE order_id = ? AND user_id = ?`
+    ).bind(orderId, sess.user_id).first() as any
+    if (!log) return c.json({ error: '결제 정보를 찾을 수 없습니다.' }, 404)
+    if (log.status !== 'paid') return c.json({ error: '결제가 완료되지 않았습니다.', status: log.status }, 400)
+
+    const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(sess.user_id).first() as any
+
+    return c.json({ success: true, credits: log.credits, creditsTotal: userRow?.credits ?? 0 })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -2091,7 +2146,7 @@ app.get('/api/payments/history', async (c) => {
     if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
 
     const logs = await db.prepare(
-      `SELECT order_id, amount, credits, status, toss_method, created_at, paid_at
+      `SELECT order_id, amount, credits, status, pg_method, created_at, paid_at
        FROM payment_logs
        WHERE user_id = ?
        ORDER BY created_at DESC
@@ -6000,7 +6055,8 @@ app.get('/studio-b/*', (c) => {
 })
 
 // ────────────────────────────────────────────────────
-// 결제 결과 페이지 — 토스페이먼츠 redirectUrl
+// 결제 결과 페이지 — 나이스페이먼츠 승인은 /payment/return(서버)에서 이미 완료됨
+// 이 페이지는 승인 결과를 조회해서 보여주기만 함
 // ────────────────────────────────────────────────────
 app.get('/payment/success', (c) => {
   return c.html(`<!DOCTYPE html>
@@ -6056,17 +6112,13 @@ app.get('/payment/success', (c) => {
 
   <script>
     const params = new URLSearchParams(location.search)
-    const paymentKey = params.get('paymentKey')
-    const orderId    = params.get('orderId')
-    const amount     = params.get('amount')
+    const orderId = params.get('orderId')
     const sessionToken = localStorage.getItem('lookbook_token') || ''
 
-    async function confirmPayment() {
+    async function loadPaymentStatus() {
       try {
-        const res = await fetch('/api/payments/confirm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
-          body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) }),
+        const res = await fetch('/api/payments/status?orderId=' + encodeURIComponent(orderId), {
+          headers: { 'X-Session-Token': sessionToken },
         })
         const data = await res.json()
         document.getElementById('loadingState').classList.add('hidden')
@@ -6090,12 +6142,12 @@ app.get('/payment/success', (c) => {
 
     function goHome() { location.href = '/' }
 
-    if (!paymentKey || !orderId || !amount) {
+    if (!orderId) {
       document.getElementById('loadingState').classList.add('hidden')
       document.getElementById('errorMsg').textContent = '결제 파라미터가 올바르지 않습니다.'
       document.getElementById('errorState').classList.remove('hidden')
     } else {
-      confirmPayment()
+      loadPaymentStatus()
     }
   </script>
 </body>
