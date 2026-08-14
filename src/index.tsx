@@ -4632,14 +4632,15 @@ app.get('/generator', (c) => {
           <div style="padding:18px 16px 4px;text-align:center;">
             <p style="font-size:13px;color:#8b8ba0;line-height:1.6;margin:0;">
               <span style="color:#9b7cff;font-weight:600;">이미지 생성은 크레딧이 차감되지 않습니다.</span><br/>
-              오류가 있거나 마음에 들지 않으면 이미지 위 <strong style="color:#e0e0f0;">🔄 재생성</strong> 버튼을 눌러보세요.
+              오류가 있거나 마음에 들지 않으면 아래 <strong style="color:#e0e0f0;">🔄 재생성</strong> 버튼을 눌러보세요.
             </p>
           </div>
         </div>
         <div class="gslide-nav">
           <div class="gslide-nav-inner">
             <button class="step-nav-back" onclick="window.location.href='/generator'"><i class="fas fa-plus"></i> 새 프로젝트</button>
-            <button class="step-nav-next" onclick="window.location.href='/'"><i class="fas fa-home"></i> 홈으로</button>
+            <button class="step-nav-back" onclick="regenFromCard(0)"><i class="fas fa-rotate-right"></i> 재생성</button>
+            <button class="step-nav-next" onclick="downloadWithCreditCheck(0)"><i class="fas fa-download"></i> 다운로드</button>
           </div>
         </div>
       </div>
