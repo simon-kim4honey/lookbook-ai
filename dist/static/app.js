@@ -2433,6 +2433,17 @@ function renderResults(images) {
   const grid = document.getElementById('resultsGrid');
   if (!grid) return;
 
+  // 새 결과가 렌더링되면 이전 영상 생성 상태/버튼을 초기화
+  _videoState = { jobId: null, videoUrl: null, polling: false };
+  const videoBtn = document.getElementById('videoActionBtn');
+  if (videoBtn) {
+    videoBtn.disabled = false;
+    const main = videoBtn.querySelector('.rnb-main');
+    if (main) main.innerHTML = '<i class="fas fa-film"></i> 영상 생성';
+  }
+  const videoSub = document.getElementById('videoActionSub');
+  if (videoSub) videoSub.textContent = '5초 · 600 크레딧';
+
   grid.innerHTML = '';
 
   // 결과 탭 텍스트 업데이트
@@ -2616,6 +2627,165 @@ async function downloadWithCreditCheck(idx) {
     closeActionProgress();
     showToast(t('downloadErr'), 'error');
   }
+}
+
+// ─────────────────────────────────────────────────────────
+// 영상 생성 (AtlasCloud seedance-2.5/reference-to-video)
+// ─────────────────────────────────────────────────────────
+let _videoState = { jobId: null, videoUrl: null, polling: false };
+
+function _resetVideoBtn() {
+  _videoState.polling = false;
+  const btn = document.getElementById('videoActionBtn');
+  const sub = document.getElementById('videoActionSub');
+  if (btn) btn.disabled = false;
+  if (sub) sub.textContent = '5초 · 600 크레딧';
+}
+
+async function startVideoGeneration() {
+  if (_videoState.videoUrl) { downloadVideo(); return; }
+  if (_videoState.polling) return;
+
+  const img = AppState.generatedImages[0];
+  if (!img || !img.originalUrl) {
+    showToast('영상을 생성할 이미지가 없습니다.', 'error');
+    return;
+  }
+
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast(t('loginRequired'), 'error');
+    return;
+  }
+
+  const btn = document.getElementById('videoActionBtn');
+  const sub = document.getElementById('videoActionSub');
+  if (btn) btn.disabled = true;
+  if (sub) sub.textContent = '요청 중...';
+  _videoState.polling = true;
+
+  openActionProgress('영상 생성을 요청하는 중...');
+
+  try {
+    const startRes = await fetch('/api/video/start', {
+      method: 'POST',
+      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageUrl: img.originalUrl,
+        modelName: AppState.lastGenParams?.modelName,
+        bgName: AppState.lastGenParams?.bgName,
+      }),
+    });
+
+    if (startRes.status === 401) {
+      closeActionProgress();
+      showToast(t('loginRequired'), 'error');
+      _resetVideoBtn();
+      return;
+    }
+    if (startRes.status === 402) {
+      closeActionProgress();
+      const errData = await startRes.json();
+      showToast(t('creditInsufficientDetail', errData.available ?? 0), 'error');
+      _resetVideoBtn();
+      setTimeout(() => {
+        const userArea = document.getElementById('navUserArea');
+        if (userArea) userArea.click();
+      }, 1500);
+      return;
+    }
+    if (!startRes.ok) {
+      closeActionProgress();
+      const errData = await startRes.json().catch(() => ({}));
+      showToast(errData.message || '영상 생성 요청에 실패했습니다.', 'error');
+      _resetVideoBtn();
+      return;
+    }
+
+    const startData = await startRes.json();
+    _videoState.jobId = startData.jobId;
+
+    if (startData.creditsRemaining !== undefined) {
+      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+      if (cachedUser) { cachedUser.credits = startData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+      if (AppState.user) AppState.user.credits = startData.creditsRemaining;
+      updateUserUI({ credits: startData.creditsRemaining });
+    }
+
+    openActionProgress('AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
+    if (sub) sub.textContent = '생성 중...';
+    _pollVideoStatus();
+  } catch (err) {
+    console.error('Video start error:', err);
+    closeActionProgress();
+    showToast('영상 생성 중 오류가 발생했습니다.', 'error');
+    _resetVideoBtn();
+  }
+}
+
+async function _pollVideoStatus() {
+  if (!_videoState.jobId) return;
+  try {
+    const res = await fetch(`/api/video/${_videoState.jobId}/status`);
+    const data = await res.json();
+    if (data.status === 'completed' && data.videoUrl) {
+      _videoState.videoUrl = data.videoUrl;
+      _videoState.polling = false;
+      _onVideoReady(data.videoUrl);
+      return;
+    }
+    if (data.status === 'failed') {
+      _videoState.polling = false;
+      closeActionProgress();
+      showToast(data.error || '영상 생성에 실패했습니다.', 'error');
+      _resetVideoBtn();
+      return;
+    }
+    setTimeout(_pollVideoStatus, 4000);
+  } catch (err) {
+    console.error('Video poll error:', err);
+    setTimeout(_pollVideoStatus, 5000);
+  }
+}
+
+function _onVideoReady(videoUrl) {
+  const btn = document.getElementById('videoActionBtn');
+  const sub = document.getElementById('videoActionSub');
+  if (btn) {
+    btn.disabled = false;
+    const main = btn.querySelector('.rnb-main');
+    if (main) main.innerHTML = '<i class="fas fa-download"></i> 영상 다운로드';
+  }
+  if (sub) sub.textContent = '다운로드 준비 완료';
+
+  setActionComplete('영상 생성이 완료되었습니다!', {
+    showShare: true,
+    jobId: _videoState.jobId,
+    idx: 0,
+    imageUrl: videoUrl,
+  });
+}
+
+function downloadVideo() {
+  if (!_videoState.videoUrl) {
+    showToast('다운로드할 영상이 없습니다.', 'error');
+    return;
+  }
+  const dlUrl = `/api/proxy/gen-image?url=${encodeURIComponent(_videoState.videoUrl)}&download=1`;
+  const a = document.createElement('a');
+  a.href = dlUrl;
+  a.download = 'lookbook_ai_video.mp4';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('영상 다운로드를 시작합니다.', 'success');
+
+  setActionComplete('영상 다운로드가 시작되었습니다.', {
+    showShare: true,
+    jobId: _videoState.jobId,
+    idx: 0,
+    imageUrl: _videoState.videoUrl,
+  });
 }
 
 // 레거시 — 내부에서만 사용 (크레딧 차감 없이 파일 저장만)
