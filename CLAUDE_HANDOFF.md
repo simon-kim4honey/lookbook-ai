@@ -74,7 +74,7 @@ pm2 start ecosystem.config.cjs
 - **D1 SQLite** (`LOOKBOOK_DB` binding)
 - **외부 API**: Atlas Cloud AI (`ATLAS_API_KEY`), aifashion.co.kr
 - **OAuth**: 카카오 + 구글 소셜 로그인
-- **결제**: 토스페이먼츠 (`TOSS_SECRET_KEY`)
+- **결제**: 나이스페이먼츠 (`NICEPAY_CLIENT_ID` / `NICEPAY_SECRET_KEY` / `NICEPAY_API_BASE`)
 
 ### 프론트엔드 (`public/static/app.js`)
 - Vanilla JS + 인라인 HTML (SPA 구조)
@@ -91,8 +91,11 @@ LOOKBOOK_DB  → Cloudflare D1 (lookbook-ai-production)
 KAKAO_CLIENT_ID / KAKAO_CLIENT_SECRET
 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
 ADMIN_PASSWORD
-TOSS_SECRET_KEY
+NICEPAY_CLIENT_ID
+NICEPAY_SECRET_KEY
+NICEPAY_API_BASE   (샌드박스: https://sandbox-api.nicepay.co.kr / 운영: https://api.nicepay.co.kr)
 ATLAS_API_KEY
+OPENAI_API_KEY
 ```
 
 ---
