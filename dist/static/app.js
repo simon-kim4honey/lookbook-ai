@@ -301,10 +301,10 @@ const STATIC_I18N = {
   'nav-logout':      { ko: '로그아웃', en: 'Sign Out', ja: 'ログアウト' },
   'nav-charge':      { ko: '충전', en: 'Top Up', ja: 'チャージ' },
   'nav-history':     { ko: '생성 내역', en: 'History', ja: '生成履歴' },
-  // Step 레이블
-  'step1-label':     { ko: 'Step 1 / 3 · 의상 업로드', en: 'Step 1 / 3 · Upload Clothes', ja: 'Step 1 / 3 · 服をアップロード' },
-  'step2-label':     { ko: 'Step 2 / 3 · 모델 선택', en: 'Step 2 / 3 · Select Model', ja: 'Step 2 / 3 · モデル選択' },
-  'step3-label':     { ko: 'Step 3 / 3 · 배경 선택', en: 'Step 3 / 3 · Select Background', ja: 'Step 3 / 3 · 背景選択' },
+  // Step 네비게이션 (①상품 업로드 › ②모델 선택 › ③배경선택)
+  'stepnav-1':       { ko: '상품 업로드', en: 'Upload Product', ja: '商品アップロード' },
+  'stepnav-2':       { ko: '모델 선택', en: 'Select Model', ja: 'モデル選択' },
+  'stepnav-3':       { ko: '배경선택', en: 'Select Background', ja: '背景選択' },
   'step1-title':     { ko: '의상 이미지를 업로드하세요', en: 'Upload your clothing images', ja: '服の画像をアップロード' },
   'step2-title':     { ko: 'AI 모델을 선택하세요', en: 'Select an AI model', ja: 'AIモデルを選択してください' },
   'step3-title':     { ko: '배경을 선택하세요', en: 'Select a background', ja: '背景を選択してください' },
@@ -427,6 +427,8 @@ function initPage() {
   verifySession().then(() => {
     if (path === '/' || path === '') {
       // Landing — verifySession 후 UI만 업데이트됨
+      initHomeShowcase();
+      initHomeFeatureBgs();
     } else if (path === '/dashboard') {
       initDashboard();
     } else if (path === '/generator') {
@@ -444,6 +446,66 @@ function initNavbar() {
   window.addEventListener('scroll', () => {
     navbar.classList.toggle('scrolled', window.scrollY > 20);
   });
+}
+
+// ─────────────────────────────────────────────────────────
+// 홈페이지 히어로 쇼케이스 캐러셀 (관리자 업로드 이미지 자동 롤링)
+// ─────────────────────────────────────────────────────────
+async function initHomeShowcase() {
+  const wrap = document.getElementById('heroShowcase');
+  const img = document.getElementById('heroShowcaseImg');
+  const placeholder = document.getElementById('heroShowcasePlaceholder');
+  if (!wrap || !img) return;
+  try {
+    const res = await fetch('/api/home/showcase');
+    const data = await res.json();
+    const images = (data.images || []).map(i => i.imageBase64);
+    if (!images.length) return; // 등록된 이미지 없으면 플레이스홀더 유지
+    let idx = 0;
+    const show = (i) => {
+      img.style.opacity = '0';
+      setTimeout(() => {
+        img.src = images[i];
+        img.style.opacity = '1';
+      }, 300);
+    };
+    img.style.display = 'block';
+    if (placeholder) placeholder.style.display = 'none';
+    img.src = images[0];
+    if (images.length > 1) {
+      setInterval(() => {
+        idx = (idx + 1) % images.length;
+        show(idx);
+      }, 4000);
+    }
+  } catch (e) {
+    console.warn('히어로 쇼케이스 로딩 실패:', e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// 홈페이지 기능 소개 박스 배경 이미지 (관리자 업로드, 슬롯별 1장)
+// ─────────────────────────────────────────────────────────
+async function initHomeFeatureBgs() {
+  const cards = document.querySelectorAll('#features .feature-card[data-feature-slot]');
+  if (!cards.length) return;
+  try {
+    const res = await fetch('/api/home/feature-bgs');
+    const data = await res.json();
+    const bgs = data.backgrounds || {};
+    cards.forEach(card => {
+      const slot = card.getAttribute('data-feature-slot');
+      const bg = bgs[slot];
+      if (bg) {
+        card.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.55),rgba(0,0,0,0.55)), url(${bg})`;
+        card.style.backgroundSize = 'cover';
+        card.style.backgroundPosition = 'center';
+        card.classList.add('feature-card--has-bg');
+      }
+    });
+  } catch (e) {
+    console.warn('기능 박스 배경 로딩 실패:', e);
+  }
 }
 
 // ─────────────────────────────────────────────────────────
