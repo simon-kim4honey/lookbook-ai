@@ -2468,7 +2468,7 @@ function renderResults(images) {
          </div>`;
 
     card.innerHTML = `
-      <div class="result-thumb">${thumbContent}</div>
+      <div class="result-thumb" id="resultThumb-${idx}">${thumbContent}</div>
     `;
 
     grid.appendChild(card);
@@ -2759,7 +2759,13 @@ function _onVideoReady(videoUrl) {
   if (sub) sub.textContent = '다운로드 준비 완료';
 
   closeActionProgress();
-  openVideoPreview(videoUrl);
+
+  // 결과 화면(첫 번째 카드)을 영상 재생 화면으로 교체
+  // 다운로드용 프록시가 아니라 AtlasCloud 원본 URL을 직접 재생 (재생 안정성)
+  const thumb = document.getElementById('resultThumb-0');
+  if (thumb) {
+    thumb.innerHTML = `<video src="${videoUrl}" autoplay loop muted playsinline controls style="width:100%;height:auto;display:block;"></video>`;
+  }
 }
 
 // ─── 영상 완성 후 다운로드 전 미리보기 모달 ───
