@@ -2426,7 +2426,7 @@ function buildClothingRoleDesc(
     roleLines.push(`Image ${imgNum} = ${catLabel}${item.label ? ` — ${item.label}` : ''}.`)
   })
   roleLines.push(
-    `Clothing reference images may show their own background, room, street, or setting (e.g. a lifestyle/model photo). COMPLETELY IGNORE AND DISCARD that background from every clothing image — extract ONLY the garment itself (fabric, color, pattern, cut, texture, design details). A clothing reference photo's background, environment, lighting, or any person/scene visible in it must NEVER appear in or influence the final output.`
+    `Clothing reference images may show the garment worn by a person (a lifestyle/model photo), on a hanger, or laid flat, possibly with a full outfit (top+bottom) visible together even if only one piece is being used. Whatever the source, extract ONLY the specified garment piece itself (fabric, color, pattern, cut, texture, design details). COMPLETELY IGNORE AND DISCARD everything else from every clothing image: its background/room/street/setting, AND if a person is wearing it, that person's face, body shape, pose, stance, and any other garment they have on. None of that — background, person, face, pose — may appear in or influence the final output in any way. Clothing images are a texture/design source ONLY, never a pose or scene reference.`
   )
   return roleLines.join(' ')
 }
@@ -2685,7 +2685,7 @@ app.post('/api/generation/start', async (c) => {
 
         `CLOTHING REPLACEMENT:`,
         clothingReplaceInstructions,
-        `Body pose and stance may adjust naturally to fit the new clothing and scene — natural variation is fine, no need to rigidly lock it to any reference image.`,
+        `POSE: Show a ${poseTypeText}, ${poseStyleText}. Body pose and stance should follow this direction, adjusting naturally to fit the new clothing and scene. The pose must NEVER be copied from a clothing reference image, even if that image shows a person modeling the garment — clothing images are a garment/texture source only, not a pose reference.`,
 
         `IDENTITY (from Image ${modelImgIdx}) — READ THIS ONCE, IT IS THE ONLY IDENTITY RULE:`,
         `This is Image ${modelImgIdx}'s exact face, physically rotated to a new head angle and relit under Image ${bgImgIdx}'s scene — the SAME face asset transformed, never a newly generated or substitute face. KEEP UNCHANGED: bone structure, eye shape/spacing, iris color, nose shape, lip shape, jawline, cheekbones, face width, and skin undertone — these must be pixel-consistent with Image ${modelImgIdx} when mentally rotated back to its original angle. Hair may adjust naturally (style, volume, flow) to suit the pose and scene — it does not need to be locked to Image ${modelImgIdx}'s exact hairstyle. Head/face size relative to the body must stay in natural human proportion, matching Image ${modelImgIdx}'s scale — do not enlarge or shrink it. CHANGE ONLY what a camera and lighting change: head angle, tilt, gaze direction, expression, perspective, brightness, shadows, color temperature, saturation. Do NOT copy Image ${modelImgIdx}'s original angle, expression, or lighting — they must update to match Image ${bgImgIdx}'s scene. Do NOT use body shape, clothing, or pose from Image ${modelImgIdx}.`,
@@ -4483,6 +4483,7 @@ app.get('/dashboard', (c) => {
           }
           const vProxyUrl = \`/api/proxy/gen-image?url=\${encodeURIComponent(log.video_url)}\`;
           const vUrlEsc = vProxyUrl.replace(/'/g,"\\\\'");
+          const vJobIdEsc = (log.job_id || '').replace(/'/g,"\\\\'");
           rows.push(\`<div class="hist-row">
             <div class="hist-thumb hist-thumb--video" onclick="openHistModal('\${vUrlEsc}','\${expEsc}',true)">
               <video src="\${vProxyUrl}" muted preload="metadata" onerror="this.parentNode.innerHTML='<i class=\\"fas fa-film\\"></i>'"></video>
@@ -4492,7 +4493,7 @@ app.get('/dashboard', (c) => {
               <div class="hist-meta">#\${seqLabel} · \${dateStr} · \${expLabel || ''} · 영상</div>
               <div class="hist-actions">
                 <button class="hist-action-btn" onclick="openHistModal('\${vUrlEsc}','\${expEsc}',true)"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}')"><i class="fas fa-download"></i> 다운로드</button>
+                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}')"><i class="fas fa-download"></i> 다운로드</button>
                 <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
               </div>
             </div>
@@ -4612,7 +4613,7 @@ app.get('/dashboard', (c) => {
     }
   }
 
-  function downloadHistVideo(videoUrl) {
+  function downloadHistVideo(videoUrl, jobId) {
     const dlUrl = videoUrl.includes('/api/proxy/gen-image')
       ? videoUrl + (videoUrl.includes('?') ? '&' : '?') + 'download=1'
       : \`/api/proxy/gen-image?url=\${encodeURIComponent(videoUrl)}&download=1\`;
@@ -4620,6 +4621,12 @@ app.get('/dashboard', (c) => {
     a.href = dlUrl; a.download = \`lookbook_ai_video_\${Date.now()}.mp4\`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     showToast('영상 다운로드를 시작합니다.', 'success');
+
+    // 이미지 다운로드와 동일하게 공유(링크복사/카카오톡) 팝업 노출
+    if (jobId) {
+      openModal('actionProgressModal');
+      setActionComplete('영상 다운로드가 시작되었습니다.', { showShare: true, jobId: jobId, idx: 0, imageUrl: videoUrl });
+    }
   }
 
   async function deleteHistItem(logId) {
