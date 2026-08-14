@@ -1952,7 +1952,7 @@ app.post('/payment/return', async (c) => {
       // 승인 실패 → payment_logs failed 업데이트
       await db.prepare(
         `UPDATE payment_logs
-         SET status='failed', toss_raw=?, paid_at=datetime('now')
+         SET status='failed', pg_raw=?, paid_at=datetime('now')
          WHERE order_id=?`
       ).bind(JSON.stringify(approveData), orderId).run()
       return c.redirect(`/payment/fail?message=${encodeURIComponent(approveData.resultMsg || '결제 승인 실패')}&code=${encodeURIComponent(approveData.resultCode || '')}`, 302)
@@ -1961,7 +1961,7 @@ app.post('/payment/return', async (c) => {
     // payment_logs paid 업데이트
     await db.prepare(
       `UPDATE payment_logs
-       SET status='paid', payment_key=?, toss_method=?, toss_raw=?, paid_at=datetime('now')
+       SET status='paid', payment_key=?, pg_method=?, pg_raw=?, paid_at=datetime('now')
        WHERE order_id=?`
     ).bind(
       approveData.tid,
@@ -2033,7 +2033,7 @@ app.get('/api/payments/history', async (c) => {
     if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
 
     const logs = await db.prepare(
-      `SELECT order_id, amount, credits, status, toss_method, created_at, paid_at
+      `SELECT order_id, amount, credits, status, pg_method, created_at, paid_at
        FROM payment_logs
        WHERE user_id = ?
        ORDER BY created_at DESC

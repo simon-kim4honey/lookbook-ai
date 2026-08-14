@@ -115,7 +115,9 @@ OPENAI_API_KEY
 | GET | `/api/auth/google/callback` | 구글 OAuth |
 | GET | `/api/credits` | 크레딧 조회 |
 | POST | `/api/credits/deduct` | 크레딧 차감 (다운로드) |
-| POST | `/api/payments/toss/confirm` | 토스 결제 확인 |
+| POST | `/api/payments/prepare` | 결제 준비 (orderId 발급) |
+| POST | `/payment/return` | 나이스페이먼츠 returnUrl (서버 승인) |
+| GET | `/api/payments/status` | 결제 승인 결과 조회 |
 | GET | `/api/history` | 생성 내역 |
 | GET | `/api/admin/*` | 어드민 (X-Admin-Password 헤더 필요) |
 
