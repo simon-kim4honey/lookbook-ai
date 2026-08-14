@@ -2967,7 +2967,7 @@ function generatePlaceholderImages(count: number) {
 }
 
 // ────────────────────────────────────────────────────
-// 영상 생성 API — Atlas Cloud ByteDance Seedance 2.5 (reference-to-video)
+// 영상 생성 API — Atlas Cloud ByteDance Seedance 2.5 (image-to-video)
 // 생성된 이미지 속 모델이 자연스럽게 포즈를 취하는 5초 영상 생성
 // 이미지 생성과 달리 영상은 비용이 커서 생성 요청 시점에 크레딧을 즉시 차감
 // ────────────────────────────────────────────────────
@@ -2999,16 +2999,17 @@ app.post('/api/video/start', async (c) => {
     }
 
     // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 5초 영상
-    // reference-to-video는 참조 이미지를 프롬프트 내 @Image1 태그로 명시적으로 지칭해야 함
-    const prompt = '@Image1 — the exact same person, outfit, and background as in the reference image performs natural, subtle fashion-model posing movements: gentle weight shifts, a slow turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion. Do not change the face, outfit, or background — keep them identical to @Image1 throughout the video.'
+    // "reference-to-video"는 존재하지 않는/불일치하는 모델 경로였던 것으로 확인되어
+    // 문서화된 단일 이미지 첫 프레임 입력 방식인 image-to-video로 전환 (image: 단일 URL)
+    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements: gentle weight shifts, a slow turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion. Keep the face, outfit, and background unchanged throughout the video.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
       headers: atlasHeaders(c.env.ATLAS_API_KEY),
       body: JSON.stringify({
-        model: 'bytedance/seedance-2.5/reference-to-video',
+        model: 'bytedance/seedance-2.5/image-to-video',
         prompt,
-        image_urls: [imageUrl],
+        image: imageUrl,
         duration: 5,
         resolution: '1080p-sr',
         ratio: '9:16',
@@ -4894,6 +4895,21 @@ app.get('/generator', (c) => {
         <!-- 재생성 한도 초과 메시지 -->
         <div id="regenLimitMsg" style="display:none;position:absolute;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.9);backdrop-filter:blur(8px);color:white;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;white-space:nowrap;z-index:21;">
           재생성 한도가 초과하였습니다. 다른 옷으로 시도해주세요.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video Preview Modal (영상 생성 완료 후 다운로드 전 미리보기) -->
+  <div class="modal-overlay image-modal" id="videoPreviewModal">
+    <div class="modal-box">
+      <button class="modal-close" style="background:rgba(0,0,0,0.5);color:white;top:12px;right:12px;z-index:20;" onclick="closeVideoPreview()">×</button>
+      <div style="position:relative;display:block;width:100%;">
+        <video id="videoPreviewPlayer" src="" autoplay loop muted playsinline controls style="width:100%;display:block;"></video>
+        <div style="position:absolute;bottom:16px;right:16px;z-index:20;display:flex;align-items:center;gap:8px;">
+          <button onclick="downloadVideo()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:rgba(99,102,241,0.85);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,1)'" onmouseout="this.style.background='rgba(99,102,241,0.85)'">
+            <i class="fas fa-download"></i> 다운로드
+          </button>
         </div>
       </div>
     </div>
