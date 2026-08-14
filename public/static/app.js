@@ -2458,14 +2458,6 @@ function renderResults(images) {
 
     card.innerHTML = `
       <div class="result-thumb">${thumbContent}</div>
-      <div class="result-card-actions">
-        <button class="result-action-btn download" onclick="downloadWithCreditCheck(${idx});">
-          <i class="fas fa-download"></i> 다운로드
-        </button>
-        <button class="result-action-btn regen" onclick="regenFromCard(${idx});">
-          <i class="fas fa-rotate-right"></i> 재생성
-        </button>
-      </div>
     `;
 
     grid.appendChild(card);
