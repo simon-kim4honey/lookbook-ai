@@ -2758,12 +2758,21 @@ function _onVideoReady(videoUrl) {
   }
   if (sub) sub.textContent = '다운로드 준비 완료';
 
-  setActionComplete('영상 생성이 완료되었습니다!', {
-    showShare: true,
-    jobId: _videoState.jobId,
-    idx: 0,
-    imageUrl: videoUrl,
-  });
+  closeActionProgress();
+  openVideoPreview(videoUrl);
+}
+
+// ─── 영상 완성 후 다운로드 전 미리보기 모달 ───
+function openVideoPreview(videoUrl) {
+  const player = document.getElementById('videoPreviewPlayer');
+  if (player) player.src = videoUrl;
+  openModal('videoPreviewModal');
+}
+
+function closeVideoPreview() {
+  const player = document.getElementById('videoPreviewPlayer');
+  if (player) { player.pause(); player.removeAttribute('src'); player.load(); }
+  closeModal('videoPreviewModal');
 }
 
 function downloadVideo() {
@@ -2779,6 +2788,7 @@ function downloadVideo() {
   a.click();
   document.body.removeChild(a);
   showToast('영상 다운로드를 시작합니다.', 'success');
+  closeVideoPreview();
 
   setActionComplete('영상 다운로드가 시작되었습니다.', {
     showShare: true,
