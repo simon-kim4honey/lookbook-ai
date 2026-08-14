@@ -2786,6 +2786,8 @@ function downloadVideo() {
   showToast('영상 다운로드를 시작합니다.', 'success');
 
   // 다운로드 후 이미지와 동일하게 공유(링크복사/카카오톡) 옵션 노출
+  // (setActionComplete는 모달을 열지 않고 상태만 바꾸므로 먼저 열어줘야 함)
+  openModal('actionProgressModal');
   setActionComplete('영상 다운로드가 시작되었습니다.', {
     showShare: true,
     jobId: _videoState.jobId,
