@@ -2999,7 +2999,8 @@ app.post('/api/video/start', async (c) => {
     }
 
     // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 5초 영상
-    const prompt = 'The person in the reference image performs natural, subtle fashion-model posing movements — gentle weight shifts, a slow turn, relaxed hand and hair movement — as if in a live fashion shoot. Smooth, realistic motion. Keep the face, outfit, and background exactly consistent with the reference image throughout.'
+    // reference-to-video는 참조 이미지를 프롬프트 내 @Image1 태그로 명시적으로 지칭해야 함
+    const prompt = '@Image1 — the exact same person, outfit, and background as in the reference image performs natural, subtle fashion-model posing movements: gentle weight shifts, a slow turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion. Do not change the face, outfit, or background — keep them identical to @Image1 throughout the video.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
@@ -3007,7 +3008,7 @@ app.post('/api/video/start', async (c) => {
       body: JSON.stringify({
         model: 'bytedance/seedance-2.5/reference-to-video',
         prompt,
-        images: [imageUrl],
+        image_urls: [imageUrl],
         duration: 5,
         resolution: '1080p-sr',
         ratio: '9:16',
