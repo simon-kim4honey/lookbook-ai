@@ -4851,11 +4851,11 @@ app.get('/generator', (c) => {
           <div class="result-nav-grid">
             <button class="result-nav-btn primary" onclick="downloadWithCreditCheck(0)">
               <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운</span>
-              <span class="rnb-sub">90 크레딧</span>
+              <span class="rnb-sub"><i class="fas fa-coins"></i> 90</span>
             </button>
             <button class="result-nav-btn primary" id="videoActionBtn" onclick="startVideoGeneration()">
               <span class="rnb-main"><i class="fas fa-film"></i> 영상 생성</span>
-              <span class="rnb-sub" id="videoActionSub">5초 · 600 크레딧</span>
+              <span class="rnb-sub" id="videoActionSub">5초 · <i class="fas fa-coins"></i> 600</span>
             </button>
             <button class="result-nav-btn" onclick="window.location.href='/generator'">
               <span class="rnb-main"><i class="fas fa-plus"></i> 새 프로젝트</span>

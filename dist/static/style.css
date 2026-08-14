@@ -1286,9 +1286,16 @@ footer {
   font-weight: 600;
 }
 .result-nav-btn .rnb-sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   opacity: 0.75;
   font-weight: 500;
+}
+.result-nav-btn .rnb-sub i {
+  color: #fbbf24;
+  font-size: 10px;
 }
 .result-nav-btn.primary {
   background: linear-gradient(135deg, #7c3aed, #a78bfa);
