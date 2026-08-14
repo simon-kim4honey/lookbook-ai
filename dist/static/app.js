@@ -3041,20 +3041,25 @@ async function startPayment() {
 
     // 나이스페이먼츠 서버 승인 모델: 결제창 인증 완료 후 우리 서버(/payment/return)로
     // 결제창이 직접 POST → 서버에서 승인 API 호출까지 끝난 뒤 결과 페이지로 리다이렉트됨
-    AUTHNICE.requestPay({
+    const payReq = {
       clientId: data.clientId,
       method: 'card',
       orderId: data.orderId,
       amount: data.amount,
       goodsName: data.orderName,
       buyerName: data.customerName,
-      buyerEmail: data.customerEmail,
       returnUrl: location.origin + '/payment/return',
       fnError: function (result) {
         if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
         showToast(t('payFail', result && result.errorMsg || ''), 'error');
       },
-    });
+    };
+    // 카카오 로그인 등 이메일 미동의 계정은 내부용 가짜 이메일(@kakao.local)이 저장되어
+    // 있는데, 이걸 그대로 보내면 나이스페이 인증 단계에서 거부됨(U116) — 실제 이메일일 때만 전달
+    if (data.customerEmail && !data.customerEmail.endsWith('@kakao.local')) {
+      payReq.buyerEmail = data.customerEmail;
+    }
+    AUTHNICE.requestPay(payReq);
   } catch (e) {
     if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
     showToast(t('payFail', e.message), 'error');
