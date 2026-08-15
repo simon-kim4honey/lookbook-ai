@@ -3196,6 +3196,12 @@ const htmlShell = (title: string, bodyContent: string, extraHead: string = '') =
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title} | EZlook</title>
   <meta name="description" content="의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요." />
+  <meta property="og:site_name" content="EZlook" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="${title} | EZlook" />
+  <meta property="og:description" content="의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요." />
+  <meta property="og:locale" content="ko_KR" />
+  <meta name="twitter:card" content="summary" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=${BUILD_VERSION}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -3666,7 +3672,7 @@ const homeStructuredData = () => {
 app.get('/', (c) => {
   // studiob.aifashion.co.kr는 상단 전역 미들웨어에서 이미 www로 리다이렉트됨
   // 마케팅 홈페이지(이용약관·개인정보처리방침·사업자정보 포함)를 직접 서빙
-  const homeExtraHead = `<link rel="canonical" href="${AIFASHION_BASE}/" />\n  ${homeStructuredData()}`
+  const homeExtraHead = `<link rel="canonical" href="${AIFASHION_BASE}/" />\n  <meta property="og:url" content="${AIFASHION_BASE}/" />\n  ${homeStructuredData()}`
   return c.html(htmlShell('홈', `
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
