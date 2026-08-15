@@ -2787,12 +2787,14 @@ function downloadVideo() {
 
   // 다운로드 후 이미지와 동일하게 공유(링크복사/카카오톡) 옵션 노출
   // (setActionComplete는 모달을 열지 않고 상태만 바꾸므로 먼저 열어줘야 함)
+  // 카카오톡 카드는 영상을 미리보기로 못 그리므로 소스 정지 이미지를 사용
+  const sourceImg = AppState.generatedImages[0];
   openModal('actionProgressModal');
   setActionComplete('영상 다운로드가 시작되었습니다.', {
     showShare: true,
     jobId: _videoState.jobId,
     idx: 0,
-    imageUrl: _videoState.videoUrl,
+    imageUrl: (sourceImg && (sourceImg.originalUrl || sourceImg.url)) || _videoState.videoUrl,
   });
 }
 
