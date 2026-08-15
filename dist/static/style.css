@@ -2134,6 +2134,26 @@ footer {
   display: block;
 }
 
+/* ── 생성된 이미지/영상 무단 저장 방지 (우클릭/드래그/롱프레스 차단) ──
+   실제 다운로드는 크레딧 차감 버튼을 통해서만 가능해야 함 */
+.no-save-media,
+.no-save-media img,
+.no-save-media video,
+.result-thumb img,
+.result-thumb video,
+#modalImage,
+.hist-thumb img,
+.hist-thumb video,
+#histModalImg,
+#histModalVideo {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  user-drag: none;
+}
+
 /* ── 이미지 하단 고정 버튼 영역 ── */
 .result-card-actions {
   display: flex;

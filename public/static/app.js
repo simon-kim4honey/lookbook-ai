@@ -699,6 +699,13 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// ── 생성된 이미지/영상 무단 저장 방지 — 우클릭 저장 차단 (다운로드는 크레딧 버튼으로만) ──
+document.addEventListener('contextmenu', (e) => {
+  if (e.target.closest('.result-thumb, #modalImage, .hist-thumb, #histModalImg, #histModalVideo, .no-save-media')) {
+    e.preventDefault();
+  }
+});
+
 // ─────────────────────────────────────────────────────────
 // AUTH — 탭 전환 / 소셜 로그인 / 이메일 로그인·가입
 // ─────────────────────────────────────────────────────────
@@ -2459,6 +2466,7 @@ function renderResults(images) {
             src="${img.url}"
             alt="${img.title || `피팅컷 #${idx + 1}`}"
             style="width:100%;height:auto;display:block;"
+            draggable="false"
             onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패</span></div>');"
           />`
       : `<div style="width:100%;aspect-ratio:3/4;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
@@ -2767,7 +2775,7 @@ function _onVideoReady(videoUrl) {
   const thumb = document.getElementById('resultThumb-0');
   if (thumb) {
     const proxiedVideoUrl = `/api/proxy/gen-image?url=${encodeURIComponent(videoUrl)}`;
-    thumb.innerHTML = `<video src="${proxiedVideoUrl}" autoplay loop muted playsinline controls style="width:100%;height:auto;display:block;"></video>`;
+    thumb.innerHTML = `<video src="${proxiedVideoUrl}" autoplay loop muted playsinline controls controlsList="nodownload" disablePictureInPicture style="width:100%;height:auto;display:block;"></video>`;
   }
 }
 
