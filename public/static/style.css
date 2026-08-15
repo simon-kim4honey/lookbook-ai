@@ -528,6 +528,44 @@ img { max-width: 100%; height: auto; }
   background: var(--white);
 }
 
+.howto-layout {
+  display: flex;
+  align-items: center;
+  gap: 48px;
+}
+
+.howto-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.howto-videos {
+  display: flex;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.howto-video-box {
+  width: 160px;
+  aspect-ratio: 9 / 16;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: var(--gray-1);
+  border: 2px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.howto-video-box video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+.howto-video-box.howto-video-box--has-video video {
+  display: block;
+}
+
 .steps-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -2456,6 +2494,8 @@ footer {
   .features-grid { grid-template-columns: repeat(2, 1fr); }
   .steps-grid { grid-template-columns: repeat(3, 1fr); }
   .steps-grid::before { display: none; }
+  .howto-layout { flex-direction: column; }
+  .howto-videos { width: 100%; justify-content: center; }
   .pricing-grid { grid-template-columns: 1fr; max-width: 440px; }
   .pricing-card.featured { transform: none; }
   .footer-grid { grid-template-columns: 1fr 1fr; }
@@ -2476,6 +2516,7 @@ footer {
   .hero-stats { gap: 16px; }
   .generator-header-inner { flex-direction: column; align-items: flex-start; }
   .container-wide { padding: 0 20px; }
+  .howto-video-box { width: 120px; }
 }
 
 /* Utilities */
