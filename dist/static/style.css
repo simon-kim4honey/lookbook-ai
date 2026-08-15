@@ -633,40 +633,21 @@ img { max-width: 100%; height: auto; }
   background: var(--gray-1);
 }
 
-.pricing-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-  max-width: 960px;
-  margin: 0 auto;
+.pricing-single-wrap {
+  display: flex;
+  justify-content: center;
 }
 
-.pricing-card {
+.pricing-single-card {
+  width: 100%;
+  max-width: 420px;
   background: var(--white);
   border-radius: var(--radius-xl);
   padding: 40px 32px;
-  border: 2px solid var(--border);
-  position: relative;
-  transition: var(--transition);
-}
-.pricing-card:hover { box-shadow: var(--shadow-lg); }
-.pricing-card.featured {
-  border-color: var(--primary);
-  transform: scale(1.03);
+  border: 2px solid var(--primary);
   box-shadow: var(--shadow-xl);
 }
-.pricing-popular {
-  position: absolute;
-  top: -14px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 4px 20px;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  color: white;
-  border-radius: var(--radius-full);
-  font-size: 12px;
-  font-weight: 700;
-}
+
 .pricing-plan { font-size: 13px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
 .pricing-price { margin-bottom: 6px; }
 .pricing-price .amount { font-size: 48px; font-weight: 800; color: var(--text-primary); }
@@ -683,6 +664,71 @@ img { max-width: 100%; height: auto; }
 }
 .pricing-features li .check { color: var(--success); font-size: 16px; }
 .pricing-features li .x { color: var(--gray-4); font-size: 16px; }
+.pricing-included-label { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; }
+
+/* 요금제 금액 드롭다운 선택 */
+.pricing-select { position: relative; margin-bottom: 8px; }
+.pricing-select-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--gray-1);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+.pricing-select-trigger:hover { border-color: var(--primary); }
+.pricing-select-trigger i { color: var(--text-muted); transition: transform 0.2s ease; }
+.pricing-select.open .pricing-select-trigger i { transform: rotate(180deg); }
+.pricing-select.open .pricing-select-trigger { border-color: var(--primary); }
+
+.pricing-select-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+  z-index: 20;
+}
+.pricing-select.open .pricing-select-menu { display: block; }
+
+.pricing-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: var(--transition);
+  border-bottom: 1px solid var(--border);
+}
+.pricing-select-item:last-child { border-bottom: none; }
+.pricing-select-item:hover { background: var(--gray-1); }
+.pricing-select-item.selected { background: var(--primary-bg); }
+.pricing-select-item-title { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.pricing-select-item-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.pricing-select-item-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  background: var(--primary);
+  color: #fff;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.pricing-select-item i.fa-check { color: var(--primary); font-size: 14px; }
 
 /* ============ FAQ ============ */
 #faq { padding: 100px 0; }
@@ -2552,8 +2598,6 @@ footer {
   .steps-grid::before { display: none; }
   .howto-layout { flex-direction: column; }
   .howto-videos { width: 100%; justify-content: center; }
-  .pricing-grid { grid-template-columns: 1fr; max-width: 440px; }
-  .pricing-card.featured { transform: none; }
   .footer-grid { grid-template-columns: 1fr 1fr; }
   .dashboard-layout { flex-direction: column; }
   .sidebar { position: relative; width: 100%; top: auto; }

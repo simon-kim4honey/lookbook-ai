@@ -4054,8 +4054,9 @@ app.get('/', (c) => {
 
     /* Pricing */
     #pricing .pricing-plan { color: #000 !important; }
-    #pricing .pricing-card.featured { border-color: #000 !important; }
-    #pricing .pricing-popular { background: #000 !important; color: #fff !important; }
+    #pricing .pricing-single-card { border-color: #000 !important; }
+    #pricing .pricing-select-item.selected { background: #f0f0f0 !important; }
+    #pricing .pricing-select-item-tag { background: #000 !important; color: #fff !important; }
     #pricing .pricing-features li .check { color: #000 !important; }
 
     /* CTA */
@@ -4249,55 +4250,54 @@ app.get('/', (c) => {
         <h2 class="section-title">쓴 만큼만 내는<br />크레딧 충전제</h2>
         <p class="section-desc">월정액 없이, 필요한 만큼만 충전해서 쓰세요. 가입 즉시 무료 크레딧이 지급됩니다.<br />이미지 1장 다운로드 시 90크레딧이 차감됩니다.</p>
       </div>
-      <div class="pricing-grid">
-        <div class="pricing-card">
-          <div class="pricing-plan">스타터</div>
+      <div class="pricing-single-wrap">
+        <div class="pricing-single-card">
+          <div class="pricing-plan">크레딧 충전</div>
           <div class="pricing-price">
-            <span class="amount">₩20,000</span>
+            <span class="amount" id="pricingAmount">₩40,000</span>
             <span class="period">1회 충전</span>
           </div>
-          <p class="pricing-desc">1,000 크레딧 · 이미지 최대 11장</p>
+          <p class="pricing-desc" id="pricingDesc">2,300 크레딧 · 이미지 최대 25장<br />✨ 기본 대비 15% 더 받기</p>
+
+          <div class="pricing-select" id="pricingSelect">
+            <button type="button" class="pricing-select-trigger" onclick="togglePricingSelect()" id="pricingSelectTrigger" aria-expanded="false">
+              <span id="pricingSelectTriggerLabel">40,000원 · 2,300 크레딧</span>
+              <i class="fas fa-chevron-down"></i>
+            </button>
+            <div class="pricing-select-menu" id="pricingSelectMenu">
+              <div class="pricing-select-item" data-amount="20000" data-credits="1000" data-images="11" data-bonus="" onclick="selectPricingTier(this)">
+                <div>
+                  <div class="pricing-select-item-title">20,000원</div>
+                  <div class="pricing-select-item-sub">1,000 크레딧</div>
+                </div>
+                <i class="fas fa-check" style="visibility:hidden;"></i>
+              </div>
+              <div class="pricing-select-item selected" data-amount="40000" data-credits="2300" data-images="25" data-bonus="✨ 기본 대비 15% 더 받기" onclick="selectPricingTier(this)">
+                <div>
+                  <div class="pricing-select-item-title">40,000원 <span class="pricing-select-item-tag">인기</span></div>
+                  <div class="pricing-select-item-sub">2,300 크레딧</div>
+                </div>
+                <i class="fas fa-check"></i>
+              </div>
+              <div class="pricing-select-item" data-amount="60000" data-credits="4000" data-images="44" data-bonus="🚀 기본 대비 33% 더 받기" onclick="selectPricingTier(this)">
+                <div>
+                  <div class="pricing-select-item-title">60,000원</div>
+                  <div class="pricing-select-item-sub">4,000 크레딧</div>
+                </div>
+                <i class="fas fa-check" style="visibility:hidden;"></i>
+              </div>
+            </div>
+          </div>
+
           <hr class="pricing-divider" />
+          <div class="pricing-included-label">제공 내역</div>
           <ul class="pricing-features">
             <li><span class="check">✓</span> 전체 AI 모델 1000종+</li>
             <li><span class="check">✓</span> 전체 배경 15종+</li>
             <li><span class="check">✓</span> 스타일샷 세트 생성</li>
             <li><span class="check">✓</span> 일괄 다운로드</li>
           </ul>
-          <button class="btn btn-secondary btn-full" onclick="location.href='/generator'">충전하고 시작하기</button>
-        </div>
-        <div class="pricing-card featured">
-          <div class="pricing-popular">가장 인기</div>
-          <div class="pricing-plan">인기 충전권</div>
-          <div class="pricing-price">
-            <span class="amount">₩40,000</span>
-            <span class="period">1회 충전</span>
-          </div>
-          <p class="pricing-desc">2,300 크레딧 · 이미지 최대 25장<br />✨ 기본 대비 15% 더 받기</p>
-          <hr class="pricing-divider" />
-          <ul class="pricing-features">
-            <li><span class="check">✓</span> 전체 AI 모델 1000종+</li>
-            <li><span class="check">✓</span> 전체 배경 15종+</li>
-            <li><span class="check">✓</span> 스타일샷 세트 생성</li>
-            <li><span class="check">✓</span> 일괄 다운로드</li>
-          </ul>
-          <button class="btn btn-primary btn-full" onclick="location.href='/generator'">지금 시작하기</button>
-        </div>
-        <div class="pricing-card">
-          <div class="pricing-plan">베스트 밸류</div>
-          <div class="pricing-price">
-            <span class="amount">₩60,000</span>
-            <span class="period">1회 충전</span>
-          </div>
-          <p class="pricing-desc">4,000 크레딧 · 이미지 최대 44장<br />🚀 기본 대비 33% 더 받기</p>
-          <hr class="pricing-divider" />
-          <ul class="pricing-features">
-            <li><span class="check">✓</span> 전체 AI 모델 1000종+</li>
-            <li><span class="check">✓</span> 전체 배경 15종+</li>
-            <li><span class="check">✓</span> 스타일샷 세트 생성</li>
-            <li><span class="check">✓</span> 일괄 다운로드</li>
-          </ul>
-          <button class="btn btn-secondary btn-full" onclick="location.href='/generator'">충전하고 시작하기</button>
+          <button class="btn btn-primary btn-full" onclick="location.href='/generator'">충전하고 시작하기</button>
         </div>
       </div>
     </div>
