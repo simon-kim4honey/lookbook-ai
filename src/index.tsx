@@ -2125,7 +2125,13 @@ app.post('/payment/webhook', async (c) => {
   const ackOk = () => c.text('OK', 200, { 'Content-Type': 'text/html;charset=utf-8' })
 
   try {
-    const body = await c.req.parseBody()
+    // 나이스페이는 웹훅 요청을 application/json으로 보냄 (폼 데이터 아님)
+    const rawText = await c.req.text()
+    let body: any = {}
+    try { body = JSON.parse(rawText) } catch {
+      // 만약을 대비한 폴백 — 혹시 폼 인코딩으로 오는 경우도 처리
+      body = Object.fromEntries(new URLSearchParams(rawText))
+    }
     const tid       = String(body.tid || '')
     const orderId   = String(body.orderId || '')
     const amount    = String(body.amount || '')
