@@ -429,6 +429,7 @@ function initPage() {
       // Landing — verifySession 후 UI만 업데이트됨
       initHomeShowcase();
       initHomeFeatureBgs();
+      initHowtoVideos();
     } else if (path === '/dashboard') {
       initDashboard();
     } else if (path === '/generator') {
@@ -499,13 +500,93 @@ async function initHomeFeatureBgs() {
       if (bg) {
         card.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.55),rgba(0,0,0,0.55)), url(${bg})`;
         card.style.backgroundSize = 'cover';
-        card.style.backgroundPosition = 'center';
+        card.style.backgroundPosition = 'center 20%';
         card.classList.add('feature-card--has-bg');
       }
     });
   } catch (e) {
     console.warn('기능 박스 배경 로딩 실패:', e);
   }
+}
+
+// ─────────────────────────────────────────────────────────
+// 이용방법 섹션 9:16 소개 영상 (관리자 업로드, 슬롯별 1개)
+// ─────────────────────────────────────────────────────────
+async function initHowtoVideos() {
+  const boxes = document.querySelectorAll('.howto-video-box[data-howto-video-slot]');
+  if (!boxes.length) return;
+  try {
+    const res = await fetch('/api/home/howto-videos');
+    const data = await res.json();
+    const videos = data.videos || {};
+    boxes.forEach(box => {
+      const slot = box.getAttribute('data-howto-video-slot');
+      const src = videos[slot];
+      const video = box.querySelector('video');
+      if (src && video) {
+        video.src = src;
+        box.classList.add('howto-video-box--has-video');
+      }
+    });
+  } catch (e) {
+    console.warn('이용방법 영상 로딩 실패:', e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// 생성 대기 중 패션 뉴스 로테이터 (지루함 방지)
+// ─────────────────────────────────────────────────────────
+let _fashionNewsList = null;
+let _fashionNewsFetching = null;
+let _newsRotateTimer = null;
+let _newsRotateIdx = 0;
+let _newsRotateContainerId = null;
+
+async function _loadFashionNews() {
+  if (_fashionNewsList) return _fashionNewsList;
+  if (_fashionNewsFetching) return _fashionNewsFetching;
+  _fashionNewsFetching = fetch('/api/fashion-news')
+    .then(res => res.json())
+    .then(data => { _fashionNewsList = data.news || []; return _fashionNewsList; })
+    .catch(e => { console.warn('패션 뉴스 로딩 실패:', e); _fashionNewsList = []; return _fashionNewsList; })
+    .finally(() => { _fashionNewsFetching = null; });
+  return _fashionNewsFetching;
+}
+
+function _renderNewsItem(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container || !_fashionNewsList || !_fashionNewsList.length) return;
+  const item = _fashionNewsList[_newsRotateIdx % _fashionNewsList.length];
+  _newsRotateIdx++;
+  container.innerHTML =
+    '<div class="gen-news-tag">📰 패션 뉴스</div>' +
+    '<a class="gen-news-headline" href="' + item.link + '" target="_blank" rel="noopener noreferrer">' +
+      item.title.replace(/</g, '&lt;') +
+    '</a>' +
+    (item.source ? '<div class="gen-news-source">' + item.source.replace(/</g, '&lt;') + '</div>' : '');
+}
+
+async function startNewsRotator(containerId) {
+  stopNewsRotator();
+  _newsRotateContainerId = containerId;
+  _newsRotateIdx = 0;
+  const list = await _loadFashionNews();
+  // 로테이터 시작 사이 다른 컨테이너로 전환됐으면 무시
+  if (_newsRotateContainerId !== containerId || !list.length) return;
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.style.display = '';
+  _renderNewsItem(containerId);
+  _newsRotateTimer = setInterval(() => _renderNewsItem(containerId), 6000);
+}
+
+function stopNewsRotator() {
+  if (_newsRotateTimer) { clearInterval(_newsRotateTimer); _newsRotateTimer = null; }
+  if (_newsRotateContainerId) {
+    const container = document.getElementById(_newsRotateContainerId);
+    if (container) { container.style.display = 'none'; container.innerHTML = ''; }
+  }
+  _newsRotateContainerId = null;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -599,6 +680,7 @@ function setActionComplete(text, opts) {
 }
 
 function closeActionProgress() {
+  stopNewsRotator();
   closeModal('actionProgressModal');
 }
 
@@ -1285,6 +1367,28 @@ function toggleUserMenu() {
   }
 }
 
+// 모바일 네비게이션(햄버거 메뉴) 토글
+function toggleMobileNav() {
+  const nav = document.getElementById('navbarNav');
+  const btn = document.getElementById('navbarToggle');
+  if (!nav || !btn) return;
+  const isOpen = nav.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  const icon = btn.querySelector('i');
+  if (icon) icon.className = isOpen ? 'fas fa-xmark' : 'fas fa-bars';
+}
+
+function closeMobileNav() {
+  const nav = document.getElementById('navbarNav');
+  const btn = document.getElementById('navbarToggle');
+  if (nav) nav.classList.remove('open');
+  if (btn) {
+    btn.setAttribute('aria-expanded', 'false');
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = 'fas fa-bars';
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 // DASHBOARD
 // ─────────────────────────────────────────────────────────
@@ -1375,6 +1479,9 @@ function initGenerator() {
   // 모델/배경 미리 로드
   loadModelsFromAPI();
   loadBackgroundsFromAPI();
+  // 이전에 시작된 생성/영상 작업이 있으면 이어서 확인
+  resumePendingGeneration();
+  resumePendingVideoJob();
 }
 
 function shuffleArray(arr) {
@@ -2093,6 +2200,7 @@ async function startGeneration() {
   // 진행 상태 초기화
   updateProgress(0, '시작 중...');
   setMsgState('msg1', 'current');
+  startNewsRotator('genViewNews');
 
   try {
     // 선택된 모델의 description 생성
@@ -2228,12 +2336,21 @@ async function startGeneration() {
     setMsgState('msg1', 'done');
     setMsgState('msg2', 'current');
 
+    // 페이지 재진입 시 이어서 폴링할 수 있도록 진행 중인 작업 저장
+    try {
+      localStorage.setItem('lookbook_pending_gen', JSON.stringify({
+        jobId: startData.jobId, count, lastGenParams: AppState.lastGenParams, startedAt: Date.now(),
+      }));
+    } catch (e) { /* 저장 공간 부족 등은 무시 */ }
+
     await pollGenerationStatus(startData.jobId, count);
 
   } catch (err) {
     console.error('Generation error:', err);
     showToast(t('genError', err.message), 'error');
     AppState.isGenerating = false;
+    stopNewsRotator();
+    localStorage.removeItem('lookbook_pending_gen');
 
     // UI 복원
     const step3Nav = document.getElementById('step3Nav');
@@ -2241,6 +2358,47 @@ async function startGeneration() {
     const nb3err = document.getElementById('nextBtn3');
     if (nb3err) { nb3err.innerHTML = t('genStart'); nb3err.disabled = false; }
     const genView = document.getElementById('generatingView');
+    if (genView) genView.classList.remove('active');
+  }
+}
+
+// 페이지 재진입 시 진행 중이던 이미지 생성 작업을 이어서 확인
+async function resumePendingGeneration() {
+  let pending;
+  try { pending = JSON.parse(localStorage.getItem('lookbook_pending_gen') || 'null'); } catch (e) { pending = null; }
+  if (!pending || !pending.jobId) return;
+
+  // 최대 폴링 시간(3분)을 훌쩍 넘긴 오래된 항목은 폐기
+  if (Date.now() - (pending.startedAt || 0) > 20 * 60 * 1000) {
+    localStorage.removeItem('lookbook_pending_gen');
+    return;
+  }
+
+  AppState.lastGenParams = pending.lastGenParams || AppState.lastGenParams;
+  AppState.currentJobId = pending.jobId;
+  AppState.lastJobId = pending.jobId;
+  AppState.isGenerating = true;
+
+  changeStep(3);
+  const step3Nav = document.getElementById('step3Nav');
+  if (step3Nav) step3Nav.style.display = 'none';
+  const genView = document.getElementById('generatingView');
+  if (genView) { genView.style.display = ''; genView.classList.add('active'); }
+
+  updateProgress(30, '이전 생성 작업을 이어서 확인하는 중...');
+  setMsgState('msg1', 'done');
+  setMsgState('msg2', 'current');
+  startNewsRotator('genViewNews');
+  showToast('이전에 시작한 생성 작업을 이어서 진행합니다.', 'info');
+
+  try {
+    await pollGenerationStatus(pending.jobId, pending.count || 1);
+  } catch (err) {
+    console.error('Resume generation error:', err);
+    AppState.isGenerating = false;
+    stopNewsRotator();
+    localStorage.removeItem('lookbook_pending_gen');
+    if (step3Nav) step3Nav.style.display = '';
     if (genView) genView.classList.remove('active');
   }
 }
@@ -2318,6 +2476,8 @@ async function pollGenerationStatus(jobId, count) {
 // 생성 완료 처리
 function completeGeneration(images, isFallback = false) {
   AppState.isGenerating = false;
+  stopNewsRotator();
+  localStorage.removeItem('lookbook_pending_gen');
 
   console.log('completeGeneration called — isFallback:', isFallback, '| images count:', images.length, '| images:', JSON.stringify(images.map(i => ({id:i.id, url: i.url ? i.url.substring(0,80) : null, placeholder: i.placeholder}))));
 
@@ -2650,6 +2810,41 @@ function _resetVideoBtn() {
   if (sub) sub.innerHTML = '5초 · <i class="fas fa-coins"></i> 600';
 }
 
+// 페이지 재진입 시 진행 중이던 영상 생성 작업을 백그라운드로 이어서 확인
+// (결과 카드 컨텍스트가 새로고침으로 사라지므로 모달을 다시 열지 않고,
+//  완료되면 생성내역에 자동 저장된 뒤 토스트로만 안내)
+async function resumePendingVideoJob() {
+  let pending;
+  try { pending = JSON.parse(localStorage.getItem('lookbook_pending_video') || 'null'); } catch (e) { pending = null; }
+  if (!pending || !pending.jobId) return;
+  if (Date.now() - (pending.startedAt || 0) > 20 * 60 * 1000) {
+    localStorage.removeItem('lookbook_pending_video');
+    return;
+  }
+  showToast('이전에 시작한 영상 생성을 이어서 확인합니다...', 'info');
+  _pollVideoStatusBackground(pending.jobId);
+}
+
+async function _pollVideoStatusBackground(jobId) {
+  try {
+    const res = await fetch(`/api/video/${jobId}/status`);
+    const data = await res.json();
+    if (data.status === 'completed' && data.videoUrl) {
+      localStorage.removeItem('lookbook_pending_video');
+      showToast('영상 생성이 완료되었습니다! 생성내역에서 확인하세요.', 'success');
+      return;
+    }
+    if (data.status === 'failed') {
+      localStorage.removeItem('lookbook_pending_video');
+      return;
+    }
+    setTimeout(() => _pollVideoStatusBackground(jobId), 5000);
+  } catch (err) {
+    console.error('Background video poll error:', err);
+    setTimeout(() => _pollVideoStatusBackground(jobId), 6000);
+  }
+}
+
 async function startVideoGeneration() {
   if (_videoState.videoUrl) { downloadVideo(); return; }
   if (_videoState.polling) return;
@@ -2713,6 +2908,11 @@ async function startVideoGeneration() {
     const startData = await startRes.json();
     _videoState.jobId = startData.jobId;
 
+    // 페이지 재진입 시 이어서 폴링할 수 있도록 진행 중인 작업 저장
+    try {
+      localStorage.setItem('lookbook_pending_video', JSON.stringify({ jobId: startData.jobId, startedAt: Date.now() }));
+    } catch (e) { /* 저장 공간 부족 등은 무시 */ }
+
     if (startData.creditsRemaining !== undefined) {
       const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
       if (cachedUser) { cachedUser.credits = startData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
@@ -2721,11 +2921,13 @@ async function startVideoGeneration() {
     }
 
     openActionProgress('AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
+    startNewsRotator('actionProgressNews');
     if (sub) sub.textContent = '생성 중...';
     _pollVideoStatus();
   } catch (err) {
     console.error('Video start error:', err);
     closeActionProgress();
+    stopNewsRotator();
     showToast('영상 생성 중 오류가 발생했습니다.', 'error');
     _resetVideoBtn();
   }
@@ -2739,12 +2941,15 @@ async function _pollVideoStatus() {
     if (data.status === 'completed' && data.videoUrl) {
       _videoState.videoUrl = data.videoUrl;
       _videoState.polling = false;
+      localStorage.removeItem('lookbook_pending_video');
       _onVideoReady(data.videoUrl);
       return;
     }
     if (data.status === 'failed') {
       _videoState.polling = false;
+      localStorage.removeItem('lookbook_pending_video');
       closeActionProgress();
+      stopNewsRotator();
       showToast(data.error || '영상 생성에 실패했습니다.', 'error');
       _resetVideoBtn();
       return;
@@ -2757,6 +2962,7 @@ async function _pollVideoStatus() {
 }
 
 function _onVideoReady(videoUrl) {
+  stopNewsRotator();
   const btn = document.getElementById('videoActionBtn');
   const sub = document.getElementById('videoActionSub');
   if (btn) {

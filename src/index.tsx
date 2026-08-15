@@ -1055,6 +1055,124 @@ app.delete('/api/admin/home-feature-bg/:slot', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// ── 이용방법 섹션 우측 9:16 소개 영상 (고정 2슬롯) ──
+const HOME_HOWTO_VIDEO_SLOTS = [1, 2]
+
+async function kvGetHowtoVideo(kv: KVNamespace, slot: number): Promise<string | null> {
+  return await kv.get(`home_howto_video_${slot}`)
+}
+
+// GET /api/home/howto-videos — 홈페이지에서 쓰는 공개 엔드포인트
+app.get('/api/home/howto-videos', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const result: Record<string, string | null> = {}
+  if (kv) {
+    for (const slot of HOME_HOWTO_VIDEO_SLOTS) {
+      result[slot] = await kvGetHowtoVideo(kv, slot)
+    }
+  } else {
+    HOME_HOWTO_VIDEO_SLOTS.forEach(slot => { result[slot] = null })
+  }
+  return c.json({ videos: result })
+})
+
+// PUT /api/admin/home-howto-video/:slot — 슬롯별 영상 설정
+app.put('/api/admin/home-howto-video/:slot', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const slot = Number(c.req.param('slot'))
+  if (!HOME_HOWTO_VIDEO_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  try {
+    const body: any = await c.req.json()
+    const videoBase64 = body?.videoBase64 || ''
+    if (!videoBase64) return c.json({ success: false, message: 'videoBase64 필수' }, 400)
+    await kv.put(`home_howto_video_${slot}`, videoBase64)
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
+// DELETE /api/admin/home-howto-video/:slot — 슬롯 영상 제거
+app.delete('/api/admin/home-howto-video/:slot', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const slot = Number(c.req.param('slot'))
+  if (!HOME_HOWTO_VIDEO_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  await kv.delete(`home_howto_video_${slot}`)
+  return c.json({ success: true })
+})
+
+// ────────────────────────────────────────────────────
+// 패션 뉴스 (생성 대기 화면 로테이터용) — 구글 뉴스 RSS 파싱 + KV 캐시
+// ────────────────────────────────────────────────────
+const FASHION_NEWS_KV_KEY = 'fashion_news_cache_v1'
+const FASHION_NEWS_TTL_MS = 20 * 60 * 1000 // 20분
+
+function stripCdata(s: string): string {
+  const m = s.match(/<!\[CDATA\[([\s\S]*?)\]\]>/)
+  return (m ? m[1] : s)
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+    .trim()
+}
+
+function parseGoogleNewsRss(xml: string): Array<{ title: string; link: string; source: string; pubDate: string }> {
+  const items: Array<{ title: string; link: string; source: string; pubDate: string }> = []
+  const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) || []
+  for (const block of itemBlocks) {
+    const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/)
+    const linkMatch = block.match(/<link>([\s\S]*?)<\/link>/)
+    const sourceMatch = block.match(/<source[^>]*>([\s\S]*?)<\/source>/)
+    const pubDateMatch = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)
+    if (!titleMatch || !linkMatch) continue
+    items.push({
+      title: stripCdata(titleMatch[1]),
+      link: stripCdata(linkMatch[1]),
+      source: sourceMatch ? stripCdata(sourceMatch[1]) : '',
+      pubDate: pubDateMatch ? stripCdata(pubDateMatch[1]) : '',
+    })
+  }
+  return items.slice(0, 12)
+}
+
+// GET /api/fashion-news — 생성 대기 화면에 보여줄 패션 뉴스 목록 (구글 뉴스 RSS)
+app.get('/api/fashion-news', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  try {
+    if (kv) {
+      const cached = await kv.get(FASHION_NEWS_KV_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Date.now() - parsed.fetchedAt < FASHION_NEWS_TTL_MS) {
+          return c.json({ news: parsed.news })
+        }
+      }
+    }
+
+    const rssUrl = 'https://news.google.com/rss/search?q=%ED%8C%A8%EC%85%98&hl=ko&gl=KR&ceid=KR:ko'
+    const res = await fetch(rssUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    if (!res.ok) throw new Error(`RSS fetch failed: ${res.status}`)
+    const xml = await res.text()
+    const news = parseGoogleNewsRss(xml)
+
+    if (kv && news.length > 0) {
+      await kv.put(FASHION_NEWS_KV_KEY, JSON.stringify({ fetchedAt: Date.now(), news }))
+    }
+    return c.json({ news })
+  } catch (e: any) {
+    console.warn('fashion-news fetch error:', e.message)
+    // 실패 시 만료된 캐시라도 있으면 반환
+    if (kv) {
+      const cached = await kv.get(FASHION_NEWS_KV_KEY)
+      if (cached) {
+        try { return c.json({ news: JSON.parse(cached).news }) } catch {}
+      }
+    }
+    return c.json({ news: [] })
+  }
+})
+
 // /api/proxy/model-image/:id — 기본 Unsplash 모델 제거로 404 반환
 app.get('/api/proxy/model-image/:id', (c) => c.notFound())
 
@@ -3849,10 +3967,15 @@ app.get('/', (c) => {
     #features .feature-card:hover { border-color: #000 !important; }
 
     /* How it works */
-    #how-it-works .steps-grid { grid-template-columns: repeat(3, 1fr) !important; max-width: 720px; margin: 0 auto; }
+    #how-it-works .steps-grid { grid-template-columns: repeat(3, 1fr) !important; max-width: 720px; margin: 0; }
     #how-it-works .steps-grid::before { background: #ddd !important; }
+    #how-it-works .section-header--left { text-align: left; margin: 0 0 32px; }
+    #how-it-works .section-header--left .section-desc { margin-left: 0; }
     #how-it-works .step-card:hover .step-num { background: #f0f0f0 !important; border-color: #000 !important; }
     #how-it-works .step-num i { color: #000 !important; }
+    @media (max-width: 560px) {
+      #how-it-works .steps-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    }
 
     /* Pricing */
     #pricing .pricing-plan { color: #000 !important; }
@@ -3872,15 +3995,18 @@ app.get('/', (c) => {
       <a href="/" class="navbar-logo">
         <span>EZlook</span>
       </a>
-      <div class="navbar-nav">
-        <a href="#features">기능</a>
-        <a href="#how-it-works">이용방법</a>
-        <a href="#pricing">요금제</a>
-        <a href="/dashboard">대시보드</a>
+      <div class="navbar-nav" id="navbarNav">
+        <a href="#features" onclick="closeMobileNav()">기능</a>
+        <a href="#how-it-works" onclick="closeMobileNav()">이용방법</a>
+        <a href="#pricing" onclick="closeMobileNav()">요금제</a>
+        <a href="/dashboard" onclick="closeMobileNav()">대시보드</a>
       </div>
       <div class="navbar-actions" style="position:relative;">
         <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')" data-i18n="nav-login">로그인</button>
         <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')" data-i18n="nav-signup">무료 시작</button>
+        <button class="navbar-toggle" id="navbarToggle" onclick="toggleMobileNav()" aria-label="메뉴 열기" aria-expanded="false">
+          <i class="fas fa-bars"></i>
+        </button>
         <!-- 로그인 후 프로필 아이콘만 표시 -->
         <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
           <span id="navUserCredits" style="display:none;"></span>
@@ -3928,8 +4054,8 @@ app.get('/', (c) => {
         </p>
         <div class="hero-stats">
           <div class="hero-stat">
-            <div class="hero-stat-num">95%</div>
-            <div class="hero-stat-label">생성 성공률</div>
+            <div class="hero-stat-num">3번</div>
+            <div class="hero-stat-label">클릭으로 모델컷 완성</div>
           </div>
           <div class="hero-stat">
             <div class="hero-stat-num">30초</div>
@@ -3970,11 +4096,11 @@ app.get('/', (c) => {
       </div>
       <div class="features-grid">
         <div class="feature-card" data-feature-slot="1">
-          <h3 class="feature-title">원클릭 의류 업로드</h3>
-          <p class="feature-desc">JPG, PNG, WEBP 형식의 의류 이미지를 드래그앤드롭으로 간편하게 업로드하고 앞/뒤 방향을 설정하세요.</p>
+          <h3 class="feature-title">클릭 3번에 모델컷 완성</h3>
+          <p class="feature-desc">의류 이미지 업로드, AI 모델 선택, 배경 선택 — 딱 3번의 클릭이면 전문 모델 피팅컷이 완성됩니다.</p>
         </div>
         <div class="feature-card" data-feature-slot="2">
-          <h3 class="feature-title">100+ AI 모델 프리셋</h3>
+          <h3 class="feature-title">1000+ AI 모델 프리셋</h3>
           <p class="feature-desc">성별, 연령대, 체형, 피부톤, 무드를 필터링하여 브랜드에 딱 맞는 AI 모델을 선택하세요.</p>
         </div>
         <div class="feature-card" data-feature-slot="3">
@@ -3990,8 +4116,8 @@ app.get('/', (c) => {
           <p class="feature-desc">상세용, 광고용, SNS용, 룩북용 이미지 세트를 한 번에 생성하여 모든 채널의 크리에이티브를 해결하세요.</p>
         </div>
         <div class="feature-card" data-feature-slot="6">
-          <h3 class="feature-title">일괄 다운로드</h3>
-          <p class="feature-desc">생성된 이미지를 개별 또는 ZIP 파일로 일괄 다운로드하고, 즐겨찾기로 관리하세요.</p>
+          <h3 class="feature-title">원클릭으로 영상 파일 생성</h3>
+          <p class="feature-desc">생성된 피팅컷을 기반으로 모델이 자연스럽게 포즈를 취하는 5초 세로형 영상을 버튼 한 번으로 만드세요.</p>
         </div>
       </div>
     </div>
@@ -4000,33 +4126,45 @@ app.get('/', (c) => {
   <!-- How It Works -->
   <section id="how-it-works">
     <div class="container">
-      <div class="section-header">
-        <div class="section-tag"><i class="fas fa-route"></i> 이용 방법</div>
-        <h2 class="section-title">3단계로 완성되는<br />AI 룩북 제작</h2>
-        <p class="section-desc">국내에서 가장 적은 클릭으로 상품 이미지를 모델컷으로 바꿔드립니다.</p>
-      </div>
-      <div class="steps-grid">
-        <div class="step-card">
-          <div class="step-num"><i class="fas fa-shirt"></i></div>
-          <div class="step-title">Step 1. 옷 사진 업로드</div>
-          <div class="step-desc">가지고 있는 상품 이미지 한 장만 올리면 끝</div>
+      <div class="howto-layout">
+        <div class="howto-content">
+          <div class="section-header section-header--left">
+            <div class="section-tag"><i class="fas fa-route"></i> 이용 방법</div>
+            <h2 class="section-title">3단계로 완성되는<br />AI 룩북 제작</h2>
+            <p class="section-desc">국내에서 가장 적은 클릭으로 상품 이미지를 모델컷으로 바꿔드립니다.</p>
+          </div>
+          <div class="steps-grid">
+            <div class="step-card">
+              <div class="step-num"><i class="fas fa-shirt"></i></div>
+              <div class="step-title">Step 1. 옷 사진 업로드</div>
+              <div class="step-desc">가지고 있는 상품 이미지 한 장만 올리면 끝</div>
+            </div>
+            <div class="step-card">
+              <div class="step-num"><i class="fas fa-person"></i></div>
+              <div class="step-title">Step 2. AI 모델 선택</div>
+              <div class="step-desc">성별, 체형, 무드에 맞는 모델을 선택합니다</div>
+            </div>
+            <div class="step-card">
+              <div class="step-num"><i class="fas fa-wand-magic-sparkles"></i></div>
+              <div class="step-title">Step 3. 배경 선택 → 자동 생성</div>
+              <div class="step-desc">배경만 고르면 AI가 알아서 완성해드려요</div>
+            </div>
+          </div>
+          <div style="text-align:left;margin-top:48px;">
+            <a href="/generator" class="btn btn-primary btn-lg">
+              <i class="fas fa-wand-magic-sparkles"></i>
+              지금 바로 시작하기
+            </a>
+          </div>
         </div>
-        <div class="step-card">
-          <div class="step-num"><i class="fas fa-person"></i></div>
-          <div class="step-title">Step 2. AI 모델 선택</div>
-          <div class="step-desc">성별, 체형, 무드에 맞는 모델을 선택합니다</div>
+        <div class="howto-videos">
+          <div class="howto-video-box" data-howto-video-slot="1">
+            <video muted loop playsinline autoplay preload="metadata"></video>
+          </div>
+          <div class="howto-video-box" data-howto-video-slot="2">
+            <video muted loop playsinline autoplay preload="metadata"></video>
+          </div>
         </div>
-        <div class="step-card">
-          <div class="step-num"><i class="fas fa-wand-magic-sparkles"></i></div>
-          <div class="step-title">Step 3. 배경 선택 → 자동 생성</div>
-          <div class="step-desc">배경만 고르면 AI가 알아서 완성해드려요</div>
-        </div>
-      </div>
-      <div style="text-align:center;margin-top:48px;">
-        <a href="/generator" class="btn btn-primary btn-lg">
-          <i class="fas fa-wand-magic-sparkles"></i>
-          지금 바로 시작하기
-        </a>
       </div>
     </div>
   </section>
@@ -4049,7 +4187,7 @@ app.get('/', (c) => {
           <p class="pricing-desc">1,000 크레딧 · 이미지 최대 11장</p>
           <hr class="pricing-divider" />
           <ul class="pricing-features">
-            <li><span class="check">✓</span> 전체 AI 모델 100종+</li>
+            <li><span class="check">✓</span> 전체 AI 모델 1000종+</li>
             <li><span class="check">✓</span> 전체 배경 15종+</li>
             <li><span class="check">✓</span> 스타일샷 세트 생성</li>
             <li><span class="check">✓</span> 일괄 다운로드</li>
@@ -4066,7 +4204,7 @@ app.get('/', (c) => {
           <p class="pricing-desc">2,300 크레딧 · 이미지 최대 25장<br />✨ 기본 대비 15% 더 받기</p>
           <hr class="pricing-divider" />
           <ul class="pricing-features">
-            <li><span class="check">✓</span> 전체 AI 모델 100종+</li>
+            <li><span class="check">✓</span> 전체 AI 모델 1000종+</li>
             <li><span class="check">✓</span> 전체 배경 15종+</li>
             <li><span class="check">✓</span> 스타일샷 세트 생성</li>
             <li><span class="check">✓</span> 일괄 다운로드</li>
@@ -4082,7 +4220,7 @@ app.get('/', (c) => {
           <p class="pricing-desc">4,000 크레딧 · 이미지 최대 44장<br />🚀 기본 대비 33% 더 받기</p>
           <hr class="pricing-divider" />
           <ul class="pricing-features">
-            <li><span class="check">✓</span> 전체 AI 모델 100종+</li>
+            <li><span class="check">✓</span> 전체 AI 모델 1000종+</li>
             <li><span class="check">✓</span> 전체 배경 15종+</li>
             <li><span class="check">✓</span> 스타일샷 세트 생성</li>
             <li><span class="check">✓</span> 일괄 다운로드</li>
@@ -4583,6 +4721,7 @@ app.get('/dashboard', (c) => {
           <i class="fas fa-comment"></i> 카카오톡 공유
         </button>
       </div>
+      <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
       <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
   </div>
@@ -5087,8 +5226,8 @@ app.get('/generator', (c) => {
         </div>
         <!-- 생성 중 오버레이 (step-3 내부) -->
         <div class="generating-view" id="generatingView">
-          <div class="gen-spinner"></div>
-          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;">AI가 이미지를 생성 중입니다...</h2>
+          <div class="gen-news" id="genViewNews" style="display:none;"></div>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 이미지를 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="genStatusText" data-i18n="gen-status-init">시작 중...</div>
           <div class="gen-status-msgs">
@@ -5185,6 +5324,7 @@ app.get('/generator', (c) => {
           <i class="fas fa-comment"></i> 카카오톡 공유
         </button>
       </div>
+      <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
       <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
   </div>
@@ -5586,6 +5726,12 @@ app.get('/admin02', (c) => {
         <h3><i class="fas fa-th-large" style="color:#00d4aa;"></i> 기능 소개 박스 배경 이미지 <span style="font-size:13px;font-weight:400;color:#888;">(박스별 1장, 미등록 시 기본 배경 유지)</span></h3>
         <div id="featureBgGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
+
+      <!-- 이용방법 섹션 9:16 소개 영상 -->
+      <div class="upload-form">
+        <h3><i class="fas fa-film" style="color:#ff6b6b;"></i> 이용방법 소개 영상 <span style="font-size:13px;font-weight:400;color:#888;">(9:16 세로 영상, 슬롯별 1개, 15MB 이하, 미등록 시 빈 박스 유지)</span></h3>
+        <div id="howtoVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
+      </div>
     </div>
   </div>
 
@@ -5701,7 +5847,7 @@ function switchTab(name) {
   document.getElementById('tabUsers').classList.toggle('active', name === 'users')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
-  if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs() }
+  if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos() }
   if (name === 'users')  loadUsers()
 }
 
@@ -6392,8 +6538,8 @@ async function loadShowcaseImages() {
 //  홈페이지 관리 — 기능 소개 박스 배경 (고정 6슬롯)
 // ══════════════════════════════════════════════
 const FEATURE_BG_LABELS = {
-  1: '원클릭 의류 업로드', 2: '100+ AI 모델 프리셋', 3: '다양한 배경 프리셋',
-  4: '30초 내 AI 생성', 5: '룩북 세트 자동 생성', 6: '일괄 다운로드',
+  1: '클릭 3번에 모델컷 완성', 2: '1000+ AI 모델 프리셋', 3: '다양한 배경 프리셋',
+  4: '30초 내 AI 생성', 5: '룩북 세트 자동 생성', 6: '원클릭으로 영상 파일 생성',
 }
 
 async function loadFeatureBgs() {
@@ -6457,6 +6603,75 @@ async function deleteFeatureBg(slot) {
   const data = await res.json()
   if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
   await loadFeatureBgs()
+}
+
+// ══════════════════════════════════════════════
+//  홈페이지 관리 — 이용방법 섹션 9:16 소개 영상 (고정 2슬롯)
+// ══════════════════════════════════════════════
+const HOWTO_VIDEO_LABELS = { 1: '영상 박스 1', 2: '영상 박스 2' }
+
+async function loadHowtoVideos() {
+  const grid = document.getElementById('howtoVideoGrid')
+  try {
+    const res = await fetch('/api/home/howto-videos')
+    const data = await res.json()
+    const videos = data.videos || {}
+    grid.innerHTML = Object.keys(HOWTO_VIDEO_LABELS).map(slot => {
+      const src = videos[slot]
+      return '<div style="border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden;">' +
+        '<div style="position:relative;width:100%;aspect-ratio:9/16;background:#f2f2f5;display:flex;align-items:center;justify-content:center;">' +
+        (src ? '<video src="' + src + '" muted loop playsinline autoplay style="width:100%;height:100%;object-fit:cover;"></video>' : '<i class="fas fa-video" style="color:#ccc;font-size:24px;"></i>') +
+        '</div>' +
+        '<div style="padding:8px;">' +
+        '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + HOWTO_VIDEO_LABELS[slot] + '</div>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<button onclick="pickHowtoVideo(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
+        (src ? '<button onclick="deleteHowtoVideo(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
+        '</div></div></div>'
+    }).join('')
+  } catch(e) { console.error('loadHowtoVideos error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+let _pendingHowtoVideoSlot = null
+function pickHowtoVideo(slot) {
+  _pendingHowtoVideoSlot = slot
+  let input = document.getElementById('howtoVideoInput')
+  if (!input) {
+    input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'video/*'
+    input.id = 'howtoVideoInput'
+    input.style.display = 'none'
+    input.addEventListener('change', onHowtoVideoSelect)
+    document.body.appendChild(input)
+  }
+  input.value = ''
+  input.click()
+}
+
+async function onHowtoVideoSelect(e) {
+  const file = e.target.files?.[0]
+  if (!file || !_pendingHowtoVideoSlot) return
+  if (file.size > 15 * 1024 * 1024) { alert('영상 용량이 너무 큽니다. 15MB 이하 파일을 사용해주세요.'); return }
+  const base64 = await readFileAsBase64(file)
+  try {
+    const res = await fetch('/api/admin/home-howto-video/' + _pendingHowtoVideoSlot, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ videoBase64: base64 }),
+    })
+    const data = await res.json()
+    if (!data.success) { alert('업로드 실패: ' + (data.message || '알 수 없는 오류')); return }
+    await loadHowtoVideos()
+  } catch(err) { alert('오류: ' + err.message) }
+}
+
+async function deleteHowtoVideo(slot) {
+  if (!confirm('이 박스의 영상을 삭제하시겠습니까?')) return
+  const res = await fetch('/api/admin/home-howto-video/' + slot, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+  const data = await res.json()
+  if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
+  await loadHowtoVideos()
 }
 
 // ─── 배경 "생성용"(얼굴 마스킹) 이미지 등록/교체 ───
