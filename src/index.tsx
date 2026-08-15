@@ -3311,8 +3311,8 @@ app.get('/share/:jobId/:idx', async (c) => {
             <button class="share-tab active" data-url="${opts.resultTab.url}" onclick="_switchShareTab(this)">${opts.resultTab.label}</button>
           </div>` : ''
       const mediaHtml = opts.isVideo
-        ? `<video id="shareMainImg" src="${opts.imageUrl}" class="share-img" autoplay loop muted playsinline controls></video>`
-        : `<img id="shareMainImg" src="${opts.imageUrl}" alt="EZlook 생성 이미지" class="share-img" />`
+        ? `<video id="shareMainImg" src="${opts.imageUrl}" class="share-img" autoplay loop muted playsinline controls controlsList="nodownload" disablePictureInPicture oncontextmenu="return false"></video>`
+        : `<img id="shareMainImg" src="${opts.imageUrl}" alt="EZlook 생성 이미지" class="share-img" draggable="false" oncontextmenu="return false" />`
       body = `
         <div class="share-card">
           ${topTabsHtml}
@@ -3374,7 +3374,11 @@ app.get('/share/:jobId/:idx', async (c) => {
     .share-tab { flex: 1; min-width: 60px; background: #23233d; color: #a0a0c0; border: none; border-radius: 10px; padding: 8px 4px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; }
     .share-tab.active { background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; }
     .share-img-wrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-top: 8px; background: #000; }
-    .share-img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; display: block; }
+    .share-img {
+      max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; display: block;
+      -webkit-touch-callout: none; -webkit-user-select: none; -moz-user-select: none; user-select: none;
+      -webkit-user-drag: none; user-drag: none; pointer-events: auto;
+    }
     .share-info { flex: 0 0 auto; padding: 12px 18px 16px; text-align: center; }
     .share-title { color: #fff; font-size: 14px; font-weight: 800; margin: 0 0 4px; }
     .share-desc { color: #a0a0c0; font-size: 12px; font-weight: 600; margin: 0 0 10px; }
@@ -4478,9 +4482,9 @@ app.get('/dashboard', (c) => {
   <!-- 이미지 확대 보기 모달 (히스토리 전용 — 다시보기) -->
   <div id="histImgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1000;align-items:center;justify-content:center;flex-direction:column;padding:20px;">
     <button onclick="closeHistModal()" style="position:absolute;top:16px;right:16px;width:36px;height:36px;border:none;background:rgba(255,255,255,0.1);border-radius:50%;color:#fff;font-size:20px;cursor:pointer;">×</button>
-    <img id="histModalImg" src="" alt="생성 이미지"
+    <img id="histModalImg" src="" alt="생성 이미지" draggable="false"
       style="max-width:min(420px,90vw);max-height:calc(100dvh - 140px);object-fit:contain;border-radius:14px;display:block;" />
-    <video id="histModalVideo" src="" autoplay loop muted playsinline controls
+    <video id="histModalVideo" src="" autoplay loop muted playsinline controls controlsList="nodownload" disablePictureInPicture
       style="max-width:min(420px,90vw);max-height:calc(100dvh - 140px);object-fit:contain;border-radius:14px;display:none;"></video>
     <div id="histModalExpiry" style="font-size:11px;color:#f87171;margin-top:8px;text-align:center;"></div>
   </div>
@@ -5065,7 +5069,7 @@ app.get('/generator', (c) => {
     <div class="modal-box">
       <button class="modal-close" style="background:rgba(0,0,0,0.5);color:white;top:12px;right:12px;z-index:20;" onclick="closeModal('imageModal')">×</button>
       <div style="position:relative;display:block;width:100%;">
-        <img id="modalImage" src="" alt="생성된 이미지" />
+        <img id="modalImage" src="" alt="생성된 이미지" draggable="false" />
         <!-- 버튼 영역: 재생성 + 다운로드 -->
         <div id="modalButtonArea" style="position:absolute;bottom:16px;right:16px;z-index:20;display:flex;align-items:center;gap:8px;">
           <!-- 재생성 버튼 -->
