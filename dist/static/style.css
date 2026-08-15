@@ -563,7 +563,7 @@ img { max-width: 100%; height: auto; }
 
 .howto-video-box {
   width: min(540px, 90vw);
-  aspect-ratio: 9 / 16;
+  aspect-ratio: 4 / 3;
   border-radius: var(--radius-xl);
   overflow: hidden;
   background: var(--gray-1);
@@ -2126,12 +2126,12 @@ footer {
   border-radius: 50%;
   background: #fff;
   transform: translate(50%, -50%);
-  box-shadow: 0 0 6px 2px rgba(255,255,255,0.7);
+  box-shadow: 0 0 3px 1px rgba(255,255,255,0.35);
   animation: gen-progress-glow 1.1s ease-in-out infinite;
 }
 @keyframes gen-progress-glow {
-  0%, 100% { box-shadow: 0 0 6px 2px rgba(255,255,255,0.55); opacity: 0.8; }
-  50% { box-shadow: 0 0 14px 6px rgba(255,255,255,0.95); opacity: 1; }
+  0%, 100% { box-shadow: 0 0 3px 1px rgba(255,255,255,0.28); opacity: 0.4; }
+  50% { box-shadow: 0 0 7px 3px rgba(255,255,255,0.48); opacity: 0.5; }
 }
 .gen-status-text { font-size: 15px; color: var(--text-muted); }
 .gen-status-msgs { max-width: 480px; margin: 24px auto 0; text-align: left; display: flex; flex-direction: column; gap: 8px; }

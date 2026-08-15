@@ -1055,7 +1055,7 @@ app.delete('/api/admin/home-feature-bg/:slot', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
-// ── 이용방법 섹션 우측 9:16 소개 영상 (고정 1슬롯) ──
+// ── 이용방법 섹션 우측 4:3 소개 영상 (고정 1슬롯) ──
 // KV 값 크기 한도(25MB)를 base64 오버헤드(약 33%) 없이 최대한 활용하기 위해
 // 바이너리 그대로 저장하고, 재생은 별도 스트리밍 엔드포인트를 통해 제공한다.
 const HOME_HOWTO_VIDEO_SLOTS = [1]
@@ -5787,9 +5787,9 @@ app.get('/admin02', (c) => {
         <div id="featureBgGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
 
-      <!-- 이용방법 섹션 9:16 소개 영상 -->
+      <!-- 이용방법 섹션 4:3 소개 영상 -->
       <div class="upload-form">
-        <h3><i class="fas fa-film" style="color:#ff6b6b;"></i> 이용방법 소개 영상 <span style="font-size:13px;font-weight:400;color:#888;">(9:16 세로 영상 1개, 20MB 이하, 미등록 시 빈 박스 유지)</span></h3>
+        <h3><i class="fas fa-film" style="color:#ff6b6b;"></i> 이용방법 소개 영상 <span style="font-size:13px;font-weight:400;color:#888;">(4:3 가로 영상 1개, 20MB 이하, 미등록 시 빈 박스 유지)</span></h3>
         <div id="howtoVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
     </div>
@@ -6666,7 +6666,7 @@ async function deleteFeatureBg(slot) {
 }
 
 // ══════════════════════════════════════════════
-//  홈페이지 관리 — 이용방법 섹션 9:16 소개 영상 (고정 2슬롯)
+//  홈페이지 관리 — 이용방법 섹션 4:3 소개 영상 (고정 1슬롯)
 // ══════════════════════════════════════════════
 const HOWTO_VIDEO_LABELS = { 1: '영상 박스' }
 
