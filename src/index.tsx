@@ -3189,13 +3189,22 @@ app.post('/api/admin/auth', async (c) => {
 // ────────────────────────────────────────────────────
 // Pages (HTML Shell)
 // ────────────────────────────────────────────────────
-const htmlShell = (title: string, bodyContent: string, extraHead: string = '') => `<!DOCTYPE html>
+const DEFAULT_DESCRIPTION = '의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요.'
+
+const htmlShell = (title: string, bodyContent: string, extraHead: string = '', description: string = DEFAULT_DESCRIPTION) => `<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title} | EZlook</title>
-  <meta name="description" content="의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요." />
+  <meta name="description" content="${description}" />
+  <meta property="og:site_name" content="EZlook" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="${title} | EZlook" />
+  <meta property="og:description" content="${description}" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="naver-site-verification" content="fda79db143bdb87618cabb15ab207023cff2f5da" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=${BUILD_VERSION}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -3445,6 +3454,7 @@ app.get('/terms', (c) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>서비스 이용약관 - EZlook</title>
+  <meta name="description" content="EZlook AI 룩북 생성 서비스의 이용약관, 결제 및 환불 정책을 안내합니다." />
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #333; line-height: 1.8; }
     h1 { font-size: 28px; border-bottom: 2px solid #eee; padding-bottom: 16px; }
@@ -3514,6 +3524,7 @@ app.get('/privacy', (c) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>개인정보처리방침 - EZlook</title>
+  <meta name="description" content="EZlook이 수집하는 개인정보 항목과 이용 목적, 보관 기간을 안내합니다." />
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; color: #333; line-height: 1.8; }
     h1 { font-size: 28px; border-bottom: 2px solid #eee; padding-bottom: 16px; }
@@ -3602,6 +3613,37 @@ app.get('/sitemap.xml', (c) => {
   return c.text(xml, 200, { 'Content-Type': 'application/xml; charset=utf-8' })
 })
 
+// ── llms.txt — AI 크롤러/답변엔진이 서비스를 빠르게 파악할 수 있는 요약 파일 ──
+app.get('/llms.txt', (c) => {
+  const content = `# EZlook
+
+> AI 패션 이미지 생성 플랫폼 — 의류 이미지 한 장으로 온모델 피팅컷과 룩북 세트, 홍보 영상을 자동 생성합니다.
+
+## 서비스 소개
+EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 사진(온모델 피팅컷)을 자동으로 생성해주는 서비스입니다. 촬영 스튜디오나 모델 섭외 없이 몇 번의 클릭만으로 전문적인 패션 이미지를 만들 수 있습니다.
+
+## 주요 기능
+- 의류 이미지 업로드 (상의/하의/전체 슬롯별 지정)
+- 100종 이상의 AI 모델 프리셋 (성별/연령/체형/피부톤/무드 선택)
+- 15종 이상의 배경 프리셋
+- 평균 30초 내 이미지 생성
+- 생성된 이미지 기반 5초 홍보 영상 생성 (음악 포함, 9:16 세로형)
+- 룩북 세트 일괄 생성 및 다운로드
+
+## 요금
+- 이미지 생성 자체는 무료. 다운로드 시에만 장당 90크레딧 차감
+- 크레딧 충전: 스타터(₩20,000 · 1,000크레딧) ~ 베스트 밸류(₩60,000 · 4,000크레딧)
+- 회원가입 시 무료 크레딧 지급, 신용카드 등록 불필요
+
+## 링크
+- 홈페이지: ${AIFASHION_BASE}/
+- 서비스 이용(생성기): ${AIFASHION_BASE}/generator
+- 이용약관: ${AIFASHION_BASE}/terms
+- 개인정보처리방침: ${AIFASHION_BASE}/privacy
+`
+  return c.text(content, 200, { 'Content-Type': 'text/markdown; charset=utf-8' })
+})
+
 // ── 홈페이지 GEO/SEO용 구조화 데이터 (Organization/WebSite/Service/FAQPage) ──
 const HOME_FAQ: { q: string; a: string }[] = [
   { q: 'EZlook은 어떤 서비스인가요?', a: '의류 이미지 한 장을 업로드하면 AI가 온모델 피팅컷과 룩북 세트를 자동으로 생성해주는 AI 패션 이미지 생성 플랫폼입니다. 촬영 스튜디오나 모델 섭외 없이 몇 번의 클릭만으로 전문적인 착용샷을 만들 수 있습니다.' },
@@ -3666,8 +3708,9 @@ const homeStructuredData = () => {
 app.get('/', (c) => {
   // studiob.aifashion.co.kr는 상단 전역 미들웨어에서 이미 www로 리다이렉트됨
   // 마케팅 홈페이지(이용약관·개인정보처리방침·사업자정보 포함)를 직접 서빙
-  const homeExtraHead = `<link rel="canonical" href="${AIFASHION_BASE}/" />\n  ${homeStructuredData()}`
-  return c.html(htmlShell('홈', `
+  const homeExtraHead = `<link rel="canonical" href="${AIFASHION_BASE}/" />\n  <meta property="og:url" content="${AIFASHION_BASE}/" />\n  ${homeStructuredData()}`
+  const homeDescription = '옷 사진 한 장으로 AI 온모델 피팅컷과 룩북 세트를 무료로 자동 생성하세요. 촬영 스튜디오나 모델 섭외 없이 평균 30초 만에 완성됩니다.'
+  return c.html(htmlShell('AI 온모델 피팅컷 자동 생성', `
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
@@ -4142,7 +4185,7 @@ app.get('/', (c) => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
-  `, homeExtraHead))
+  `, homeExtraHead, homeDescription))
 })
 
 // ─── Dashboard Page ───
@@ -4770,8 +4813,10 @@ app.get('/dashboard', (c) => {
 
 // ─── Generator Page ───
 app.get('/generator', (c) => {
-  return c.html(htmlShell('AI 룩북 생성', `
+  const generatorDescription = '옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.'
+  return c.html(htmlShell('무료 AI 룩북 생성기', `
   <div class="toast-container" id="toastContainer"></div>
+  <h1 class="sr-only">AI 룩북 생성기 — 옷 사진 한 장으로 온모델 피팅컷 무료 제작</h1>
 
   <!-- ════════════════════════════════════════
        GENERATOR APP — position:fixed 전체화면
@@ -5121,7 +5166,7 @@ app.get('/generator', (c) => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 이용약관 및 개인정보처리방침에 동의합니다.</p>
     </div>
   </div>
-  `))
+  `, '', generatorDescription))
 })
 
 // ────────────────────────────────────────────────────
