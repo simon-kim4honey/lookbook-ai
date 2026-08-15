@@ -2113,6 +2113,80 @@ app.post('/payment/return', async (c) => {
   }
 })
 
+// ────────────────────────────────────────────────────
+// POST /payment/webhook — 나이스페이먼츠 결제 상태 변경 통보 (URL 통보)
+// 관리자가 나이스페이 콘솔 등에서 카드결제를 취소하면 이 웹훅으로 통보됨.
+// 정책: 지급된 크레딧 중 아직 남아있는 만큼만 회수 (min(지급크레딧, 현재잔액)), 0 미만으로는 내려가지 않음.
+// 나이스페이 스펙상 정상 수신 시 반드시 200 + 본문 "OK"(text/html)로 응답해야 함 —
+// 서명 불일치/처리 중 에러가 나도 재시도 폭주를 막기 위해 항상 200 OK로 응답하고 상세는 로그로만 남김.
+// ────────────────────────────────────────────────────
+app.post('/payment/webhook', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  const ackOk = () => c.text('OK', 200, { 'Content-Type': 'text/html;charset=utf-8' })
+
+  try {
+    const body = await c.req.parseBody()
+    const tid       = String(body.tid || '')
+    const orderId   = String(body.orderId || '')
+    const amount    = String(body.amount || '')
+    const ediDate   = String(body.ediDate || '')
+    const signature = String(body.signature || '')
+    const status    = String(body.status || '')
+    const resultCode = String(body.resultCode || '')
+
+    const secretKey = c.env.NICEPAY_SECRET_KEY || ''
+
+    // 서명 검증: signature === hex(sha256(tid + amount + ediDate + SecretKey))
+    const expectedSig = await sha256Hex(tid + amount + ediDate + secretKey)
+    if (!tid || expectedSig !== signature) {
+      console.error('나이스페이 웹훅 서명 불일치 — 위변조 의심:', orderId, tid)
+      return ackOk()
+    }
+
+    // 취소/부분취소 상태가 아니면 무시 (결제 완료 통보 등은 /payment/return에서 이미 처리됨)
+    const isCanceled = ['canceled', 'cancelled', 'partialCancelled', 'PARTIAL_CANCELED'].includes(status)
+      || resultCode === '2001'
+    if (!isCanceled) {
+      return ackOk()
+    }
+
+    const log = await db.prepare(
+      `SELECT id, user_id, credits, status FROM payment_logs WHERE order_id = ? OR payment_key = ?`
+    ).bind(orderId, tid).first() as any
+
+    if (!log) {
+      console.error('나이스페이 웹훅: 결제 내역을 찾을 수 없음:', orderId, tid)
+      return ackOk()
+    }
+    if (log.status === 'canceled') {
+      // 이미 처리된 취소 건에 대한 중복 통보 — 그대로 확인 응답만
+      return ackOk()
+    }
+
+    const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(log.user_id).first() as any
+    const currentBalance = userRow?.credits ?? 0
+    const originallyGranted = Number(log.credits) || 0
+    const revokeAmount = Math.min(originallyGranted, currentBalance)
+    const newBalance = Math.max(0, currentBalance - revokeAmount)
+
+    if (revokeAmount > 0) {
+      await db.prepare(`UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`).bind(newBalance, log.user_id).run()
+      await db.prepare(
+        `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+         VALUES (?, 'revoke', ?, ?, 'payment_cancel', ?)`
+      ).bind(log.user_id, -revokeAmount, newBalance, orderId).run()
+    }
+
+    await db.prepare(`UPDATE payment_logs SET status='canceled' WHERE id=?`).bind(log.id).run()
+
+    console.log(`나이스페이 웹훅: 결제취소 처리 완료 — orderId=${orderId}, 회수 크레딧=${revokeAmount}`)
+    return ackOk()
+  } catch (err: any) {
+    console.error('payment/webhook error:', err)
+    return ackOk()
+  }
+})
+
 // GET /api/payments/status — 결제 결과 페이지에서 승인 결과 조회 (세션 인증)
 app.get('/api/payments/status', async (c) => {
   try {
