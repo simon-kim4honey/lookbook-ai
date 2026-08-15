@@ -618,6 +618,31 @@ img { max-width: 100%; height: auto; }
 .pricing-features li .check { color: var(--success); font-size: 16px; }
 .pricing-features li .x { color: var(--gray-4); font-size: 16px; }
 
+/* ============ FAQ ============ */
+#faq { padding: 100px 0; }
+.faq-list { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.faq-item {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+}
+.faq-question {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.faq-question::-webkit-details-marker { display: none; }
+.faq-question::after { content: '+'; font-size: 22px; font-weight: 400; color: var(--text-muted); transition: transform 0.2s; flex-shrink: 0; }
+.faq-item[open] .faq-question::after { transform: rotate(45deg); }
+.faq-answer { margin: 14px 0 0; font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+
 /* ============ CTA SECTION ============ */
 #cta-section {
   padding: 100px 0;

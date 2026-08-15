@@ -3189,7 +3189,7 @@ app.post('/api/admin/auth', async (c) => {
 // ────────────────────────────────────────────────────
 // Pages (HTML Shell)
 // ────────────────────────────────────────────────────
-const htmlShell = (title: string, bodyContent: string) => `<!DOCTYPE html>
+const htmlShell = (title: string, bodyContent: string, extraHead: string = '') => `<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -3203,6 +3203,7 @@ const htmlShell = (title: string, bodyContent: string) => `<!DOCTYPE html>
   <link href="/static/style.css?v=${BUILD_VERSION}" rel="stylesheet" />
   <!-- app.js는 head에 defer — body 인라인 script보다 항상 먼저 파싱·실행됨 -->
   <script src="/static/app.js?v=${BUILD_VERSION}" defer></script>
+  ${extraHead}
 </head>
 <body>
 ${bodyContent}
@@ -3572,9 +3573,100 @@ app.get('/_home_old', (c) => {
   return c.redirect('/generator', 302)
 })
 
+app.get('/robots.txt', (c) => {
+  return c.text(
+    [
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /dashboard',
+      'Disallow: /api/',
+      'Disallow: /admin',
+      `Sitemap: ${AIFASHION_BASE}/sitemap.xml`,
+    ].join('\n'),
+    200,
+    { 'Content-Type': 'text/plain; charset=utf-8' }
+  )
+})
+
+app.get('/sitemap.xml', (c) => {
+  const pages = [
+    { path: '/', priority: '1.0', changefreq: 'weekly' },
+    { path: '/generator', priority: '0.9', changefreq: 'weekly' },
+    { path: '/terms', priority: '0.3', changefreq: 'yearly' },
+    { path: '/privacy', priority: '0.3', changefreq: 'yearly' },
+  ]
+  const urlsXml = pages.map(p =>
+    `  <url><loc>${AIFASHION_BASE}${p.path}</loc><changefreq>${p.changefreq}</changefreq><priority>${p.priority}</priority></url>`
+  ).join('\n')
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlsXml}\n</urlset>`
+  return c.text(xml, 200, { 'Content-Type': 'application/xml; charset=utf-8' })
+})
+
+// ── 홈페이지 GEO/SEO용 구조화 데이터 (Organization/WebSite/Service/FAQPage) ──
+const HOME_FAQ: { q: string; a: string }[] = [
+  { q: 'EZlook은 어떤 서비스인가요?', a: '의류 이미지 한 장을 업로드하면 AI가 온모델 피팅컷과 룩북 세트를 자동으로 생성해주는 AI 패션 이미지 생성 플랫폼입니다. 촬영 스튜디오나 모델 섭외 없이 몇 번의 클릭만으로 전문적인 착용샷을 만들 수 있습니다.' },
+  { q: '이미지 생성에 비용이 드나요?', a: '이미지 생성 자체는 무료입니다. 마음에 드는 결과물을 실제 파일로 다운로드할 때만 장당 90크레딧이 차감됩니다.' },
+  { q: '무료로 체험할 수 있나요?', a: '네, 신용카드 등록 없이 회원가입만 하면 무료 크레딧이 바로 지급되어 AI 룩북 제작을 체험해볼 수 있습니다.' },
+  { q: '영상도 만들 수 있나요?', a: '네, 생성된 피팅컷 이미지를 기반으로 모델이 자연스럽게 포즈를 취하는 5초 분량의 세로형(9:16) 영상을 만들 수 있습니다.' },
+  { q: '결과물은 얼마나 빨리 나오나요?', a: '평균 30초, 최대 90초 이내에 고품질 온모델 피팅컷 이미지가 생성됩니다.' },
+  { q: '크레딧은 어떻게 충전하나요?', a: '월 정액 없이 필요한 만큼만 충전하는 방식입니다. 스타터(₩20,000 · 1,000크레딧)부터 베스트 밸류(₩60,000 · 4,000크레딧)까지 선택할 수 있습니다.' },
+]
+
+const homeStructuredData = () => {
+  const org = {
+    '@type': 'Organization',
+    name: 'EZlook',
+    alternateName: '벌거벗은호랑이',
+    url: AIFASHION_BASE,
+    logo: `${AIFASHION_BASE}/static/favicon.svg`,
+    telephone: '070-4581-8166',
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: '무심서로 377-3',
+      addressLocality: '청주시 서원구',
+      addressRegion: '충청북도',
+      addressCountry: 'KR',
+    },
+  }
+  const website = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'EZlook',
+    url: AIFASHION_BASE,
+    publisher: org,
+  }
+  const service = {
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    name: 'EZlook AI 패션 룩북 생성 서비스',
+    serviceType: 'AI 패션 이미지/영상 생성',
+    description: '옷 사진 한 장을 업로드하면 AI 모델이 착용한 온모델 피팅컷과 룩북 세트, 홍보 영상을 자동으로 생성하는 서비스',
+    provider: org,
+    areaServed: 'KR',
+    offers: [
+      { '@type': 'Offer', name: '스타터', price: '20000', priceCurrency: 'KRW', description: '1,000 크레딧 · 이미지 최대 11장' },
+      { '@type': 'Offer', name: '인기 충전권', price: '40000', priceCurrency: 'KRW', description: '2,300 크레딧 · 이미지 최대 25장' },
+      { '@type': 'Offer', name: '베스트 밸류', price: '60000', priceCurrency: 'KRW', description: '4,000 크레딧 · 이미지 최대 44장' },
+    ],
+  }
+  const faq = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: HOME_FAQ.map(item => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: { '@type': 'Answer', text: item.a },
+    })),
+  }
+  return [website, service, faq]
+    .map(obj => `<script type="application/ld+json">${JSON.stringify(obj)}</script>`)
+    .join('\n  ')
+}
+
 app.get('/', (c) => {
   // studiob.aifashion.co.kr는 상단 전역 미들웨어에서 이미 www로 리다이렉트됨
   // 마케팅 홈페이지(이용약관·개인정보처리방침·사업자정보 포함)를 직접 서빙
+  const homeExtraHead = `<link rel="canonical" href="${AIFASHION_BASE}/" />\n  ${homeStructuredData()}`
   return c.html(htmlShell('홈', `
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
@@ -3869,6 +3961,23 @@ app.get('/', (c) => {
     </div>
   </section>
 
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-tag"><i class="fas fa-circle-question"></i> 자주 묻는 질문</div>
+        <h2 class="section-title">궁금한 점이<br />있으신가요?</h2>
+      </div>
+      <div class="faq-list">
+        ${HOME_FAQ.map(item => `
+        <details class="faq-item">
+          <summary class="faq-question">${item.q}</summary>
+          <p class="faq-answer">${item.a}</p>
+        </details>`).join('')}
+      </div>
+    </div>
+  </section>
+
   <!-- CTA -->
   <section id="cta-section">
     <div class="container">
@@ -4033,7 +4142,7 @@ app.get('/', (c) => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
-  `))
+  `, homeExtraHead))
 })
 
 // ─── Dashboard Page ───
