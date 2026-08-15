@@ -1056,19 +1056,19 @@ app.delete('/api/admin/home-feature-bg/:slot', adminAuth, async (c) => {
 })
 
 // ── 이용방법 섹션 우측 9:16 소개 영상 (고정 2슬롯) ──
+// KV 값 크기 한도(25MB)를 base64 오버헤드(약 33%) 없이 최대한 활용하기 위해
+// 바이너리 그대로 저장하고, 재생은 별도 스트리밍 엔드포인트를 통해 제공한다.
 const HOME_HOWTO_VIDEO_SLOTS = [1, 2]
+const HOWTO_VIDEO_MAX_BYTES = 22 * 1024 * 1024 // KV 25MB 한도 대비 여유
 
-async function kvGetHowtoVideo(kv: KVNamespace, slot: number): Promise<string | null> {
-  return await kv.get(`home_howto_video_${slot}`)
-}
-
-// GET /api/home/howto-videos — 홈페이지에서 쓰는 공개 엔드포인트
+// GET /api/home/howto-videos — 홈페이지에서 쓰는 공개 엔드포인트 (슬롯별 재생 URL 목록)
 app.get('/api/home/howto-videos', async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
   const result: Record<string, string | null> = {}
   if (kv) {
     for (const slot of HOME_HOWTO_VIDEO_SLOTS) {
-      result[slot] = await kvGetHowtoVideo(kv, slot)
+      const meta = await kv.getWithMetadata(`home_howto_video_${slot}`)
+      result[slot] = meta.value != null ? `/api/home/howto-video/${slot}` : null
     }
   } else {
     HOME_HOWTO_VIDEO_SLOTS.forEach(slot => { result[slot] = null })
@@ -1076,17 +1076,64 @@ app.get('/api/home/howto-videos', async (c) => {
   return c.json({ videos: result })
 })
 
-// PUT /api/admin/home-howto-video/:slot — 슬롯별 영상 설정
+// GET /api/home/howto-video/:slot — 실제 영상 바이너리 스트리밍 (Range 요청 지원 — Safari 등 재생 호환용)
+app.get('/api/home/howto-video/:slot', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.notFound()
+  const slot = Number(c.req.param('slot'))
+  if (!HOME_HOWTO_VIDEO_SLOTS.includes(slot)) return c.notFound()
+  const { value, metadata } = await kv.getWithMetadata(`home_howto_video_${slot}`, 'arrayBuffer')
+  if (!value) return c.notFound()
+  const buf = value as ArrayBuffer
+  const contentType = (metadata as any)?.contentType || 'video/mp4'
+  const total = buf.byteLength
+
+  const range = c.req.header('range')
+  if (range) {
+    const m = range.match(/bytes=(\d*)-(\d*)/)
+    if (m) {
+      const start = m[1] ? parseInt(m[1], 10) : 0
+      const end = m[2] ? parseInt(m[2], 10) : total - 1
+      const safeStart = Math.max(0, Math.min(start, total - 1))
+      const safeEnd = Math.max(safeStart, Math.min(end, total - 1))
+      const chunk = buf.slice(safeStart, safeEnd + 1)
+      return new Response(chunk, {
+        status: 206,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Range': `bytes ${safeStart}-${safeEnd}/${total}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': String(chunk.byteLength),
+          'Cache-Control': 'public, max-age=3600',
+        },
+      })
+    }
+  }
+
+  return new Response(buf, {
+    headers: {
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'public, max-age=3600',
+      'Content-Length': String(total),
+    },
+  })
+})
+
+// PUT /api/admin/home-howto-video/:slot — 슬롯별 영상 설정 (바이너리 바디)
 app.put('/api/admin/home-howto-video/:slot', adminAuth, async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
   if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
   const slot = Number(c.req.param('slot'))
   if (!HOME_HOWTO_VIDEO_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
   try {
-    const body: any = await c.req.json()
-    const videoBase64 = body?.videoBase64 || ''
-    if (!videoBase64) return c.json({ success: false, message: 'videoBase64 필수' }, 400)
-    await kv.put(`home_howto_video_${slot}`, videoBase64)
+    const body = await c.req.arrayBuffer()
+    if (!body || body.byteLength === 0) return c.json({ success: false, message: '영상 파일이 필요합니다.' }, 400)
+    if (body.byteLength > HOWTO_VIDEO_MAX_BYTES) {
+      return c.json({ success: false, message: `영상 용량은 ${Math.floor(HOWTO_VIDEO_MAX_BYTES / 1024 / 1024)}MB 이하만 가능합니다.` }, 400)
+    }
+    const contentType = c.req.header('content-type') || 'video/mp4'
+    await kv.put(`home_howto_video_${slot}`, body, { metadata: { contentType } })
     return c.json({ success: true })
   } catch (e: any) {
     return c.json({ success: false, message: e.message }, 500)
@@ -1139,6 +1186,14 @@ function parseGoogleNewsRss(xml: string): Array<{ title: string; link: string; s
 // GET /api/fashion-news — 생성 대기 화면에 보여줄 패션 뉴스 목록 (구글 뉴스 RSS)
 app.get('/api/fashion-news', async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+
+  async function staleCache(): Promise<Array<{ title: string; link: string; source: string; pubDate: string }> | null> {
+    if (!kv) return null
+    const cached = await kv.get(FASHION_NEWS_KV_KEY)
+    if (!cached) return null
+    try { return JSON.parse(cached).news || null } catch { return null }
+  }
+
   try {
     if (kv) {
       const cached = await kv.get(FASHION_NEWS_KV_KEY)
@@ -1151,25 +1206,33 @@ app.get('/api/fashion-news', async (c) => {
     }
 
     const rssUrl = 'https://news.google.com/rss/search?q=%ED%8C%A8%EC%85%98&hl=ko&gl=KR&ceid=KR:ko'
-    const res = await fetch(rssUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    const res = await fetch(rssUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        'Accept-Language': 'ko-KR,ko;q=0.9',
+      },
+    })
     if (!res.ok) throw new Error(`RSS fetch failed: ${res.status}`)
     const xml = await res.text()
     const news = parseGoogleNewsRss(xml)
 
-    if (kv && news.length > 0) {
+    if (news.length === 0) {
+      // 파싱 결과가 비어 있으면(구글 응답 형식 변경 등) 만료된 캐시라도 있으면 그걸 반환
+      const stale = await staleCache()
+      if (stale && stale.length > 0) return c.json({ news: stale })
+      console.warn('fashion-news: RSS 응답에서 기사 파싱 실패 (item 0개)')
+      return c.json({ news: [] })
+    }
+
+    if (kv) {
       await kv.put(FASHION_NEWS_KV_KEY, JSON.stringify({ fetchedAt: Date.now(), news }))
     }
     return c.json({ news })
   } catch (e: any) {
     console.warn('fashion-news fetch error:', e.message)
-    // 실패 시 만료된 캐시라도 있으면 반환
-    if (kv) {
-      const cached = await kv.get(FASHION_NEWS_KV_KEY)
-      if (cached) {
-        try { return c.json({ news: JSON.parse(cached).news }) } catch {}
-      }
-    }
-    return c.json({ news: [] })
+    const stale = await staleCache()
+    return c.json({ news: stale || [] })
   }
 })
 
@@ -5729,7 +5792,7 @@ app.get('/admin02', (c) => {
 
       <!-- 이용방법 섹션 9:16 소개 영상 -->
       <div class="upload-form">
-        <h3><i class="fas fa-film" style="color:#ff6b6b;"></i> 이용방법 소개 영상 <span style="font-size:13px;font-weight:400;color:#888;">(9:16 세로 영상, 슬롯별 1개, 15MB 이하, 미등록 시 빈 박스 유지)</span></h3>
+        <h3><i class="fas fa-film" style="color:#ff6b6b;"></i> 이용방법 소개 영상 <span style="font-size:13px;font-weight:400;color:#888;">(9:16 세로 영상, 슬롯별 1개, 20MB 이하, 미등록 시 빈 박스 유지)</span></h3>
         <div id="howtoVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
     </div>
@@ -6652,13 +6715,12 @@ function pickHowtoVideo(slot) {
 async function onHowtoVideoSelect(e) {
   const file = e.target.files?.[0]
   if (!file || !_pendingHowtoVideoSlot) return
-  if (file.size > 15 * 1024 * 1024) { alert('영상 용량이 너무 큽니다. 15MB 이하 파일을 사용해주세요.'); return }
-  const base64 = await readFileAsBase64(file)
+  if (file.size > 20 * 1024 * 1024) { alert('영상 용량이 너무 큽니다. 20MB 이하 파일을 사용해주세요.'); return }
   try {
     const res = await fetch('/api/admin/home-howto-video/' + _pendingHowtoVideoSlot, {
       method: 'PUT',
-      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
-      body: JSON.stringify({ videoBase64: base64 }),
+      headers: {'Content-Type': file.type || 'video/mp4', 'X-Admin-Password':adminPassword},
+      body: file,
     })
     const data = await res.json()
     if (!data.success) { alert('업로드 실패: ' + (data.message || '알 수 없는 오류')); return }
