@@ -1218,11 +1218,21 @@ app.get('/api/fashion-news', async (c) => {
     const news = parseGoogleNewsRss(xml)
 
     if (news.length === 0) {
-      // 파싱 결과가 비어 있으면(구글 응답 형식 변경 등) 만료된 캐시라도 있으면 그걸 반환
+      // 파싱 결과가 비어 있으면(구글 응답 형식 변경/차단 등) 만료된 캐시라도 있으면 그걸 반환
       const stale = await staleCache()
       if (stale && stale.length > 0) return c.json({ news: stale })
       console.warn('fashion-news: RSS 응답에서 기사 파싱 실패 (item 0개)')
-      return c.json({ news: [] })
+      // 임시 진단 정보 — 원인 파악되면 제거 예정
+      return c.json({
+        news: [],
+        _debug: {
+          httpStatus: res.status,
+          xmlLength: xml.length,
+          hasItemTag: xml.includes('<item>'),
+          hasRssTag: xml.includes('<rss'),
+          preview: xml.slice(0, 500),
+        },
+      })
     }
 
     if (kv) {
@@ -1232,7 +1242,9 @@ app.get('/api/fashion-news', async (c) => {
   } catch (e: any) {
     console.warn('fashion-news fetch error:', e.message)
     const stale = await staleCache()
-    return c.json({ news: stale || [] })
+    if (stale && stale.length > 0) return c.json({ news: stale })
+    // 임시 진단 정보 — 원인 파악되면 제거 예정
+    return c.json({ news: [], _debug: { error: e.message } })
   }
 })
 
