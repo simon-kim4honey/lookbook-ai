@@ -1367,6 +1367,28 @@ function toggleUserMenu() {
   }
 }
 
+// 모바일 네비게이션(햄버거 메뉴) 토글
+function toggleMobileNav() {
+  const nav = document.getElementById('navbarNav');
+  const btn = document.getElementById('navbarToggle');
+  if (!nav || !btn) return;
+  const isOpen = nav.classList.toggle('open');
+  btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  const icon = btn.querySelector('i');
+  if (icon) icon.className = isOpen ? 'fas fa-xmark' : 'fas fa-bars';
+}
+
+function closeMobileNav() {
+  const nav = document.getElementById('navbarNav');
+  const btn = document.getElementById('navbarToggle');
+  if (nav) nav.classList.remove('open');
+  if (btn) {
+    btn.setAttribute('aria-expanded', 'false');
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = 'fas fa-bars';
+  }
+}
+
 // ─────────────────────────────────────────────────────────
 // DASHBOARD
 // ─────────────────────────────────────────────────────────

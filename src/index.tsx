@@ -3967,10 +3967,15 @@ app.get('/', (c) => {
     #features .feature-card:hover { border-color: #000 !important; }
 
     /* How it works */
-    #how-it-works .steps-grid { grid-template-columns: repeat(3, 1fr) !important; max-width: 720px; margin: 0 auto; }
+    #how-it-works .steps-grid { grid-template-columns: repeat(3, 1fr) !important; max-width: 720px; margin: 0; }
     #how-it-works .steps-grid::before { background: #ddd !important; }
+    #how-it-works .section-header--left { text-align: left; margin: 0 0 32px; }
+    #how-it-works .section-header--left .section-desc { margin-left: 0; }
     #how-it-works .step-card:hover .step-num { background: #f0f0f0 !important; border-color: #000 !important; }
     #how-it-works .step-num i { color: #000 !important; }
+    @media (max-width: 560px) {
+      #how-it-works .steps-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    }
 
     /* Pricing */
     #pricing .pricing-plan { color: #000 !important; }
@@ -3990,15 +3995,18 @@ app.get('/', (c) => {
       <a href="/" class="navbar-logo">
         <span>EZlook</span>
       </a>
-      <div class="navbar-nav">
-        <a href="#features">기능</a>
-        <a href="#how-it-works">이용방법</a>
-        <a href="#pricing">요금제</a>
-        <a href="/dashboard">대시보드</a>
+      <div class="navbar-nav" id="navbarNav">
+        <a href="#features" onclick="closeMobileNav()">기능</a>
+        <a href="#how-it-works" onclick="closeMobileNav()">이용방법</a>
+        <a href="#pricing" onclick="closeMobileNav()">요금제</a>
+        <a href="/dashboard" onclick="closeMobileNav()">대시보드</a>
       </div>
       <div class="navbar-actions" style="position:relative;">
         <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')" data-i18n="nav-login">로그인</button>
         <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')" data-i18n="nav-signup">무료 시작</button>
+        <button class="navbar-toggle" id="navbarToggle" onclick="toggleMobileNav()" aria-label="메뉴 열기" aria-expanded="false">
+          <i class="fas fa-bars"></i>
+        </button>
         <!-- 로그인 후 프로필 아이콘만 표시 -->
         <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
           <span id="navUserCredits" style="display:none;"></span>
@@ -4118,13 +4126,13 @@ app.get('/', (c) => {
   <!-- How It Works -->
   <section id="how-it-works">
     <div class="container">
-      <div class="section-header">
-        <div class="section-tag"><i class="fas fa-route"></i> 이용 방법</div>
-        <h2 class="section-title">3단계로 완성되는<br />AI 룩북 제작</h2>
-        <p class="section-desc">국내에서 가장 적은 클릭으로 상품 이미지를 모델컷으로 바꿔드립니다.</p>
-      </div>
       <div class="howto-layout">
         <div class="howto-content">
+          <div class="section-header section-header--left">
+            <div class="section-tag"><i class="fas fa-route"></i> 이용 방법</div>
+            <h2 class="section-title">3단계로 완성되는<br />AI 룩북 제작</h2>
+            <p class="section-desc">국내에서 가장 적은 클릭으로 상품 이미지를 모델컷으로 바꿔드립니다.</p>
+          </div>
           <div class="steps-grid">
             <div class="step-card">
               <div class="step-num"><i class="fas fa-shirt"></i></div>
@@ -4142,7 +4150,7 @@ app.get('/', (c) => {
               <div class="step-desc">배경만 고르면 AI가 알아서 완성해드려요</div>
             </div>
           </div>
-          <div style="text-align:center;margin-top:48px;">
+          <div style="text-align:left;margin-top:48px;">
             <a href="/generator" class="btn btn-primary btn-lg">
               <i class="fas fa-wand-magic-sparkles"></i>
               지금 바로 시작하기
@@ -5218,8 +5226,8 @@ app.get('/generator', (c) => {
         </div>
         <!-- 생성 중 오버레이 (step-3 내부) -->
         <div class="generating-view" id="generatingView">
-          <div class="gen-spinner"></div>
-          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;">AI가 이미지를 생성 중입니다...</h2>
+          <div class="gen-news" id="genViewNews" style="display:none;"></div>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 이미지를 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="genStatusText" data-i18n="gen-status-init">시작 중...</div>
           <div class="gen-status-msgs">
@@ -5229,7 +5237,6 @@ app.get('/generator', (c) => {
             <div class="gen-msg" id="msg4"><div class="dot"></div> 이미지 품질 향상 중...</div>
             <div class="gen-msg" id="msg5"><div class="dot"></div> 최종 렌더링 중...</div>
           </div>
-          <div class="gen-news" id="genViewNews" style="display:none;"></div>
         </div>
         <div class="gslide-nav" id="step3Nav">
           <div class="gslide-nav-inner">
