@@ -3203,7 +3203,11 @@ const htmlShell = (title: string, bodyContent: string, extraHead: string = '', d
   <meta property="og:title" content="${title} | EZlook" />
   <meta property="og:description" content="${description}" />
   <meta property="og:locale" content="ko_KR" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="${AIFASHION_BASE}/static/og-image.jpg" />
+  <meta property="og:image:width" content="928" />
+  <meta property="og:image:height" content="1232" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="${AIFASHION_BASE}/static/og-image.jpg" />
   <meta name="naver-site-verification" content="fda79db143bdb87618cabb15ab207023cff2f5da" />
   <meta name="google-site-verification" content="W4DGx5Ts0G07ZjGwcRMDUo1e-zAocUD1UNo2KOjyRz0" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=${BUILD_VERSION}" />
