@@ -3205,6 +3205,7 @@ const htmlShell = (title: string, bodyContent: string, extraHead: string = '', d
   <meta property="og:locale" content="ko_KR" />
   <meta name="twitter:card" content="summary" />
   <meta name="naver-site-verification" content="fda79db143bdb87618cabb15ab207023cff2f5da" />
+  <meta name="google-site-verification" content="W4DGx5Ts0G07ZjGwcRMDUo1e-zAocUD1UNo2KOjyRz0" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=${BUILD_VERSION}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
