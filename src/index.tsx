@@ -1055,10 +1055,10 @@ app.delete('/api/admin/home-feature-bg/:slot', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
-// ── 이용방법 섹션 우측 9:16 소개 영상 (고정 2슬롯) ──
+// ── 이용방법 섹션 우측 9:16 소개 영상 (고정 1슬롯) ──
 // KV 값 크기 한도(25MB)를 base64 오버헤드(약 33%) 없이 최대한 활용하기 위해
 // 바이너리 그대로 저장하고, 재생은 별도 스트리밍 엔드포인트를 통해 제공한다.
-const HOME_HOWTO_VIDEO_SLOTS = [1, 2]
+const HOME_HOWTO_VIDEO_SLOTS = [1]
 const HOWTO_VIDEO_MAX_BYTES = 22 * 1024 * 1024 // KV 25MB 한도 대비 여유
 
 // GET /api/home/howto-videos — 홈페이지에서 쓰는 공개 엔드포인트 (슬롯별 재생 URL 목록)
@@ -4224,9 +4224,6 @@ app.get('/', (c) => {
           <div class="howto-video-box" data-howto-video-slot="1">
             <video muted loop playsinline autoplay preload="metadata"></video>
           </div>
-          <div class="howto-video-box" data-howto-video-slot="2">
-            <video muted loop playsinline autoplay preload="metadata"></video>
-          </div>
         </div>
       </div>
     </div>
@@ -5792,7 +5789,7 @@ app.get('/admin02', (c) => {
 
       <!-- 이용방법 섹션 9:16 소개 영상 -->
       <div class="upload-form">
-        <h3><i class="fas fa-film" style="color:#ff6b6b;"></i> 이용방법 소개 영상 <span style="font-size:13px;font-weight:400;color:#888;">(9:16 세로 영상, 슬롯별 1개, 20MB 이하, 미등록 시 빈 박스 유지)</span></h3>
+        <h3><i class="fas fa-film" style="color:#ff6b6b;"></i> 이용방법 소개 영상 <span style="font-size:13px;font-weight:400;color:#888;">(9:16 세로 영상 1개, 20MB 이하, 미등록 시 빈 박스 유지)</span></h3>
         <div id="howtoVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
     </div>
@@ -6671,7 +6668,7 @@ async function deleteFeatureBg(slot) {
 // ══════════════════════════════════════════════
 //  홈페이지 관리 — 이용방법 섹션 9:16 소개 영상 (고정 2슬롯)
 // ══════════════════════════════════════════════
-const HOWTO_VIDEO_LABELS = { 1: '영상 박스 1', 2: '영상 박스 2' }
+const HOWTO_VIDEO_LABELS = { 1: '영상 박스' }
 
 async function loadHowtoVideos() {
   const grid = document.getElementById('howtoVideoGrid')
