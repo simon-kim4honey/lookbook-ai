@@ -429,6 +429,7 @@ function initPage() {
       // Landing — verifySession 후 UI만 업데이트됨
       initHomeShowcase();
       initHomeFeatureBgs();
+      initHowtoVideos();
     } else if (path === '/dashboard') {
       initDashboard();
     } else if (path === '/generator') {
@@ -499,12 +500,36 @@ async function initHomeFeatureBgs() {
       if (bg) {
         card.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.55),rgba(0,0,0,0.55)), url(${bg})`;
         card.style.backgroundSize = 'cover';
-        card.style.backgroundPosition = 'center';
+        card.style.backgroundPosition = 'center 20%';
         card.classList.add('feature-card--has-bg');
       }
     });
   } catch (e) {
     console.warn('기능 박스 배경 로딩 실패:', e);
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// 이용방법 섹션 9:16 소개 영상 (관리자 업로드, 슬롯별 1개)
+// ─────────────────────────────────────────────────────────
+async function initHowtoVideos() {
+  const boxes = document.querySelectorAll('.howto-video-box[data-howto-video-slot]');
+  if (!boxes.length) return;
+  try {
+    const res = await fetch('/api/home/howto-videos');
+    const data = await res.json();
+    const videos = data.videos || {};
+    boxes.forEach(box => {
+      const slot = box.getAttribute('data-howto-video-slot');
+      const src = videos[slot];
+      const video = box.querySelector('video');
+      if (src && video) {
+        video.src = src;
+        box.classList.add('howto-video-box--has-video');
+      }
+    });
+  } catch (e) {
+    console.warn('이용방법 영상 로딩 실패:', e);
   }
 }
 
