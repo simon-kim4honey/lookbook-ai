@@ -3204,6 +3204,7 @@ const htmlShell = (title: string, bodyContent: string, extraHead: string = '', d
   <meta property="og:description" content="${description}" />
   <meta property="og:locale" content="ko_KR" />
   <meta name="twitter:card" content="summary" />
+  <meta name="naver-site-verification" content="fda79db143bdb87618cabb15ab207023cff2f5da" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=${BUILD_VERSION}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
