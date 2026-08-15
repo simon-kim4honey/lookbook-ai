@@ -1390,6 +1390,60 @@ function closeMobileNav() {
 }
 
 // ─────────────────────────────────────────────────────────
+// 홈페이지 요금제 카드 — 충전 금액 드롭다운 선택
+// ─────────────────────────────────────────────────────────
+function togglePricingSelect() {
+  const wrap = document.getElementById('pricingSelect');
+  if (!wrap) return;
+  const isOpen = wrap.classList.toggle('open');
+  const trigger = document.getElementById('pricingSelectTrigger');
+  if (trigger) trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+  if (isOpen) {
+    const closeOnOutsideClick = (e) => {
+      if (!wrap.contains(e.target)) {
+        wrap.classList.remove('open');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        document.removeEventListener('click', closeOnOutsideClick);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeOnOutsideClick), 10);
+  }
+}
+
+function selectPricingTier(el) {
+  document.querySelectorAll('#pricingSelectMenu .pricing-select-item').forEach(item => {
+    item.classList.remove('selected');
+    const check = item.querySelector('i.fa-check');
+    if (check) check.style.visibility = 'hidden';
+  });
+  el.classList.add('selected');
+  const check = el.querySelector('i.fa-check');
+  if (check) check.style.visibility = 'visible';
+
+  const amount = Number(el.getAttribute('data-amount'));
+  const credits = el.getAttribute('data-credits');
+  const images = el.getAttribute('data-images');
+  const bonus = el.getAttribute('data-bonus');
+
+  const amountEl = document.getElementById('pricingAmount');
+  if (amountEl) amountEl.textContent = '₩' + amount.toLocaleString();
+
+  const descEl = document.getElementById('pricingDesc');
+  if (descEl) {
+    const creditsFmt = Number(credits).toLocaleString();
+    descEl.innerHTML = `${creditsFmt} 크레딧 · 이미지 최대 ${images}장` + (bonus ? `<br />${bonus}` : '');
+  }
+
+  const triggerLabel = document.getElementById('pricingSelectTriggerLabel');
+  if (triggerLabel) triggerLabel.textContent = `${amount.toLocaleString()}원 · ${Number(credits).toLocaleString()} 크레딧`;
+
+  const wrap = document.getElementById('pricingSelect');
+  const trigger = document.getElementById('pricingSelectTrigger');
+  if (wrap) wrap.classList.remove('open');
+  if (trigger) trigger.setAttribute('aria-expanded', 'false');
+}
+
+// ─────────────────────────────────────────────────────────
 // DASHBOARD
 // ─────────────────────────────────────────────────────────
 function initDashboard() {
