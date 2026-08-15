@@ -2122,6 +2122,35 @@ footer {
 .gen-msg.current .dot { background: var(--primary); animation: pulse 1s infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
+/* 로딩 중 패션 뉴스 로테이터 */
+.gen-news {
+  margin-top: 20px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  max-width: 480px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  animation: gen-news-fade 0.4s ease;
+}
+@keyframes gen-news-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.gen-news-tag { font-size: 11px; font-weight: 700; color: var(--primary); margin-bottom: 6px; letter-spacing: 0.02em; }
+.gen-news-headline {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  line-height: 1.5;
+}
+.gen-news-headline:hover { text-decoration: underline; }
+.gen-news-source { margin-top: 6px; font-size: 11px; color: var(--text-muted); }
+
 /* Results (Step 6) */
 .results-toolbar {
   display: flex;

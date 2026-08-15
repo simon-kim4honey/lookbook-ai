@@ -1103,6 +1103,76 @@ app.delete('/api/admin/home-howto-video/:slot', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// ────────────────────────────────────────────────────
+// 패션 뉴스 (생성 대기 화면 로테이터용) — 구글 뉴스 RSS 파싱 + KV 캐시
+// ────────────────────────────────────────────────────
+const FASHION_NEWS_KV_KEY = 'fashion_news_cache_v1'
+const FASHION_NEWS_TTL_MS = 20 * 60 * 1000 // 20분
+
+function stripCdata(s: string): string {
+  const m = s.match(/<!\[CDATA\[([\s\S]*?)\]\]>/)
+  return (m ? m[1] : s)
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+    .trim()
+}
+
+function parseGoogleNewsRss(xml: string): Array<{ title: string; link: string; source: string; pubDate: string }> {
+  const items: Array<{ title: string; link: string; source: string; pubDate: string }> = []
+  const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) || []
+  for (const block of itemBlocks) {
+    const titleMatch = block.match(/<title>([\s\S]*?)<\/title>/)
+    const linkMatch = block.match(/<link>([\s\S]*?)<\/link>/)
+    const sourceMatch = block.match(/<source[^>]*>([\s\S]*?)<\/source>/)
+    const pubDateMatch = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)
+    if (!titleMatch || !linkMatch) continue
+    items.push({
+      title: stripCdata(titleMatch[1]),
+      link: stripCdata(linkMatch[1]),
+      source: sourceMatch ? stripCdata(sourceMatch[1]) : '',
+      pubDate: pubDateMatch ? stripCdata(pubDateMatch[1]) : '',
+    })
+  }
+  return items.slice(0, 12)
+}
+
+// GET /api/fashion-news — 생성 대기 화면에 보여줄 패션 뉴스 목록 (구글 뉴스 RSS)
+app.get('/api/fashion-news', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  try {
+    if (kv) {
+      const cached = await kv.get(FASHION_NEWS_KV_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Date.now() - parsed.fetchedAt < FASHION_NEWS_TTL_MS) {
+          return c.json({ news: parsed.news })
+        }
+      }
+    }
+
+    const rssUrl = 'https://news.google.com/rss/search?q=%ED%8C%A8%EC%85%98&hl=ko&gl=KR&ceid=KR:ko'
+    const res = await fetch(rssUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+    if (!res.ok) throw new Error(`RSS fetch failed: ${res.status}`)
+    const xml = await res.text()
+    const news = parseGoogleNewsRss(xml)
+
+    if (kv && news.length > 0) {
+      await kv.put(FASHION_NEWS_KV_KEY, JSON.stringify({ fetchedAt: Date.now(), news }))
+    }
+    return c.json({ news })
+  } catch (e: any) {
+    console.warn('fashion-news fetch error:', e.message)
+    // 실패 시 만료된 캐시라도 있으면 반환
+    if (kv) {
+      const cached = await kv.get(FASHION_NEWS_KV_KEY)
+      if (cached) {
+        try { return c.json({ news: JSON.parse(cached).news }) } catch {}
+      }
+    }
+    return c.json({ news: [] })
+  }
+})
+
 // /api/proxy/model-image/:id — 기본 Unsplash 모델 제거로 404 반환
 app.get('/api/proxy/model-image/:id', (c) => c.notFound())
 
@@ -4643,6 +4713,7 @@ app.get('/dashboard', (c) => {
           <i class="fas fa-comment"></i> 카카오톡 공유
         </button>
       </div>
+      <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
       <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
   </div>
@@ -5158,6 +5229,7 @@ app.get('/generator', (c) => {
             <div class="gen-msg" id="msg4"><div class="dot"></div> 이미지 품질 향상 중...</div>
             <div class="gen-msg" id="msg5"><div class="dot"></div> 최종 렌더링 중...</div>
           </div>
+          <div class="gen-news" id="genViewNews" style="display:none;"></div>
         </div>
         <div class="gslide-nav" id="step3Nav">
           <div class="gslide-nav-inner">
@@ -5245,6 +5317,7 @@ app.get('/generator', (c) => {
           <i class="fas fa-comment"></i> 카카오톡 공유
         </button>
       </div>
+      <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
       <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
   </div>
