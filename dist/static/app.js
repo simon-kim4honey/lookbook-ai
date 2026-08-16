@@ -293,10 +293,14 @@ async function initLocale() {
   } catch (e) {
     _locale = 'ko';
   }
-  // 사용자가 직접 고른 언어가 있으면 자동감지 결과보다 우선
+  // 사용자가 직접 고른 언어가 있으면 자동감지 결과보다 우선 — 통화/PG도 함께 복원해야
+  // 페이지 이동/새로고침 후 언어는 English인데 결제는 나이스페이로 되돌아가는 문제가 생기지 않음
   const override = localStorage.getItem(LOCALE_OVERRIDE_KEY);
   if (override && I18N[override]) {
     _locale = override;
+    const market = LOCALE_MARKET_MAP[override] || LOCALE_MARKET_MAP.en;
+    _currency = market.currency;
+    _pg = market.pg;
   }
   // HTML lang 속성 설정
   document.documentElement.lang = _locale;
