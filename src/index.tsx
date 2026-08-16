@@ -2167,10 +2167,13 @@ app.delete('/api/generation/history/:id', async (c) => {
 // ────────────────────────────────────────────────────
 
 // 크레딧 패키지 정의
-const CREDIT_PACKAGES: Record<string, { amount: number; credits: number; label: string }> = {
-  pkg_20000: { amount: 20000, credits: 1000,  label: '20,000원 → 1,000크레딧' },
-  pkg_40000: { amount: 40000, credits: 2300,  label: '40,000원 → 2,300크레딧' },
-  pkg_60000: { amount: 60000, credits: 4000,  label: '60,000원 → 4,000크레딧' },
+// 크레딧 티어(1,000 / 2,300 / 4,000)는 전 세계 공통, 가격만 시장별로 별도 책정
+// (환율 환산이 아니라 각 시장 심리적 가격대에 맞춰 별도 설정 — 글로벌 로컬라이제이션 기획 참고)
+// usdCents/jpyAmount는 Stripe에 그대로 넘기는 최소 결제 단위 (USD=센트, JPY=엔 그대로 — Stripe 무소수점 통화)
+const CREDIT_PACKAGES: Record<string, { amount: number; credits: number; label: string; usdCents: number; jpyAmount: number }> = {
+  pkg_20000: { amount: 20000, credits: 1000,  label: '20,000원 → 1,000크레딧', usdCents: 999,  jpyAmount: 1480 },
+  pkg_40000: { amount: 40000, credits: 2300,  label: '40,000원 → 2,300크레딧', usdCents: 1999, jpyAmount: 2980 },
+  pkg_60000: { amount: 60000, credits: 4000,  label: '60,000원 → 4,000크레딧', usdCents: 2999, jpyAmount: 4480 },
 }
 
 // GET /api/payments/packages — 패키지 목록
@@ -2252,6 +2255,162 @@ async function sha256Hex(input: string): Promise<string> {
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
+
+// HMAC-SHA256 hex 다이제스트 (Stripe 웹훅 서명 검증용)
+async function hmacSha256Hex(secret: string, message: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message))
+  return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// ────────────────────────────────────────────────────
+// Stripe 결제 API — 해외(한국 제외) 시장 전용, 나이스페이먼츠와 별개 파이프라인
+// Stripe Checkout(호스팅 결제 페이지)을 사용 — 결제 UI 자체를 우리가 만들 필요 없음
+// ────────────────────────────────────────────────────
+
+// POST /api/stripe/checkout — Stripe Checkout Session 생성 후 결제 페이지 URL 반환
+app.post('/api/stripe/checkout', async (c) => {
+  const secretKey = c.env.STRIPE_SECRET_KEY
+  if (!secretKey) return c.json({ success: false, message: '서버 설정 오류: STRIPE_SECRET_KEY 미설정' }, 500)
+
+  const db: D1Database = c.env.LOOKBOOK_DB
+  const sessionToken = c.req.header('X-Session-Token') || ''
+  if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+  const sess = await db.prepare(
+    `SELECT s.user_id, u.email FROM user_sessions s
+     JOIN users u ON u.id = s.user_id
+     WHERE s.token = ? AND s.expires_at > datetime('now')`
+  ).bind(sessionToken).first() as any
+  if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
+
+  try {
+    const { packageId, currency } = await c.req.json() as any
+    const pkg = CREDIT_PACKAGES[packageId]
+    if (!pkg) return c.json({ error: '잘못된 패키지입니다.' }, 400)
+    const cur = String(currency || 'USD').toUpperCase()
+    if (cur !== 'USD' && cur !== 'JPY') return c.json({ error: '지원하지 않는 통화입니다.' }, 400)
+    const amount = cur === 'USD' ? pkg.usdCents : pkg.jpyAmount
+
+    const shortUid = sess.user_id.slice(0, 6)
+    const orderId = `lookbook-${shortUid}-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+
+    await db.prepare(
+      `INSERT INTO payment_logs (user_id, order_id, amount, credits, status, pg_provider, currency)
+       VALUES (?, ?, ?, ?, 'pending', 'stripe', ?)`
+    ).bind(sess.user_id, orderId, amount, pkg.credits, cur).run()
+
+    const origin = new URL(c.req.url).origin
+    const params = new URLSearchParams()
+    params.set('mode', 'payment')
+    params.set('success_url', `${origin}/payment/stripe/return?order_id=${orderId}`)
+    params.set('cancel_url', `${origin}/payment/fail`)
+    params.set('client_reference_id', orderId)
+    if (sess.email && !String(sess.email).endsWith('@kakao.local')) params.set('customer_email', sess.email)
+    params.set('line_items[0][price_data][currency]', cur.toLowerCase())
+    params.set('line_items[0][price_data][product_data][name]', `${pkg.label.split(' → ')[1] || pkg.label} (${pkg.credits.toLocaleString()} credits)`)
+    params.set('line_items[0][price_data][unit_amount]', String(amount))
+    params.set('line_items[0][quantity]', '1')
+    params.set('metadata[order_id]', orderId)
+
+    const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString(),
+    })
+    const session = await stripeRes.json() as any
+    if (!stripeRes.ok) {
+      console.error('Stripe checkout session error:', session)
+      return c.json({ success: false, message: session?.error?.message || 'Stripe 결제 세션 생성 실패' }, 500)
+    }
+
+    return c.json({ success: true, url: session.url })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /payment/stripe/return — Stripe Checkout 성공 후 리다이렉트 (실제 크레딧 지급은 웹훅에서 처리)
+app.get('/payment/stripe/return', async (c) => {
+  const orderId = c.req.query('order_id') || ''
+  return c.redirect(`/payment/success?orderId=${encodeURIComponent(orderId)}`, 302)
+})
+
+// POST /payment/stripe/webhook — Stripe 결제 완료 통보. 서명 검증 후 크레딧 지급
+app.post('/payment/stripe/webhook', async (c) => {
+  const webhookSecret = c.env.STRIPE_WEBHOOK_SECRET
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    if (!webhookSecret) throw new Error('STRIPE_WEBHOOK_SECRET 미설정')
+
+    const sigHeader = c.req.header('stripe-signature') || ''
+    const rawBody = await c.req.text()
+
+    // stripe-signature 형식: "t=<timestamp>,v1=<hex signature>[,v0=...]"
+    const parts = Object.fromEntries(sigHeader.split(',').map(p => p.split('=')))
+    const timestamp = parts['t']
+    const v1 = parts['v1']
+    if (!timestamp || !v1) throw new Error('서명 헤더 형식 오류')
+
+    const expectedSig = await hmacSha256Hex(webhookSecret, `${timestamp}.${rawBody}`)
+    if (expectedSig !== v1) throw new Error('서명 불일치')
+
+    const event = JSON.parse(rawBody)
+
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object
+      const orderId = session.client_reference_id || session.metadata?.order_id
+      if (orderId) {
+        const log = await db.prepare(
+          `SELECT id, user_id, credits, status FROM payment_logs WHERE order_id = ? AND pg_provider = 'stripe'`
+        ).bind(orderId).first() as any
+
+        if (log && log.status === 'pending') {
+          await db.prepare(
+            `UPDATE payment_logs SET status='paid', payment_key=?, pg_raw=?, paid_at=datetime('now') WHERE id=?`
+          ).bind(session.payment_intent || session.id, JSON.stringify(session), log.id).run()
+
+          const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(log.user_id).first() as any
+          const newBal = (userRow?.credits ?? 0) + log.credits
+          await db.prepare(`UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`).bind(newBal, log.user_id).run()
+          await db.prepare(
+            `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id) VALUES (?, 'grant', ?, ?, 'payment', ?)`
+          ).bind(log.user_id, log.credits, newBal, orderId).run()
+
+          console.log(`[Stripe] Payment completed: ${orderId} → +${log.credits} credits (user ${log.user_id})`)
+        }
+      }
+    } else if (event.type === 'charge.refunded' || event.type === 'payment_intent.canceled') {
+      // 결제 취소/환불 통보 — 사용한 만큼 제외하고 크레딧 회수 (나이스페이 웹훅과 동일 정책)
+      const obj = event.data.object
+      const paymentKey = obj.payment_intent || obj.id
+      const log = await db.prepare(
+        `SELECT id, user_id, credits, status FROM payment_logs WHERE payment_key = ? AND pg_provider = 'stripe'`
+      ).bind(paymentKey).first() as any
+
+      if (log && log.status === 'paid') {
+        const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(log.user_id).first() as any
+        const currentBalance = userRow?.credits ?? 0
+        const clawback = Math.min(log.credits, currentBalance)
+        const newBal = currentBalance - clawback
+        await db.prepare(`UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`).bind(newBal, log.user_id).run()
+        await db.prepare(
+          `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id) VALUES (?, 'deduct', ?, ?, 'payment_refund', ?)`
+        ).bind(log.user_id, -clawback, newBal, paymentKey).run()
+        await db.prepare(`UPDATE payment_logs SET status='canceled' WHERE id=?`).bind(log.id).run()
+        console.log(`[Stripe] Refund clawback: ${paymentKey} → -${clawback} credits (user ${log.user_id})`)
+      }
+    }
+
+    return c.text('OK', 200)
+  } catch (err: any) {
+    console.error('Stripe webhook error:', err.message)
+    return c.text('Bad Request', 400)
+  }
+})
 
 // POST /payment/return — 나이스페이먼츠 returnUrl (결제창이 브라우저를 통해 이 주소로 직접 POST)
 // 서버 승인 모델: 여기서 위변조 서명 검증 후 승인 API를 호출해야 실제 결제(승인)가 완료됨
@@ -6953,24 +7112,31 @@ app.get('/payment/success', (c) => {
     const orderId = params.get('orderId')
     const sessionToken = localStorage.getItem('lookbook_token') || ''
 
-    async function loadPaymentStatus() {
+    async function loadPaymentStatus(attempt) {
+      attempt = attempt || 1
       try {
         const res = await fetch('/api/payments/status?orderId=' + encodeURIComponent(orderId), {
           headers: { 'X-Session-Token': sessionToken },
         })
         const data = await res.json()
-        document.getElementById('loadingState').classList.add('hidden')
         if (data.success) {
+          document.getElementById('loadingState').classList.add('hidden')
           document.getElementById('successMsg').textContent = '크레딧이 충전되었습니다.'
           document.getElementById('creditsGranted').textContent = '+' + data.credits.toLocaleString() + ' 크레딧'
           document.getElementById('creditsTotal').textContent = data.creditsTotal.toLocaleString() + ' 크레딧'
           document.getElementById('successState').classList.remove('hidden')
           // 세션스토리지에 갱신 신호
           sessionStorage.setItem('creditsRefresh', '1')
-        } else {
-          document.getElementById('errorMsg').textContent = data.error || '알 수 없는 오류가 발생했습니다.'
-          document.getElementById('errorState').classList.remove('hidden')
+          return
         }
+        // Stripe는 웹훅이 비동기로 도착하므로, 아직 pending이면 잠깐 재시도 (최대 5회, 1.5초 간격)
+        if (data.status === 'pending' && attempt < 5) {
+          setTimeout(() => loadPaymentStatus(attempt + 1), 1500)
+          return
+        }
+        document.getElementById('loadingState').classList.add('hidden')
+        document.getElementById('errorMsg').textContent = data.error || '알 수 없는 오류가 발생했습니다.'
+        document.getElementById('errorState').classList.remove('hidden')
       } catch (e) {
         document.getElementById('loadingState').classList.add('hidden')
         document.getElementById('errorMsg').textContent = '네트워크 오류가 발생했습니다.'

@@ -95,6 +95,7 @@ const I18N = {
     // 결제
     payFail: (msg) => msg || '결제 중 오류가 발생했습니다.',
     paySelectPkg: '패키지를 선택해주세요.',
+    payBtnSuffix: '결제',
     // 프로젝트
     projectDownload: '이미지를 다운로드합니다.',
     projectOpen: (name) => `"${name}" 프로젝트를 엽니다.`,
@@ -178,6 +179,7 @@ const I18N = {
     favIcon: (isFav) => isFav ? '❤️' : '🤍',
     payFail: (msg) => msg || 'An error occurred during payment.',
     paySelectPkg: 'Please select a package.',
+    payBtnSuffix: 'Checkout',
     projectDownload: 'Downloading images.',
     projectOpen: (name) => `Opening project "${name}".`,
   },
@@ -260,6 +262,7 @@ const I18N = {
     favIcon: (isFav) => isFav ? '❤️' : '🤍',
     payFail: (msg) => msg || '決済中にエラーが発生しました。',
     paySelectPkg: 'パッケージを選択してください。',
+    payBtnSuffix: '決済へ',
     projectDownload: '画像をダウンロードします。',
     projectOpen: (name) => `プロジェクト「${name}」を開きます。`,
   }
@@ -3515,6 +3518,13 @@ function closeChargePanel() {
   _selectedPkg = null;
 }
 
+// 패키지별 시장 가격 표시 (크레딧 티어는 공통, 가격만 시장별 별도 책정)
+const PKG_PRICE_DISPLAY = {
+  pkg_20000: { KRW: '20,000원', USD: '$9.99',  JPY: '¥1,480' },
+  pkg_40000: { KRW: '40,000원', USD: '$19.99', JPY: '¥2,980' },
+  pkg_60000: { KRW: '60,000원', USD: '$29.99', JPY: '¥4,480' },
+};
+
 function selectPackage(pkgId, el) {
   _selectedPkg = pkgId;
   document.querySelectorAll('.pkg-card').forEach(c => {
@@ -3526,14 +3536,17 @@ function selectPackage(pkgId, el) {
   const cta = document.getElementById('chargeCta');
   const lbl = document.getElementById('ctaLabel');
   if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-  const map = { pkg_20000: '20,000원 결제', pkg_40000: '40,000원 결제', pkg_60000: '60,000원 결제' };
-  if (lbl) lbl.textContent = map[pkgId] || '결제하기';
+  const price = (PKG_PRICE_DISPLAY[pkgId] && PKG_PRICE_DISPLAY[pkgId][_currency]) || PKG_PRICE_DISPLAY[pkgId].KRW;
+  if (lbl) lbl.textContent = `${price} ${t('payBtnSuffix')}`;
 }
 
 async function startPayment() {
   if (!_selectedPkg) { showToast(t('paySelectPkg'), 'error'); return; }
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   if (!sessionToken) { showToast(t('loginRequired'), 'error'); return; }
+
+  // 한국(나이스페이) 외 시장은 Stripe Checkout으로 분기
+  if (_pg === 'stripe') { return startStripePayment(); }
 
   const cta = document.getElementById('chargeCta');
   try {
@@ -3586,6 +3599,28 @@ function loadNicepaySDK() {
     s.onerror = () => reject(new Error('나이스페이먼츠 SDK 로드 실패'));
     document.head.appendChild(s);
   });
+}
+
+// 해외(한국 제외) 시장 결제 — Stripe Checkout(호스팅 결제 페이지)으로 이동
+async function startStripePayment() {
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  const cta = document.getElementById('chargeCta');
+  try {
+    if (cta) { cta.style.opacity = '0.6'; cta.style.pointerEvents = 'none'; }
+    const res = await fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+      body: JSON.stringify({ packageId: _selectedPkg, currency: _currency }),
+    });
+    if (res.status === 401) { showToast(t('loginRequired'), 'error'); return; }
+    const data = await res.json();
+    if (!data.success || !data.url) throw new Error(data.message || 'Stripe 결제 준비 실패');
+    // Stripe 호스팅 결제 페이지로 이동 — 결제 완료 후 success_url로 자동 복귀
+    location.href = data.url;
+  } catch (e) {
+    if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
+    showToast(t('payFail', e.message), 'error');
+  }
 }
 
 // 결제 완료 후 creditsRefresh 신호 처리 (탭 복귀 시)
