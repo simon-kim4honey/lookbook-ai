@@ -305,11 +305,22 @@ async function initLocale() {
   applyStaticI18n();
 }
 
+// 언어별 기본 통화/PG — 서버의 resolveLocaleProfile()과 동일한 매핑.
+// 수동으로 언어를 바꾸면 결제 통화/PG도 함께 바뀜(한국어→나이스페이/KRW, 그 외→Stripe)
+const LOCALE_MARKET_MAP = {
+  ko: { currency: 'KRW', pg: 'nicepay' },
+  ja: { currency: 'JPY', pg: 'stripe' },
+  en: { currency: 'USD', pg: 'stripe' },
+};
+
 // 언어 스위처에서 수동으로 언어를 고른 경우
 function setLocaleOverride(locale) {
   if (!I18N[locale]) return;
   localStorage.setItem(LOCALE_OVERRIDE_KEY, locale);
   _locale = locale;
+  const market = LOCALE_MARKET_MAP[locale] || LOCALE_MARKET_MAP.en;
+  _currency = market.currency;
+  _pg = market.pg;
   document.documentElement.lang = _locale;
   updateLocaleSwitcherUI();
   applyStaticI18n();
