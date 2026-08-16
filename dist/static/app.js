@@ -268,6 +268,10 @@ const I18N = {
 // t() — 현재 locale의 번역 키 반환
 // 값이 함수면 인자 전달, 문자열이면 그대로 반환
 let _locale = 'ko'; // 기본값, initLocale()에서 갱신
+let _country = '';
+let _currency = 'KRW';
+let _pg = 'nicepay';
+const LOCALE_OVERRIDE_KEY = 'lookbook_locale_override';
 function t(key, ...args) {
   const dict = I18N[_locale] || I18N['en'];
   const val = dict[key] ?? I18N['en'][key] ?? key;
@@ -276,16 +280,75 @@ function t(key, ...args) {
 
 async function initLocale() {
   try {
-    const res = await fetch('/api/locale');
+    const token = localStorage.getItem('lookbook_token') || '';
+    const res = await fetch('/api/locale', { headers: token ? { 'X-Session-Token': token } : {} });
     const data = await res.json();
     _locale = data.locale || 'ko';
+    _country = data.country || '';
+    _currency = data.currency || 'KRW';
+    _pg = data.pg || 'nicepay';
   } catch (e) {
     _locale = 'ko';
   }
+  // 사용자가 직접 고른 언어가 있으면 자동감지 결과보다 우선
+  const override = localStorage.getItem(LOCALE_OVERRIDE_KEY);
+  if (override && I18N[override]) {
+    _locale = override;
+  }
   // HTML lang 속성 설정
   document.documentElement.lang = _locale;
+  updateLocaleSwitcherUI();
   // data-i18n 속성 정적 텍스트 교체
   applyStaticI18n();
+}
+
+// 언어 스위처에서 수동으로 언어를 고른 경우
+function setLocaleOverride(locale) {
+  if (!I18N[locale]) return;
+  localStorage.setItem(LOCALE_OVERRIDE_KEY, locale);
+  _locale = locale;
+  document.documentElement.lang = _locale;
+  updateLocaleSwitcherUI();
+  applyStaticI18n();
+  closeLocaleSwitcher();
+  // 로그인 상태면 서버에도 선호 언어를 저장해 다른 기기에서도 유지되게 함
+  const token = localStorage.getItem('lookbook_token');
+  if (token) {
+    fetch('/api/user/locale', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': token },
+      body: JSON.stringify({ locale, country: _country, currency: _currency }),
+    }).catch(() => {});
+  }
+}
+
+function updateLocaleSwitcherUI() {
+  const label = document.getElementById('localeSwitcherLabel');
+  const names = { ko: '한국어', en: 'English', ja: '日本語' };
+  if (label) label.textContent = names[_locale] || _locale;
+  document.querySelectorAll('#localeSwitcherMenu .locale-item').forEach(item => {
+    item.classList.toggle('selected', item.getAttribute('data-locale') === _locale);
+  });
+}
+
+function toggleLocaleSwitcher() {
+  const wrap = document.getElementById('localeSwitcher');
+  if (!wrap) return;
+  const isOpen = wrap.classList.toggle('open');
+  if (isOpen) {
+    const closeOnOutsideClick = (e) => {
+      if (!wrap.contains(e.target)) {
+        wrap.classList.remove('open');
+        document.removeEventListener('click', closeOnOutsideClick);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeOnOutsideClick), 10);
+  }
+}
+
+function closeLocaleSwitcher() {
+  const wrap = document.getElementById('localeSwitcher');
+  if (wrap) wrap.classList.remove('open');
 }
 
 // data-i18n 속성 기반 정적 텍스트 교체

@@ -1323,20 +1323,66 @@ app.get('/api/projects', (c) => {
   return c.json({ projects: sampleProjects })
 })
 
-// ── 국가 기반 locale 감지 ──────────────────────────────
+// ── 국가 기반 locale/통화/PG/공유채널 통합 감지 ──────────────
 // Workers for Platform dispatch 환경에서는 c.req.raw.cf가 전달되지 않으므로
-// Cloudflare가 모든 요청에 주입하는 CF-IPCountry 헤더를 우선 사용
-app.get('/api/locale', (c) => {
+// Cloudflare가 모든 요청에 주입하는 CF-IPCountry 헤더를 우선 사용.
+// 국내(한국)는 나이스페이먼츠, 해외는 전부 Stripe로 이원화 — 글로벌 로컬라이제이션 기획 참고.
+function resolveLocaleProfile(country: string) {
+  const cc = (country || '').toUpperCase()
+  if (cc === 'KR') return { locale: 'ko', currency: 'KRW', pg: 'nicepay', messenger: 'kakao' }
+  if (cc === 'JP') return { locale: 'ja', currency: 'JPY', pg: 'stripe', messenger: 'line' }
+  // 그 외 국가(미국 포함) — 기본값. 서비스 대상 시장은 en/USD/Stripe로 수렴
+  return { locale: 'en', currency: 'USD', pg: 'stripe', messenger: 'web-share' }
+}
+
+app.get('/api/locale', async (c) => {
   const country = (
     c.req.header('CF-IPCountry') ??
     c.req.header('cf-ipcountry') ??
     (c.req.raw as any).cf?.country ??
     ''
   ).toUpperCase()
-  let locale = 'en'
-  if (country === 'KR') locale = 'ko'
-  else if (country === 'JP') locale = 'ja'
-  return c.json({ locale, country })
+
+  // 로그인한 사용자가 이전에 직접 저장해둔 언어가 있으면 IP 감지보다 우선
+  const sessionToken = c.req.header('X-Session-Token') || ''
+  if (sessionToken) {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sess = await db.prepare(
+      `SELECT u.locale, u.country, u.currency FROM user_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token = ? AND s.expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (sess?.locale) {
+      return c.json({ country: sess.country || country, locale: sess.locale, currency: sess.currency || 'USD', pg: sess.locale === 'ko' ? 'nicepay' : 'stripe', messenger: sess.locale === 'ko' ? 'kakao' : (sess.locale === 'ja' ? 'line' : 'web-share') })
+    }
+  }
+
+  const profile = resolveLocaleProfile(country)
+  return c.json({ country, ...profile })
+})
+
+// PUT /api/user/locale — 로그인한 사용자의 언어/국가/통화 선호 저장
+app.put('/api/user/locale', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  const sessionToken = c.req.header('X-Session-Token') || ''
+  if (!sessionToken) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+  const sess = await db.prepare(
+    `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+  ).bind(sessionToken).first() as any
+  if (!sess) return c.json({ success: false, message: '세션이 만료되었습니다.' }, 401)
+
+  const body = await c.req.json() as any
+  const locale = ['ko', 'en', 'ja'].includes(body?.locale) ? body.locale : null
+  if (!locale) return c.json({ success: false, message: '지원하지 않는 언어입니다.' }, 400)
+  const country = typeof body?.country === 'string' ? body.country.slice(0, 8) : null
+  const currency = typeof body?.currency === 'string' ? body.currency.slice(0, 8) : null
+
+  await db.prepare(
+    `UPDATE users SET locale = ?, country = ?, currency = ?, updated_at = datetime('now') WHERE id = ?`
+  ).bind(locale, country, currency, sess.user_id).run()
+
+  return c.json({ success: true })
 })
 
 // ── 카카오톡 공유하기용 JS 키 조회 (공개 정보 — 카카오 로그인 REST 키와 무관) ──
@@ -4078,6 +4124,17 @@ app.get('/', (c) => {
         <a href="/dashboard" onclick="closeMobileNav()">대시보드</a>
       </div>
       <div class="navbar-actions" style="position:relative;">
+        <div class="locale-switcher" id="localeSwitcher">
+          <button type="button" class="locale-switcher-trigger" onclick="toggleLocaleSwitcher()" id="localeSwitcherTrigger" aria-label="언어 선택">
+            <i class="fas fa-globe"></i>
+            <span id="localeSwitcherLabel">한국어</span>
+          </button>
+          <div class="locale-switcher-menu" id="localeSwitcherMenu">
+            <div class="locale-item" data-locale="ko" onclick="setLocaleOverride('ko')">한국어</div>
+            <div class="locale-item" data-locale="en" onclick="setLocaleOverride('en')">English</div>
+            <div class="locale-item" data-locale="ja" onclick="setLocaleOverride('ja')">日本語</div>
+          </div>
+        </div>
         <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')" data-i18n="nav-login">로그인</button>
         <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')" data-i18n="nav-signup">무료 시작</button>
         <button class="navbar-toggle" id="navbarToggle" onclick="toggleMobileNav()" aria-label="메뉴 열기" aria-expanded="false">
