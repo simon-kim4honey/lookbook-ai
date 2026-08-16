@@ -2169,11 +2169,12 @@ app.delete('/api/generation/history/:id', async (c) => {
 // 크레딧 패키지 정의
 // 크레딧 티어(1,000 / 2,300 / 4,000)는 전 세계 공통, 가격만 시장별로 별도 책정
 // (환율 환산이 아니라 각 시장 심리적 가격대에 맞춰 별도 설정 — 글로벌 로컬라이제이션 기획 참고)
+// 미국/일본은 원화 환산 대비 더 높게 책정(결정 사항) — 국내가 아닌 해외 시장 프리미엄 반영
 // usdCents/jpyAmount는 Stripe에 그대로 넘기는 최소 결제 단위 (USD=센트, JPY=엔 그대로 — Stripe 무소수점 통화)
 const CREDIT_PACKAGES: Record<string, { amount: number; credits: number; label: string; usdCents: number; jpyAmount: number }> = {
-  pkg_20000: { amount: 20000, credits: 1000,  label: '20,000원 → 1,000크레딧', usdCents: 999,  jpyAmount: 1480 },
-  pkg_40000: { amount: 40000, credits: 2300,  label: '40,000원 → 2,300크레딧', usdCents: 1999, jpyAmount: 2980 },
-  pkg_60000: { amount: 60000, credits: 4000,  label: '60,000원 → 4,000크레딧', usdCents: 2999, jpyAmount: 4480 },
+  pkg_20000: { amount: 20000, credits: 1000,  label: '20,000원 → 1,000크레딧', usdCents: 1999, jpyAmount: 2980 },
+  pkg_40000: { amount: 40000, credits: 2300,  label: '40,000원 → 2,300크레딧', usdCents: 3499, jpyAmount: 4980 },
+  pkg_60000: { amount: 60000, credits: 4000,  label: '60,000원 → 4,000크레딧', usdCents: 4999, jpyAmount: 7980 },
 }
 
 // GET /api/payments/packages — 패키지 목록
@@ -2312,12 +2313,13 @@ app.post('/api/stripe/checkout', async (c) => {
     if (sess.email && !String(sess.email).endsWith('@kakao.local')) params.set('customer_email', sess.email)
     params.set('line_items[0][price_data][currency]', cur.toLowerCase())
     params.set('line_items[0][price_data][product_data][name]', `${pkg.label.split(' → ')[1] || pkg.label} (${pkg.credits.toLocaleString()} credits)`)
+    // 계정에 Managed Payments(자동 세금 계산)가 기본 켜져 있으면 product tax_code가
+    // 없는 임의 price_data는 세션 생성이 거부됨 — 전자적으로 공급되는 서비스(디지털 크레딧)
+    // 일반 코드로 지정. managed_payments[enabled]=false 만으로는 반영 안 되는 계정도 있어 병행 지정
+    params.set('line_items[0][price_data][product_data][tax_code]', 'txcd_10000000')
     params.set('line_items[0][price_data][unit_amount]', String(amount))
     params.set('line_items[0][quantity]', '1')
     params.set('metadata[order_id]', orderId)
-    // 계정에 Managed Payments(자동 세금 계산)가 기본 켜져 있으면 임의 price_data에
-    // product tax_code가 필요해져 세션 생성이 실패함 — 크레딧 판매는 세금 분류 대상이
-    // 아니므로 이 세션에서는 Managed Payments를 끔
     params.set('managed_payments[enabled]', 'false')
 
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {

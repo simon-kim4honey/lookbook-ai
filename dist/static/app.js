@@ -3533,11 +3533,11 @@ function closeChargePanel() {
   _selectedPkg = null;
 }
 
-// 패키지별 시장 가격 표시 (크레딧 티어는 공통, 가격만 시장별 별도 책정)
+// 패키지별 시장 가격 표시 (크레딧 티어는 공통, 가격만 시장별 별도 책정 — 미국/일본은 원화 환산 대비 프리미엄, 서버 CREDIT_PACKAGES와 동일하게 유지)
 const PKG_PRICE_DISPLAY = {
-  pkg_20000: { KRW: '20,000원', USD: '$9.99',  JPY: '¥1,480' },
-  pkg_40000: { KRW: '40,000원', USD: '$19.99', JPY: '¥2,980' },
-  pkg_60000: { KRW: '60,000원', USD: '$29.99', JPY: '¥4,480' },
+  pkg_20000: { KRW: '20,000원', USD: '$19.99', JPY: '¥2,980' },
+  pkg_40000: { KRW: '40,000원', USD: '$34.99', JPY: '¥4,980' },
+  pkg_60000: { KRW: '60,000원', USD: '$49.99', JPY: '¥7,980' },
 };
 
 function selectPackage(pkgId, el) {
