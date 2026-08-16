@@ -2315,6 +2315,10 @@ app.post('/api/stripe/checkout', async (c) => {
     params.set('line_items[0][price_data][unit_amount]', String(amount))
     params.set('line_items[0][quantity]', '1')
     params.set('metadata[order_id]', orderId)
+    // 계정에 Managed Payments(자동 세금 계산)가 기본 켜져 있으면 임의 price_data에
+    // product tax_code가 필요해져 세션 생성이 실패함 — 크레딧 판매는 세금 분류 대상이
+    // 아니므로 이 세션에서는 Managed Payments를 끔
+    params.set('managed_payments[enabled]', 'false')
 
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
