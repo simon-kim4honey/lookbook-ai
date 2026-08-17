@@ -3008,7 +3008,7 @@ function buildClothingReplaceInstructions(
 
 // ── 크레딧 상수 ──
 const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
-const CREDITS_PER_VIDEO = 600 // 영상 1개(5초)당 차감 크레딧 — 생성 시점에 즉시 차감
+const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
 
 app.post('/api/generation/start', async (c) => {
   try {
@@ -3502,7 +3502,7 @@ function generatePlaceholderImages(count: number) {
 
 // ────────────────────────────────────────────────────
 // 영상 생성 API — Atlas Cloud ByteDance Seedance 2.5 (image-to-video)
-// 생성된 이미지 속 모델이 자연스럽게 포즈를 취하는 5초 영상 생성
+// 생성된 이미지 속 모델이 자연스럽게 포즈를 취하는 7초 영상 생성
 // 이미지 생성과 달리 영상은 비용이 커서 생성 요청 시점에 크레딧을 즉시 차감
 // ────────────────────────────────────────────────────
 app.post('/api/video/start', async (c) => {
@@ -3532,10 +3532,10 @@ app.post('/api/video/start', async (c) => {
       }, 402)
     }
 
-    // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 5초 영상
+    // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 7초 영상
     // (공식 API 문서 기준 파라미터 — resolution은 480p/720p/*-esr만 지원,
     //  ratio는 'adaptive' 고정으로 원본 이미지 비율을 그대로 따라감)
-    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements: gentle weight shifts, a slow turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion. Keep the face, outfit, and background unchanged throughout the video. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.'
+    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements at normal real-time speed: gentle weight shifts, a natural turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Keep the face, outfit, and background unchanged throughout the video. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
@@ -3544,7 +3544,7 @@ app.post('/api/video/start', async (c) => {
         model: 'bytedance/seedance-2.5/image-to-video',
         prompt,
         image: imageUrl,
-        duration: 5,
+        duration: 7,
         resolution: '1080p-esr',
         ratio: 'adaptive',
         output_format: 'mp4',
@@ -4169,7 +4169,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 - 100종 이상의 AI 모델 프리셋 (성별/연령/체형/피부톤/무드 선택)
 - 2,000종 이상의 배경 프리셋
 - 평균 30초 내 이미지 생성
-- 생성된 이미지 기반 5초 홍보 영상 생성 (음악 포함, 9:16 세로형)
+- 생성된 이미지 기반 7초 홍보 영상 생성 (음악 포함, 9:16 세로형)
 - 룩북 세트 일괄 생성 및 다운로드
 
 ## 요금
@@ -4191,7 +4191,7 @@ const HOME_FAQ: { q: string; a: string }[] = [
   { q: 'EZlook은 어떤 서비스인가요?', a: '의류 이미지 한 장을 업로드하면 AI가 온모델 피팅컷과 룩북 세트를 자동으로 생성해주는 AI 패션 이미지 생성 플랫폼입니다. 촬영 스튜디오나 모델 섭외 없이 몇 번의 클릭만으로 전문적인 착용샷을 만들 수 있습니다.' },
   { q: '이미지 생성에 비용이 드나요?', a: '이미지 생성 자체는 무료입니다. 마음에 드는 결과물을 실제 파일로 다운로드할 때만 장당 90크레딧이 차감됩니다.' },
   { q: '무료로 체험할 수 있나요?', a: '네, 신용카드 등록 없이 회원가입만 하면 무료 크레딧이 바로 지급되어 AI 룩북 제작을 체험해볼 수 있습니다.' },
-  { q: '영상도 만들 수 있나요?', a: '네, 생성된 피팅컷 이미지를 기반으로 모델이 자연스럽게 포즈를 취하는 5초 분량의 세로형(9:16) 영상을 만들 수 있습니다.' },
+  { q: '영상도 만들 수 있나요?', a: '네, 생성된 피팅컷 이미지를 기반으로 모델이 자연스럽게 포즈를 취하는 7초 분량의 세로형(9:16) 영상을 만들 수 있습니다.' },
   { q: '결과물은 얼마나 빨리 나오나요?', a: '평균 30초, 최대 90초 이내에 고품질 온모델 피팅컷 이미지가 생성됩니다.' },
   { q: '크레딧은 어떻게 충전하나요?', a: '월 정액 없이 필요한 만큼만 충전하는 방식입니다. 스타터(₩20,000 · 1,000크레딧)부터 베스트 밸류(₩60,000 · 4,000크레딧)까지 선택할 수 있습니다.' },
 ]
@@ -4463,7 +4463,7 @@ app.get('/', (c) => {
         </div>
         <div class="feature-card" data-feature-slot="6">
           <h3 class="feature-title">원클릭으로 영상 파일 생성</h3>
-          <p class="feature-desc">생성된 피팅컷을 기반으로 모델이 자연스럽게 포즈를 취하는 5초 세로형 영상을 버튼 한 번으로 만드세요.</p>
+          <p class="feature-desc">생성된 피팅컷을 기반으로 모델이 자연스럽게 포즈를 취하는 7초 세로형 영상을 버튼 한 번으로 만드세요.</p>
         </div>
       </div>
     </div>
@@ -5611,13 +5611,14 @@ app.get('/generator', (c) => {
         <div class="gslide-nav">
           <div class="result-nav-grid">
             <button class="result-nav-btn primary" onclick="downloadWithCreditCheck(0)">
+              <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운</span>
-              <span class="rnb-sub"><i class="fas fa-coins"></i> 90</span>
+              <span class="rnb-sub"><s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90</span>
             </button>
             <button class="result-nav-btn primary" id="videoActionBtn" onclick="startVideoGeneration()">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-film"></i> 영상 생성</span>
-              <span class="rnb-sub" id="videoActionSub">5초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
+              <span class="rnb-sub" id="videoActionSub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
             </button>
             <button class="result-nav-btn" onclick="window.location.href='/generator'">
               <span class="rnb-main"><i class="fas fa-plus"></i> 새 프로젝트</span>
