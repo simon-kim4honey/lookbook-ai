@@ -2740,10 +2740,10 @@ function getRatioDimensions(ratio: string): { width: number; height: number } {
   const map: Record<string, { width: number; height: number }> = {
     '1:1':  { width: 1024, height: 1024 },
     '4:5':  { width: 896,  height: 1120 },
-    '3:4':  { width: 896,  height: 1216 },  // 기본 (패션 세로형)
-    '9:16': { width: 768,  height: 1360 },
+    '3:4':  { width: 896,  height: 1216 },
+    '9:16': { width: 768,  height: 1360 },  // 기본 (패션 세로형)
   }
-  return map[ratio] || { width: 896, height: 1216 }
+  return map[ratio] || { width: 768, height: 1360 }
 }
 
 // 해상도 배율 적용
@@ -2762,7 +2762,7 @@ function toAspectRatio(ratio: string): string {
   const map: Record<string, string> = {
     '1:1': '1:1', '4:5': '4:5', '3:4': '3:4', '9:16': '9:16',
   }
-  return map[ratio] || '3:4'
+  return map[ratio] || '9:16'
 }
 
 // resolution → nano-banana-2 resolution 문자열 변환
@@ -3031,7 +3031,7 @@ app.post('/api/generation/start', async (c) => {
       bgDesc = 'clean white studio background with professional lighting',
       poseType = '전신',
       pose = '정면',
-      ratio = '3:4',
+      ratio = '9:16',
       resolution = 'HD',
       count = 4,
       clothingImageUrl,          // 레거시 단일 파라미터 (하위 호환)
@@ -3372,7 +3372,7 @@ app.post('/api/generation/start', async (c) => {
           count,
           modelName || '패션 모델',
           bgName || '스튜디오',
-          ratio || '3:4',
+          ratio || '9:16',
           nextSeq,
           modelId ? String(modelId) : null,
           bgId ? String(bgId) : null,

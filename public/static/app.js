@@ -462,7 +462,7 @@ const AppState = {
   selectedModel: null,     // { id, name, description, gender, ... }
   selectedBg: null,        // { id, name, category, mood, bgDesc }
   genOptions: {
-    ratio: '3:4',
+    ratio: '9:16',
     resolution: 'HD',
     pose_type: '전신',
     pose: '정면',
@@ -2391,7 +2391,7 @@ async function startGeneration() {
       bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
       poseType: AppState.genOptions.pose_type,
       pose: AppState.genOptions.pose,
-      ratio: AppState.genOptions.ratio || '3:4',
+      ratio: AppState.genOptions.ratio || '9:16',
       resolution: AppState.genOptions.resolution || 'HD',
       count,
       clothingImages,
