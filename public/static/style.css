@@ -2257,7 +2257,7 @@ footer {
   animation: gen-news-fade 0.4s ease;
 }
 @keyframes gen-news-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-#genViewNews { margin-top: 0; margin-bottom: 24px; }
+#genViewNews, #videoGenViewNews { margin-top: 0; margin-bottom: 40px; }
 .gen-news-tag { font-size: 11px; font-weight: 700; color: var(--primary); margin-bottom: 6px; letter-spacing: 0.02em; }
 .gen-news-headline {
   display: -webkit-box;
