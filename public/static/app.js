@@ -462,7 +462,7 @@ const AppState = {
   selectedModel: null,     // { id, name, description, gender, ... }
   selectedBg: null,        // { id, name, category, mood, bgDesc }
   genOptions: {
-    ratio: '3:4',
+    ratio: '9:16',
     resolution: 'HD',
     pose_type: '전신',
     pose: '정면',
@@ -640,7 +640,6 @@ function _renderNewsItem(containerId) {
   const item = _fashionNewsList[_newsRotateIdx % _fashionNewsList.length];
   _newsRotateIdx++;
   container.innerHTML =
-    '<div class="gen-news-tag">📰 패션 뉴스</div>' +
     '<a class="gen-news-headline" href="' + item.link + '" target="_blank" rel="noopener noreferrer">' +
       item.title.replace(/</g, '&lt;') +
     '</a>' +
@@ -657,6 +656,8 @@ async function startNewsRotator(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.style.display = '';
+  const heading = document.getElementById(containerId + 'Heading');
+  if (heading) heading.style.display = '';
   _renderNewsItem(containerId);
   _newsRotateTimer = setInterval(() => _renderNewsItem(containerId), 6000);
 }
@@ -666,6 +667,8 @@ function stopNewsRotator() {
   if (_newsRotateContainerId) {
     const container = document.getElementById(_newsRotateContainerId);
     if (container) { container.style.display = 'none'; container.innerHTML = ''; }
+    const heading = document.getElementById(_newsRotateContainerId + 'Heading');
+    if (heading) heading.style.display = 'none';
   }
   _newsRotateContainerId = null;
 }
@@ -2388,7 +2391,7 @@ async function startGeneration() {
       bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
       poseType: AppState.genOptions.pose_type,
       pose: AppState.genOptions.pose,
-      ratio: AppState.genOptions.ratio || '3:4',
+      ratio: AppState.genOptions.ratio || '9:16',
       resolution: AppState.genOptions.resolution || 'HD',
       count,
       clothingImages,
@@ -2746,7 +2749,7 @@ function renderResults(images) {
     if (main) main.innerHTML = '<i class="fas fa-film"></i> 영상 생성';
   }
   const videoSub = document.getElementById('videoActionSub');
-  if (videoSub) videoSub.innerHTML = '5초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600';
+  if (videoSub) videoSub.innerHTML = '7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600';
 
   grid.innerHTML = '';
 
@@ -2944,7 +2947,7 @@ function _resetVideoBtn() {
   const btn = document.getElementById('videoActionBtn');
   const sub = document.getElementById('videoActionSub');
   if (btn) btn.disabled = false;
-  if (sub) sub.innerHTML = '5초 · <i class="fas fa-coins"></i> 600';
+  if (sub) sub.innerHTML = '7초 · <i class="fas fa-coins"></i> 600';
 }
 
 // 페이지 재진입 시 진행 중이던 영상 생성 작업을 백그라운드로 이어서 확인
@@ -2982,6 +2985,51 @@ async function _pollVideoStatusBackground(jobId) {
   }
 }
 
+// 영상 생성 로딩 화면 — 이미지 생성 로딩 화면(.generating-view)과 동일한 구조를 재사용
+function _showVideoGeneratingView() {
+  const view = document.getElementById('videoGeneratingView');
+  if (view) view.classList.add('active');
+  const nav = document.getElementById('step4Nav');
+  if (nav) nav.style.display = 'none';
+  updateVideoProgress(0, '시작 중...');
+  setVideoMsgState('vmsg1', 'current');
+  startNewsRotator('videoGenViewNews');
+}
+
+function _hideVideoGeneratingView() {
+  const view = document.getElementById('videoGeneratingView');
+  if (view) view.classList.remove('active');
+  const nav = document.getElementById('step4Nav');
+  if (nav) nav.style.display = '';
+  stopNewsRotator();
+  _stopVideoFakeProgress();
+}
+
+let _videoFakeProgressTimer = null;
+function _startVideoFakeProgress() {
+  _stopVideoFakeProgress();
+  let percent = 15;
+  const stageMsgs = ['vmsg2', 'vmsg3', 'vmsg4', 'vmsg5'];
+  let stageIdx = 0;
+  setVideoMsgState('vmsg1', 'done');
+  setVideoMsgState('vmsg2', 'current');
+  updateVideoProgress(percent, 'AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
+  _videoFakeProgressTimer = setInterval(() => {
+    if (percent >= 90) return;
+    percent += 2;
+    const nextStage = Math.min(Math.floor((percent - 15) / 18), stageMsgs.length - 1);
+    if (nextStage > stageIdx) {
+      setVideoMsgState(stageMsgs[stageIdx], 'done');
+      setVideoMsgState(stageMsgs[nextStage], 'current');
+      stageIdx = nextStage;
+    }
+    updateVideoProgress(percent, 'AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
+  }, 2500);
+}
+function _stopVideoFakeProgress() {
+  if (_videoFakeProgressTimer) { clearInterval(_videoFakeProgressTimer); _videoFakeProgressTimer = null; }
+}
+
 async function startVideoGeneration() {
   if (_videoState.videoUrl) { downloadVideo(); return; }
   if (_videoState.polling) return;
@@ -3004,7 +3052,7 @@ async function startVideoGeneration() {
   if (sub) sub.textContent = '요청 중...';
   _videoState.polling = true;
 
-  openActionProgress('영상 생성을 요청하는 중...');
+  _showVideoGeneratingView();
 
   try {
     const startRes = await fetch('/api/video/start', {
@@ -3018,13 +3066,13 @@ async function startVideoGeneration() {
     });
 
     if (startRes.status === 401) {
-      closeActionProgress();
+      _hideVideoGeneratingView();
       showToast(t('loginRequired'), 'error');
       _resetVideoBtn();
       return;
     }
     if (startRes.status === 402) {
-      closeActionProgress();
+      _hideVideoGeneratingView();
       const errData = await startRes.json();
       showToast(t('creditInsufficientDetail', errData.available ?? 0), 'error');
       _resetVideoBtn();
@@ -3035,7 +3083,7 @@ async function startVideoGeneration() {
       return;
     }
     if (!startRes.ok) {
-      closeActionProgress();
+      _hideVideoGeneratingView();
       const errData = await startRes.json().catch(() => ({}));
       showToast(errData.message || '영상 생성 요청에 실패했습니다.', 'error');
       _resetVideoBtn();
@@ -3057,14 +3105,12 @@ async function startVideoGeneration() {
       updateUserUI({ credits: startData.creditsRemaining });
     }
 
-    openActionProgress('AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
-    startNewsRotator('actionProgressNews');
+    _startVideoFakeProgress();
     if (sub) sub.textContent = '생성 중...';
     _pollVideoStatus();
   } catch (err) {
     console.error('Video start error:', err);
-    closeActionProgress();
-    stopNewsRotator();
+    _hideVideoGeneratingView();
     showToast('영상 생성 중 오류가 발생했습니다.', 'error');
     _resetVideoBtn();
   }
@@ -3085,8 +3131,7 @@ async function _pollVideoStatus() {
     if (data.status === 'failed') {
       _videoState.polling = false;
       localStorage.removeItem('lookbook_pending_video');
-      closeActionProgress();
-      stopNewsRotator();
+      _hideVideoGeneratingView();
       showToast(data.error || '영상 생성에 실패했습니다.', 'error');
       _resetVideoBtn();
       return;
@@ -3099,7 +3144,6 @@ async function _pollVideoStatus() {
 }
 
 function _onVideoReady(videoUrl) {
-  stopNewsRotator();
   const btn = document.getElementById('videoActionBtn');
   const sub = document.getElementById('videoActionSub');
   if (btn) {
@@ -3109,7 +3153,9 @@ function _onVideoReady(videoUrl) {
   }
   if (sub) sub.textContent = '다운로드 준비 완료';
 
-  closeActionProgress();
+  updateVideoProgress(100, '완료!');
+  setVideoMsgState('vmsg5', 'done');
+  _hideVideoGeneratingView();
 
   // 결과 화면(첫 번째 카드)을 영상 재생 화면으로 교체
   // AtlasCloud 원본 저장소가 Content-Disposition: attachment로 강제 다운로드
@@ -3438,6 +3484,29 @@ function updateProgress(percent, text) {
 }
 
 function setMsgState(msgId, state) {
+  const msg = document.getElementById(msgId);
+  if (!msg) return;
+  msg.classList.remove('current', 'done');
+  if (state === 'current') {
+    msg.classList.add('current');
+    const dot = msg.querySelector('.dot');
+    if (dot) dot.style.background = 'var(--primary)';
+  } else if (state === 'done') {
+    msg.classList.add('done');
+    const dot = msg.querySelector('.dot');
+    if (dot) dot.style.background = 'var(--success)';
+  }
+}
+
+// 영상 생성용 진행률/상태 헬퍼 — updateProgress/setMsgState와 동일한 로직, 대상 id만 다름
+function updateVideoProgress(percent, text) {
+  const fill = document.getElementById('videoGenProgressFill');
+  if (fill) fill.style.width = Math.min(percent, 100) + '%';
+  const statusText = document.getElementById('videoGenStatusText');
+  if (statusText) statusText.textContent = text;
+}
+
+function setVideoMsgState(msgId, state) {
   const msg = document.getElementById(msgId);
   if (!msg) return;
   msg.classList.remove('current', 'done');

@@ -1173,10 +1173,18 @@ function parseGoogleNewsRss(xml: string): Array<{ title: string; link: string; s
     const sourceMatch = block.match(/<source[^>]*>([\s\S]*?)<\/source>/)
     const pubDateMatch = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)
     if (!titleMatch || !linkMatch) continue
+    let title = stripCdata(titleMatch[1])
+    const source = sourceMatch ? stripCdata(sourceMatch[1]) : ''
+    // 구글 뉴스 RSS는 제목 끝에 "- 언론사명"을 덧붙여 주는데, 뉴스 박스 하단에
+    // 언론사명을 이미 별도로 표기하므로 제목에서는 중복되는 접미사를 제거
+    if (source) {
+      const suffix = ' - ' + source
+      if (title.endsWith(suffix)) title = title.slice(0, -suffix.length).trim()
+    }
     items.push({
-      title: stripCdata(titleMatch[1]),
+      title,
       link: stripCdata(linkMatch[1]),
-      source: sourceMatch ? stripCdata(sourceMatch[1]) : '',
+      source,
       pubDate: pubDateMatch ? stripCdata(pubDateMatch[1]) : '',
     })
   }
@@ -2732,10 +2740,10 @@ function getRatioDimensions(ratio: string): { width: number; height: number } {
   const map: Record<string, { width: number; height: number }> = {
     '1:1':  { width: 1024, height: 1024 },
     '4:5':  { width: 896,  height: 1120 },
-    '3:4':  { width: 896,  height: 1216 },  // 기본 (패션 세로형)
-    '9:16': { width: 768,  height: 1360 },
+    '3:4':  { width: 896,  height: 1216 },
+    '9:16': { width: 768,  height: 1360 },  // 기본 (패션 세로형)
   }
-  return map[ratio] || { width: 896, height: 1216 }
+  return map[ratio] || { width: 768, height: 1360 }
 }
 
 // 해상도 배율 적용
@@ -2754,7 +2762,7 @@ function toAspectRatio(ratio: string): string {
   const map: Record<string, string> = {
     '1:1': '1:1', '4:5': '4:5', '3:4': '3:4', '9:16': '9:16',
   }
-  return map[ratio] || '3:4'
+  return map[ratio] || '9:16'
 }
 
 // resolution → nano-banana-2 resolution 문자열 변환
@@ -3008,7 +3016,7 @@ function buildClothingReplaceInstructions(
 
 // ── 크레딧 상수 ──
 const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
-const CREDITS_PER_VIDEO = 600 // 영상 1개(5초)당 차감 크레딧 — 생성 시점에 즉시 차감
+const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
 
 app.post('/api/generation/start', async (c) => {
   try {
@@ -3023,7 +3031,7 @@ app.post('/api/generation/start', async (c) => {
       bgDesc = 'clean white studio background with professional lighting',
       poseType = '전신',
       pose = '정면',
-      ratio = '3:4',
+      ratio = '9:16',
       resolution = 'HD',
       count = 4,
       clothingImageUrl,          // 레거시 단일 파라미터 (하위 호환)
@@ -3211,7 +3219,7 @@ app.post('/api/generation/start', async (c) => {
 
         `CLOTHING REPLACEMENT:`,
         clothingReplaceInstructions,
-        `POSE: Show a ${poseTypeText}, ${poseStyleText}. Body pose and stance should follow this direction, adjusting naturally to fit the new clothing and scene. The pose must NEVER be copied from a clothing reference image, even if that image shows a person modeling the garment — clothing images are a garment/texture source only, not a pose reference.`,
+        `POSE: If Image ${bgImgIdx} already shows a person, that person's pose, stance, and body position are the PRIMARY pose reference — the output pose should naturally emerge from theirs, adjusting only as needed to fit the new clothing (do not rigidly lock every joint, but do not replace it with an unrelated generic pose either). Only if Image ${bgImgIdx} has no person to reference, fall back to a ${poseTypeText}, ${poseStyleText}. The pose must NEVER be copied from a clothing reference image, even if that image shows a person modeling the garment — clothing images are a garment/texture source only, not a pose reference.`,
 
         `IDENTITY (from Image ${modelImgIdx}) — READ THIS ONCE, IT IS THE ONLY IDENTITY RULE:`,
         `This is Image ${modelImgIdx}'s exact face, physically rotated to a new head angle and relit under Image ${bgImgIdx}'s scene — the SAME face asset transformed, never a newly generated or substitute face. KEEP UNCHANGED: bone structure, eye shape/spacing, iris color, nose shape, lip shape, jawline, cheekbones, face width, and skin undertone — these must be pixel-consistent with Image ${modelImgIdx} when mentally rotated back to its original angle. Hair may adjust naturally (style, volume, flow) to suit the pose and scene — it does not need to be locked to Image ${modelImgIdx}'s exact hairstyle. Head/face size relative to the body must stay in natural human proportion, matching Image ${modelImgIdx}'s scale — do not enlarge or shrink it. CHANGE ONLY what a camera and lighting change: head angle, tilt, gaze direction, expression, perspective, brightness, shadows, color temperature, saturation. Do NOT copy Image ${modelImgIdx}'s original angle, expression, or lighting — they must update to match Image ${bgImgIdx}'s scene. Do NOT use body shape, clothing, or pose from Image ${modelImgIdx}.`,
@@ -3364,7 +3372,7 @@ app.post('/api/generation/start', async (c) => {
           count,
           modelName || '패션 모델',
           bgName || '스튜디오',
-          ratio || '3:4',
+          ratio || '9:16',
           nextSeq,
           modelId ? String(modelId) : null,
           bgId ? String(bgId) : null,
@@ -3502,7 +3510,7 @@ function generatePlaceholderImages(count: number) {
 
 // ────────────────────────────────────────────────────
 // 영상 생성 API — Atlas Cloud ByteDance Seedance 2.5 (image-to-video)
-// 생성된 이미지 속 모델이 자연스럽게 포즈를 취하는 5초 영상 생성
+// 생성된 이미지 속 모델이 자연스럽게 포즈를 취하는 7초 영상 생성
 // 이미지 생성과 달리 영상은 비용이 커서 생성 요청 시점에 크레딧을 즉시 차감
 // ────────────────────────────────────────────────────
 app.post('/api/video/start', async (c) => {
@@ -3532,10 +3540,10 @@ app.post('/api/video/start', async (c) => {
       }, 402)
     }
 
-    // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 5초 영상
+    // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 7초 영상
     // (공식 API 문서 기준 파라미터 — resolution은 480p/720p/*-esr만 지원,
     //  ratio는 'adaptive' 고정으로 원본 이미지 비율을 그대로 따라감)
-    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements: gentle weight shifts, a slow turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion. Keep the face, outfit, and background unchanged throughout the video. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.'
+    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements at normal real-time speed: gentle weight shifts, a natural turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Keep the face, outfit, and background unchanged throughout the video. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
@@ -3544,7 +3552,7 @@ app.post('/api/video/start', async (c) => {
         model: 'bytedance/seedance-2.5/image-to-video',
         prompt,
         image: imageUrl,
-        duration: 5,
+        duration: 7,
         resolution: '1080p-esr',
         ratio: 'adaptive',
         output_format: 'mp4',
@@ -4169,7 +4177,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 - 100종 이상의 AI 모델 프리셋 (성별/연령/체형/피부톤/무드 선택)
 - 2,000종 이상의 배경 프리셋
 - 평균 30초 내 이미지 생성
-- 생성된 이미지 기반 5초 홍보 영상 생성 (음악 포함, 9:16 세로형)
+- 생성된 이미지 기반 7초 홍보 영상 생성 (음악 포함, 9:16 세로형)
 - 룩북 세트 일괄 생성 및 다운로드
 
 ## 요금
@@ -4191,7 +4199,7 @@ const HOME_FAQ: { q: string; a: string }[] = [
   { q: 'EZlook은 어떤 서비스인가요?', a: '의류 이미지 한 장을 업로드하면 AI가 온모델 피팅컷과 룩북 세트를 자동으로 생성해주는 AI 패션 이미지 생성 플랫폼입니다. 촬영 스튜디오나 모델 섭외 없이 몇 번의 클릭만으로 전문적인 착용샷을 만들 수 있습니다.' },
   { q: '이미지 생성에 비용이 드나요?', a: '이미지 생성 자체는 무료입니다. 마음에 드는 결과물을 실제 파일로 다운로드할 때만 장당 90크레딧이 차감됩니다.' },
   { q: '무료로 체험할 수 있나요?', a: '네, 신용카드 등록 없이 회원가입만 하면 무료 크레딧이 바로 지급되어 AI 룩북 제작을 체험해볼 수 있습니다.' },
-  { q: '영상도 만들 수 있나요?', a: '네, 생성된 피팅컷 이미지를 기반으로 모델이 자연스럽게 포즈를 취하는 5초 분량의 세로형(9:16) 영상을 만들 수 있습니다.' },
+  { q: '영상도 만들 수 있나요?', a: '네, 생성된 피팅컷 이미지를 기반으로 모델이 자연스럽게 포즈를 취하는 7초 분량의 세로형(9:16) 영상을 만들 수 있습니다.' },
   { q: '결과물은 얼마나 빨리 나오나요?', a: '평균 30초, 최대 90초 이내에 고품질 온모델 피팅컷 이미지가 생성됩니다.' },
   { q: '크레딧은 어떻게 충전하나요?', a: '월 정액 없이 필요한 만큼만 충전하는 방식입니다. 스타터(₩20,000 · 1,000크레딧)부터 베스트 밸류(₩60,000 · 4,000크레딧)까지 선택할 수 있습니다.' },
 ]
@@ -4463,7 +4471,7 @@ app.get('/', (c) => {
         </div>
         <div class="feature-card" data-feature-slot="6">
           <h3 class="feature-title">원클릭으로 영상 파일 생성</h3>
-          <p class="feature-desc">생성된 피팅컷을 기반으로 모델이 자연스럽게 포즈를 취하는 5초 세로형 영상을 버튼 한 번으로 만드세요.</p>
+          <p class="feature-desc">생성된 피팅컷을 기반으로 모델이 자연스럽게 포즈를 취하는 7초 세로형 영상을 버튼 한 번으로 만드세요.</p>
         </div>
       </div>
     </div>
@@ -5576,6 +5584,7 @@ app.get('/generator', (c) => {
         </div>
         <!-- 생성 중 오버레이 (step-3 내부) -->
         <div class="generating-view" id="generatingView">
+          <div class="gen-news-tag" id="genViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
           <div class="gen-news" id="genViewNews" style="display:none;"></div>
           <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 이미지를 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
@@ -5598,6 +5607,21 @@ app.get('/generator', (c) => {
 
       <!-- STEP 4 (구 Step5) · 결과 -->
       <div class="gslide" id="step-4">
+        <!-- 영상 생성 중 오버레이 (이미지 생성 로딩 화면과 동일한 구조, step-4 내부) -->
+        <div class="generating-view" id="videoGeneratingView">
+          <div class="gen-news-tag" id="videoGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
+          <div class="gen-news" id="videoGenViewNews" style="display:none;"></div>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 영상을 생성 중입니다...</h2>
+          <div class="gen-progress-bar"><div class="gen-progress-fill" id="videoGenProgressFill" style="width:0%"></div></div>
+          <div class="gen-status-text" id="videoGenStatusText">시작 중...</div>
+          <div class="gen-status-msgs">
+            <div class="gen-msg current" id="vmsg1"><div class="dot"></div> 영상 생성 요청 중...</div>
+            <div class="gen-msg" id="vmsg2"><div class="dot"></div> 자연스러운 포즈 동작 생성 중...</div>
+            <div class="gen-msg" id="vmsg3"><div class="dot"></div> 배경음악 합성 중...</div>
+            <div class="gen-msg" id="vmsg4"><div class="dot"></div> 영상 렌더링 중...</div>
+            <div class="gen-msg" id="vmsg5"><div class="dot"></div> 최종 인코딩 중...</div>
+          </div>
+        </div>
         <div class="gslide-scroll" style="padding-top:12px;">
           <div class="results-grid" id="resultsGrid"></div>
           <!-- 이미지 하단 ~ 버튼 상단 사이 안내 메시지 -->
@@ -5608,16 +5632,17 @@ app.get('/generator', (c) => {
             </p>
           </div>
         </div>
-        <div class="gslide-nav">
+        <div class="gslide-nav" id="step4Nav">
           <div class="result-nav-grid">
             <button class="result-nav-btn primary" onclick="downloadWithCreditCheck(0)">
+              <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운</span>
-              <span class="rnb-sub"><i class="fas fa-coins"></i> 90</span>
+              <span class="rnb-sub"><s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90</span>
             </button>
             <button class="result-nav-btn primary" id="videoActionBtn" onclick="startVideoGeneration()">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-film"></i> 영상 생성</span>
-              <span class="rnb-sub" id="videoActionSub">5초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
+              <span class="rnb-sub" id="videoActionSub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
             </button>
             <button class="result-nav-btn" onclick="window.location.href='/generator'">
               <span class="rnb-main"><i class="fas fa-plus"></i> 새 프로젝트</span>
