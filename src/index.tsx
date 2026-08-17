@@ -4524,30 +4524,30 @@ app.get('/', (c) => {
         <div class="pricing-single-card">
           <div class="pricing-plan">크레딧 충전</div>
           <div class="pricing-price">
-            <span class="amount" id="pricingAmount">₩40,000</span>
+            <span class="amount" id="pricingAmount">₩20,000</span>
             <span class="period">1회 충전</span>
           </div>
-          <p class="pricing-desc" id="pricingDesc">2,300 크레딧 · 이미지 최대 25장<br />✨ 기본 대비 15% 더 받기</p>
+          <p class="pricing-desc" id="pricingDesc">1,000 크레딧 · 이미지 최대 11장</p>
 
           <div class="pricing-select" id="pricingSelect">
             <button type="button" class="pricing-select-trigger" onclick="togglePricingSelect()" id="pricingSelectTrigger" aria-expanded="false">
-              <span id="pricingSelectTriggerLabel">40,000원 · 2,300 크레딧</span>
+              <span id="pricingSelectTriggerLabel">20,000원 · 1,000 크레딧</span>
               <i class="fas fa-chevron-down"></i>
             </button>
             <div class="pricing-select-menu" id="pricingSelectMenu">
-              <div class="pricing-select-item" data-amount="20000" data-credits="1000" data-images="11" data-bonus="" onclick="selectPricingTier(this)">
+              <div class="pricing-select-item selected" data-amount="20000" data-credits="1000" data-images="11" data-bonus="" onclick="selectPricingTier(this)">
                 <div>
                   <div class="pricing-select-item-title">20,000원</div>
                   <div class="pricing-select-item-sub">1,000 크레딧</div>
                 </div>
-                <i class="fas fa-check" style="visibility:hidden;"></i>
+                <i class="fas fa-check"></i>
               </div>
-              <div class="pricing-select-item selected" data-amount="40000" data-credits="2300" data-images="25" data-bonus="✨ 기본 대비 15% 더 받기" onclick="selectPricingTier(this)">
+              <div class="pricing-select-item" data-amount="40000" data-credits="2300" data-images="25" data-bonus="✨ 기본 대비 15% 더 받기" onclick="selectPricingTier(this)">
                 <div>
                   <div class="pricing-select-item-title">40,000원 <span class="pricing-select-item-tag">인기</span></div>
                   <div class="pricing-select-item-sub">2,300 크레딧</div>
                 </div>
-                <i class="fas fa-check"></i>
+                <i class="fas fa-check" style="visibility:hidden;"></i>
               </div>
               <div class="pricing-select-item" data-amount="60000" data-credits="4000" data-images="44" data-bonus="🚀 기본 대비 33% 더 받기" onclick="selectPricingTier(this)">
                 <div>
