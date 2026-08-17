@@ -1460,9 +1460,9 @@ function publicUser(u: any) {
 
 // ────────────────────────────────────────────────────
 // 추천인(제휴사) 목록 — 회원가입 드롭다운/할인·보너스 정책에서 공통 사용
-const REFERRER_OPTIONS = ['BFM', '코오롱 FnC', '한섬'] as const
+const REFERRER_OPTIONS = ['BFM회원', '코오롱 FnC', '한섬'] as const
 const REFERRER_SIGNUP_BONUS_CREDITS = 750 // BFM 추천 시 가입 크레딧 (일반 200 대신 750 지급)
-const REFERRER_DISCOUNT_RATE: Record<string, number> = { 'BFM': 0.2 } // 유료 결제 시 20% 할인
+const REFERRER_DISCOUNT_RATE: Record<string, number> = { 'BFM회원': 0.2 } // 유료 결제 시 20% 할인
 
 // POST /api/auth/signup — 이메일 회원가입
 // ────────────────────────────────────────────────────
@@ -1483,7 +1483,7 @@ app.post('/api/auth/signup', async (c) => {
     const id = genUserId()
     const hash = await hashPassword(password)
     const marketingFlag = agreeMarketing ? 1 : 0
-    const initialCredits = referrer === 'BFM' ? REFERRER_SIGNUP_BONUS_CREDITS : 200
+    const initialCredits = referrer === 'BFM회원' ? REFERRER_SIGNUP_BONUS_CREDITS : 200
     await db.prepare(`
       INSERT INTO users (id, email, name, password_hash, provider, status, credits, role, agree_marketing, referrer)
       VALUES (?, ?, ?, ?, 'email', 'active', ?, 'user', ?, ?)
@@ -4749,7 +4749,7 @@ app.get('/', (c) => {
           <div class="form-group">
             <select class="form-input" id="signupReferrer">
               <option value="">추천인 선택 (선택 사항)</option>
-              <option value="BFM">BFM</option>
+              <option value="BFM회원">BFM회원</option>
               <option value="코오롱 FnC">코오롱 FnC</option>
               <option value="한섬">한섬</option>
             </select>
@@ -5742,7 +5742,7 @@ app.get('/generator', (c) => {
           <div class="form-group">
             <select class="form-input" id="signupReferrer">
               <option value="">추천인 선택 (선택 사항)</option>
-              <option value="BFM">BFM</option>
+              <option value="BFM회원">BFM회원</option>
               <option value="코오롱 FnC">코오롱 FnC</option>
               <option value="한섬">한섬</option>
             </select>
