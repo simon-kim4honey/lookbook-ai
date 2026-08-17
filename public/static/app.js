@@ -3518,7 +3518,7 @@ function openChargePanel() {
   const credits = user ? (user.credits ?? 0) : 0;
   const el = document.getElementById('chargePanelCredits');
   if (el) el.textContent = t('creditsUnit', credits);
-  const isBFM = !!(user && user.referrer === 'BFM');
+  const isBFM = !!(user && user.referrer === 'BFM회원');
   const badge = document.getElementById('bfmDiscountBadge');
   if (badge) badge.style.display = isBFM ? 'flex' : 'none';
   renderPkgPrices(isBFM);
@@ -3587,7 +3587,7 @@ function selectPackage(pkgId, el) {
   const cta = document.getElementById('chargeCta');
   const lbl = document.getElementById('ctaLabel');
   if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-  const isBFM = !!(AppState.user && AppState.user.referrer === 'BFM');
+  const isBFM = !!(AppState.user && AppState.user.referrer === 'BFM회원');
   const price = formatPkgPrice(pkgId, _currency, isBFM);
   if (lbl) lbl.textContent = `${price} ${t('payBtnSuffix')}`;
 }
