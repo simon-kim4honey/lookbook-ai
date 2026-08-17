@@ -1173,10 +1173,18 @@ function parseGoogleNewsRss(xml: string): Array<{ title: string; link: string; s
     const sourceMatch = block.match(/<source[^>]*>([\s\S]*?)<\/source>/)
     const pubDateMatch = block.match(/<pubDate>([\s\S]*?)<\/pubDate>/)
     if (!titleMatch || !linkMatch) continue
+    let title = stripCdata(titleMatch[1])
+    const source = sourceMatch ? stripCdata(sourceMatch[1]) : ''
+    // 구글 뉴스 RSS는 제목 끝에 "- 언론사명"을 덧붙여 주는데, 뉴스 박스 하단에
+    // 언론사명을 이미 별도로 표기하므로 제목에서는 중복되는 접미사를 제거
+    if (source) {
+      const suffix = ' - ' + source
+      if (title.endsWith(suffix)) title = title.slice(0, -suffix.length).trim()
+    }
     items.push({
-      title: stripCdata(titleMatch[1]),
+      title,
       link: stripCdata(linkMatch[1]),
-      source: sourceMatch ? stripCdata(sourceMatch[1]) : '',
+      source,
       pubDate: pubDateMatch ? stripCdata(pubDateMatch[1]) : '',
     })
   }
@@ -3211,7 +3219,7 @@ app.post('/api/generation/start', async (c) => {
 
         `CLOTHING REPLACEMENT:`,
         clothingReplaceInstructions,
-        `POSE: Show a ${poseTypeText}, ${poseStyleText}. Body pose and stance should follow this direction, adjusting naturally to fit the new clothing and scene. The pose must NEVER be copied from a clothing reference image, even if that image shows a person modeling the garment — clothing images are a garment/texture source only, not a pose reference.`,
+        `POSE: If Image ${bgImgIdx} already shows a person, that person's pose, stance, and body position are the PRIMARY pose reference — the output pose should naturally emerge from theirs, adjusting only as needed to fit the new clothing (do not rigidly lock every joint, but do not replace it with an unrelated generic pose either). Only if Image ${bgImgIdx} has no person to reference, fall back to a ${poseTypeText}, ${poseStyleText}. The pose must NEVER be copied from a clothing reference image, even if that image shows a person modeling the garment — clothing images are a garment/texture source only, not a pose reference.`,
 
         `IDENTITY (from Image ${modelImgIdx}) — READ THIS ONCE, IT IS THE ONLY IDENTITY RULE:`,
         `This is Image ${modelImgIdx}'s exact face, physically rotated to a new head angle and relit under Image ${bgImgIdx}'s scene — the SAME face asset transformed, never a newly generated or substitute face. KEEP UNCHANGED: bone structure, eye shape/spacing, iris color, nose shape, lip shape, jawline, cheekbones, face width, and skin undertone — these must be pixel-consistent with Image ${modelImgIdx} when mentally rotated back to its original angle. Hair may adjust naturally (style, volume, flow) to suit the pose and scene — it does not need to be locked to Image ${modelImgIdx}'s exact hairstyle. Head/face size relative to the body must stay in natural human proportion, matching Image ${modelImgIdx}'s scale — do not enlarge or shrink it. CHANGE ONLY what a camera and lighting change: head angle, tilt, gaze direction, expression, perspective, brightness, shadows, color temperature, saturation. Do NOT copy Image ${modelImgIdx}'s original angle, expression, or lighting — they must update to match Image ${bgImgIdx}'s scene. Do NOT use body shape, clothing, or pose from Image ${modelImgIdx}.`,
@@ -5576,6 +5584,7 @@ app.get('/generator', (c) => {
         </div>
         <!-- 생성 중 오버레이 (step-3 내부) -->
         <div class="generating-view" id="generatingView">
+          <div class="gen-news-tag" id="genViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
           <div class="gen-news" id="genViewNews" style="display:none;"></div>
           <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 이미지를 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
@@ -5598,6 +5607,21 @@ app.get('/generator', (c) => {
 
       <!-- STEP 4 (구 Step5) · 결과 -->
       <div class="gslide" id="step-4">
+        <!-- 영상 생성 중 오버레이 (이미지 생성 로딩 화면과 동일한 구조, step-4 내부) -->
+        <div class="generating-view" id="videoGeneratingView">
+          <div class="gen-news-tag" id="videoGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
+          <div class="gen-news" id="videoGenViewNews" style="display:none;"></div>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 영상을 생성 중입니다...</h2>
+          <div class="gen-progress-bar"><div class="gen-progress-fill" id="videoGenProgressFill" style="width:0%"></div></div>
+          <div class="gen-status-text" id="videoGenStatusText">시작 중...</div>
+          <div class="gen-status-msgs">
+            <div class="gen-msg current" id="vmsg1"><div class="dot"></div> 영상 생성 요청 중...</div>
+            <div class="gen-msg" id="vmsg2"><div class="dot"></div> 자연스러운 포즈 동작 생성 중...</div>
+            <div class="gen-msg" id="vmsg3"><div class="dot"></div> 배경음악 합성 중...</div>
+            <div class="gen-msg" id="vmsg4"><div class="dot"></div> 영상 렌더링 중...</div>
+            <div class="gen-msg" id="vmsg5"><div class="dot"></div> 최종 인코딩 중...</div>
+          </div>
+        </div>
         <div class="gslide-scroll" style="padding-top:12px;">
           <div class="results-grid" id="resultsGrid"></div>
           <!-- 이미지 하단 ~ 버튼 상단 사이 안내 메시지 -->
@@ -5608,7 +5632,7 @@ app.get('/generator', (c) => {
             </p>
           </div>
         </div>
-        <div class="gslide-nav">
+        <div class="gslide-nav" id="step4Nav">
           <div class="result-nav-grid">
             <button class="result-nav-btn primary" onclick="downloadWithCreditCheck(0)">
               <span class="rnb-badge">50%↓</span>
