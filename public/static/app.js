@@ -95,6 +95,7 @@ const I18N = {
     // 결제
     payFail: (msg) => msg || '결제 중 오류가 발생했습니다.',
     paySelectPkg: '패키지를 선택해주세요.',
+    payBtnSuffix: '결제',
     // 프로젝트
     projectDownload: '이미지를 다운로드합니다.',
     projectOpen: (name) => `"${name}" 프로젝트를 엽니다.`,
@@ -178,6 +179,7 @@ const I18N = {
     favIcon: (isFav) => isFav ? '❤️' : '🤍',
     payFail: (msg) => msg || 'An error occurred during payment.',
     paySelectPkg: 'Please select a package.',
+    payBtnSuffix: 'Checkout',
     projectDownload: 'Downloading images.',
     projectOpen: (name) => `Opening project "${name}".`,
   },
@@ -260,6 +262,7 @@ const I18N = {
     favIcon: (isFav) => isFav ? '❤️' : '🤍',
     payFail: (msg) => msg || '決済中にエラーが発生しました。',
     paySelectPkg: 'パッケージを選択してください。',
+    payBtnSuffix: '決済へ',
     projectDownload: '画像をダウンロードします。',
     projectOpen: (name) => `プロジェクト「${name}」を開きます。`,
   }
@@ -268,6 +271,10 @@ const I18N = {
 // t() — 현재 locale의 번역 키 반환
 // 값이 함수면 인자 전달, 문자열이면 그대로 반환
 let _locale = 'ko'; // 기본값, initLocale()에서 갱신
+let _country = '';
+let _currency = 'KRW';
+let _pg = 'nicepay';
+const LOCALE_OVERRIDE_KEY = 'lookbook_locale_override';
 function t(key, ...args) {
   const dict = I18N[_locale] || I18N['en'];
   const val = dict[key] ?? I18N['en'][key] ?? key;
@@ -276,16 +283,90 @@ function t(key, ...args) {
 
 async function initLocale() {
   try {
-    const res = await fetch('/api/locale');
+    const token = localStorage.getItem('lookbook_token') || '';
+    const res = await fetch('/api/locale', { headers: token ? { 'X-Session-Token': token } : {} });
     const data = await res.json();
     _locale = data.locale || 'ko';
+    _country = data.country || '';
+    _currency = data.currency || 'KRW';
+    _pg = data.pg || 'nicepay';
   } catch (e) {
     _locale = 'ko';
   }
+  // 사용자가 직접 고른 언어가 있으면 자동감지 결과보다 우선 — 통화/PG도 함께 복원해야
+  // 페이지 이동/새로고침 후 언어는 English인데 결제는 나이스페이로 되돌아가는 문제가 생기지 않음
+  const override = localStorage.getItem(LOCALE_OVERRIDE_KEY);
+  if (override && I18N[override]) {
+    _locale = override;
+    const market = LOCALE_MARKET_MAP[override] || LOCALE_MARKET_MAP.en;
+    _currency = market.currency;
+    _pg = market.pg;
+  }
   // HTML lang 속성 설정
   document.documentElement.lang = _locale;
+  updateLocaleSwitcherUI();
   // data-i18n 속성 정적 텍스트 교체
   applyStaticI18n();
+}
+
+// 언어별 기본 통화/PG — 서버의 resolveLocaleProfile()과 동일한 매핑.
+// 수동으로 언어를 바꾸면 결제 통화/PG도 함께 바뀜(한국어→나이스페이/KRW, 그 외→Stripe)
+const LOCALE_MARKET_MAP = {
+  ko: { currency: 'KRW', pg: 'nicepay' },
+  ja: { currency: 'JPY', pg: 'stripe' },
+  en: { currency: 'USD', pg: 'stripe' },
+};
+
+// 언어 스위처에서 수동으로 언어를 고른 경우
+function setLocaleOverride(locale) {
+  if (!I18N[locale]) return;
+  localStorage.setItem(LOCALE_OVERRIDE_KEY, locale);
+  _locale = locale;
+  const market = LOCALE_MARKET_MAP[locale] || LOCALE_MARKET_MAP.en;
+  _currency = market.currency;
+  _pg = market.pg;
+  document.documentElement.lang = _locale;
+  updateLocaleSwitcherUI();
+  applyStaticI18n();
+  closeLocaleSwitcher();
+  // 로그인 상태면 서버에도 선호 언어를 저장해 다른 기기에서도 유지되게 함
+  const token = localStorage.getItem('lookbook_token');
+  if (token) {
+    fetch('/api/user/locale', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': token },
+      body: JSON.stringify({ locale, country: _country, currency: _currency }),
+    }).catch(() => {});
+  }
+}
+
+function updateLocaleSwitcherUI() {
+  const label = document.getElementById('localeSwitcherLabel');
+  const names = { ko: '한국어', en: 'English', ja: '日本語' };
+  if (label) label.textContent = names[_locale] || _locale;
+  document.querySelectorAll('#localeSwitcherMenu .locale-item').forEach(item => {
+    item.classList.toggle('selected', item.getAttribute('data-locale') === _locale);
+  });
+}
+
+function toggleLocaleSwitcher() {
+  const wrap = document.getElementById('localeSwitcher');
+  if (!wrap) return;
+  const isOpen = wrap.classList.toggle('open');
+  if (isOpen) {
+    const closeOnOutsideClick = (e) => {
+      if (!wrap.contains(e.target)) {
+        wrap.classList.remove('open');
+        document.removeEventListener('click', closeOnOutsideClick);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeOnOutsideClick), 10);
+  }
+}
+
+function closeLocaleSwitcher() {
+  const wrap = document.getElementById('localeSwitcher');
+  if (wrap) wrap.classList.remove('open');
 }
 
 // data-i18n 속성 기반 정적 텍스트 교체
@@ -1150,11 +1231,13 @@ async function handleSignup(e) {
   const nameEl          = document.getElementById('signupName');
   const emailEl         = document.getElementById('signupEmail');
   const passwordEl      = document.getElementById('signupPassword');
+  const referrerEl      = document.getElementById('signupReferrer');
   const agreePrivacyEl  = document.getElementById('agreePrivacy');
   const agreeMarketingEl= document.getElementById('agreeMarketing');
   const name            = nameEl     ? nameEl.value.trim()     : '';
   const email           = emailEl    ? emailEl.value.trim()    : '';
   const password        = passwordEl ? passwordEl.value        : '';
+  const referrer         = referrerEl ? referrerEl.value        : '';
   const agreePrivacy    = agreePrivacyEl  ? agreePrivacyEl.checked  : false;
   const agreeMarketing  = agreeMarketingEl? agreeMarketingEl.checked : false;
   const btn             = document.getElementById('signupBtn');
@@ -1195,7 +1278,7 @@ async function handleSignup(e) {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, agreeMarketing })
+      body: JSON.stringify({ name, email, password, agreeMarketing, referrer })
     });
     const data = await res.json();
 
@@ -3435,6 +3518,10 @@ function openChargePanel() {
   const credits = user ? (user.credits ?? 0) : 0;
   const el = document.getElementById('chargePanelCredits');
   if (el) el.textContent = t('creditsUnit', credits);
+  const isBFM = !!(user && user.referrer === 'BFM');
+  const badge = document.getElementById('bfmDiscountBadge');
+  if (badge) badge.style.display = isBFM ? 'flex' : 'none';
+  renderPkgPrices(isBFM);
   const panel = document.getElementById('chargePanel');
   if (!panel) return;
   panel.style.display = 'block';
@@ -3452,6 +3539,43 @@ function closeChargePanel() {
   _selectedPkg = null;
 }
 
+// 패키지별 원가 (크레딧 티어는 공통, 가격만 시장별 별도 책정 — 서버 CREDIT_PACKAGES와 동일하게 유지)
+const PKG_PRICE_RAW = {
+  pkg_20000: { KRW: 20000, usdCents: 1999, JPY: 2980 },
+  pkg_40000: { KRW: 40000, usdCents: 3499, JPY: 4980 },
+  pkg_60000: { KRW: 60000, usdCents: 4999, JPY: 7980 },
+};
+const BFM_DISCOUNT_RATE = 0.2; // 서버 REFERRER_DISCOUNT_RATE.BFM 과 동일하게 유지
+
+function formatPkgPrice(pkgId, currency, discounted) {
+  const raw = PKG_PRICE_RAW[pkgId];
+  if (currency === 'USD') {
+    const cents = discounted ? Math.round(raw.usdCents * (1 - BFM_DISCOUNT_RATE)) : raw.usdCents;
+    return '$' + (cents / 100).toFixed(2);
+  }
+  if (currency === 'JPY') {
+    const amt = discounted ? Math.round(raw.JPY * (1 - BFM_DISCOUNT_RATE)) : raw.JPY;
+    return '¥' + amt.toLocaleString('ja-JP');
+  }
+  const amt = discounted ? Math.round(raw.KRW * (1 - BFM_DISCOUNT_RATE)) : raw.KRW;
+  return amt.toLocaleString('ko-KR') + '원';
+}
+
+function renderPkgPrices(isBFM) {
+  Object.keys(PKG_PRICE_RAW).forEach(pkgId => {
+    const mainEl = document.getElementById('pkgPrice_' + pkgId);
+    const origEl = document.getElementById('pkgPriceOriginal_' + pkgId);
+    if (!mainEl) return;
+    if (isBFM) {
+      if (origEl) { origEl.textContent = formatPkgPrice(pkgId, _currency, false); origEl.style.display = 'block'; }
+      mainEl.textContent = formatPkgPrice(pkgId, _currency, true);
+    } else {
+      if (origEl) origEl.style.display = 'none';
+      mainEl.textContent = formatPkgPrice(pkgId, _currency, false);
+    }
+  });
+}
+
 function selectPackage(pkgId, el) {
   _selectedPkg = pkgId;
   document.querySelectorAll('.pkg-card').forEach(c => {
@@ -3463,14 +3587,18 @@ function selectPackage(pkgId, el) {
   const cta = document.getElementById('chargeCta');
   const lbl = document.getElementById('ctaLabel');
   if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-  const map = { pkg_20000: '20,000원 결제', pkg_40000: '40,000원 결제', pkg_60000: '60,000원 결제' };
-  if (lbl) lbl.textContent = map[pkgId] || '결제하기';
+  const isBFM = !!(AppState.user && AppState.user.referrer === 'BFM');
+  const price = formatPkgPrice(pkgId, _currency, isBFM);
+  if (lbl) lbl.textContent = `${price} ${t('payBtnSuffix')}`;
 }
 
 async function startPayment() {
   if (!_selectedPkg) { showToast(t('paySelectPkg'), 'error'); return; }
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   if (!sessionToken) { showToast(t('loginRequired'), 'error'); return; }
+
+  // 한국(나이스페이) 외 시장은 Stripe Checkout으로 분기
+  if (_pg === 'stripe') { return startStripePayment(); }
 
   const cta = document.getElementById('chargeCta');
   try {
@@ -3523,6 +3651,28 @@ function loadNicepaySDK() {
     s.onerror = () => reject(new Error('나이스페이먼츠 SDK 로드 실패'));
     document.head.appendChild(s);
   });
+}
+
+// 해외(한국 제외) 시장 결제 — Stripe Checkout(호스팅 결제 페이지)으로 이동
+async function startStripePayment() {
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  const cta = document.getElementById('chargeCta');
+  try {
+    if (cta) { cta.style.opacity = '0.6'; cta.style.pointerEvents = 'none'; }
+    const res = await fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+      body: JSON.stringify({ packageId: _selectedPkg, currency: _currency }),
+    });
+    if (res.status === 401) { showToast(t('loginRequired'), 'error'); return; }
+    const data = await res.json();
+    if (!data.success || !data.url) throw new Error(data.message || 'Stripe 결제 준비 실패');
+    // Stripe 호스팅 결제 페이지로 이동 — 결제 완료 후 success_url로 자동 복귀
+    location.href = data.url;
+  } catch (e) {
+    if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
+    showToast(t('payFail', e.message), 'error');
+  }
 }
 
 // 결제 완료 후 creditsRefresh 신호 처리 (탭 복귀 시)
