@@ -3775,7 +3775,8 @@ ${bodyContent}
             <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-11">이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능</div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:22px;font-weight:800;color:#6c47ff;">20,000원</div>
+            <div id="pkgPriceOriginal_pkg_20000" style="display:none;font-size:12px;color:#8b8ba0;text-decoration:line-through;"></div>
+            <div id="pkgPrice_pkg_20000" style="font-size:22px;font-weight:800;color:#6c47ff;">20,000원</div>
           </div>
         </div>
       </div>
@@ -3789,7 +3790,8 @@ ${bodyContent}
             <div style="font-size:11px;color:#a78bfa;margin-top:4px;" data-i18n="pkg-bonus15">✨ 기본 대비 15% 더 받기</div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:22px;font-weight:800;color:#6c47ff;">40,000원</div>
+            <div id="pkgPriceOriginal_pkg_40000" style="display:none;font-size:12px;color:#8b8ba0;text-decoration:line-through;"></div>
+            <div id="pkgPrice_pkg_40000" style="font-size:22px;font-weight:800;color:#6c47ff;">40,000원</div>
           </div>
         </div>
       </div>
@@ -3802,7 +3804,8 @@ ${bodyContent}
             <div style="font-size:11px;color:#a78bfa;margin-top:4px;" data-i18n="pkg-bonus33">🚀 기본 대비 33% 더 받기</div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:22px;font-weight:800;color:#6c47ff;">60,000원</div>
+            <div id="pkgPriceOriginal_pkg_60000" style="display:none;font-size:12px;color:#8b8ba0;text-decoration:line-through;"></div>
+            <div id="pkgPrice_pkg_60000" style="font-size:22px;font-weight:800;color:#6c47ff;">60,000원</div>
           </div>
         </div>
       </div>

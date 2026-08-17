@@ -3518,8 +3518,10 @@ function openChargePanel() {
   const credits = user ? (user.credits ?? 0) : 0;
   const el = document.getElementById('chargePanelCredits');
   if (el) el.textContent = t('creditsUnit', credits);
+  const isBFM = !!(user && user.referrer === 'BFM');
   const badge = document.getElementById('bfmDiscountBadge');
-  if (badge) badge.style.display = (user && user.referrer === 'BFM') ? 'flex' : 'none';
+  if (badge) badge.style.display = isBFM ? 'flex' : 'none';
+  renderPkgPrices(isBFM);
   const panel = document.getElementById('chargePanel');
   if (!panel) return;
   panel.style.display = 'block';
@@ -3537,12 +3539,42 @@ function closeChargePanel() {
   _selectedPkg = null;
 }
 
-// 패키지별 시장 가격 표시 (크레딧 티어는 공통, 가격만 시장별 별도 책정 — 미국/일본은 원화 환산 대비 프리미엄, 서버 CREDIT_PACKAGES와 동일하게 유지)
-const PKG_PRICE_DISPLAY = {
-  pkg_20000: { KRW: '20,000원', USD: '$19.99', JPY: '¥2,980' },
-  pkg_40000: { KRW: '40,000원', USD: '$34.99', JPY: '¥4,980' },
-  pkg_60000: { KRW: '60,000원', USD: '$49.99', JPY: '¥7,980' },
+// 패키지별 원가 (크레딧 티어는 공통, 가격만 시장별 별도 책정 — 서버 CREDIT_PACKAGES와 동일하게 유지)
+const PKG_PRICE_RAW = {
+  pkg_20000: { KRW: 20000, usdCents: 1999, JPY: 2980 },
+  pkg_40000: { KRW: 40000, usdCents: 3499, JPY: 4980 },
+  pkg_60000: { KRW: 60000, usdCents: 4999, JPY: 7980 },
 };
+const BFM_DISCOUNT_RATE = 0.2; // 서버 REFERRER_DISCOUNT_RATE.BFM 과 동일하게 유지
+
+function formatPkgPrice(pkgId, currency, discounted) {
+  const raw = PKG_PRICE_RAW[pkgId];
+  if (currency === 'USD') {
+    const cents = discounted ? Math.round(raw.usdCents * (1 - BFM_DISCOUNT_RATE)) : raw.usdCents;
+    return '$' + (cents / 100).toFixed(2);
+  }
+  if (currency === 'JPY') {
+    const amt = discounted ? Math.round(raw.JPY * (1 - BFM_DISCOUNT_RATE)) : raw.JPY;
+    return '¥' + amt.toLocaleString('ja-JP');
+  }
+  const amt = discounted ? Math.round(raw.KRW * (1 - BFM_DISCOUNT_RATE)) : raw.KRW;
+  return amt.toLocaleString('ko-KR') + '원';
+}
+
+function renderPkgPrices(isBFM) {
+  Object.keys(PKG_PRICE_RAW).forEach(pkgId => {
+    const mainEl = document.getElementById('pkgPrice_' + pkgId);
+    const origEl = document.getElementById('pkgPriceOriginal_' + pkgId);
+    if (!mainEl) return;
+    if (isBFM) {
+      if (origEl) { origEl.textContent = formatPkgPrice(pkgId, _currency, false); origEl.style.display = 'block'; }
+      mainEl.textContent = formatPkgPrice(pkgId, _currency, true);
+    } else {
+      if (origEl) origEl.style.display = 'none';
+      mainEl.textContent = formatPkgPrice(pkgId, _currency, false);
+    }
+  });
+}
 
 function selectPackage(pkgId, el) {
   _selectedPkg = pkgId;
@@ -3555,7 +3587,8 @@ function selectPackage(pkgId, el) {
   const cta = document.getElementById('chargeCta');
   const lbl = document.getElementById('ctaLabel');
   if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-  const price = (PKG_PRICE_DISPLAY[pkgId] && PKG_PRICE_DISPLAY[pkgId][_currency]) || PKG_PRICE_DISPLAY[pkgId].KRW;
+  const isBFM = !!(AppState.user && AppState.user.referrer === 'BFM');
+  const price = formatPkgPrice(pkgId, _currency, isBFM);
   if (lbl) lbl.textContent = `${price} ${t('payBtnSuffix')}`;
 }
 
