@@ -3518,6 +3518,8 @@ function openChargePanel() {
   const credits = user ? (user.credits ?? 0) : 0;
   const el = document.getElementById('chargePanelCredits');
   if (el) el.textContent = t('creditsUnit', credits);
+  const badge = document.getElementById('bfmDiscountBadge');
+  if (badge) badge.style.display = (user && user.referrer === 'BFM') ? 'flex' : 'none';
   const panel = document.getElementById('chargePanel');
   if (!panel) return;
   panel.style.display = 'block';

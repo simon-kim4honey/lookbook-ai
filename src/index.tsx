@@ -1432,7 +1432,7 @@ async function getUserFromToken(db: D1Database, token: string | null) {
   if (!token) return null
   const now = new Date().toISOString()
   const row = await db.prepare(`
-    SELECT u.id, u.name, u.email, u.role, u.status, u.credits, u.avatar_url, u.provider
+    SELECT u.id, u.name, u.email, u.role, u.status, u.credits, u.avatar_url, u.provider, u.referrer
     FROM user_sessions s JOIN users u ON s.user_id = u.id
     WHERE s.token = ? AND s.expires_at > ? AND u.status = 'active'
   `).bind(token, now).first()
@@ -1455,13 +1455,13 @@ async function createSession(db: D1Database, userId: string): Promise<string> {
 
 // ── 공개 사용자 정보 (민감 정보 제외)
 function publicUser(u: any) {
-  return { id: u.id, name: u.name, email: u.email, role: u.role, credits: u.credits, avatar_url: u.avatar_url, provider: u.provider }
+  return { id: u.id, name: u.name, email: u.email, role: u.role, credits: u.credits, avatar_url: u.avatar_url, provider: u.provider, referrer: u.referrer ?? null }
 }
 
 // ────────────────────────────────────────────────────
 // 추천인(제휴사) 목록 — 회원가입 드롭다운/할인·보너스 정책에서 공통 사용
 const REFERRER_OPTIONS = ['BFM', '코오롱 FnC', '한섬'] as const
-const REFERRER_SIGNUP_BONUS_CREDITS = 200 + 1000 // BFM 추천 시 기본 200 + 추가 1,000
+const REFERRER_SIGNUP_BONUS_CREDITS = 750 // BFM 추천 시 가입 크레딧 (일반 200 대신 750 지급)
 const REFERRER_DISCOUNT_RATE: Record<string, number> = { 'BFM': 0.2 } // 유료 결제 시 20% 할인
 
 // POST /api/auth/signup — 이메일 회원가입
@@ -1490,7 +1490,7 @@ app.post('/api/auth/signup', async (c) => {
     `).bind(id, email.toLowerCase(), name, hash, initialCredits, marketingFlag, referrer).run()
 
     const token = await createSession(db, id)
-    const user = { id, name, email: email.toLowerCase(), role: 'user', credits: initialCredits, avatar_url: null, provider: 'email' }
+    const user = { id, name, email: email.toLowerCase(), role: 'user', credits: initialCredits, avatar_url: null, provider: 'email', referrer }
     return c.json({ success: true, user, token })
   } catch (err: any) {
     console.error('signup error:', err)
@@ -3762,6 +3762,10 @@ ${bodyContent}
       </div>
       <div style="font-size:32px;opacity:0.5;">💎</div>
     </div>
+    <div id="bfmDiscountBadge" style="display:none;align-items:center;gap:8px;background:linear-gradient(135deg,#fff7e0,#ffe9b3);border:1px solid #f5c542;border-radius:12px;padding:10px 16px;margin-bottom:16px;">
+      <span style="font-size:18px;">🎁</span>
+      <span style="font-size:13px;font-weight:700;color:#7a5b00;">BFM회원사 할인 20% 적용</span>
+    </div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;">
       <div class="pkg-card" onclick="selectPackage('pkg_20000',this)" data-pkg="pkg_20000"
            style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
@@ -4160,7 +4164,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 ## 주요 기능
 - 의류 이미지 업로드 (상의/하의/전체 슬롯별 지정)
 - 100종 이상의 AI 모델 프리셋 (성별/연령/체형/피부톤/무드 선택)
-- 15종 이상의 배경 프리셋
+- 2,000종 이상의 배경 프리셋
 - 평균 30초 내 이미지 생성
 - 생성된 이미지 기반 5초 홍보 영상 생성 (음악 포함, 9:16 세로형)
 - 룩북 세트 일괄 생성 및 다운로드
@@ -4328,7 +4332,6 @@ app.get('/', (c) => {
         <a href="#features" onclick="closeMobileNav()">기능</a>
         <a href="#how-it-works" onclick="closeMobileNav()">이용방법</a>
         <a href="#pricing" onclick="closeMobileNav()">요금제</a>
-        <a href="/dashboard" onclick="closeMobileNav()">대시보드</a>
       </div>
       <div class="navbar-actions" style="position:relative;">
         <div class="locale-switcher" id="localeSwitcher">
@@ -4445,7 +4448,7 @@ app.get('/', (c) => {
         </div>
         <div class="feature-card" data-feature-slot="3">
           <h3 class="feature-title">다양한 배경 프리셋</h3>
-          <p class="feature-desc">스튜디오, 스트리트, 카페, 자연 등 15가지+ 배경을 제공합니다. 무드에 맞는 배경으로 분위기를 완성하세요.</p>
+          <p class="feature-desc">스튜디오, 스트리트, 카페, 자연 등 2,000가지+ 배경을 제공합니다. 무드에 맞는 배경으로 분위기를 완성하세요.</p>
         </div>
         <div class="feature-card" data-feature-slot="4">
           <h3 class="feature-title">30초 내 AI 생성</h3>
@@ -4557,7 +4560,7 @@ app.get('/', (c) => {
           <div class="pricing-included-label">제공 내역</div>
           <ul class="pricing-features">
             <li><span class="check">✓</span> 전체 AI 모델 1000종+</li>
-            <li><span class="check">✓</span> 전체 배경 15종+</li>
+            <li><span class="check">✓</span> 전체 배경 2,000종+</li>
             <li><span class="check">✓</span> 스타일샷 세트 생성</li>
             <li><span class="check">✓</span> 일괄 다운로드</li>
           </ul>
