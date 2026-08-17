@@ -1459,6 +1459,11 @@ function publicUser(u: any) {
 }
 
 // ────────────────────────────────────────────────────
+// 추천인(제휴사) 목록 — 회원가입 드롭다운/할인·보너스 정책에서 공통 사용
+const REFERRER_OPTIONS = ['BFM', '코오롱 FnC', '한섬'] as const
+const REFERRER_SIGNUP_BONUS_CREDITS = 200 + 1000 // BFM 추천 시 기본 200 + 추가 1,000
+const REFERRER_DISCOUNT_RATE: Record<string, number> = { 'BFM': 0.2 } // 유료 결제 시 20% 할인
+
 // POST /api/auth/signup — 이메일 회원가입
 // ────────────────────────────────────────────────────
 app.post('/api/auth/signup', async (c) => {
@@ -1466,6 +1471,7 @@ app.post('/api/auth/signup', async (c) => {
     const db = c.env.LOOKBOOK_DB
     const body: any = await c.req.json()
     const { name, email, password, agreeMarketing } = body
+    const referrer = REFERRER_OPTIONS.includes(body?.referrer) ? body.referrer : null
 
     if (!name || !email || !password) return c.json({ success: false, message: '모든 항목을 입력해주세요.' }, 400)
     if (password.length < 8) return c.json({ success: false, message: '비밀번호는 8자 이상이어야 합니다.' }, 400)
@@ -1477,13 +1483,14 @@ app.post('/api/auth/signup', async (c) => {
     const id = genUserId()
     const hash = await hashPassword(password)
     const marketingFlag = agreeMarketing ? 1 : 0
+    const initialCredits = referrer === 'BFM' ? REFERRER_SIGNUP_BONUS_CREDITS : 200
     await db.prepare(`
-      INSERT INTO users (id, email, name, password_hash, provider, status, credits, role, agree_marketing)
-      VALUES (?, ?, ?, ?, 'email', 'active', 200, 'user', ?)
-    `).bind(id, email.toLowerCase(), name, hash, marketingFlag).run()
+      INSERT INTO users (id, email, name, password_hash, provider, status, credits, role, agree_marketing, referrer)
+      VALUES (?, ?, ?, ?, 'email', 'active', ?, 'user', ?, ?)
+    `).bind(id, email.toLowerCase(), name, hash, initialCredits, marketingFlag, referrer).run()
 
     const token = await createSession(db, id)
-    const user = { id, name, email: email.toLowerCase(), role: 'user', credits: 200, avatar_url: null, provider: 'email' }
+    const user = { id, name, email: email.toLowerCase(), role: 'user', credits: initialCredits, avatar_url: null, provider: 'email' }
     return c.json({ success: true, user, token })
   } catch (err: any) {
     console.error('signup error:', err)
@@ -1856,7 +1863,7 @@ app.get('/api/admin/users', adminAuth, async (c) => {
 
     const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM users ${where}`).bind(...params).first()
     const users = await db.prepare(
-      `SELECT id, name, email, provider, status, credits, role, last_login_at, created_at FROM users ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      `SELECT id, name, email, provider, status, credits, role, referrer, last_login_at, created_at FROM users ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
     ).bind(...params, limit, offset).all()
 
     return c.json({ success: true, users: users.results, total: total?.cnt || 0, page, limit })
@@ -1869,9 +1876,37 @@ app.get('/api/admin/users', adminAuth, async (c) => {
 app.get('/api/admin/users/:id', adminAuth, async (c) => {
   try {
     const db = c.env.LOOKBOOK_DB
-    const user = await db.prepare(`SELECT id, name, email, provider, status, credits, role, last_login_at, created_at FROM users WHERE id = ?`).bind(c.req.param('id')).first()
+    const user = await db.prepare(`SELECT id, name, email, provider, status, credits, role, referrer, last_login_at, created_at FROM users WHERE id = ?`).bind(c.req.param('id')).first()
     if (!user) return c.json({ success: false, message: '존재하지 않는 사용자입니다.' }, 404)
     return c.json({ success: true, user })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /api/admin/users/:id/payments — 관리자용 회원별 결제내역
+app.get('/api/admin/users/:id/payments', adminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const payments = await db.prepare(
+      `SELECT order_id, amount, credits, status, pg_provider, currency, pg_method, created_at, paid_at
+       FROM payment_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`
+    ).bind(c.req.param('id')).all()
+    return c.json({ success: true, payments: payments.results })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /api/admin/users/:id/generations — 관리자용 회원별 생성(사용) 내역
+app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const generations = await db.prepare(
+      `SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, created_at
+       FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`
+    ).bind(c.req.param('id')).all()
+    return c.json({ success: true, generations: generations.results })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -2190,7 +2225,7 @@ app.post('/api/payments/prepare', async (c) => {
     if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
 
     const sess = await db.prepare(
-      `SELECT s.user_id, u.name, u.email FROM user_sessions s
+      `SELECT s.user_id, u.name, u.email, u.referrer FROM user_sessions s
        JOIN users u ON u.id = s.user_id
        WHERE s.token = ? AND s.expires_at > datetime('now')`
     ).bind(sessionToken).first() as any
@@ -2200,6 +2235,10 @@ app.post('/api/payments/prepare', async (c) => {
     const pkg = CREDIT_PACKAGES[packageId]
     if (!pkg) return c.json({ error: '잘못된 패키지입니다.' }, 400)
 
+    // 추천인(제휴사) 할인 적용 — 크레딧 지급량은 그대로, 결제 금액만 할인
+    const discountRate = REFERRER_DISCOUNT_RATE[sess.referrer] || 0
+    const chargeAmount = discountRate > 0 ? Math.round(pkg.amount * (1 - discountRate)) : pkg.amount
+
     // ── M-7: 중복 orderId 방지 ─────────────────────────────
     // 동일 유저가 5분 이내 동일 패키지로 pending 레코드를 이미 생성했으면
     // 새 orderId를 발급하지 않고 기존 것을 재사용 (결제창 중복 호출 방어)
@@ -2208,13 +2247,13 @@ app.post('/api/payments/prepare', async (c) => {
        WHERE user_id = ? AND amount = ? AND status = 'pending'
          AND created_at > datetime('now', '-5 minutes')
        ORDER BY created_at DESC LIMIT 1`
-    ).bind(sess.user_id, pkg.amount).first() as any
+    ).bind(sess.user_id, chargeAmount).first() as any
 
     if (existing?.order_id) {
       return c.json({
         success: true,
         orderId: existing.order_id,
-        amount: pkg.amount,
+        amount: chargeAmount,
         credits: pkg.credits,
         orderName: pkg.label,
         customerName: sess.name,
@@ -2233,12 +2272,12 @@ app.post('/api/payments/prepare', async (c) => {
     await db.prepare(
       `INSERT INTO payment_logs (user_id, order_id, amount, credits, status)
        VALUES (?, ?, ?, ?, 'pending')`
-    ).bind(sess.user_id, orderId, pkg.amount, pkg.credits).run()
+    ).bind(sess.user_id, orderId, chargeAmount, pkg.credits).run()
 
     return c.json({
       success: true,
       orderId,
-      amount: pkg.amount,
+      amount: chargeAmount,
       credits: pkg.credits,
       orderName: pkg.label,
       customerName: sess.name,
@@ -2282,7 +2321,7 @@ app.post('/api/stripe/checkout', async (c) => {
   if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
 
   const sess = await db.prepare(
-    `SELECT s.user_id, u.email FROM user_sessions s
+    `SELECT s.user_id, u.email, u.referrer FROM user_sessions s
      JOIN users u ON u.id = s.user_id
      WHERE s.token = ? AND s.expires_at > datetime('now')`
   ).bind(sessionToken).first() as any
@@ -2294,7 +2333,10 @@ app.post('/api/stripe/checkout', async (c) => {
     if (!pkg) return c.json({ error: '잘못된 패키지입니다.' }, 400)
     const cur = String(currency || 'USD').toUpperCase()
     if (cur !== 'USD' && cur !== 'JPY') return c.json({ error: '지원하지 않는 통화입니다.' }, 400)
-    const amount = cur === 'USD' ? pkg.usdCents : pkg.jpyAmount
+    const baseAmount = cur === 'USD' ? pkg.usdCents : pkg.jpyAmount
+    // 추천인(제휴사) 할인 적용 — 크레딧 지급량은 그대로, 결제 금액만 할인
+    const discountRate = REFERRER_DISCOUNT_RATE[sess.referrer] || 0
+    const amount = discountRate > 0 ? Math.round(baseAmount * (1 - discountRate)) : baseAmount
 
     const shortUid = sess.user_id.slice(0, 6)
     const orderId = `lookbook-${shortUid}-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
@@ -4698,6 +4740,14 @@ app.get('/', (c) => {
           <div class="form-group">
             <input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" />
           </div>
+          <div class="form-group">
+            <select class="form-input" id="signupReferrer">
+              <option value="">추천인 선택 (선택 사항)</option>
+              <option value="BFM">BFM</option>
+              <option value="코오롱 FnC">코오롱 FnC</option>
+              <option value="한섬">한섬</option>
+            </select>
+          </div>
 
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:12px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
         </form>
@@ -5683,6 +5733,14 @@ app.get('/generator', (c) => {
           <div class="form-group"><input type="text" class="form-input" id="signupName" placeholder="이름" autocomplete="name" /></div>
           <div class="form-group"><input type="email" class="form-input" id="signupEmail" placeholder="이메일" autocomplete="email" /></div>
           <div class="form-group"><input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" /></div>
+          <div class="form-group">
+            <select class="form-input" id="signupReferrer">
+              <option value="">추천인 선택 (선택 사항)</option>
+              <option value="BFM">BFM</option>
+              <option value="코오롱 FnC">코오롱 FnC</option>
+              <option value="한섬">한섬</option>
+            </select>
+          </div>
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
         </form>
       </div>
@@ -5802,6 +5860,10 @@ app.get('/admin02', (c) => {
     .upload-preview{width:100%;max-height:180px;object-fit:contain;border-radius:8px;margin-top:8px;display:none;}
     .empty-state{text-align:center;padding:48px 20px;color:#8b8ba0;font-size:13px;}
     .empty-state .icon{font-size:32px;margin-bottom:12px;opacity:.4;}
+    /* 모달 */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,20,.7);align-items:center;justify-content:center;padding:20px;z-index:2000;}
+    .modal-overlay.open{display:flex;}
+    .modal-box{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;padding:24px;width:100%;max-width:480px;}
   </style>
 </head>
 <body>
@@ -6087,6 +6149,7 @@ app.get('/admin02', (c) => {
             <tr style="background:#0f0f1a;border-bottom:1px solid #2e2e50;">
               <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">회원</th>
               <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">가입경로</th>
+              <th style="text-align:center;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">추천인</th>
               <th style="text-align:center;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">크레딧</th>
               <th style="text-align:center;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">상태</th>
               <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">가입일</th>
@@ -6094,13 +6157,30 @@ app.get('/admin02', (c) => {
             </tr>
           </thead>
           <tbody id="userTableBody">
-            <tr><td colspan="6" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">로딩 중...</td></tr>
+            <tr><td colspan="7" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">로딩 중...</td></tr>
           </tbody>
         </table>
       </div>
 
       <!-- 페이징 -->
       <div id="userPagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- 회원 상세 모달 (결제내역 / 사용내역) -->
+  <div class="modal-overlay" id="userDetailModal" style="z-index:5000;">
+    <div class="modal-box" style="max-width:640px;max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:17px;" id="userDetailName">회원 상세</h3>
+        <button onclick="closeModal('userDetailModal')" style="background:none;border:none;color:#8b8ba0;font-size:20px;cursor:pointer;">×</button>
+      </div>
+      <div id="userDetailSummary" style="font-size:13px;color:#c8c8dc;margin-bottom:20px;line-height:1.8;"></div>
+
+      <div style="font-size:13px;font-weight:700;color:#e0e0f0;margin-bottom:8px;">💳 결제내역</div>
+      <div id="userDetailPayments" style="margin-bottom:24px;">불러오는 중...</div>
+
+      <div style="font-size:13px;font-weight:700;color:#e0e0f0;margin-bottom:8px;">🖼️ 사용내역(생성)</div>
+      <div id="userDetailGenerations">불러오는 중...</div>
     </div>
   </div>
 
@@ -6186,7 +6266,7 @@ async function loadUsers() {
     renderUserPagination(data.total || allUsers.length, data.page || 1, data.limit || USERS_PER_PAGE)
   } catch(e) {
     document.getElementById('userTableBody').innerHTML =
-      '<tr><td colspan="6" style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">⚠️ 로딩 실패</td></tr>'
+      '<tr><td colspan="7" style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">⚠️ 로딩 실패</td></tr>'
   }
 }
 
@@ -6198,7 +6278,7 @@ function filterUsers() {
 function renderUserTable(users) {
   const tbody = document.getElementById('userTableBody')
   if (!users.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">조건에 맞는 회원이 없습니다</td></tr>'
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">조건에 맞는 회원이 없습니다</td></tr>'
     return
   }
   const providerBadge = {
@@ -6238,6 +6318,7 @@ function renderUserTable(users) {
       +   '</div>'
       + '</td>'
       + '<td style="padding:12px 16px;">' + (providerBadge[u.provider] || u.provider) + '</td>'
+      + '<td style="padding:12px 16px;text-align:center;font-size:12px;color:' + (u.referrer ? '#9b7cff;font-weight:600;' : '#8b8ba0;') + '">' + (u.referrer ? escHtml(u.referrer) : '-') + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">'
       +   '<span style="font-size:14px;font-weight:700;color:#9b7cff;">' + credits + '</span>'
       +   '<span style="font-size:10px;color:#8b8ba0;"> 크레딧</span>'
@@ -6249,7 +6330,8 @@ function renderUserTable(users) {
       + '<td style="padding:12px 16px;text-align:center;">' + (statusBadge[u.status] || u.status) + '</td>'
       + '<td style="padding:12px 16px;font-size:12px;color:#8b8ba0;">' + joined + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">'
-      +   '<div style="display:flex;gap:6px;justify-content:center;">'
+      +   '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
+      +     '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="detail" class="btn-sm" style="font-size:11px;padding:4px 10px;">상세보기</button>'
       +     statusBtn + deleteBtn
       +   '</div>'
       + '</td>'
@@ -6337,6 +6419,58 @@ async function deleteUser(id, name, email) {
     if (data.success) { showAdminToast('삭제 완료', 'ok'); loadUsers() }
     else showAdminToast(data.message || '실패', 'err')
   } catch(e) { showAdminToast('서버 오류', 'err') }
+}
+
+function openModal(id) { const m = document.getElementById(id); if (m) m.classList.add('open') }
+function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.remove('open') }
+
+async function openUserDetail(id, name) {
+  document.getElementById('userDetailName').textContent = '👤 ' + (name || '회원 상세')
+  const u = allUsers.find(function(x) { return String(x.id) === String(id) })
+  const summaryEl = document.getElementById('userDetailSummary')
+  summaryEl.innerHTML = u
+    ? ('이메일: ' + escHtml(u.email || '-') + '<br>'
+      + '추천인: ' + (u.referrer ? escHtml(u.referrer) : '-') + '<br>'
+      + '보유 크레딧: ' + (u.credits != null ? u.credits : 0) + '<br>'
+      + '가입일: ' + (u.created_at ? u.created_at.slice(0,10) : '-'))
+    : ''
+  document.getElementById('userDetailPayments').innerHTML = '불러오는 중...'
+  document.getElementById('userDetailGenerations').innerHTML = '불러오는 중...'
+  openModal('userDetailModal')
+
+  try {
+    const res = await fetch('/api/admin/users/' + id + '/payments', { headers: {'X-Admin-Password':adminPassword} })
+    const data = await res.json()
+    const list = (data.success && data.payments) ? data.payments : []
+    document.getElementById('userDetailPayments').innerHTML = list.length
+      ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(p) {
+          var statusColor = p.status === 'paid' ? '#22c55e' : (p.status === 'refunded' ? '#ef4444' : '#8b8ba0')
+          return '<div style="display:flex;justify-content:space-between;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
+            + '<span>' + (p.created_at ? p.created_at.slice(0,16).replace('T',' ') : '-') + ' · ' + (p.pg_provider || '-') + '</span>'
+            + '<span>' + (p.amount != null ? p.amount.toLocaleString() : '-') + ' ' + (p.currency || '') + ' → +' + (p.credits || 0) + '크레딧</span>'
+            + '<span style="color:' + statusColor + ';font-weight:600;">' + (p.status || '-') + '</span>'
+            + '</div>'
+        }).join('') + '</div>'
+      : '<div style="font-size:12px;color:#8b8ba0;">결제 내역이 없습니다.</div>'
+  } catch(e) {
+    document.getElementById('userDetailPayments').innerHTML = '<div style="font-size:12px;color:#ef4444;">불러오기 실패</div>'
+  }
+
+  try {
+    const res = await fetch('/api/admin/users/' + id + '/generations', { headers: {'X-Admin-Password':adminPassword} })
+    const data = await res.json()
+    const list = (data.success && data.generations) ? data.generations : []
+    document.getElementById('userDetailGenerations').innerHTML = list.length
+      ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(g) {
+          return '<div style="display:flex;justify-content:space-between;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
+            + '<span>' + (g.created_at ? g.created_at.slice(0,16).replace('T',' ') : '-') + ' · ' + (g.kind === 'video' ? '🎬 영상' : '🖼️ 이미지') + '</span>'
+            + '<span>' + (g.model_name || '-') + ' / ' + (g.bg_name || '-') + (g.image_count ? (' · ' + g.image_count + '장') : '') + '</span>'
+            + '</div>'
+        }).join('') + '</div>'
+      : '<div style="font-size:12px;color:#8b8ba0;">사용 내역이 없습니다.</div>'
+  } catch(e) {
+    document.getElementById('userDetailGenerations').innerHTML = '<div style="font-size:12px;color:#ef4444;">불러오기 실패</div>'
+  }
 }
 
 function showAdminToast(msg, type) {
@@ -7037,6 +7171,11 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (action === 'delete') { deleteUser(uid, btn.dataset.name || '', btn.dataset.email || '') }
     else if (action === 'credits') { adjustCredits(uid, parseInt(btn.dataset.credits || '0')) }
     else if (action === 'grant')   { grantCredits(uid, parseInt(btn.dataset.credits || '0')) }
+    else if (action === 'detail')  { openUserDetail(uid, btn.dataset.name || '') }
+  })
+
+  document.getElementById('userDetailModal').addEventListener('click', function(e) {
+    if (e.target.id === 'userDetailModal') closeModal('userDetailModal')
   })
 })
 </script>

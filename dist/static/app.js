@@ -1231,11 +1231,13 @@ async function handleSignup(e) {
   const nameEl          = document.getElementById('signupName');
   const emailEl         = document.getElementById('signupEmail');
   const passwordEl      = document.getElementById('signupPassword');
+  const referrerEl      = document.getElementById('signupReferrer');
   const agreePrivacyEl  = document.getElementById('agreePrivacy');
   const agreeMarketingEl= document.getElementById('agreeMarketing');
   const name            = nameEl     ? nameEl.value.trim()     : '';
   const email           = emailEl    ? emailEl.value.trim()    : '';
   const password        = passwordEl ? passwordEl.value        : '';
+  const referrer         = referrerEl ? referrerEl.value        : '';
   const agreePrivacy    = agreePrivacyEl  ? agreePrivacyEl.checked  : false;
   const agreeMarketing  = agreeMarketingEl? agreeMarketingEl.checked : false;
   const btn             = document.getElementById('signupBtn');
@@ -1276,7 +1278,7 @@ async function handleSignup(e) {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, agreeMarketing })
+      body: JSON.stringify({ name, email, password, agreeMarketing, referrer })
     });
     const data = await res.json();
 
