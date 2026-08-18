@@ -1,7 +1,47 @@
 /* ===================================================
-   EZlook - Frontend Logic
+   AI Fashion Lookbook Studio - Frontend Logic
    aifashion.co.kr + Atlas Cloud AI 실API 연동
    =================================================== */
+
+// ─────────────────────────────────────────────────────────
+// GA4 이벤트 헬퍼 — GA4_MEASUREMENT_ID 미설정 시 gtag가 없어 조용히 무시됨
+// ─────────────────────────────────────────────────────────
+function gaEvent(name, params) {
+  try {
+    if (typeof gtag === 'function') gtag('event', name, params || {});
+  } catch (e) {}
+}
+
+// ─────────────────────────────────────────────────────────
+// UTM 파라미터 캡처 — 랜딩 시점에 저장해두었다가 가입 시점에 함께 전송(어트리뷰션)
+// 30일 이내 첫 방문 UTM을 우선 유지(last-touch가 아닌 first-touch 방식)
+// ─────────────────────────────────────────────────────────
+(function captureUtm() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const utm = {};
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((k) => {
+      if (params.get(k)) utm[k] = params.get(k);
+    });
+    if (Object.keys(utm).length === 0) return;
+    const existing = JSON.parse(localStorage.getItem('lookbook_utm') || 'null');
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    if (existing && Date.now() - (existing.ts || 0) < THIRTY_DAYS) return; // 기존 어트리뷰션 유지
+    utm.ts = Date.now();
+    localStorage.setItem('lookbook_utm', JSON.stringify(utm));
+  } catch (e) {}
+})();
+
+function getStoredUtm() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('lookbook_utm') || 'null');
+    if (!raw) return {};
+    const { ts, ...utm } = raw;
+    return utm;
+  } catch (e) {
+    return {};
+  }
+}
 
 // ─────────────────────────────────────────────────────────
 // i18n — 다국어 번역 테이블
@@ -31,7 +71,6 @@ const I18N = {
     creditInsufficient: (need, have) => `크레딧이 부족합니다. 필요: ${need}크레딧 / 보유: ${have}크레딧`,
     creditInsufficientDetail: (have) => `크레딧이 부족합니다. (보유: ${have}크레딧 / 필요: 90크레딧) 대시보드에서 충전해 주세요.`,
     creditDeductDone: (remain) => `다운로드 완료! (90크레딧 차감, 잔액: ${remain}크레딧)`,
-    creditRedownloadDone: '재다운로드 완료! (크레딧 차감 없음)',
     creditError: '크레딧 처리 중 오류가 발생했습니다.',
     creditLackPartial: (n, have) => `크레딧 부족으로 ${n}장만 다운로드했습니다. (보유: ${have}크레딧 / 필요: 90크레딧)`,
     creditErrNum: (n) => `${n}번 이미지 크레딧 처리 오류`,
@@ -41,18 +80,6 @@ const I18N = {
     uploadSizeErr: '파일 크기는 10MB 이하여야 합니다.',
     uploadDone: (label) => `${label} 업로드 완료`,
     uploadHint: '상의·하의·전체(원피스/세트) 중 하나 이상 업로드해주세요.',
-    notClothingErr: (cat) => {
-      const label = { TOP: '상의', BOTTOM: '하의', DRESS: '전체' }[cat] || '의류';
-      return `장난치지 마세요. ${label} 상품 사진을 업로드해주세요.`;
-    },
-    slotLockedErr: (cat) => {
-      return cat === 'DRESS'
-        ? '상의/하의를 이미 업로드해서 전체는 사용할 수 없어요. 전체를 쓰려면 상의/하의를 먼저 삭제해주세요.'
-        : '전체를 이미 업로드해서 상의/하의는 사용할 수 없어요. 상의/하의를 쓰려면 전체를 먼저 삭제해주세요.';
-    },
-    slotLockedHint: (cat) => cat === 'DRESS' ? '상의/하의 업로드 시 사용 불가' : '전체 업로드 시 사용 불가',
-    validatingClothing: '이미지 확인 중...',
-    genAnalysisErr: '이미지 분석 오류입니다. 상품을 다시 업로드해주세요.',
     // 모델/배경
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">등록된 모델이 없습니다</p><p style="font-size:12px;margin-top:4px">관리자 페이지에서 모델을 등록해주세요</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">모델 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
@@ -66,7 +93,7 @@ const I18N = {
     generating: '준비 중...',
     genStart: '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작',
     genError: (msg) => `생성 중 오류: ${msg}`,
-    genDoneDemo: '이미지 분석 오류, 상품 업로드를 다시해주세요.',
+    genDoneDemo: (n) => `${n}장의 이미지가 생성되었습니다. (데모 모드) 🎉`,
     genDone: (n) => `${n}장의 실사 AI 이미지가 생성되었습니다! 🎉`,
     genStyleHint: '스타일샷 세트를 추가 생성하려면 아래 버튼을 클릭하세요.',
     fitLabel: (n) => `피팅컷 (${n})`,
@@ -95,7 +122,6 @@ const I18N = {
     // 결제
     payFail: (msg) => msg || '결제 중 오류가 발생했습니다.',
     paySelectPkg: '패키지를 선택해주세요.',
-    payBtnSuffix: '결제',
     // 프로젝트
     projectDownload: '이미지를 다운로드합니다.',
     projectOpen: (name) => `"${name}" 프로젝트를 엽니다.`,
@@ -121,7 +147,6 @@ const I18N = {
     creditInsufficient: (need, have) => `Insufficient credits. Need: ${need} / Have: ${have}`,
     creditInsufficientDetail: (have) => `Insufficient credits. (Have: ${have} / Need: 90) Please top up on the dashboard.`,
     creditDeductDone: (remain) => `Download complete! (90 credits used, balance: ${remain})`,
-    creditRedownloadDone: 'Re-download complete! (no credits charged)',
     creditError: 'An error occurred while processing credits.',
     creditLackPartial: (n, have) => `Only ${n} image(s) downloaded due to insufficient credits. (Have: ${have} / Need: 90)`,
     creditErrNum: (n) => `Credit processing error for image #${n}`,
@@ -130,18 +155,6 @@ const I18N = {
     uploadSizeErr: 'File size must be 10MB or less.',
     uploadDone: (label) => `${label} uploaded`,
     uploadHint: 'Please upload at least one of: top, bottom, or full outfit.',
-    notClothingErr: (cat) => {
-      const label = { TOP: 'top', BOTTOM: 'bottom', DRESS: 'full outfit' }[cat] || 'clothing';
-      return `Nice try. Please upload an actual ${label} product photo.`;
-    },
-    slotLockedErr: (cat) => {
-      return cat === 'DRESS'
-        ? "You've already uploaded a top/bottom, so full outfit is unavailable. Remove the top/bottom first to use this slot."
-        : "You've already uploaded a full outfit, so top/bottom are unavailable. Remove the full outfit first to use this slot.";
-    },
-    slotLockedHint: (cat) => cat === 'DRESS' ? 'Unavailable while top/bottom is uploaded' : 'Unavailable while full outfit is uploaded',
-    validatingClothing: 'Checking image...',
-    genAnalysisErr: 'Image analysis error. Please re-upload your product photo.',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">No models registered</p><p style="font-size:12px;margin-top:4px">Please register models in the admin page</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load models</p><p style="font-size:13px">Please try again later</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">No backgrounds registered</p><p style="font-size:13px">Please add backgrounds in the admin page</p></div>',
@@ -153,7 +166,7 @@ const I18N = {
     generating: 'Preparing...',
     genStart: '<i class="fas fa-wand-magic-sparkles"></i> Start AI Generation',
     genError: (msg) => `Generation error: ${msg}`,
-    genDoneDemo: 'Image analysis error. Please re-upload your product photo.',
+    genDoneDemo: (n) => `${n} image(s) generated. (Demo mode) 🎉`,
     genDone: (n) => `${n} AI image(s) generated! 🎉`,
     genStyleHint: 'Click the button below to generate additional style shots.',
     fitLabel: (n) => `Fitting Shots (${n})`,
@@ -179,7 +192,6 @@ const I18N = {
     favIcon: (isFav) => isFav ? '❤️' : '🤍',
     payFail: (msg) => msg || 'An error occurred during payment.',
     paySelectPkg: 'Please select a package.',
-    payBtnSuffix: 'Checkout',
     projectDownload: 'Downloading images.',
     projectOpen: (name) => `Opening project "${name}".`,
   },
@@ -204,7 +216,6 @@ const I18N = {
     creditInsufficient: (need, have) => `クレジットが不足しています。必要: ${need} / 保有: ${have}`,
     creditInsufficientDetail: (have) => `クレジットが不足しています。(保有: ${have} / 必要: 90) ダッシュボードでチャージしてください。`,
     creditDeductDone: (remain) => `ダウンロード完了！(90クレジット消費、残高: ${remain})`,
-    creditRedownloadDone: '再ダウンロード完了！(クレジット消費なし)',
     creditError: 'クレジット処理中にエラーが発生しました。',
     creditLackPartial: (n, have) => `クレジット不足のため${n}枚のみダウンロードしました。(保有: ${have} / 必要: 90)`,
     creditErrNum: (n) => `画像${n}番のクレジット処理エラー`,
@@ -213,18 +224,6 @@ const I18N = {
     uploadSizeErr: 'ファイルサイズは10MB以下にしてください。',
     uploadDone: (label) => `${label}をアップロードしました`,
     uploadHint: 'トップス・ボトムス・全身のいずれかをアップロードしてください。',
-    notClothingErr: (cat) => {
-      const label = { TOP: 'トップス', BOTTOM: 'ボトムス', DRESS: 'ワンピース/セット' }[cat] || '衣類';
-      return `ふざけないでください。${label}の商品写真をアップロードしてください。`;
-    },
-    slotLockedErr: (cat) => {
-      return cat === 'DRESS'
-        ? 'トップス/ボトムスを既にアップロードしているため、ワンピース/セットは使用できません。先にトップス/ボトムスを削除してください。'
-        : 'ワンピース/セットを既にアップロードしているため、トップス/ボトムスは使用できません。先にワンピース/セットを削除してください。';
-    },
-    slotLockedHint: (cat) => cat === 'DRESS' ? 'トップス/ボトムスアップロード時は使用不可' : 'ワンピース/セットアップロード時は使用不可',
-    validatingClothing: '画像を確認中...',
-    genAnalysisErr: '画像分析エラーです。商品画像を再アップロードしてください。',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">モデルが登録されていません</p><p style="font-size:12px;margin-top:4px">管理ページでモデルを登録してください</p>',
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">モデルの読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景が登録されていません</p><p style="font-size:13px">管理ページで背景を登録してください</p></div>',
@@ -236,7 +235,7 @@ const I18N = {
     generating: '準備中...',
     genStart: '<i class="fas fa-wand-magic-sparkles"></i> AI生成スタート',
     genError: (msg) => `生成エラー: ${msg}`,
-    genDoneDemo: '画像解析エラー。商品画像を再アップロードしてください。',
+    genDoneDemo: (n) => `${n}枚の画像が生成されました。(デモモード) 🎉`,
     genDone: (n) => `${n}枚のAI画像が生成されました！ 🎉`,
     genStyleHint: '下のボタンをクリックして追加スタイルショットを生成してください。',
     fitLabel: (n) => `フィッティングショット (${n})`,
@@ -262,7 +261,6 @@ const I18N = {
     favIcon: (isFav) => isFav ? '❤️' : '🤍',
     payFail: (msg) => msg || '決済中にエラーが発生しました。',
     paySelectPkg: 'パッケージを選択してください。',
-    payBtnSuffix: '決済へ',
     projectDownload: '画像をダウンロードします。',
     projectOpen: (name) => `プロジェクト「${name}」を開きます。`,
   }
@@ -271,10 +269,6 @@ const I18N = {
 // t() — 현재 locale의 번역 키 반환
 // 값이 함수면 인자 전달, 문자열이면 그대로 반환
 let _locale = 'ko'; // 기본값, initLocale()에서 갱신
-let _country = '';
-let _currency = 'KRW';
-let _pg = 'nicepay';
-const LOCALE_OVERRIDE_KEY = 'lookbook_locale_override';
 function t(key, ...args) {
   const dict = I18N[_locale] || I18N['en'];
   const val = dict[key] ?? I18N['en'][key] ?? key;
@@ -283,90 +277,16 @@ function t(key, ...args) {
 
 async function initLocale() {
   try {
-    const token = localStorage.getItem('lookbook_token') || '';
-    const res = await fetch('/api/locale', { headers: token ? { 'X-Session-Token': token } : {} });
+    const res = await fetch('/api/locale');
     const data = await res.json();
     _locale = data.locale || 'ko';
-    _country = data.country || '';
-    _currency = data.currency || 'KRW';
-    _pg = data.pg || 'nicepay';
   } catch (e) {
     _locale = 'ko';
   }
-  // 사용자가 직접 고른 언어가 있으면 자동감지 결과보다 우선 — 통화/PG도 함께 복원해야
-  // 페이지 이동/새로고침 후 언어는 English인데 결제는 나이스페이로 되돌아가는 문제가 생기지 않음
-  const override = localStorage.getItem(LOCALE_OVERRIDE_KEY);
-  if (override && I18N[override]) {
-    _locale = override;
-    const market = LOCALE_MARKET_MAP[override] || LOCALE_MARKET_MAP.en;
-    _currency = market.currency;
-    _pg = market.pg;
-  }
   // HTML lang 속성 설정
   document.documentElement.lang = _locale;
-  updateLocaleSwitcherUI();
   // data-i18n 속성 정적 텍스트 교체
   applyStaticI18n();
-}
-
-// 언어별 기본 통화/PG — 서버의 resolveLocaleProfile()과 동일한 매핑.
-// 수동으로 언어를 바꾸면 결제 통화/PG도 함께 바뀜(한국어→나이스페이/KRW, 그 외→Stripe)
-const LOCALE_MARKET_MAP = {
-  ko: { currency: 'KRW', pg: 'nicepay' },
-  ja: { currency: 'JPY', pg: 'stripe' },
-  en: { currency: 'USD', pg: 'stripe' },
-};
-
-// 언어 스위처에서 수동으로 언어를 고른 경우
-function setLocaleOverride(locale) {
-  if (!I18N[locale]) return;
-  localStorage.setItem(LOCALE_OVERRIDE_KEY, locale);
-  _locale = locale;
-  const market = LOCALE_MARKET_MAP[locale] || LOCALE_MARKET_MAP.en;
-  _currency = market.currency;
-  _pg = market.pg;
-  document.documentElement.lang = _locale;
-  updateLocaleSwitcherUI();
-  applyStaticI18n();
-  closeLocaleSwitcher();
-  // 로그인 상태면 서버에도 선호 언어를 저장해 다른 기기에서도 유지되게 함
-  const token = localStorage.getItem('lookbook_token');
-  if (token) {
-    fetch('/api/user/locale', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'X-Session-Token': token },
-      body: JSON.stringify({ locale, country: _country, currency: _currency }),
-    }).catch(() => {});
-  }
-}
-
-function updateLocaleSwitcherUI() {
-  const label = document.getElementById('localeSwitcherLabel');
-  const names = { ko: '한국어', en: 'English', ja: '日本語' };
-  if (label) label.textContent = names[_locale] || _locale;
-  document.querySelectorAll('#localeSwitcherMenu .locale-item').forEach(item => {
-    item.classList.toggle('selected', item.getAttribute('data-locale') === _locale);
-  });
-}
-
-function toggleLocaleSwitcher() {
-  const wrap = document.getElementById('localeSwitcher');
-  if (!wrap) return;
-  const isOpen = wrap.classList.toggle('open');
-  if (isOpen) {
-    const closeOnOutsideClick = (e) => {
-      if (!wrap.contains(e.target)) {
-        wrap.classList.remove('open');
-        document.removeEventListener('click', closeOnOutsideClick);
-      }
-    };
-    setTimeout(() => document.addEventListener('click', closeOnOutsideClick), 10);
-  }
-}
-
-function closeLocaleSwitcher() {
-  const wrap = document.getElementById('localeSwitcher');
-  if (wrap) wrap.classList.remove('open');
 }
 
 // data-i18n 속성 기반 정적 텍스트 교체
@@ -382,10 +302,10 @@ const STATIC_I18N = {
   'nav-logout':      { ko: '로그아웃', en: 'Sign Out', ja: 'ログアウト' },
   'nav-charge':      { ko: '충전', en: 'Top Up', ja: 'チャージ' },
   'nav-history':     { ko: '생성 내역', en: 'History', ja: '生成履歴' },
-  // Step 네비게이션 (①상품 업로드 › ②모델 선택 › ③배경선택)
-  'stepnav-1':       { ko: '상품 업로드', en: 'Upload Product', ja: '商品アップロード' },
-  'stepnav-2':       { ko: '모델 선택', en: 'Select Model', ja: 'モデル選択' },
-  'stepnav-3':       { ko: '배경선택', en: 'Select Background', ja: '背景選択' },
+  // Step 레이블
+  'step1-label':     { ko: 'Step 1 / 3 · 의상 업로드', en: 'Step 1 / 3 · Upload Clothes', ja: 'Step 1 / 3 · 服をアップロード' },
+  'step2-label':     { ko: 'Step 2 / 3 · 모델 선택', en: 'Step 2 / 3 · Select Model', ja: 'Step 2 / 3 · モデル選択' },
+  'step3-label':     { ko: 'Step 3 / 3 · 배경 선택', en: 'Step 3 / 3 · Select Background', ja: 'Step 3 / 3 · 背景選択' },
   'step1-title':     { ko: '의상 이미지를 업로드하세요', en: 'Upload your clothing images', ja: '服の画像をアップロード' },
   'step2-title':     { ko: 'AI 모델을 선택하세요', en: 'Select an AI model', ja: 'AIモデルを選択してください' },
   'step3-title':     { ko: '배경을 선택하세요', en: 'Select a background', ja: '背景を選択してください' },
@@ -462,7 +382,7 @@ const AppState = {
   selectedModel: null,     // { id, name, description, gender, ... }
   selectedBg: null,        // { id, name, category, mood, bgDesc }
   genOptions: {
-    ratio: '9:16',
+    ratio: '3:4',
     resolution: 'HD',
     pose_type: '전신',
     pose: '정면',
@@ -508,9 +428,6 @@ function initPage() {
   verifySession().then(() => {
     if (path === '/' || path === '') {
       // Landing — verifySession 후 UI만 업데이트됨
-      initHomeShowcase();
-      initHomeFeatureBgs();
-      initHowtoVideos();
     } else if (path === '/dashboard') {
       initDashboard();
     } else if (path === '/generator') {
@@ -531,149 +448,6 @@ function initNavbar() {
 }
 
 // ─────────────────────────────────────────────────────────
-// 홈페이지 히어로 쇼케이스 캐러셀 (관리자 업로드 이미지 자동 롤링)
-// ─────────────────────────────────────────────────────────
-async function initHomeShowcase() {
-  const wrap = document.getElementById('heroShowcase');
-  const img = document.getElementById('heroShowcaseImg');
-  const placeholder = document.getElementById('heroShowcasePlaceholder');
-  if (!wrap || !img) return;
-  try {
-    const res = await fetch('/api/home/showcase');
-    const data = await res.json();
-    const images = (data.images || []).map(i => i.imageBase64);
-    if (!images.length) return; // 등록된 이미지 없으면 플레이스홀더 유지
-    let idx = 0;
-    const show = (i) => {
-      img.style.opacity = '0';
-      setTimeout(() => {
-        img.src = images[i];
-        img.style.opacity = '1';
-      }, 300);
-    };
-    img.style.display = 'block';
-    if (placeholder) placeholder.style.display = 'none';
-    img.src = images[0];
-    if (images.length > 1) {
-      setInterval(() => {
-        idx = (idx + 1) % images.length;
-        show(idx);
-      }, 4000);
-    }
-  } catch (e) {
-    console.warn('히어로 쇼케이스 로딩 실패:', e);
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// 홈페이지 기능 소개 박스 배경 이미지 (관리자 업로드, 슬롯별 1장)
-// ─────────────────────────────────────────────────────────
-async function initHomeFeatureBgs() {
-  const cards = document.querySelectorAll('#features .feature-card[data-feature-slot]');
-  if (!cards.length) return;
-  try {
-    const res = await fetch('/api/home/feature-bgs');
-    const data = await res.json();
-    const bgs = data.backgrounds || {};
-    cards.forEach(card => {
-      const slot = card.getAttribute('data-feature-slot');
-      const bg = bgs[slot];
-      if (bg) {
-        card.style.backgroundImage = `linear-gradient(rgba(0,0,0,0.55),rgba(0,0,0,0.55)), url(${bg})`;
-        card.style.backgroundSize = 'cover';
-        card.style.backgroundPosition = 'center 20%';
-        card.classList.add('feature-card--has-bg');
-      }
-    });
-  } catch (e) {
-    console.warn('기능 박스 배경 로딩 실패:', e);
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// 이용방법 섹션 9:16 소개 영상 (관리자 업로드, 슬롯별 1개)
-// ─────────────────────────────────────────────────────────
-async function initHowtoVideos() {
-  const boxes = document.querySelectorAll('.howto-video-box[data-howto-video-slot]');
-  if (!boxes.length) return;
-  try {
-    const res = await fetch('/api/home/howto-videos');
-    const data = await res.json();
-    const videos = data.videos || {};
-    boxes.forEach(box => {
-      const slot = box.getAttribute('data-howto-video-slot');
-      const src = videos[slot];
-      const video = box.querySelector('video');
-      if (src && video) {
-        video.src = src;
-        box.classList.add('howto-video-box--has-video');
-      }
-    });
-  } catch (e) {
-    console.warn('이용방법 영상 로딩 실패:', e);
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// 생성 대기 중 패션 뉴스 로테이터 (지루함 방지)
-// ─────────────────────────────────────────────────────────
-let _fashionNewsList = null;
-let _fashionNewsFetching = null;
-let _newsRotateTimer = null;
-let _newsRotateIdx = 0;
-let _newsRotateContainerId = null;
-
-async function _loadFashionNews() {
-  if (_fashionNewsList) return _fashionNewsList;
-  if (_fashionNewsFetching) return _fashionNewsFetching;
-  _fashionNewsFetching = fetch('/api/fashion-news')
-    .then(res => res.json())
-    .then(data => { _fashionNewsList = data.news || []; return _fashionNewsList; })
-    .catch(e => { console.warn('패션 뉴스 로딩 실패:', e); _fashionNewsList = []; return _fashionNewsList; })
-    .finally(() => { _fashionNewsFetching = null; });
-  return _fashionNewsFetching;
-}
-
-function _renderNewsItem(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container || !_fashionNewsList || !_fashionNewsList.length) return;
-  const item = _fashionNewsList[_newsRotateIdx % _fashionNewsList.length];
-  _newsRotateIdx++;
-  container.innerHTML =
-    '<a class="gen-news-headline" href="' + item.link + '" target="_blank" rel="noopener noreferrer">' +
-      item.title.replace(/</g, '&lt;') +
-    '</a>' +
-    (item.source ? '<div class="gen-news-source">' + item.source.replace(/</g, '&lt;') + '</div>' : '');
-}
-
-async function startNewsRotator(containerId) {
-  stopNewsRotator();
-  _newsRotateContainerId = containerId;
-  _newsRotateIdx = 0;
-  const list = await _loadFashionNews();
-  // 로테이터 시작 사이 다른 컨테이너로 전환됐으면 무시
-  if (_newsRotateContainerId !== containerId || !list.length) return;
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.style.display = '';
-  const heading = document.getElementById(containerId + 'Heading');
-  if (heading) heading.style.display = '';
-  _renderNewsItem(containerId);
-  _newsRotateTimer = setInterval(() => _renderNewsItem(containerId), 6000);
-}
-
-function stopNewsRotator() {
-  if (_newsRotateTimer) { clearInterval(_newsRotateTimer); _newsRotateTimer = null; }
-  if (_newsRotateContainerId) {
-    const container = document.getElementById(_newsRotateContainerId);
-    if (container) { container.style.display = 'none'; container.innerHTML = ''; }
-    const heading = document.getElementById(_newsRotateContainerId + 'Heading');
-    if (heading) heading.style.display = 'none';
-  }
-  _newsRotateContainerId = null;
-}
-
-// ─────────────────────────────────────────────────────────
 // TOAST NOTIFICATIONS
 // ─────────────────────────────────────────────────────────
 function showToast(message, type = 'info', duration = 4000) {
@@ -686,13 +460,13 @@ function showToast(message, type = 'info', duration = 4000) {
   toast.innerHTML = `
     <span style="font-size:18px;">${icons[type] || 'ℹ️'}</span>
     <span style="flex:1;">${message}</span>
-    <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:18px;padding:0;margin-left:8px;">×</button>
+    <button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text-muted);padding:0;margin-left:8px;">×</button>
   `;
   container.appendChild(toast);
 
   setTimeout(() => {
     toast.style.opacity = '0';
-    toast.style.transform = 'translateY(100%)';
+    toast.style.transform = 'translateX(100%)';
     toast.style.transition = 'all 0.3s ease';
     setTimeout(() => toast.remove(), 300);
   }, duration);
@@ -722,134 +496,6 @@ function switchModal(from, to) {
   setTimeout(() => openModal(to), 150);
 }
 
-// ─────────────────────────────────────────────────────────
-// ACTION PROGRESS MODAL (다운로드 / 재생성 진행 + 완료 팝업)
-// ─────────────────────────────────────────────────────────
-let _shareCtx = { jobId: null, idx: null, imageUrl: null };
-let _kakaoJsKey = null;
-
-function openActionProgress(text) {
-  const spinner = document.getElementById('actionProgressSpinner');
-  const check = document.getElementById('actionProgressCheck');
-  const textEl = document.getElementById('actionProgressText');
-  const share = document.getElementById('actionProgressShare');
-  const closeBtn = document.getElementById('actionProgressCloseBtn');
-  if (spinner) spinner.style.display = '';
-  if (check) check.style.display = 'none';
-  if (textEl) textEl.textContent = text;
-  if (share) share.style.display = 'none';
-  if (closeBtn) closeBtn.style.display = 'none';
-  openModal('actionProgressModal');
-}
-
-function setActionComplete(text, opts) {
-  opts = opts || {};
-  const spinner = document.getElementById('actionProgressSpinner');
-  const check = document.getElementById('actionProgressCheck');
-  const textEl = document.getElementById('actionProgressText');
-  const share = document.getElementById('actionProgressShare');
-  const closeBtn = document.getElementById('actionProgressCloseBtn');
-  const kakaoBtn = document.getElementById('actionProgressKakaoBtn');
-  if (spinner) spinner.style.display = 'none';
-  if (check) check.style.display = 'flex';
-  if (textEl) textEl.textContent = text;
-  if (closeBtn) closeBtn.style.display = '';
-  if (opts.showShare && opts.jobId && opts.idx != null && opts.idx >= 0) {
-    _shareCtx = { jobId: opts.jobId, idx: opts.idx, imageUrl: opts.imageUrl || '' };
-    if (share) share.style.display = 'flex';
-    if (kakaoBtn) kakaoBtn.style.display = _kakaoJsKey ? '' : 'none';
-  } else if (share) {
-    share.style.display = 'none';
-  }
-}
-
-function closeActionProgress() {
-  stopNewsRotator();
-  closeModal('actionProgressModal');
-}
-
-function _shareUrlFor(jobId, idx) {
-  return `${location.origin}/share/${jobId}/${idx}`;
-}
-
-// 생성 이미지 배열 내 idx → 실제 저장된 image_urls 배열 내 인덱스로 변환
-function getShareIndex(idx) {
-  const img = AppState.generatedImages[idx];
-  if (!img || !img.originalUrl) return -1;
-  const realOnly = AppState.generatedImages.filter(im => im.originalUrl);
-  return realOnly.indexOf(img);
-}
-
-function copyShareLink() {
-  if (!_shareCtx.jobId || _shareCtx.idx == null || _shareCtx.idx < 0) {
-    showToast('공유 가능한 이미지가 없습니다.', 'error');
-    return;
-  }
-  const url = _shareUrlFor(_shareCtx.jobId, _shareCtx.idx);
-  const done = () => showToast('공유 링크가 복사되었습니다. (14일간 유효)', 'success');
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(done).catch(() => _fallbackCopy(url, done));
-  } else {
-    _fallbackCopy(url, done);
-  }
-}
-
-function _fallbackCopy(text, onDone) {
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.select();
-  try {
-    document.execCommand('copy');
-    onDone();
-  } catch (e) {
-    showToast('링크 복사에 실패했습니다.', 'error');
-  }
-  document.body.removeChild(ta);
-}
-
-// ─── 카카오톡 공유 SDK 로드 (JS 키가 설정된 경우에만) ───
-(function loadKakaoConfig() {
-  fetch('/api/config/kakao-js-key').then(r => r.json()).then(d => {
-    if (d && d.key) {
-      _kakaoJsKey = d.key;
-      const s = document.createElement('script');
-      s.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.2/kakao.min.js';
-      s.onload = () => {
-        if (window.Kakao && !Kakao.isInitialized()) Kakao.init(_kakaoJsKey);
-      };
-      document.head.appendChild(s);
-    }
-  }).catch(() => {});
-})();
-
-function shareToKakao() {
-  if (!window.Kakao || !Kakao.isInitialized()) {
-    showToast('카카오톡 공유 기능을 사용할 수 없습니다.', 'error');
-    return;
-  }
-  if (!_shareCtx.jobId || _shareCtx.idx == null || _shareCtx.idx < 0) {
-    showToast('공유 가능한 이미지가 없습니다.', 'error');
-    return;
-  }
-  const shareUrl = _shareUrlFor(_shareCtx.jobId, _shareCtx.idx);
-  try { if (typeof gtag === 'function') gtag('event', 'share', { method: 'kakao', content_type: 'lookbook_image' }); } catch (e) {}
-  Kakao.Share.sendDefault({
-    objectType: 'feed',
-    content: {
-      title: '상품 이미지로 모델컷 만들기',
-      description: '클릭4번으로 AI모델컷이 무료로 만들어 진다고?',
-      imageUrl: _shareCtx.imageUrl,
-      link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
-    },
-    buttons: [
-      { title: '나도 해보기', link: { mobileWebUrl: shareUrl, webUrl: shareUrl } },
-    ],
-  });
-}
-
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('modal-overlay')) {
     e.target.classList.remove('active');
@@ -863,13 +509,6 @@ document.addEventListener('keydown', (e) => {
       m.classList.remove('active');
     });
     document.body.style.overflow = '';
-  }
-});
-
-// ── 생성된 이미지/영상 무단 저장 방지 — 우클릭 저장 차단 (다운로드는 크레딧 버튼으로만) ──
-document.addEventListener('contextmenu', (e) => {
-  if (e.target.closest('.result-thumb, #modalImage, .hist-thumb, #histModalImg, #histModalVideo, .no-save-media')) {
-    e.preventDefault();
   }
 });
 
@@ -924,79 +563,19 @@ function isMobileDevice() {
 }
 
 /** OAuth 소셜 로그인 — 모바일: 리다이렉트 / PC: 팝업 */
-// 진행 중인 위저드 상태(의류/모델/배경/옵션)를 직렬화 — 로그인 후 생성 재개용
-function _captureGenState() {
-  return {
-    clothingItems: (AppState.clothingItems || []).map(ci => ({
-      dataUrl: ci.dataUrl, category: ci.category, label: ci.label || '',
-    })),
-    uploadedImageUrl: AppState.uploadedImageUrl || null,
-    selectedModel: AppState.selectedModel || null,
-    selectedBg: AppState.selectedBg || null,
-    genOptions: AppState.genOptions || null,
-  };
-}
-
-function _restoreGenState(genState) {
-  if (!genState) return;
-  if (genState.clothingItems) AppState.clothingItems = genState.clothingItems;
-  if (genState.uploadedImageUrl) AppState.uploadedImageUrl = genState.uploadedImageUrl;
-  if (genState.selectedModel) AppState.selectedModel = genState.selectedModel;
-  if (genState.selectedBg) AppState.selectedBg = genState.selectedBg;
-  if (genState.genOptions) AppState.genOptions = genState.genOptions;
-  changeStep(3);
-  updateGenSummary();
-}
-
-// 로그인 모달의 카카오/구글 버튼 전체 — 클릭 즉시 로딩 상태로 전환
-function _setAuthButtonsBusy(busy, activeBtn) {
-  const buttons = document.querySelectorAll('#loginModal button[onclick^="oauthLogin"]');
-  buttons.forEach(b => {
-    if (busy) {
-      if (!b.dataset.originalHtml) b.dataset.originalHtml = b.innerHTML;
-      b.disabled = true;
-      if (b === activeBtn) {
-        b.innerHTML = '<span class="btn-spinner" style="width:16px;height:16px;border-width:2px;"></span> 이동 중...';
-      } else {
-        b.style.opacity = '0.5';
-      }
-    } else {
-      b.disabled = false;
-      b.style.opacity = '';
-      if (b.dataset.originalHtml) {
-        b.innerHTML = b.dataset.originalHtml;
-        delete b.dataset.originalHtml;
-      }
-    }
-  });
-}
-
-function oauthLogin(provider, btn) {
+function oauthLogin(provider) {
   // 이전 oauth_result 잔여 데이터 제거
   localStorage.removeItem('oauth_result');
-  // 클릭 즉시 반응 피드백 (버튼 로딩 상태)
-  _setAuthButtonsBusy(true, btn);
 
   if (isMobileDevice()) {
     // ── 모바일: 현재 탭에서 OAuth 제공자로 이동 (팝업 차단 우회) ──
     // 콜백 복귀 후 처리할 정보 저장
-    const pending = {
+    localStorage.setItem('oauth_redirect_pending', JSON.stringify({
       provider,
       returnPath: window.location.pathname,
       pendingGeneration: AppState.pendingGeneration || false,
       ts: Date.now(),
-    };
-    if (AppState.pendingGeneration) {
-      pending.genState = _captureGenState();
-    }
-    try {
-      localStorage.setItem('oauth_redirect_pending', JSON.stringify(pending));
-    } catch (e) {
-      // 저장 용량 초과 등 — genState 없이라도 기본 정보는 저장 시도
-      console.warn('oauth_redirect_pending 저장 실패, genState 제외 후 재시도:', e);
-      delete pending.genState;
-      try { localStorage.setItem('oauth_redirect_pending', JSON.stringify(pending)); } catch (e2) {}
-    }
+    }));
     window.location.href = `/api/auth/${provider}?mode=redirect`;
     return;
   }
@@ -1014,13 +593,17 @@ function oauthLogin(provider, btn) {
     localStorage.setItem('lookbook_token', token);
     localStorage.setItem('lookbook_user', JSON.stringify(user));
     localStorage.removeItem('oauth_result');
-    _setAuthButtonsBusy(false);
     updateUserUI();
     closeModal('loginModal');
     showToast(t('welcome', user.name), 'success');
+    if (data.isNewUser) {
+      gaEvent('sign_up', Object.assign({ method: data.provider || 'oauth' }, getStoredUtm()));
+    }
     if (AppState.pendingGeneration) {
       AppState.pendingGeneration = false;
       setTimeout(() => startGeneration(), 300);
+    } else if (window.location.pathname === '/') {
+      setTimeout(() => window.location.href = '/dashboard', 800);
     }
   }
 
@@ -1032,7 +615,6 @@ function oauthLogin(provider, btn) {
     } else if (e.data?.type === 'oauth_error') {
       clearInterval(checkClosed);
       window.removeEventListener('message', onMessage);
-      _setAuthButtonsBusy(false);
       showToast(t('loginFailed'), 'error');
     }
   };
@@ -1054,8 +636,6 @@ function oauthLogin(provider, btn) {
           }
         }
       } catch(e) {}
-      // 성공 데이터 없이 팝업만 닫힘 — 사용자가 취소한 것으로 간주하고 버튼 복원
-      _setAuthButtonsBusy(false);
     }
   }, 500);
 }
@@ -1099,11 +679,14 @@ function checkOAuthRedirectResult() {
       localStorage.setItem('lookbook_user', JSON.stringify(user));
       updateUserUI();
       showToast(t('welcome', user.name), 'success');
+      if (data.isNewUser) {
+        gaEvent('sign_up', Object.assign({ method: data.provider || 'oauth' }, getStoredUtm()));
+      }
       if (pending.pendingGeneration) {
         AppState.pendingGeneration = false;
-        // 전체 페이지 리다이렉트로 날아간 의류/모델/배경 선택 상태 복원 후 생성 재개
-        _restoreGenState(pending.genState);
         setTimeout(() => startGeneration(), 300);
+      } else if (window.location.pathname === '/') {
+        setTimeout(() => window.location.href = '/dashboard', 800);
       }
     } else if (data?.type === 'oauth_error') {
       showToast(t('loginFailed'), 'error');
@@ -1184,6 +767,8 @@ async function handleLogin(e) {
       if (AppState.pendingGeneration) {
         AppState.pendingGeneration = false;
         setTimeout(() => startGeneration(), 300);
+      } else if (window.location.pathname === '/') {
+        setTimeout(() => window.location.href = '/dashboard', 800);
       }
     } else {
       // 서버 오류 메시지를 모달 안에 표시
@@ -1235,13 +820,11 @@ async function handleSignup(e) {
   const nameEl          = document.getElementById('signupName');
   const emailEl         = document.getElementById('signupEmail');
   const passwordEl      = document.getElementById('signupPassword');
-  const referrerEl      = document.getElementById('signupReferrer');
   const agreePrivacyEl  = document.getElementById('agreePrivacy');
   const agreeMarketingEl= document.getElementById('agreeMarketing');
   const name            = nameEl     ? nameEl.value.trim()     : '';
   const email           = emailEl    ? emailEl.value.trim()    : '';
   const password        = passwordEl ? passwordEl.value        : '';
-  const referrer         = referrerEl ? referrerEl.value        : '';
   const agreePrivacy    = agreePrivacyEl  ? agreePrivacyEl.checked  : false;
   const agreeMarketing  = agreeMarketingEl? agreeMarketingEl.checked : false;
   const btn             = document.getElementById('signupBtn');
@@ -1282,7 +865,7 @@ async function handleSignup(e) {
     const res = await fetch('/api/auth/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, password, agreeMarketing, referrer })
+      body: JSON.stringify({ name, email, password, agreeMarketing })
     });
     const data = await res.json();
 
@@ -1293,10 +876,13 @@ async function handleSignup(e) {
       updateUserUI();
       closeModal('loginModal');
       showToast(t('signupDone'), 'success');
+      gaEvent('sign_up', Object.assign({ method: 'email' }, getStoredUtm()));
       // 가입 후 생성 재개
       if (AppState.pendingGeneration) {
         AppState.pendingGeneration = false;
         setTimeout(() => startGeneration(), 300);
+      } else if (window.location.pathname === '/') {
+        setTimeout(() => window.location.href = '/dashboard', 800);
       }
     } else {
       // 서버 오류 메시지를 모달 안에 표시
@@ -1337,6 +923,7 @@ async function handleLogout() {
   localStorage.removeItem('lookbook_user');
   updateUserUI();
   showToast(t('loggedOut'), 'info');
+  setTimeout(() => window.location.href = '/', 600);
 }
 
 /** 헤더/네비바 사용자 UI 업데이트 */
@@ -1454,82 +1041,6 @@ function toggleUserMenu() {
   }
 }
 
-// 모바일 네비게이션(햄버거 메뉴) 토글
-function toggleMobileNav() {
-  const nav = document.getElementById('navbarNav');
-  const btn = document.getElementById('navbarToggle');
-  if (!nav || !btn) return;
-  const isOpen = nav.classList.toggle('open');
-  btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-  const icon = btn.querySelector('i');
-  if (icon) icon.className = isOpen ? 'fas fa-xmark' : 'fas fa-bars';
-}
-
-function closeMobileNav() {
-  const nav = document.getElementById('navbarNav');
-  const btn = document.getElementById('navbarToggle');
-  if (nav) nav.classList.remove('open');
-  if (btn) {
-    btn.setAttribute('aria-expanded', 'false');
-    const icon = btn.querySelector('i');
-    if (icon) icon.className = 'fas fa-bars';
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// 홈페이지 요금제 카드 — 충전 금액 드롭다운 선택
-// ─────────────────────────────────────────────────────────
-function togglePricingSelect() {
-  const wrap = document.getElementById('pricingSelect');
-  if (!wrap) return;
-  const isOpen = wrap.classList.toggle('open');
-  const trigger = document.getElementById('pricingSelectTrigger');
-  if (trigger) trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-  if (isOpen) {
-    const closeOnOutsideClick = (e) => {
-      if (!wrap.contains(e.target)) {
-        wrap.classList.remove('open');
-        if (trigger) trigger.setAttribute('aria-expanded', 'false');
-        document.removeEventListener('click', closeOnOutsideClick);
-      }
-    };
-    setTimeout(() => document.addEventListener('click', closeOnOutsideClick), 10);
-  }
-}
-
-function selectPricingTier(el) {
-  document.querySelectorAll('#pricingSelectMenu .pricing-select-item').forEach(item => {
-    item.classList.remove('selected');
-    const check = item.querySelector('i.fa-check');
-    if (check) check.style.visibility = 'hidden';
-  });
-  el.classList.add('selected');
-  const check = el.querySelector('i.fa-check');
-  if (check) check.style.visibility = 'visible';
-
-  const amount = Number(el.getAttribute('data-amount'));
-  const credits = el.getAttribute('data-credits');
-  const images = el.getAttribute('data-images');
-  const bonus = el.getAttribute('data-bonus');
-
-  const amountEl = document.getElementById('pricingAmount');
-  if (amountEl) amountEl.textContent = '₩' + amount.toLocaleString();
-
-  const descEl = document.getElementById('pricingDesc');
-  if (descEl) {
-    const creditsFmt = Number(credits).toLocaleString();
-    descEl.innerHTML = `${creditsFmt} 크레딧 · 이미지 최대 ${images}장` + (bonus ? `<br />${bonus}` : '');
-  }
-
-  const triggerLabel = document.getElementById('pricingSelectTriggerLabel');
-  if (triggerLabel) triggerLabel.textContent = `${amount.toLocaleString()}원 · ${Number(credits).toLocaleString()} 크레딧`;
-
-  const wrap = document.getElementById('pricingSelect');
-  const trigger = document.getElementById('pricingSelectTrigger');
-  if (wrap) wrap.classList.remove('open');
-  if (trigger) trigger.setAttribute('aria-expanded', 'false');
-}
-
 // ─────────────────────────────────────────────────────────
 // DASHBOARD
 // ─────────────────────────────────────────────────────────
@@ -1620,30 +1131,6 @@ function initGenerator() {
   // 모델/배경 미리 로드
   loadModelsFromAPI();
   loadBackgroundsFromAPI();
-  // 이전에 시작된 생성/영상 작업이 있으면 이어서 확인
-  resumePendingGeneration();
-  resumePendingVideoJob();
-}
-
-function shuffleArray(arr) {
-  const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-// 앞 FRONT_RESERVE자리는 남성 모델 제외(여성 선호 사용자가 다수라 초반 이탈 방지),
-// 그 다음 자리부터는 (남은 여성 + 전체 남성)을 완전 랜덤으로 섞음 — 남성도 너무
-// 뒤로 밀리지 않고 5번째 자리부터는 자연스럽게 랜덤 등장.
-function shuffleModelsGenderFrontReserve(models) {
-  const FRONT_RESERVE = 4
-  const male = models.filter(m => m.gender === '남성')
-  const rest = shuffleArray(models.filter(m => m.gender !== '남성'))
-  const front = rest.slice(0, FRONT_RESERVE)
-  const remaining = shuffleArray([...rest.slice(FRONT_RESERVE), ...male])
-  return [...front, ...remaining]
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1656,8 +1143,6 @@ async function loadModelsFromAPI() {
     const data = await res.json();
 
     AppState.allModels = data.models || [];
-    // 모델 노출 순서 랜덤화 — 앞 4자리는 남성 제외(여성 선호 사용자 다수), 5번째 자리부터는 랜덤 혼합
-    AppState.allModels = shuffleModelsGenderFrontReserve(AppState.allModels);
     AppState.filteredModels = [...AppState.allModels];
 
     const wrap = document.getElementById('modelGridWrap');
@@ -1690,12 +1175,6 @@ async function loadBackgroundsFromAPI() {
     const data = await res.json();
 
     AppState.allBackgrounds = data.backgrounds || [];
-
-    // 배경 노출 순서 랜덤화
-    for (let i = AppState.allBackgrounds.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [AppState.allBackgrounds[i], AppState.allBackgrounds[j]] = [AppState.allBackgrounds[j], AppState.allBackgrounds[i]];
-    }
     AppState.filteredBackgrounds = [...AppState.allBackgrounds];
 
     const wrap = document.getElementById('bgGridWrap');
@@ -1861,33 +1340,14 @@ const SLOT_LABEL = { TOP: '상의', BOTTOM: '하의', DRESS: '전체' };
 
 // 슬롯별 데이터 저장 (null = 비어 있음)
 const slotData = { TOP: null, BOTTOM: null, DRESS: null };
-// 슬롯별 AI 의류 검증 진행 중 여부
-const slotValidating = { TOP: false, BOTTOM: false, DRESS: false };
-
-// ── 상의/하의 ↔ 전체 상호 배타 ──
-// 상의 또는 하의를 먼저 올리면 전체는 잠기고, 전체를 먼저 올리면 상의/하의가 잠김.
-// (부분 조합과 전체를 동시에 올리면 생성 시 뒤섞여 오류 이미지가 나오는 문제 방지)
-function getDisabledSlotCats() {
-  if (slotData.DRESS !== null) return ['TOP', 'BOTTOM'];
-  if (slotData.TOP !== null || slotData.BOTTOM !== null) return ['DRESS'];
-  return [];
-}
-function isSlotDisabled(cat) {
-  return getDisabledSlotCats().includes(cat);
-}
 
 // ── label for= 방식: 이미 채워진 슬롯이면 파일선택창 열기 차단 ──
 // label 클릭 시 호출. 이미 이미지가 있으면 false 반환 → label의 for= 동작 억제
 function handleSlotLabelClick(e, cat) {
   // ✕ 버튼 클릭은 removeSlot()에서 처리 → label 기본동작 억제
   if (e.target.closest('.cslot-remove')) return false;
-  // 이미 채워진 슬롯 또는 검증 중인 슬롯: 파일 선택창 열지 않음
-  if (slotData[cat] || slotValidating[cat]) return false;
-  // 상의/하의 ↔ 전체 상호 배타로 잠긴 슬롯: 이유 안내 후 차단
-  if (isSlotDisabled(cat)) {
-    showToast(t('slotLockedErr', cat), 'error');
-    return false;
-  }
+  // 이미 채워진 슬롯: 파일 선택창 열지 않음
+  if (slotData[cat]) return false;
   // 비어 있으면 label for= 연결로 파일 선택창 열림 (브라우저 네이티브 동작)
   return true;
 }
@@ -1903,7 +1363,7 @@ function triggerSlotInput(cat) {
 function handleSlotDragOver(e, cat) {
   e.preventDefault();
   e.stopPropagation();
-  if (slotData[cat] || slotValidating[cat] || isSlotDisabled(cat)) return; // 이미 채워졌거나 검증 중이거나 잠긴 슬롯은 무시
+  if (slotData[cat]) return; // 이미 채워진 슬롯은 무시
   document.getElementById(`slot-${cat}`)?.classList.add('drag-over');
 }
 function handleSlotDragLeave(e, cat) {
@@ -1916,8 +1376,7 @@ function handleSlotDrop(e, cat) {
   e.preventDefault();
   e.stopPropagation();
   document.getElementById(`slot-${cat}`)?.classList.remove('drag-over');
-  if (slotData[cat] || slotValidating[cat]) return; // 이미 채워졌거나 검증 중인 슬롯 무시
-  if (isSlotDisabled(cat)) { showToast(t('slotLockedErr', cat), 'error'); return; }
+  if (slotData[cat]) return; // 이미 채워진 슬롯 무시
   const file = e.dataTransfer.files?.[0];
   if (file) processSlotFile(file, cat);
 }
@@ -1931,7 +1390,6 @@ function handleSlotFileSelect(e, cat) {
 
 // ── 공통: 파일 유효성 검사 + 슬롯에 저장 ──
 function processSlotFile(file, cat) {
-  if (isSlotDisabled(cat)) { showToast(t('slotLockedErr', cat), 'error'); return; }
   const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
   if (!validTypes.includes(file.type)) {
     showToast(t('uploadFormatErr'), 'error');
@@ -1942,78 +1400,15 @@ function processSlotFile(file, cat) {
     return;
   }
 
-  const onReady = async (dataUrl) => {
-    // 옷이 아닌 이미지(강아지, 풍경 등)를 올려 이상한 결과가 나오는 것을 사전 차단
-    slotValidating[cat] = true;
-    renderSlots();
-    updateNextBtn1();
-    let isClothing = true;
-    try {
-      const vr = await fetch('/api/validate/clothing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: dataUrl, cat }),
-      });
-      const vd = await vr.json();
-      if (vd && vd.isClothing === false) isClothing = false;
-    } catch (err) {
-      console.warn('의류 이미지 검증 실패, 통과 처리:', err); // 검증 자체가 실패하면 업로드는 막지 않음
-    }
-    slotValidating[cat] = false;
-    if (!isClothing) {
-      showToast(t('notClothingErr', cat), 'error');
-      renderSlots();
-      updateNextBtn1();
-      return;
-    }
-    slotData[cat] = { file, dataUrl };
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    slotData[cat] = { file, dataUrl: ev.target.result };
     syncClothingItems();
     renderSlots();
     updateNextBtn1();
+    showToast(t('uploadDone', SLOT_LABEL[cat]), 'success');
   };
-
-  // 원본 해상도가 크면(특히 "전체" 등 풀샷) base64 payload가 너무 커져
-  // AI 생성 요청이 간헐적으로 실패하는 원인이 됨 — 업로드 시 다운스케일 압축
-  _resizeImageFile(file, 1600, 0.85).then(onReady).catch((err) => {
-    console.warn('이미지 리사이즈 실패, 원본으로 대체:', err);
-    const reader = new FileReader();
-    reader.onload = (ev) => onReady(ev.target.result);
-    reader.readAsDataURL(file);
-  });
-}
-
-// 업로드 이미지를 캔버스로 다운스케일 + JPEG 재압축 (Atlas Cloud 전송 payload 절감)
-function _resizeImageFile(file, maxDim, quality) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = reject;
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onerror = reject;
-      img.onload = () => {
-        let { width, height } = img;
-        if (width <= maxDim && height <= maxDim) {
-          // 이미 충분히 작으면 원본 화질 유지
-          resolve(ev.target.result);
-          return;
-        }
-        const scale = maxDim / Math.max(width, height);
-        width = Math.round(width * scale);
-        height = Math.round(height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        // 투명 PNG 대비 흰 배경 채우기
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-  });
+  reader.readAsDataURL(file);
 }
 
 // ── 슬롯 삭제 ──
@@ -2053,31 +1448,11 @@ function renderSlots() {
 
     const data = slotData[cat];
 
-    if (slotValidating[cat]) {
-      // AI 의류 검증 중 → 스피너 표시
-      slot.classList.remove('cslot--filled');
-      body.innerHTML = `
-        <span class="cslot-empty">
-          <span class="btn-spinner dark"></span>
-          <span class="cslot-hint">${t('validatingClothing')}</span>
-        </span>`;
-      if (removeBtn) removeBtn.classList.add('hidden');
-    } else if (data) {
+    if (data) {
       // 이미지 있음 → 썸네일 표시 + label for= 비활성화 (pointer-events:none 로 파일창 방지)
       slot.classList.add('cslot--filled');
       body.innerHTML = `<img src="${data.dataUrl}" alt="${SLOT_LABEL[cat]}" class="cslot-img" />`;
       if (removeBtn) removeBtn.classList.remove('hidden');
-    } else if (isSlotDisabled(cat)) {
-      // 상의/하의 ↔ 전체 상호 배타로 잠김 → 비활성 플레이스홀더
-      slot.classList.remove('cslot--filled');
-      slot.classList.add('cslot--disabled');
-      body.innerHTML = `
-        <span class="cslot-empty">
-          <span class="cslot-plus">🔒</span>
-          <span class="cslot-hint">${t('slotLockedHint', cat)}</span>
-        </span>`;
-      if (removeBtn) removeBtn.classList.add('hidden');
-      return;
     } else {
       // 비어 있음 → 플레이스홀더 (span 태그 — label 내부에서도 block처럼 동작)
       slot.classList.remove('cslot--filled');
@@ -2088,7 +1463,6 @@ function renderSlots() {
         </span>`;
       if (removeBtn) removeBtn.classList.add('hidden');
     }
-    slot.classList.remove('cslot--disabled');
   });
 }
 
@@ -2097,8 +1471,7 @@ function updateNextBtn1() {
   const btn = document.getElementById('nextBtn1');
   if (!btn) return;
   const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null);
-  const validating = SLOT_CATS.some(cat => slotValidating[cat]);
-  btn.disabled = !hasAny || validating;
+  btn.disabled = !hasAny;
 }
 
 // ── 전체 초기화 (레거시 resetUpload 호환) ──
@@ -2341,7 +1714,6 @@ async function startGeneration() {
   // 진행 상태 초기화
   updateProgress(0, '시작 중...');
   setMsgState('msg1', 'current');
-  startNewsRotator('genViewNews');
 
   try {
     // 선택된 모델의 description 생성
@@ -2392,7 +1764,7 @@ async function startGeneration() {
       bgDesc: bg?.bgDesc || 'clean studio background with professional lighting',
       poseType: AppState.genOptions.pose_type,
       pose: AppState.genOptions.pose,
-      ratio: AppState.genOptions.ratio || '9:16',
+      ratio: AppState.genOptions.ratio || '3:4',
       resolution: AppState.genOptions.resolution || 'HD',
       count,
       clothingImages,
@@ -2446,7 +1818,6 @@ async function startGeneration() {
 
     // Fallback 처리 (즉시 완료)
     if (startData.isFallback) {
-      console.warn('[Generation] Atlas Cloud 요청 실패 — 데모 이미지로 대체:', startData.error);
       updateProgress(30, 'AI 모델 피팅 적용 중...');
       setMsgState('msg1', 'done');
       setMsgState('msg2', 'current');
@@ -2466,9 +1837,9 @@ async function startGeneration() {
       setMsgState('msg4', 'done');
       setMsgState('msg5', 'done');
 
-      // 폴백 결과 표시 — Atlas Cloud가 이미지를 받지 못했거나 요청 실패 시 (isFallback: true 필수 전달)
+      // 폴백 결과 표시
       const fallbackImages = generateFallbackImages(count);
-      completeGeneration(fallbackImages, true);
+      completeGeneration(fallbackImages);
       return;
     }
 
@@ -2477,21 +1848,12 @@ async function startGeneration() {
     setMsgState('msg1', 'done');
     setMsgState('msg2', 'current');
 
-    // 페이지 재진입 시 이어서 폴링할 수 있도록 진행 중인 작업 저장
-    try {
-      localStorage.setItem('lookbook_pending_gen', JSON.stringify({
-        jobId: startData.jobId, count, lastGenParams: AppState.lastGenParams, startedAt: Date.now(),
-      }));
-    } catch (e) { /* 저장 공간 부족 등은 무시 */ }
-
     await pollGenerationStatus(startData.jobId, count);
 
   } catch (err) {
     console.error('Generation error:', err);
     showToast(t('genError', err.message), 'error');
     AppState.isGenerating = false;
-    stopNewsRotator();
-    localStorage.removeItem('lookbook_pending_gen');
 
     // UI 복원
     const step3Nav = document.getElementById('step3Nav');
@@ -2499,47 +1861,6 @@ async function startGeneration() {
     const nb3err = document.getElementById('nextBtn3');
     if (nb3err) { nb3err.innerHTML = t('genStart'); nb3err.disabled = false; }
     const genView = document.getElementById('generatingView');
-    if (genView) genView.classList.remove('active');
-  }
-}
-
-// 페이지 재진입 시 진행 중이던 이미지 생성 작업을 이어서 확인
-async function resumePendingGeneration() {
-  let pending;
-  try { pending = JSON.parse(localStorage.getItem('lookbook_pending_gen') || 'null'); } catch (e) { pending = null; }
-  if (!pending || !pending.jobId) return;
-
-  // 최대 폴링 시간(3분)을 훌쩍 넘긴 오래된 항목은 폐기
-  if (Date.now() - (pending.startedAt || 0) > 20 * 60 * 1000) {
-    localStorage.removeItem('lookbook_pending_gen');
-    return;
-  }
-
-  AppState.lastGenParams = pending.lastGenParams || AppState.lastGenParams;
-  AppState.currentJobId = pending.jobId;
-  AppState.lastJobId = pending.jobId;
-  AppState.isGenerating = true;
-
-  changeStep(3);
-  const step3Nav = document.getElementById('step3Nav');
-  if (step3Nav) step3Nav.style.display = 'none';
-  const genView = document.getElementById('generatingView');
-  if (genView) { genView.style.display = ''; genView.classList.add('active'); }
-
-  updateProgress(30, '이전 생성 작업을 이어서 확인하는 중...');
-  setMsgState('msg1', 'done');
-  setMsgState('msg2', 'current');
-  startNewsRotator('genViewNews');
-  showToast('이전에 시작한 생성 작업을 이어서 진행합니다.', 'info');
-
-  try {
-    await pollGenerationStatus(pending.jobId, pending.count || 1);
-  } catch (err) {
-    console.error('Resume generation error:', err);
-    AppState.isGenerating = false;
-    stopNewsRotator();
-    localStorage.removeItem('lookbook_pending_gen');
-    if (step3Nav) step3Nav.style.display = '';
     if (genView) genView.classList.remove('active');
   }
 }
@@ -2617,15 +1938,10 @@ async function pollGenerationStatus(jobId, count) {
 // 생성 완료 처리
 function completeGeneration(images, isFallback = false) {
   AppState.isGenerating = false;
-  stopNewsRotator();
-  localStorage.removeItem('lookbook_pending_gen');
 
   console.log('completeGeneration called — isFallback:', isFallback, '| images count:', images.length, '| images:', JSON.stringify(images.map(i => ({id:i.id, url: i.url ? i.url.substring(0,80) : null, placeholder: i.placeholder}))));
 
-  // 실제 생성이 실패해서 임시 이미지로 대체된 경우, 사용자에게 명확히 알림
-  if (isFallback) {
-    showToast(t('genAnalysisErr'), 'error');
-  }
+  gaEvent('generate_lookbook', { image_count: images.length, is_fallback: !!isFallback });
 
   // Atlas Cloud 이미지 URL을 서버사이드 프록시로 변환 (CORS 우회)
   const proxiedImages = images.map(img => {
@@ -2669,7 +1985,7 @@ function completeGeneration(images, isFallback = false) {
 
   const count = images.length;
   if (isFallback) {
-    showToast(t('genDoneDemo'), 'error');
+    showToast(t('genDoneDemo', count), 'success');
   } else {
     showToast(t('genDone', count), 'success');
   }
@@ -2741,17 +2057,6 @@ function renderResults(images) {
   const grid = document.getElementById('resultsGrid');
   if (!grid) return;
 
-  // 새 결과가 렌더링되면 이전 영상 생성 상태/버튼을 초기화
-  _videoState = { jobId: null, videoUrl: null, polling: false };
-  const videoBtn = document.getElementById('videoActionBtn');
-  if (videoBtn) {
-    videoBtn.disabled = false;
-    const main = videoBtn.querySelector('.rnb-main');
-    if (main) main.innerHTML = '<i class="fas fa-film"></i> 영상 생성';
-  }
-  const videoSub = document.getElementById('videoActionSub');
-  if (videoSub) videoSub.innerHTML = '7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600';
-
   grid.innerHTML = '';
 
   // 결과 탭 텍스트 업데이트
@@ -2767,7 +2072,6 @@ function renderResults(images) {
             src="${img.url}"
             alt="${img.title || `피팅컷 #${idx + 1}`}"
             style="width:100%;height:auto;display:block;"
-            draggable="false"
             onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패</span></div>');"
           />`
       : `<div style="width:100%;aspect-ratio:3/4;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
@@ -2777,7 +2081,15 @@ function renderResults(images) {
          </div>`;
 
     card.innerHTML = `
-      <div class="result-thumb" id="resultThumb-${idx}">${thumbContent}</div>
+      <div class="result-thumb">${thumbContent}</div>
+      <div class="result-card-actions">
+        <button class="result-action-btn download" onclick="downloadWithCreditCheck(${idx});">
+          <i class="fas fa-download"></i> 다운로드
+        </button>
+        <button class="result-action-btn regen" onclick="regenFromCard(${idx});">
+          <i class="fas fa-rotate-right"></i> 재생성
+        </button>
+      </div>
     `;
 
     grid.appendChild(card);
@@ -2883,22 +2195,17 @@ async function downloadWithCreditCheck(idx) {
     return;
   }
 
-  openActionProgress(t('downloadIng').replace(/<[^>]*>/g, '').trim() || '다운로드 중...');
-
   try {
     const deductRes = await fetch('/api/credits/deduct', {
       method: 'POST',
-      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: AppState.lastJobId, idx: getShareIndex(idx) }),
+      headers: { 'X-Session-Token': sessionToken },
     });
 
     if (deductRes.status === 401) {
-      closeActionProgress();
       showToast(t('loginRequired'), 'error');
       return;
     }
     if (deductRes.status === 402) {
-      closeActionProgress();
       const errData = await deductRes.json();
       const have = errData.available ?? 0;
       showToast(t('creditInsufficientDetail', have), 'error');
@@ -2909,7 +2216,6 @@ async function downloadWithCreditCheck(idx) {
       return;
     }
     if (!deductRes.ok) {
-      closeActionProgress();
       showToast(t('creditError'), 'error');
       return;
     }
@@ -2924,276 +2230,11 @@ async function downloadWithCreditCheck(idx) {
     }
     // 파일 다운로드
     _doFileDownload(img.url, idx + 1);
-    const completeMsg = deductData.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', deductData.creditsRemaining);
-    setActionComplete(completeMsg, {
-      showShare: true,
-      jobId: AppState.lastJobId,
-      idx: getShareIndex(idx),
-      imageUrl: img.originalUrl || img.url,
-    });
+    showToast(t('creditDeductDone', deductData.creditsRemaining), 'success');
   } catch (err) {
     console.error('Download error:', err);
-    closeActionProgress();
     showToast(t('downloadErr'), 'error');
   }
-}
-
-// ─────────────────────────────────────────────────────────
-// 영상 생성 (AtlasCloud seedance-2.5/reference-to-video)
-// ─────────────────────────────────────────────────────────
-let _videoState = { jobId: null, videoUrl: null, polling: false };
-
-function _resetVideoBtn() {
-  _videoState.polling = false;
-  const btn = document.getElementById('videoActionBtn');
-  const sub = document.getElementById('videoActionSub');
-  if (btn) btn.disabled = false;
-  if (sub) sub.innerHTML = '7초 · <i class="fas fa-coins"></i> 600';
-}
-
-// 페이지 재진입 시 진행 중이던 영상 생성 작업을 백그라운드로 이어서 확인
-// (결과 카드 컨텍스트가 새로고침으로 사라지므로 모달을 다시 열지 않고,
-//  완료되면 생성내역에 자동 저장된 뒤 토스트로만 안내)
-async function resumePendingVideoJob() {
-  let pending;
-  try { pending = JSON.parse(localStorage.getItem('lookbook_pending_video') || 'null'); } catch (e) { pending = null; }
-  if (!pending || !pending.jobId) return;
-  if (Date.now() - (pending.startedAt || 0) > 20 * 60 * 1000) {
-    localStorage.removeItem('lookbook_pending_video');
-    return;
-  }
-  showToast('이전에 시작한 영상 생성을 이어서 확인합니다...', 'info');
-  _pollVideoStatusBackground(pending.jobId);
-}
-
-async function _pollVideoStatusBackground(jobId) {
-  try {
-    const res = await fetch(`/api/video/${jobId}/status`);
-    const data = await res.json();
-    if (data.status === 'completed' && data.videoUrl) {
-      localStorage.removeItem('lookbook_pending_video');
-      showToast('영상 생성이 완료되었습니다! 생성내역에서 확인하세요.', 'success');
-      return;
-    }
-    if (data.status === 'failed') {
-      localStorage.removeItem('lookbook_pending_video');
-      return;
-    }
-    setTimeout(() => _pollVideoStatusBackground(jobId), 5000);
-  } catch (err) {
-    console.error('Background video poll error:', err);
-    setTimeout(() => _pollVideoStatusBackground(jobId), 6000);
-  }
-}
-
-// 영상 생성 로딩 화면 — 이미지 생성 로딩 화면(.generating-view)과 동일한 구조를 재사용
-function _showVideoGeneratingView() {
-  const view = document.getElementById('videoGeneratingView');
-  if (view) view.classList.add('active');
-  const nav = document.getElementById('step4Nav');
-  if (nav) nav.style.display = 'none';
-  updateVideoProgress(0, '시작 중...');
-  setVideoMsgState('vmsg1', 'current');
-  startNewsRotator('videoGenViewNews');
-}
-
-function _hideVideoGeneratingView() {
-  const view = document.getElementById('videoGeneratingView');
-  if (view) view.classList.remove('active');
-  const nav = document.getElementById('step4Nav');
-  if (nav) nav.style.display = '';
-  stopNewsRotator();
-  _stopVideoFakeProgress();
-}
-
-let _videoFakeProgressTimer = null;
-function _startVideoFakeProgress() {
-  _stopVideoFakeProgress();
-  let percent = 15;
-  const stageMsgs = ['vmsg2', 'vmsg3', 'vmsg4', 'vmsg5'];
-  let stageIdx = 0;
-  setVideoMsgState('vmsg1', 'done');
-  setVideoMsgState('vmsg2', 'current');
-  updateVideoProgress(percent, 'AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
-  _videoFakeProgressTimer = setInterval(() => {
-    if (percent >= 90) return;
-    percent += 2;
-    const nextStage = Math.min(Math.floor((percent - 15) / 18), stageMsgs.length - 1);
-    if (nextStage > stageIdx) {
-      setVideoMsgState(stageMsgs[stageIdx], 'done');
-      setVideoMsgState(stageMsgs[nextStage], 'current');
-      stageIdx = nextStage;
-    }
-    updateVideoProgress(percent, 'AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
-  }, 2500);
-}
-function _stopVideoFakeProgress() {
-  if (_videoFakeProgressTimer) { clearInterval(_videoFakeProgressTimer); _videoFakeProgressTimer = null; }
-}
-
-async function startVideoGeneration() {
-  if (_videoState.videoUrl) { downloadVideo(); return; }
-  if (_videoState.polling) return;
-
-  const img = AppState.generatedImages[0];
-  if (!img || !img.originalUrl) {
-    showToast('영상을 생성할 이미지가 없습니다.', 'error');
-    return;
-  }
-
-  const sessionToken = localStorage.getItem('lookbook_token') || '';
-  if (!sessionToken) {
-    showToast(t('loginRequired'), 'error');
-    return;
-  }
-
-  const btn = document.getElementById('videoActionBtn');
-  const sub = document.getElementById('videoActionSub');
-  if (btn) btn.disabled = true;
-  if (sub) sub.textContent = '요청 중...';
-  _videoState.polling = true;
-
-  _showVideoGeneratingView();
-
-  try {
-    const startRes = await fetch('/api/video/start', {
-      method: 'POST',
-      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageUrl: img.originalUrl,
-        modelName: AppState.lastGenParams?.modelName,
-        bgName: AppState.lastGenParams?.bgName,
-      }),
-    });
-
-    if (startRes.status === 401) {
-      _hideVideoGeneratingView();
-      showToast(t('loginRequired'), 'error');
-      _resetVideoBtn();
-      return;
-    }
-    if (startRes.status === 402) {
-      _hideVideoGeneratingView();
-      const errData = await startRes.json();
-      showToast(t('creditInsufficientDetail', errData.available ?? 0), 'error');
-      _resetVideoBtn();
-      setTimeout(() => {
-        const userArea = document.getElementById('navUserArea');
-        if (userArea) userArea.click();
-      }, 1500);
-      return;
-    }
-    if (!startRes.ok) {
-      _hideVideoGeneratingView();
-      const errData = await startRes.json().catch(() => ({}));
-      showToast(errData.message || '영상 생성 요청에 실패했습니다.', 'error');
-      _resetVideoBtn();
-      return;
-    }
-
-    const startData = await startRes.json();
-    _videoState.jobId = startData.jobId;
-
-    // 페이지 재진입 시 이어서 폴링할 수 있도록 진행 중인 작업 저장
-    try {
-      localStorage.setItem('lookbook_pending_video', JSON.stringify({ jobId: startData.jobId, startedAt: Date.now() }));
-    } catch (e) { /* 저장 공간 부족 등은 무시 */ }
-
-    if (startData.creditsRemaining !== undefined) {
-      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
-      if (cachedUser) { cachedUser.credits = startData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
-      if (AppState.user) AppState.user.credits = startData.creditsRemaining;
-      updateUserUI({ credits: startData.creditsRemaining });
-    }
-
-    _startVideoFakeProgress();
-    if (sub) sub.textContent = '생성 중...';
-    _pollVideoStatus();
-  } catch (err) {
-    console.error('Video start error:', err);
-    _hideVideoGeneratingView();
-    showToast('영상 생성 중 오류가 발생했습니다.', 'error');
-    _resetVideoBtn();
-  }
-}
-
-async function _pollVideoStatus() {
-  if (!_videoState.jobId) return;
-  try {
-    const res = await fetch(`/api/video/${_videoState.jobId}/status`);
-    const data = await res.json();
-    if (data.status === 'completed' && data.videoUrl) {
-      _videoState.videoUrl = data.videoUrl;
-      _videoState.polling = false;
-      localStorage.removeItem('lookbook_pending_video');
-      _onVideoReady(data.videoUrl);
-      return;
-    }
-    if (data.status === 'failed') {
-      _videoState.polling = false;
-      localStorage.removeItem('lookbook_pending_video');
-      _hideVideoGeneratingView();
-      showToast(data.error || '영상 생성에 실패했습니다.', 'error');
-      _resetVideoBtn();
-      return;
-    }
-    setTimeout(_pollVideoStatus, 4000);
-  } catch (err) {
-    console.error('Video poll error:', err);
-    setTimeout(_pollVideoStatus, 5000);
-  }
-}
-
-function _onVideoReady(videoUrl) {
-  const btn = document.getElementById('videoActionBtn');
-  const sub = document.getElementById('videoActionSub');
-  if (btn) {
-    btn.disabled = false;
-    const main = btn.querySelector('.rnb-main');
-    if (main) main.innerHTML = '<i class="fas fa-download"></i> 영상 다운로드';
-  }
-  if (sub) sub.textContent = '다운로드 준비 완료';
-
-  updateVideoProgress(100, '완료!');
-  setVideoMsgState('vmsg5', 'done');
-  _hideVideoGeneratingView();
-
-  // 결과 화면(첫 번째 카드)을 영상 재생 화면으로 교체
-  // AtlasCloud 원본 저장소가 Content-Disposition: attachment로 강제 다운로드
-  // 설정돼 있어 원본 URL을 그대로 쓰면 브라우저가 재생 대신 다운로드로 튐 —
-  // 프록시를 거쳐야 이 헤더가 제거되어 인라인 재생이 됨
-  const thumb = document.getElementById('resultThumb-0');
-  if (thumb) {
-    const proxiedVideoUrl = `/api/proxy/gen-image?url=${encodeURIComponent(videoUrl)}`;
-    thumb.innerHTML = `<video src="${proxiedVideoUrl}" autoplay loop muted playsinline controls controlsList="nodownload" disablePictureInPicture style="width:100%;height:auto;display:block;"></video>`;
-  }
-}
-
-function downloadVideo() {
-  if (!_videoState.videoUrl) {
-    showToast('다운로드할 영상이 없습니다.', 'error');
-    return;
-  }
-  const dlUrl = `/api/proxy/gen-image?url=${encodeURIComponent(_videoState.videoUrl)}&download=1`;
-  const a = document.createElement('a');
-  a.href = dlUrl;
-  a.download = 'lookbook_ai_video.mp4';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  showToast('영상 다운로드를 시작합니다.', 'success');
-
-  // 다운로드 후 이미지와 동일하게 공유(링크복사/카카오톡) 옵션 노출
-  // (setActionComplete는 모달을 열지 않고 상태만 바꾸므로 먼저 열어줘야 함)
-  // 카카오톡 카드는 영상을 미리보기로 못 그리므로 소스 정지 이미지를 사용
-  const sourceImg = AppState.generatedImages[0];
-  openModal('actionProgressModal');
-  setActionComplete('영상 다운로드가 시작되었습니다.', {
-    showShare: true,
-    jobId: _videoState.jobId,
-    idx: 0,
-    imageUrl: (sourceImg && (sourceImg.originalUrl || sourceImg.url)) || _videoState.videoUrl,
-  });
 }
 
 // 레거시 — 내부에서만 사용 (크레딧 차감 없이 파일 저장만)
@@ -3275,30 +2316,28 @@ async function downloadImage() {
     downloadBtn.innerHTML = t('downloadIng');
   }
 
-  closeModal('imageModal');
-  openActionProgress(t('downloadIng').replace(/<[^>]*>/g, '').trim() || '다운로드 중...');
-
   try {
     // 크레딧 차감 API 호출
     const sessionToken = localStorage.getItem('lookbook_token') || '';
     const deductRes = await fetch('/api/credits/deduct', {
       method: 'POST',
-      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ job_id: AppState.lastJobId, idx: getShareIndex(idx) }),
+      headers: { 'X-Session-Token': sessionToken },
     });
 
     if (deductRes.status === 401) {
-      closeActionProgress();
       showToast(t('loginRequired'), 'error');
+      closeModal('imageModal');
       return;
     }
 
     if (deductRes.status === 402) {
-      closeActionProgress();
       const errData = await deductRes.json();
       const have = errData.available || 0;
       showToast(t('creditInsufficientDetail', have), 'error');
+      // 모달 닫고 대시보드 충전 페이지로 유도
       setTimeout(() => {
+        closeModal('imageModal');
+        // 네비 드롭다운 열기 (충전 버튼 노출)
         const userArea = document.getElementById('navUserArea');
         if (userArea) userArea.click();
       }, 1500);
@@ -3306,7 +2345,6 @@ async function downloadImage() {
     }
 
     if (!deductRes.ok) {
-      closeActionProgress();
       showToast(t('creditError'), 'error');
       return;
     }
@@ -3328,20 +2366,14 @@ async function downloadImage() {
     // 실제 다운로드 실행
     if (img?.url) {
       downloadSingleImage(img.url, idx + 1);
-      const completeMsg = deductData.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', deductData.creditsRemaining);
-      setActionComplete(completeMsg, {
-        showShare: true,
-        jobId: AppState.lastJobId,
-        idx: getShareIndex(idx),
-        imageUrl: img.originalUrl || img.url,
-      });
+      showToast(t('creditDeductDone', deductData.creditsRemaining), 'success');
     } else {
-      setActionComplete(t('downloadSingle'), { showShare: false });
+      showToast(t('downloadSingle'), 'success');
     }
+    closeModal('imageModal');
 
   } catch (err) {
     console.error('Download error:', err);
-    closeActionProgress();
     showToast(t('downloadErr'), 'error');
   } finally {
     if (downloadBtn) {
@@ -3394,8 +2426,6 @@ async function regenImage() {
   }
   if (regenCounter) regenCounter.textContent = '';
 
-  openActionProgress(t('regenIng').replace(/<[^>]*>/g, '').trim() || '재생성 중...');
-
   const sessionToken = localStorage.getItem('lookbook_token') || '';
 
   try {
@@ -3414,12 +2444,10 @@ async function regenImage() {
     });
 
     if (res.status === 401) {
-      closeActionProgress();
       showToast(t('loginRequired'), 'error');
       return;
     }
     if (!res.ok) {
-      closeActionProgress();
       const errData = await res.json().catch(() => ({}));
       showToast(t('regenFail', errData.error), 'error');
       return;
@@ -3427,7 +2455,6 @@ async function regenImage() {
 
     const startData = await res.json();
     if (!startData.jobId) {
-      closeActionProgress();
       showToast(t('regenNoJobId'), 'error');
       return;
     }
@@ -3435,11 +2462,12 @@ async function regenImage() {
     // 재생성 카운트 증가
     AppState.regenCount++;
 
+    showToast(t('regenStart', AppState.regenCount, MAX_REGEN), 'info');
+
     // ── 재생성 시에도 lastJobId 업데이트 (save-images가 올바른 job에 저장되도록)
     AppState.lastJobId = startData.jobId;
 
     // 모달 닫고 step-3 (생성 진행 화면)으로 전환
-    closeActionProgress();
     closeModal('imageModal');
 
     // step-3으로 되돌아가서 generatingView 표시 (step-4 → step-3 → step-4 흐름)
@@ -3458,7 +2486,6 @@ async function regenImage() {
 
   } catch (err) {
     console.error('Regen error:', err);
-    closeActionProgress();
     showToast(t('regenErr', err.message), 'error');
   } finally {
     // 버튼 상태 복원은 updateRegenUI에서 처리
@@ -3485,29 +2512,6 @@ function updateProgress(percent, text) {
 }
 
 function setMsgState(msgId, state) {
-  const msg = document.getElementById(msgId);
-  if (!msg) return;
-  msg.classList.remove('current', 'done');
-  if (state === 'current') {
-    msg.classList.add('current');
-    const dot = msg.querySelector('.dot');
-    if (dot) dot.style.background = 'var(--primary)';
-  } else if (state === 'done') {
-    msg.classList.add('done');
-    const dot = msg.querySelector('.dot');
-    if (dot) dot.style.background = 'var(--success)';
-  }
-}
-
-// 영상 생성용 진행률/상태 헬퍼 — updateProgress/setMsgState와 동일한 로직, 대상 id만 다름
-function updateVideoProgress(percent, text) {
-  const fill = document.getElementById('videoGenProgressFill');
-  if (fill) fill.style.width = Math.min(percent, 100) + '%';
-  const statusText = document.getElementById('videoGenStatusText');
-  if (statusText) statusText.textContent = text;
-}
-
-function setVideoMsgState(msgId, state) {
   const msg = document.getElementById(msgId);
   if (!msg) return;
   msg.classList.remove('current', 'done');
@@ -3588,10 +2592,6 @@ function openChargePanel() {
   const credits = user ? (user.credits ?? 0) : 0;
   const el = document.getElementById('chargePanelCredits');
   if (el) el.textContent = t('creditsUnit', credits);
-  const isBFM = !!(user && user.referrer === 'BFM회원');
-  const badge = document.getElementById('bfmDiscountBadge');
-  if (badge) badge.style.display = isBFM ? 'flex' : 'none';
-  renderPkgPrices(isBFM);
   const panel = document.getElementById('chargePanel');
   if (!panel) return;
   panel.style.display = 'block';
@@ -3609,43 +2609,6 @@ function closeChargePanel() {
   _selectedPkg = null;
 }
 
-// 패키지별 원가 (크레딧 티어는 공통, 가격만 시장별 별도 책정 — 서버 CREDIT_PACKAGES와 동일하게 유지)
-const PKG_PRICE_RAW = {
-  pkg_20000: { KRW: 20000, usdCents: 1999, JPY: 2980 },
-  pkg_40000: { KRW: 40000, usdCents: 3499, JPY: 4980 },
-  pkg_60000: { KRW: 60000, usdCents: 4999, JPY: 7980 },
-};
-const BFM_DISCOUNT_RATE = 0.2; // 서버 REFERRER_DISCOUNT_RATE.BFM 과 동일하게 유지
-
-function formatPkgPrice(pkgId, currency, discounted) {
-  const raw = PKG_PRICE_RAW[pkgId];
-  if (currency === 'USD') {
-    const cents = discounted ? Math.round(raw.usdCents * (1 - BFM_DISCOUNT_RATE)) : raw.usdCents;
-    return '$' + (cents / 100).toFixed(2);
-  }
-  if (currency === 'JPY') {
-    const amt = discounted ? Math.round(raw.JPY * (1 - BFM_DISCOUNT_RATE)) : raw.JPY;
-    return '¥' + amt.toLocaleString('ja-JP');
-  }
-  const amt = discounted ? Math.round(raw.KRW * (1 - BFM_DISCOUNT_RATE)) : raw.KRW;
-  return amt.toLocaleString('ko-KR') + '원';
-}
-
-function renderPkgPrices(isBFM) {
-  Object.keys(PKG_PRICE_RAW).forEach(pkgId => {
-    const mainEl = document.getElementById('pkgPrice_' + pkgId);
-    const origEl = document.getElementById('pkgPriceOriginal_' + pkgId);
-    if (!mainEl) return;
-    if (isBFM) {
-      if (origEl) { origEl.textContent = formatPkgPrice(pkgId, _currency, false); origEl.style.display = 'block'; }
-      mainEl.textContent = formatPkgPrice(pkgId, _currency, true);
-    } else {
-      if (origEl) origEl.style.display = 'none';
-      mainEl.textContent = formatPkgPrice(pkgId, _currency, false);
-    }
-  });
-}
-
 function selectPackage(pkgId, el) {
   _selectedPkg = pkgId;
   document.querySelectorAll('.pkg-card').forEach(c => {
@@ -3657,18 +2620,14 @@ function selectPackage(pkgId, el) {
   const cta = document.getElementById('chargeCta');
   const lbl = document.getElementById('ctaLabel');
   if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-  const isBFM = !!(AppState.user && AppState.user.referrer === 'BFM회원');
-  const price = formatPkgPrice(pkgId, _currency, isBFM);
-  if (lbl) lbl.textContent = `${price} ${t('payBtnSuffix')}`;
+  const map = { pkg_20000: '20,000원 결제', pkg_40000: '40,000원 결제', pkg_60000: '60,000원 결제' };
+  if (lbl) lbl.textContent = map[pkgId] || '결제하기';
 }
 
 async function startPayment() {
   if (!_selectedPkg) { showToast(t('paySelectPkg'), 'error'); return; }
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   if (!sessionToken) { showToast(t('loginRequired'), 'error'); return; }
-
-  // 한국(나이스페이) 외 시장은 Stripe Checkout으로 분기
-  if (_pg === 'stripe') { return startStripePayment(); }
 
   const cta = document.getElementById('chargeCta');
   try {
@@ -3681,68 +2640,36 @@ async function startPayment() {
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || '결제 준비 실패');
-    if (!data.clientId) throw new Error('결제 설정 오류 (NICEPAY_CLIENT_ID 미설정)');
 
-    if (!window.AUTHNICE) await loadNicepaySDK();
+    if (!window.TossPayments) await loadTossSDK();
 
-    // 나이스페이먼츠 서버 승인 모델: 결제창 인증 완료 후 우리 서버(/payment/return)로
-    // 결제창이 직접 POST → 서버에서 승인 API 호출까지 끝난 뒤 결과 페이지로 리다이렉트됨
-    const payReq = {
-      clientId: data.clientId,
-      method: 'card',
-      orderId: data.orderId,
+    const clientKey = 'test_ck_D5GePWvyJnrK0W0k6q8gLzN97Eoq';
+    const toss = TossPayments(clientKey);
+    await toss.requestPayment('카드', {
       amount: data.amount,
-      goodsName: data.orderName,
-      buyerName: data.customerName,
-      returnUrl: location.origin + '/payment/return',
-      fnError: function (result) {
-        if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-        showToast(t('payFail', result && result.errorMsg || ''), 'error');
-      },
-    };
-    // 카카오 로그인 등 이메일 미동의 계정은 내부용 가짜 이메일(@kakao.local)이 저장되어
-    // 있는데, 이걸 그대로 보내면 나이스페이 인증 단계에서 거부됨(U116) — 실제 이메일일 때만 전달
-    if (data.customerEmail && !data.customerEmail.endsWith('@kakao.local')) {
-      payReq.buyerEmail = data.customerEmail;
-    }
-    AUTHNICE.requestPay(payReq);
+      orderId: data.orderId,
+      orderName: data.orderName,
+      customerName: data.customerName,
+      successUrl: location.origin + '/payment/success',
+      failUrl:    location.origin + '/payment/fail',
+    });
   } catch (e) {
     if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-    showToast(t('payFail', e.message), 'error');
+    if (e.code !== 'USER_CANCEL') {
+      showToast(t('payFail', e.message), 'error');
+    }
   }
 }
 
-function loadNicepaySDK() {
+function loadTossSDK() {
   return new Promise((resolve, reject) => {
-    if (window.AUTHNICE) { resolve(); return; }
+    if (window.TossPayments) { resolve(); return; }
     const s = document.createElement('script');
-    s.src = 'https://pay.nicepay.co.kr/v1/js/';
+    s.src = 'https://js.tosspayments.com/v1/payment';
     s.onload = resolve;
-    s.onerror = () => reject(new Error('나이스페이먼츠 SDK 로드 실패'));
+    s.onerror = () => reject(new Error('토스페이먼츠 SDK 로드 실패'));
     document.head.appendChild(s);
   });
-}
-
-// 해외(한국 제외) 시장 결제 — Stripe Checkout(호스팅 결제 페이지)으로 이동
-async function startStripePayment() {
-  const sessionToken = localStorage.getItem('lookbook_token') || '';
-  const cta = document.getElementById('chargeCta');
-  try {
-    if (cta) { cta.style.opacity = '0.6'; cta.style.pointerEvents = 'none'; }
-    const res = await fetch('/api/stripe/checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
-      body: JSON.stringify({ packageId: _selectedPkg, currency: _currency }),
-    });
-    if (res.status === 401) { showToast(t('loginRequired'), 'error'); return; }
-    const data = await res.json();
-    if (!data.success || !data.url) throw new Error(data.message || 'Stripe 결제 준비 실패');
-    // Stripe 호스팅 결제 페이지로 이동 — 결제 완료 후 success_url로 자동 복귀
-    location.href = data.url;
-  } catch (e) {
-    if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-    showToast(t('payFail', e.message), 'error');
-  }
 }
 
 // 결제 완료 후 creditsRefresh 신호 처리 (탭 복귀 시)

@@ -31,6 +31,21 @@ type Bindings = {
   OPENAI_API_KEY: string
   // 브랜드 리드 분석/초안 생성 고도화(선택) — 미설정 시 휴리스틱/템플릿으로 자동 폴백
   ANTHROPIC_API_KEY?: string
+  // GA4 측정 ID (예: G-XXXXXXXXXX) — 미설정 시 GA 스니펫 자체를 삽입하지 않음
+  GA4_MEASUREMENT_ID?: string
+}
+
+// GA4 gtag.js 스니펫 — GA4_MEASUREMENT_ID 미설정 시 빈 문자열(추적 없음)
+const gaSnippet = (gaId?: string) => {
+  if (!gaId) return ''
+  return `
+  <script async src="https://www.googletagmanager.com/gtag/js?id=${gaId}"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '${gaId}');
+  </script>`
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -1641,6 +1656,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
     const kakaoAvatar = profile.kakao_account?.profile?.profile_image_url || null
 
     // 기존 사용자 조회 또는 신규 생성
+    let isNewUser = false
     let user: any = await db.prepare(`SELECT * FROM users WHERE provider = 'kakao' AND provider_id = ?`).bind(providerId).first()
     if (!user) {
       user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(kakaoEmail).first()
@@ -1650,6 +1666,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
         const id = genUserId()
         await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 200, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
+        isNewUser = true
       }
     }
     if (!user || user.status !== 'active') throw new Error('계정이 정지 상태입니다.')
@@ -1669,7 +1686,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
 <p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 이동합니다...</p>
 <script>
 (function(){
-  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson}};
+  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson},isNewUser:${isNewUser}};
   try { localStorage.setItem('oauth_result', JSON.stringify(payload)); } catch(e) {}
   var pending = {};
   try { pending = JSON.parse(localStorage.getItem('oauth_redirect_pending') || '{}'); } catch(e) {}
@@ -1688,7 +1705,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
 <p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 후 창이 닫힙니다...</p>
 <script>
 (function() {
-  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson}};
+  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson},isNewUser:${isNewUser}};
   function tryClose() { try { window.close(); } catch(e) {} }
   function sendMsg() {
     try {
@@ -1783,6 +1800,7 @@ app.get('/api/auth/google/callback', async (c) => {
     const googleName  = profile.name || '구글 사용자'
     const googleAvatar = profile.picture || null
 
+    let isNewUser = false
     let user: any = await db.prepare(`SELECT * FROM users WHERE provider = 'google' AND provider_id = ?`).bind(providerId).first()
     if (!user) {
       user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(googleEmail).first()
@@ -1792,6 +1810,7 @@ app.get('/api/auth/google/callback', async (c) => {
         const id = genUserId()
         await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 200, 'user')`).bind(id, googleEmail, googleName, providerId, googleAvatar).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
+        isNewUser = true
       }
     }
     if (!user || user.status !== 'active') throw new Error('계정이 정지 상태입니다.')
@@ -1811,7 +1830,7 @@ app.get('/api/auth/google/callback', async (c) => {
 <p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 이동합니다...</p>
 <script>
 (function(){
-  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson}};
+  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson},isNewUser:${isNewUser}};
   try { localStorage.setItem('oauth_result', JSON.stringify(payload)); } catch(e) {}
   var pending = {};
   try { pending = JSON.parse(localStorage.getItem('oauth_redirect_pending') || '{}'); } catch(e) {}
@@ -1830,7 +1849,7 @@ app.get('/api/auth/google/callback', async (c) => {
 <p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 후 창이 닫힙니다...</p>
 <script>
 (function() {
-  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson}};
+  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson},isNewUser:${isNewUser}};
   function tryClose() { try { window.close(); } catch(e) {} }
   function sendMsg() {
     try {
@@ -3738,7 +3757,8 @@ app.post('/api/admin/auth', async (c) => {
 // ────────────────────────────────────────────────────
 const DEFAULT_DESCRIPTION = '의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요.'
 
-const htmlShell = (title: string, bodyContent: string, extraHead: string = '', description: string = DEFAULT_DESCRIPTION) => `<!DOCTYPE html>
+const htmlShell = (title: string, bodyContent: string, extraHead: string = '', description: string = DEFAULT_DESCRIPTION, gaId?: string) => `<!DOCTYPE html>
+
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -3762,6 +3782,7 @@ const htmlShell = (title: string, bodyContent: string, extraHead: string = '', d
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
   <link href="/static/style.css?v=${BUILD_VERSION}" rel="stylesheet" />
+  ${gaSnippet(gaId)}
   <!-- app.js는 head에 defer — body 인라인 script보다 항상 먼저 파싱·실행됨 -->
   <script src="/static/app.js?v=${BUILD_VERSION}" defer></script>
   ${extraHead}
@@ -4783,7 +4804,7 @@ app.get('/', (c) => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
-  `, homeExtraHead, homeDescription))
+  `, homeExtraHead, homeDescription, c.env.GA4_MEASUREMENT_ID))
 })
 
 // ─── Dashboard Page ───
@@ -5406,7 +5427,7 @@ app.get('/dashboard', (c) => {
   }
 
   </script>
-  `))
+  `, c.env.GA4_MEASUREMENT_ID))
 })
 
 
@@ -5791,7 +5812,7 @@ app.get('/generator', (c) => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 이용약관 및 개인정보처리방침에 동의합니다.</p>
     </div>
   </div>
-  `, '', generatorDescription))
+  `, '', generatorDescription, c.env.GA4_MEASUREMENT_ID))
 })
 
 // ────────────────────────────────────────────────────
@@ -7605,6 +7626,7 @@ app.get('/payment/success', (c) => {
     body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }
     .card { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid rgba(255,255,255,0.08); }
   </style>
+  ${gaSnippet(c.env.GA4_MEASUREMENT_ID)}
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
   <div class="card rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
@@ -7664,6 +7686,14 @@ app.get('/payment/success', (c) => {
           document.getElementById('successState').classList.remove('hidden')
           // 세션스토리지에 갱신 신호
           sessionStorage.setItem('creditsRefresh', '1')
+          try {
+            if (typeof gtag === 'function') {
+              gtag('event', 'purchase', {
+                transaction_id: orderId,
+                items: [{ item_name: 'credits', quantity: data.credits }],
+              })
+            }
+          } catch (e) {}
           return
         }
         // Stripe는 웹훅이 비동기로 도착하므로, 아직 pending이면 잠깐 재시도 (최대 5회, 1.5초 간격)
@@ -7705,6 +7735,7 @@ app.get('/payment/fail', (c) => {
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }</style>
+  ${gaSnippet(c.env.GA4_MEASUREMENT_ID)}
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
   <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,255,255,0.08)" class="rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
