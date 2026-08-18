@@ -3762,7 +3762,7 @@ app.post('/api/video/start', async (c) => {
     // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 7초 영상
     // (공식 API 문서 기준 파라미터 — resolution은 480p/720p/*-esr만 지원,
     //  ratio는 'adaptive' 고정으로 원본 이미지 비율을 그대로 따라감)
-    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements at normal real-time speed: gentle weight shifts, a natural turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Keep the face, outfit, and background unchanged throughout the video. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.'
+    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements at normal real-time speed: gentle weight shifts, a natural turn, relaxed hand and hair movement, as if in a live fashion shoot. The camera is NOT static — apply a slow, subtle cinematic camera movement throughout the shot (a gentle push-in/dolly-in, slow pan, or slight orbit around the subject), the way a real videographer would shoot a fashion editorial, adding depth and a sense of motion beyond the model\'s own movement. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Keep the person\'s identity, outfit, and scene/background setting unchanged throughout the video — only the camera framing and the model\'s pose may shift naturally. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
@@ -3843,9 +3843,19 @@ app.get('/api/video/:jobId/status', async (c) => {
       }
     }
 
-    const pollRes: any = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
-      headers: { 'Authorization': `Bearer ${c.env.ATLAS_API_KEY}` },
-    }).then(r => r.json())
+    // Atlas Cloud 조회 자체가 일시적으로 실패해도(네트워크 hiccup 등) 곧바로 실패 처리하지 않는다 —
+    // 15분 타임아웃 임계값에 도달하기 전까지는 "아직 처리 중"으로 취급해 다음 폴링에서 재시도한다.
+    // (여기서 곧바로 실패+환불 처리하면, 실제로는 Atlas에서 정상 완료될 작업을 오판해 잘못
+    //  환불하고 사용자에게 가짜 오류를 보여주는 사고로 이어질 수 있음 — 실제 발생했던 문제.)
+    let pollRes: any
+    try {
+      pollRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
+        headers: { 'Authorization': `Bearer ${c.env.ATLAS_API_KEY}` },
+      }).then(r => r.json())
+    } catch (fetchErr: any) {
+      console.error('Atlas 상태 조회 일시 실패 (재시도 예정):', fetchErr)
+      return c.json({ status: 'processing', progress: 50 })
+    }
 
     const status = pollRes.data?.status ?? pollRes.status
     const terminalStatuses = new Set(['completed', 'succeeded', 'failed', 'timeout', 'canceled', 'error'])
@@ -3866,9 +3876,10 @@ app.get('/api/video/:jobId/status', async (c) => {
       : (typeof rawOut === 'string' && rawOut.startsWith('http') ? rawOut : null)
 
     if (!videoUrl) {
-      console.error('video 완료했지만 URL 없음:', pollRes)
-      const refund = await markVideoFailedAndRefund(db, jobId)
-      return c.json({ status: 'failed', progress: 100, error: '영상 URL을 찾을 수 없습니다. (크레딧은 차감되지 않았습니다)', ...refund })
+      // Atlas는 완료라고 응답했지만 URL 파싱에 실패한 경우 — 응답 구조가 예상과 다를 수 있으므로
+      // 곧바로 환불하지 않고 처리 중으로 유지해, 다음 폴링(또는 15분 타임아웃)에서 재확인한다.
+      console.error('video 완료 응답이지만 URL 파싱 실패 — 재시도 예정:', JSON.stringify(pollRes).slice(0, 500))
+      return c.json({ status: 'processing', progress: 90 })
     }
 
     // 완료 즉시 생성내역에 URL 저장
@@ -3876,13 +3887,10 @@ app.get('/api/video/:jobId/status', async (c) => {
 
     return c.json({ status: 'completed', progress: 100, videoUrl })
   } catch (err: any) {
-    console.error('video status poll error:', err)
-    try {
-      const refund = await markVideoFailedAndRefund(db, jobId)
-      return c.json({ status: 'failed', progress: 100, error: err.message, ...refund })
-    } catch {
-      return c.json({ status: 'failed', progress: 100, error: err.message })
-    }
+    // 위 블록에서 처리되지 않은 예외(DB 조회 실패 등) — 마찬가지로 곧바로 실패 처리하지 않고
+    // 다음 폴링에서 재시도하도록 한다. 실제 타임아웃 판정은 이 함수 상단의 15분 체크가 담당한다.
+    console.error('video status poll error (재시도 예정):', err)
+    return c.json({ status: 'processing', progress: 50 })
   }
 })
 
@@ -5317,7 +5325,7 @@ app.get('/dashboard', (c) => {
     <div id="histModalExpiry" style="font-size:11px;color:#f87171;margin-top:8px;text-align:center;"></div>
     <button id="histModalVideoBtn" class="result-nav-btn primary" onclick="startHistVideoGeneration()" style="display:none;width:100%;max-width:220px;margin:14px auto 0;">
       <span class="rnb-badge">50%↓</span>
-      <span class="rnb-main"><i class="fas fa-film"></i> 영상 생성</span>
+      <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
       <span class="rnb-sub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
     </button>
   </div>
@@ -5425,7 +5433,7 @@ app.get('/dashboard', (c) => {
         videoBtn.style.display = '';
         videoBtn.disabled = false;
         const main = videoBtn.querySelector('.rnb-main');
-        if (main) main.innerHTML = '<i class="fas fa-film"></i> 영상 생성';
+        if (main) main.innerHTML = '<i class="fas fa-film"></i> 2K 영상 생성';
       } else {
         _histModalVideoGenCtx = null;
         if (videoBtn) videoBtn.style.display = 'none';
@@ -5494,9 +5502,11 @@ app.get('/dashboard', (c) => {
       openActionProgress('AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
       await _pollHistVideoStatus(startData.jobId, btn);
     } catch (err) {
+      // 네트워크 오류로 요청/응답이 유실된 경우, 서버에는 이미 요청이 접수되어 정상
+      // 진행 중일 수 있다 — "실패"로 단정하지 않고 생성내역에서 확인하도록 안내한다.
       console.error('영상 생성 오류:', err);
       closeActionProgress();
-      showToast('영상 생성 중 오류가 발생했습니다.', 'error');
+      showToast('영상 생성 요청 중 네트워크 오류가 발생했습니다. 잠시 후 생성내역에서 확인해주세요.', 'error');
       if (btn) btn.disabled = false;
     }
   }
@@ -5531,13 +5541,14 @@ app.get('/dashboard', (c) => {
       setTimeout(() => _pollHistVideoStatus(jobId, btn), 5000);
     }
   }
-  // "영상을 생성하는 중입니다..." 상태로 방치된 항목을 대시보드 방문 시 자동으로
-  // 재확인 — 서버가 실패를 확인하면 크레딧 환불 + status='failed' 전환까지 처리하므로
-  // 여기서는 상태 엔드포인트를 한 번 호출하고, 결과가 바뀌었으면 목록만 새로고침한다.
-  const _selfHealedJobIds = new Set();
+  // "영상을 생성하는 중입니다..." 상태로 방치된 항목을 대시보드에 머무는 동안 주기적으로
+  // 재확인한다. 원래 요청을 보낸 브라우저 탭이 네트워크 오류 등으로 폴링을 놓쳐도
+  // (예: /api/video/start 응답이 유실되어 클라이언트는 실패로 보이지만 서버·Atlas
+  // 쪽에서는 실제로는 정상 진행/완료된 경우), 생성내역 화면에 머무는 동안 자동으로
+  // 상태가 바로잡히도록 하기 위함. 처리 중인 영상이 하나도 없으면 재확인을 멈춘다.
+  let _historyPollTimer = null;
   async function _selfHealStuckVideo(jobId) {
-    if (!jobId || _selfHealedJobIds.has(jobId)) return;
-    _selfHealedJobIds.add(jobId);
+    if (!jobId) return;
     try {
       const res = await fetch(\`/api/video/\${jobId}/status\`);
       const data = await res.json();
@@ -5548,10 +5559,11 @@ app.get('/dashboard', (c) => {
         }
         loadHistory();
       }
-    } catch (e) { /* 조용히 무시 — 다음 방문 때 재시도 */ }
+    } catch (e) { /* 조용히 무시 — 다음 재확인 때 재시도 */ }
   }
 
   async function loadHistory() {
+    if (_historyPollTimer) { clearTimeout(_historyPollTimer); _historyPollTimer = null; }
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
     try {
@@ -5702,6 +5714,12 @@ app.get('/dashboard', (c) => {
       });
 
       list.innerHTML = rows.join('');
+
+      // 처리 중인 영상이 남아있으면 20초 후 자동으로 다시 확인 (모두 해소되면 자동 중단)
+      const stillPending = logs.some(l => l.kind === 'video' && !l.video_url && l.status !== 'failed');
+      if (stillPending) {
+        _historyPollTimer = setTimeout(loadHistory, 20000);
+      }
     } catch (e) {
       list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
     }
@@ -6040,7 +6058,7 @@ app.get('/generator', (c) => {
             </button>
             <button class="result-nav-btn primary" id="videoActionBtn" onclick="startVideoGeneration()">
               <span class="rnb-badge">50%↓</span>
-              <span class="rnb-main"><i class="fas fa-film"></i> 영상 생성</span>
+              <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
               <span class="rnb-sub" id="videoActionSub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
             </button>
             <button class="result-nav-btn" onclick="window.location.href='/generator'">
