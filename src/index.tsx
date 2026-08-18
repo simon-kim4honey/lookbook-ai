@@ -2237,14 +2237,27 @@ app.get('/api/generation/history', async (c) => {
     ).bind(sessionToken).first() as any
     if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
 
-    const logs = await db.prepare(
-      `SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
-              image_urls, expires_at, created_at, downloaded_indices, kind, video_url
-       FROM generation_logs
-       WHERE user_id = ?
-       ORDER BY created_at DESC
-       LIMIT 100`
-    ).bind(sess.user_id).all()
+    // status 컬럼 마이그레이션(0019) 전 구 스키마 환경 대비 try-catch
+    let logs: any
+    try {
+      logs = await db.prepare(
+        `SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
+                image_urls, expires_at, created_at, downloaded_indices, kind, video_url, status
+         FROM generation_logs
+         WHERE user_id = ?
+         ORDER BY created_at DESC
+         LIMIT 100`
+      ).bind(sess.user_id).all()
+    } catch {
+      logs = await db.prepare(
+        `SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
+                image_urls, expires_at, created_at, downloaded_indices, kind, video_url
+         FROM generation_logs
+         WHERE user_id = ?
+         ORDER BY created_at DESC
+         LIMIT 100`
+      ).bind(sess.user_id).all()
+    }
 
     return c.json({ success: true, logs: logs.results || [] })
   } catch (err: any) {
@@ -3192,6 +3205,31 @@ function buildClothingReplaceInstructions(
 const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
 const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
 
+// 영상 생성 실패(또는 15분 이상 응답 없음) 확인 시 크레딧을 환불하고 생성내역을
+// 'failed'로 전환한다. status='processing' → 'failed' 전환은 원자적 UPDATE로 수행해
+// 동시에 여러 번 폴링이 들어와도 환불이 중복되지 않도록 한다.
+async function markVideoFailedAndRefund(db: D1Database, jobId: string): Promise<{ creditsRemaining?: number }> {
+  let row: any
+  try {
+    row = await db.prepare(`SELECT user_id, status FROM generation_logs WHERE job_id = ?`).bind(jobId).first()
+  } catch {
+    return {} // status 컬럼 마이그레이션(0019) 전 구 스키마 환경 — 환불 로직 건너뜀
+  }
+  if (!row || row.status !== 'processing') return {}
+
+  const upd = await db.prepare(`UPDATE generation_logs SET status = 'failed' WHERE job_id = ? AND status = 'processing'`).bind(jobId).run()
+  if ((upd.meta?.changes ?? 0) === 0) return {} // 다른 요청이 먼저 처리함 — 중복 환불 방지
+
+  await db.prepare(`UPDATE users SET credits = credits + ?, updated_at = datetime('now') WHERE id = ?`).bind(CREDITS_PER_VIDEO, row.user_id).run()
+  const userRow: any = await db.prepare(`SELECT credits FROM users WHERE id = ?`).bind(row.user_id).first()
+  const newBalance = userRow?.credits ?? null
+  await db.prepare(
+    `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id) VALUES (?, 'refund', ?, ?, 'video_generation_failed', ?)`
+  ).bind(row.user_id, CREDITS_PER_VIDEO, newBalance, jobId).run()
+
+  return { creditsRemaining: newBalance ?? undefined }
+}
+
 app.post('/api/generation/start', async (c) => {
   try {
     const body: any = await c.req.json()
@@ -3777,9 +3815,34 @@ app.post('/api/video/start', async (c) => {
 })
 
 // GET /api/video/:jobId/status — 영상 생성 상태 폴링
+// 실패(또는 15분 이상 무응답 = 타임아웃)가 확인되면 크레딧을 자동 환불하고
+// 생성내역을 'failed'로 전환한다(markVideoFailedAndRefund, 중복 환불 방지 내장).
 app.get('/api/video/:jobId/status', async (c) => {
   const jobId = c.req.param('jobId')
+  const db: D1Database = c.env.LOOKBOOK_DB
   try {
+    // 이미 종결된 작업(완료/실패)이면 Atlas Cloud를 다시 조회하지 않고 DB 상태를 그대로 반환
+    // (status 컬럼 마이그레이션(0019) 전 구 스키마 환경에서는 조회 실패 시 기존 방식대로 진행)
+    let existing: any = null
+    try {
+      existing = await db.prepare(`SELECT status, video_url, created_at FROM generation_logs WHERE job_id = ?`).bind(jobId).first()
+    } catch { existing = null }
+    if (existing?.status === 'completed' && existing.video_url) {
+      return c.json({ status: 'completed', progress: 100, videoUrl: existing.video_url })
+    }
+    if (existing?.status === 'failed') {
+      return c.json({ status: 'failed', progress: 100, error: '영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)' })
+    }
+
+    // 15분 이상 처리 중 상태로 방치된 작업은 응답 없는 실패로 간주하고 즉시 환불 처리
+    if (existing?.created_at) {
+      const elapsedMs = Date.now() - new Date(existing.created_at.replace(' ', 'T') + 'Z').getTime()
+      if (elapsedMs > 15 * 60 * 1000) {
+        const refund = await markVideoFailedAndRefund(db, jobId)
+        return c.json({ status: 'failed', progress: 100, error: '영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)', ...refund })
+      }
+    }
+
     const pollRes: any = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
       headers: { 'Authorization': `Bearer ${c.env.ATLAS_API_KEY}` },
     }).then(r => r.json())
@@ -3793,7 +3856,8 @@ app.get('/api/video/:jobId/status', async (c) => {
 
     if (status !== 'completed' && status !== 'succeeded') {
       console.error('video status 실패:', status, pollRes)
-      return c.json({ status: 'failed', progress: 100, error: '영상 생성에 실패했습니다.' })
+      const refund = await markVideoFailedAndRefund(db, jobId)
+      return c.json({ status: 'failed', progress: 100, error: '영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)', ...refund })
     }
 
     const rawOut = pollRes.data?.outputs ?? pollRes.data?.output ?? pollRes.data?.video ?? pollRes.data?.videos ?? pollRes.output ?? null
@@ -3803,17 +3867,22 @@ app.get('/api/video/:jobId/status', async (c) => {
 
     if (!videoUrl) {
       console.error('video 완료했지만 URL 없음:', pollRes)
-      return c.json({ status: 'failed', progress: 100, error: '영상 URL을 찾을 수 없습니다.' })
+      const refund = await markVideoFailedAndRefund(db, jobId)
+      return c.json({ status: 'failed', progress: 100, error: '영상 URL을 찾을 수 없습니다. (크레딧은 차감되지 않았습니다)', ...refund })
     }
 
     // 완료 즉시 생성내역에 URL 저장
-    const db: D1Database = c.env.LOOKBOOK_DB
-    await db.prepare(`UPDATE generation_logs SET video_url = ? WHERE job_id = ?`).bind(videoUrl, jobId).run()
+    await db.prepare(`UPDATE generation_logs SET video_url = ?, status = 'completed' WHERE job_id = ?`).bind(videoUrl, jobId).run()
 
     return c.json({ status: 'completed', progress: 100, videoUrl })
   } catch (err: any) {
     console.error('video status poll error:', err)
-    return c.json({ status: 'failed', progress: 100, error: err.message })
+    try {
+      const refund = await markVideoFailedAndRefund(db, jobId)
+      return c.json({ status: 'failed', progress: 100, error: err.message, ...refund })
+    } catch {
+      return c.json({ status: 'failed', progress: 100, error: err.message })
+    }
   }
 })
 
@@ -5444,6 +5513,13 @@ app.get('/dashboard', (c) => {
       }
       if (data.status === 'failed') {
         closeActionProgress();
+        if (data.creditsRemaining !== undefined) {
+          const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+          if (cachedUser) { cachedUser.credits = data.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+          if (AppState.user) AppState.user.credits = data.creditsRemaining;
+          const dbCredEl = document.getElementById('dbCredits');
+          if (dbCredEl) dbCredEl.textContent = (data.creditsRemaining ?? 0).toLocaleString();
+        }
         showToast(data.error || '영상 생성에 실패했습니다.', 'error');
         if (btn) btn.disabled = false;
         loadHistory();
@@ -5455,6 +5531,26 @@ app.get('/dashboard', (c) => {
       setTimeout(() => _pollHistVideoStatus(jobId, btn), 5000);
     }
   }
+  // "영상을 생성하는 중입니다..." 상태로 방치된 항목을 대시보드 방문 시 자동으로
+  // 재확인 — 서버가 실패를 확인하면 크레딧 환불 + status='failed' 전환까지 처리하므로
+  // 여기서는 상태 엔드포인트를 한 번 호출하고, 결과가 바뀌었으면 목록만 새로고침한다.
+  const _selfHealedJobIds = new Set();
+  async function _selfHealStuckVideo(jobId) {
+    if (!jobId || _selfHealedJobIds.has(jobId)) return;
+    _selfHealedJobIds.add(jobId);
+    try {
+      const res = await fetch(\`/api/video/\${jobId}/status\`);
+      const data = await res.json();
+      if (data.status === 'completed' || data.status === 'failed') {
+        if (data.creditsRemaining !== undefined) {
+          const dbCredEl = document.getElementById('dbCredits');
+          if (dbCredEl) dbCredEl.textContent = (data.creditsRemaining ?? 0).toLocaleString();
+        }
+        loadHistory();
+      }
+    } catch (e) { /* 조용히 무시 — 다음 방문 때 재시도 */ }
+  }
+
   async function loadHistory() {
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
@@ -5492,6 +5588,21 @@ app.get('/dashboard', (c) => {
             return;
           }
           if (!log.video_url) {
+            if (log.status === 'failed') {
+              rows.push(\`<div class="hist-row">
+                <div class="hist-thumb hist-thumb--empty"><i class="fas fa-triangle-exclamation"></i></div>
+                <div class="hist-body">
+                  <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
+                  <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
+                  <div class="hist-actions">
+                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  </div>
+                </div>
+              </div>\`);
+              return;
+            }
+            // 처리 중으로 방치된 작업은 대시보드 방문 시 상태를 재확인해 자동으로 실패/환불 처리되도록 함
+            _selfHealStuckVideo(log.job_id);
             rows.push(\`<div class="hist-row">
               <div class="hist-thumb hist-thumb--empty"><i class="fas fa-film"></i></div>
               <div class="hist-body">
@@ -5538,10 +5649,10 @@ app.get('/dashboard', (c) => {
 
         if (urls.length === 0) {
           rows.push(\`<div class="hist-row">
-            <div class="hist-thumb hist-thumb--empty"><i class="fas fa-image"></i></div>
+            <div class="hist-thumb hist-thumb--empty"><i class="fas fa-triangle-exclamation"></i></div>
             <div class="hist-body">
               <div class="hist-meta">#\${seqLabel} · \${dateStr}</div>
-              <div class="hist-meta-sub">이미지 준비 중이거나 저장 전 세션이 종료되었습니다</div>
+              <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
               <div class="hist-actions">
                 <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
               </div>
@@ -5882,9 +5993,7 @@ app.get('/generator', (c) => {
           </div>
           <div class="gen-video-promo-box">
             <p class="gen-video-promo-text"><i class="fas fa-film"></i> 이미지가 생성되면 클릭한번으로 2K 고화질 영상 생성이 가능합니다.</p>
-            <div class="gen-video-promo-player" id="genLoadingVideoPlayer" style="display:none;">
-              <video id="genLoadingVideoEl" muted playsinline autoplay preload="metadata"></video>
-            </div>
+            <div class="gen-video-promo-player" id="genLoadingVideoPlayer" style="display:none;"></div>
           </div>
         </div>
         <div class="gslide-nav" id="step3Nav">

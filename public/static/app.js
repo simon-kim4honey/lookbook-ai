@@ -717,6 +717,7 @@ function stopNewsRotator() {
 // 이미지 생성 로딩화면 하단 영상 슬롯 — 관리자 등록 영상을 순서대로 반복재생
 // ─────────────────────────────────────────────────────────
 let _genLoadingVideoList = null;
+let _genLoadingVideoEls = [];
 let _genLoadingVideoIdx = 0;
 
 async function _loadGenLoadingVideoList() {
@@ -733,30 +734,55 @@ async function _loadGenLoadingVideoList() {
   return _genLoadingVideoList;
 }
 
+// 영상마다 별도 <video> 엘리먼트를 미리 만들어 동시에 로딩해두고, 전환 시에는
+// src를 바꾸는 대신 opacity 크로스페이드로 겹쳐 보여준다 — src 교체 시 발생하던
+// 블랙 프레임(깜빡임) 없이 전환된다.
 async function startGenLoadingVideoPlaylist() {
   const player = document.getElementById('genLoadingVideoPlayer');
-  const videoEl = document.getElementById('genLoadingVideoEl');
-  if (!player || !videoEl) return;
+  if (!player) return;
   const list = await _loadGenLoadingVideoList();
-  if (!list.length) { player.style.display = 'none'; return; }
+  if (!list.length) { player.style.display = 'none'; player.innerHTML = ''; return; }
+
   player.style.display = '';
+  player.innerHTML = '';
   _genLoadingVideoIdx = 0;
-  videoEl.loop = list.length === 1; // 영상이 1개뿐이면 네이티브 반복재생 사용
-  videoEl.onended = () => {
-    if (list.length <= 1) return;
-    _genLoadingVideoIdx = (_genLoadingVideoIdx + 1) % list.length;
-    videoEl.src = list[_genLoadingVideoIdx];
-    videoEl.play().catch(() => {});
-  };
-  videoEl.src = list[_genLoadingVideoIdx];
-  videoEl.play().catch(() => {});
+  _genLoadingVideoEls = list.map((src, i) => {
+    const v = document.createElement('video');
+    v.src = src;
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    v.loop = list.length === 1; // 영상이 1개뿐이면 네이티브 반복재생 사용
+    if (i === 0) v.classList.add('active');
+    player.appendChild(v);
+    return v;
+  });
+  if (list.length > 1) _genLoadingVideoEls[0].onended = _advanceGenLoadingVideo;
+  _genLoadingVideoEls[0].play().catch(() => {});
+}
+
+function _advanceGenLoadingVideo() {
+  const els = _genLoadingVideoEls;
+  if (!els || els.length <= 1) return;
+  const current = els[_genLoadingVideoIdx];
+  const nextIdx = (_genLoadingVideoIdx + 1) % els.length;
+  const next = els[nextIdx];
+  current.onended = null;
+  current.classList.remove('active');
+  next.currentTime = 0;
+  next.classList.add('active');
+  next.onended = _advanceGenLoadingVideo;
+  next.play().catch(() => {});
+  _genLoadingVideoIdx = nextIdx;
+  setTimeout(() => { current.pause(); }, 450); // 크로스페이드가 끝난 뒤 이전 영상 정지(리소스 절약)
 }
 
 function stopGenLoadingVideoPlaylist() {
   const player = document.getElementById('genLoadingVideoPlayer');
-  const videoEl = document.getElementById('genLoadingVideoEl');
-  if (player) player.style.display = 'none';
-  if (videoEl) { videoEl.onended = null; videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load(); }
+  if (player) { player.style.display = 'none'; player.innerHTML = ''; }
+  _genLoadingVideoEls.forEach(v => { v.onended = null; v.pause(); });
+  _genLoadingVideoEls = [];
+  _genLoadingVideoIdx = 0;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -2319,6 +2345,7 @@ function renderBgGrid(bgs) {
     const card = document.createElement('div');
     card.className = 'grid-card' + (AppState.selectedBg?.id === bg.id ? ' selected' : '');
     card.innerHTML = `
+      ${bg.isDefault ? `<span class="grid-card-default-badge">기본(${bg.category || '스튜디오'})</span>` : ''}
       <img src="${imgSrc}" alt="${bg.name}"
         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
       <div class="grid-card-fallback">🖼️</div>
@@ -3224,6 +3251,12 @@ async function _pollVideoStatus() {
       _videoState.polling = false;
       localStorage.removeItem('lookbook_pending_video');
       _hideVideoGeneratingView();
+      if (data.creditsRemaining !== undefined) {
+        const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+        if (cachedUser) { cachedUser.credits = data.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+        if (AppState.user) AppState.user.credits = data.creditsRemaining;
+        updateUserUI({ credits: data.creditsRemaining });
+      }
       showToast(data.error || '영상 생성에 실패했습니다.', 'error');
       _resetVideoBtn();
       return;
