@@ -160,6 +160,7 @@ interface CustomBg {
   category: string
   createdAt: string
   hasGenImage?: boolean  // 얼굴-마스킹된 "생성용" 이미지가 별도로 등록되어 있는지
+  isDefault?: boolean    // 배경 선택 그리드에서 셔플 제외, 항상 맨 앞에 고정 노출 (관리자 지정, 단일 항목)
 }
 
 // ── KV 헬퍼 (BYOK) ──
@@ -176,6 +177,15 @@ async function kvGetBgs(kv: KVNamespace): Promise<CustomBg[]> {
 }
 async function kvSaveBgs(kv: KVNamespace, list: CustomBg[]) {
   await kv.put('bg_index', JSON.stringify(list))
+}
+async function kvSetDefaultBg(kv: KVNamespace, id: string): Promise<{ ok: boolean; isDefault: boolean }> {
+  const list = await kvGetBgs(kv)
+  const target = list.find(b => b.id === id)
+  if (!target) return { ok: false, isDefault: false }
+  const nowDefault = !target.isDefault
+  list.forEach(b => { b.isDefault = nowDefault && b.id === id })
+  await kvSaveBgs(kv, list)
+  return { ok: true, isDefault: nowDefault }
 }
 async function kvNextId(kv: KVNamespace): Promise<string> {
   const raw = await kv.get('id_counter')
@@ -206,6 +216,7 @@ async function d1EnsureSchema(db: D1Database) {
     bg_desc TEXT NOT NULL DEFAULT '',
     image_b64 TEXT NOT NULL,
     gen_image_b64 TEXT,
+    is_default INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`).run()
   // 어드민 프롬프트 설정 영속화 테이블
@@ -256,8 +267,22 @@ async function d1GetModelImg(db: D1Database, id: string): Promise<string | null>
   return row?.image_b64 ?? null
 }
 async function d1GetBgs(db: D1Database): Promise<CustomBg[]> {
-  const { results } = await db.prepare(`SELECT id, name, category, bg_desc, created_at, CASE WHEN gen_image_b64 IS NOT NULL AND gen_image_b64 != '' THEN 1 ELSE 0 END AS has_gen_image FROM custom_bgs ORDER BY created_at ASC`).all()
-  return (results as any[]).map(r => ({ id: r.id, name: r.name, bgDesc: r.bg_desc, category: r.category, createdAt: r.created_at, hasGenImage: !!r.has_gen_image }))
+  // is_default 컬럼 마이그레이션(0018) 전 구 스키마 환경 대비 try-catch
+  try {
+    const { results } = await db.prepare(`SELECT id, name, category, bg_desc, created_at, is_default, CASE WHEN gen_image_b64 IS NOT NULL AND gen_image_b64 != '' THEN 1 ELSE 0 END AS has_gen_image FROM custom_bgs ORDER BY created_at ASC`).all()
+    return (results as any[]).map(r => ({ id: r.id, name: r.name, bgDesc: r.bg_desc, category: r.category, createdAt: r.created_at, hasGenImage: !!r.has_gen_image, isDefault: !!r.is_default }))
+  } catch {
+    const { results } = await db.prepare(`SELECT id, name, category, bg_desc, created_at, CASE WHEN gen_image_b64 IS NOT NULL AND gen_image_b64 != '' THEN 1 ELSE 0 END AS has_gen_image FROM custom_bgs ORDER BY created_at ASC`).all()
+    return (results as any[]).map(r => ({ id: r.id, name: r.name, bgDesc: r.bg_desc, category: r.category, createdAt: r.created_at, hasGenImage: !!r.has_gen_image, isDefault: false }))
+  }
+}
+async function d1SetDefaultBg(db: D1Database, id: string): Promise<{ ok: boolean; isDefault: boolean }> {
+  const row: any = await db.prepare(`SELECT is_default FROM custom_bgs WHERE id = ?`).bind(id).first()
+  if (!row) return { ok: false, isDefault: false }
+  const nowDefault = !row.is_default
+  await db.prepare(`UPDATE custom_bgs SET is_default = 0`).run()
+  if (nowDefault) await db.prepare(`UPDATE custom_bgs SET is_default = 1 WHERE id = ?`).bind(id).run()
+  return { ok: true, isDefault: nowDefault }
 }
 async function d1AddBgs(db: D1Database, items: Array<{ name: string; bgDesc?: string; category?: string; imageBase64: string }>): Promise<CustomBg[]> {
   const results: CustomBg[] = []
@@ -590,7 +615,7 @@ app.get('/api/admin/backgrounds', adminAuth, async (c) => {
     const list = await d1GetBgs(db)
     return c.json({ success: true, backgrounds: list })
   }
-  const list = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt, hasGenImage: !!(b as any).genImageBase64 }))
+  const list = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt, hasGenImage: !!(b as any).genImageBase64, isDefault: !!(b as any).isDefault }))
   return c.json({ success: true, backgrounds: list })
 })
 
@@ -645,6 +670,36 @@ app.put('/api/admin/backgrounds/:id/gen-image', adminAuth, async (c) => {
     if (!target) return c.json({ success: false, message: '배경을 찾을 수 없습니다.' }, 404)
     target.genImageBase64 = imageBase64
     return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
+// PUT /api/admin/backgrounds/:id/default — 배경 선택 그리드의 "기본 슬롯" 토글
+// 기본 슬롯은 셔플에서 제외되고 항상 그리드 맨 앞에 고정 노출됨(사용자에게는 일반 카드와 동일하게 표시, 별도 표기 없음).
+// 한 번에 하나만 지정 가능 — 새로 지정하면 기존 지정은 자동 해제됨. 이미 기본인 항목을 다시 호출하면 해제(toggle)됨.
+app.put('/api/admin/backgrounds/:id/default', adminAuth, async (c) => {
+  const id = c.req.param('id')
+  try {
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+
+    if (kv) {
+      const result = await kvSetDefaultBg(kv, id)
+      if (!result.ok) return c.json({ success: false, message: '배경을 찾을 수 없습니다.' }, 404)
+      return c.json({ success: true, isDefault: result.isDefault })
+    }
+    if (db) {
+      const result = await d1SetDefaultBg(db, id)
+      if (!result.ok) return c.json({ success: false, message: '배경을 찾을 수 없습니다.' }, 404)
+      return c.json({ success: true, isDefault: result.isDefault })
+    }
+    const target = _memBgs.find(b => b.id === id) as any
+    if (!target) return c.json({ success: false, message: '배경을 찾을 수 없습니다.' }, 404)
+    const nowDefault = !target.isDefault
+    _memBgs.forEach(b => { (b as any).isDefault = false })
+    target.isDefault = nowDefault
+    return c.json({ success: true, isDefault: nowDefault })
   } catch (e: any) {
     return c.json({ success: false, message: e.message }, 500)
   }
@@ -954,11 +1009,12 @@ app.get('/api/presets/backgrounds', async (c) => {
   } else if (db) {
     customBgRaw = await d1GetBgs(db)
   } else {
-    customBgRaw = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt }))
+    customBgRaw = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt, isDefault: !!(b as any).isDefault }))
   }
   const customBgList = customBgRaw.map(b => ({
     id: Number(b.id), name: b.name, category: b.category, mood: '-',
     bgDesc: b.bgDesc, unsplashId: null, isCustom: true, customId: b.id,
+    isDefault: !!b.isDefault,
   }))
   return c.json({ backgrounds: customBgList })
 })
@@ -7205,6 +7261,12 @@ async function deleteBg(id) {
   if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
   await loadCustomBgs()
 }
+async function toggleBgDefault(id) {
+  const res = await fetch('/api/admin/backgrounds/' + id + '/default', {method:'PUT', headers:{'X-Admin-Password':adminPassword}})
+  const data = await res.json()
+  if (!data.success) { alert('설정 실패: ' + (data.message || '알 수 없는 오류') + ' (마이그레이션 0018_bg_default_slot.sql 실행 여부를 확인하세요)'); return }
+  await loadCustomBgs()
+}
 async function loadCustomBgs() {
   const grid = document.getElementById('customBgGrid')
   try {
@@ -7219,6 +7281,7 @@ async function loadCustomBgs() {
         '<div class="media-card bg-card-item">' +
         '<img src="/api/proxy/custom-bg/' + b.id + '" alt="' + b.name + '" loading="lazy"/>' +
         '<span class="custom-badge">커스텀</span>' +
+        (b.isDefault ? '<span class="custom-badge" style="left:auto;right:8px;background:#111;color:#fff;">그리드 고정 1번</span>' : '') +
         '<button class="del-btn" onclick="event.stopPropagation();deleteBg(' + "'" + b.id + "'" + ')"><i class="fas fa-times"></i></button>' +
         '<div class="meta"><div class="name">' + b.name + '</div><div class="desc">' + b.category + ' · ' + (b.bgDesc || '-') + '</div>' +
         '<div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
@@ -7227,6 +7290,8 @@ async function loadCustomBgs() {
           : '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fef3c7;color:#92400e;font-weight:600;">생성용 미등록 (원본 사용)</span>') +
         '<button onclick="event.stopPropagation();pickBgGenImage(' + "'" + b.id + "'" + ')" style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid #ccc;background:#fff;cursor:pointer;">' +
         (b.hasGenImage ? '생성용 이미지 교체' : '생성용 이미지 등록') + '</button>' +
+        '<button onclick="event.stopPropagation();toggleBgDefault(' + "'" + b.id + "'" + ')" style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid ' + (b.isDefault ? '#111;background:#111;color:#fff;' : '#ccc;background:#fff;color:#333;') + 'cursor:pointer;">' +
+        (b.isDefault ? '그리드 1번 고정 해제' : '그리드 1번에 고정') + '</button>' +
         '</div></div>' +
         '</div>'
       ).join('') + '</div>'
