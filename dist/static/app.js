@@ -1736,13 +1736,18 @@ async function loadBackgroundsFromAPI() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
-    AppState.allBackgrounds = data.backgrounds || [];
+    const allBgs = data.backgrounds || [];
+    // 관리자가 지정한 기본 슬롯(관리자페이지 "그리드 1번에 고정")은 셔플 대상에서 제외하고
+    // 항상 맨 앞에 고정 노출한다. 사용자에게는 일반 배경 카드와 동일하게 표시됨(별도 표기 없음).
+    const defaultBg = allBgs.find(b => b.isDefault);
+    const shuffled = allBgs.filter(b => !b.isDefault);
 
-    // 배경 노출 순서 랜덤화
-    for (let i = AppState.allBackgrounds.length - 1; i > 0; i--) {
+    // 나머지 배경 노출 순서 랜덤화
+    for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [AppState.allBackgrounds[i], AppState.allBackgrounds[j]] = [AppState.allBackgrounds[j], AppState.allBackgrounds[i]];
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
+    AppState.allBackgrounds = defaultBg ? [defaultBg, ...shuffled] : shuffled;
     AppState.filteredBackgrounds = [...AppState.allBackgrounds];
 
     const wrap = document.getElementById('bgGridWrap');
@@ -2260,17 +2265,6 @@ function renderBgGrid(bgs) {
   if (!grid) return;
   grid.innerHTML = '';
 
-  // 스킵 카드
-  const skipCard = document.createElement('div');
-  skipCard.className = 'grid-skip-card' + (!AppState.selectedBg ? ' selected' : '');
-  skipCard.innerHTML = `<p>${t('skipCard')}</p>`;
-  skipCard.addEventListener('click', () => {
-    AppState.selectedBg = null;
-    document.querySelectorAll('#bgGrid .grid-card, #bgGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
-    skipCard.classList.add('selected');
-  });
-  grid.appendChild(skipCard);
-
   bgs.forEach((bg) => {
     const imgSrc = bg.isCustom
       ? `/api/proxy/custom-bg/${bg.customId}`
@@ -2286,7 +2280,7 @@ function renderBgGrid(bgs) {
 
     card.addEventListener('click', () => {
       AppState.selectedBg = bg;
-      document.querySelectorAll('#bgGrid .grid-card, #bgGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('#bgGrid .grid-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
     });
     grid.appendChild(card);
