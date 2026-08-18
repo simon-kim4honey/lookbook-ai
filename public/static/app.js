@@ -835,6 +835,7 @@ function shareToKakao() {
     return;
   }
   const shareUrl = _shareUrlFor(_shareCtx.jobId, _shareCtx.idx);
+  try { if (typeof gtag === 'function') gtag('event', 'share', { method: 'kakao', content_type: 'lookbook_image' }); } catch (e) {}
   Kakao.Share.sendDefault({
     objectType: 'feed',
     content: {
