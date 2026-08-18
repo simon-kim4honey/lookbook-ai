@@ -1469,7 +1469,7 @@ function publicUser(u: any) {
 // ────────────────────────────────────────────────────
 // 추천인(제휴사) 목록 — 회원가입 드롭다운/할인·보너스 정책에서 공통 사용
 const REFERRER_OPTIONS = ['BFM회원', '코오롱 FnC', '한섬'] as const
-const REFERRER_SIGNUP_BONUS_CREDITS = 750 // BFM 추천 시 가입 크레딧 (일반 200 대신 750 지급)
+const REFERRER_SIGNUP_BONUS_CREDITS = 500 // BFM 추천 시 가입 크레딧 (일반 200 대신 500 지급)
 const REFERRER_DISCOUNT_RATE: Record<string, number> = { 'BFM회원': 0.2 } // 유료 결제 시 20% 할인
 
 // POST /api/auth/signup — 이메일 회원가입
