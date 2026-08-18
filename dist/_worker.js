@@ -38,7 +38,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
      LEFT JOIN brand_analysis a ON a.id = (SELECT id FROM brand_analysis WHERE brand_id=b.id ORDER BY analyzed_at DESC LIMIT 1)
      LEFT JOIN outreach_drafts d ON d.id = (SELECT id FROM outreach_drafts WHERE brand_id=b.id ORDER BY created_at DESC LIMIT 1)
      ORDER BY a.priority_score DESC`).all(),n=e=>`"${String(e??``).replace(/"/g,`""`)}"`,r=[`id`,`country`,`platform`,`brand`,`category`,`brand_url`,`contact_email`,`status`,`price_tier`,`priority_score`,`language`,`subject`,`draft_body`,`draft_status`],i=[r.join(`,`)];for(let e of t)i.push(r.map(t=>n(e[t])).join(`,`));return e.text(i.join(`
-`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`msyqjbxq`,We=e=>e?`
+`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`msyro7rk`,We=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1585,10 +1585,12 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     } catch (e) { /* 조용히 무시 — 다음 재확인 때 재시도 */ }
   }
 
-  async function loadHistory() {
+  // silent=true: 20초 자동 재확인용 — 로딩 placeholder를 띄우지 않고, 내용이 실제로
+  //바뀌었을 때만 DOM을 교체해 화면이 깜빡이지 않도록 한다.
+  async function loadHistory(silent) {
     if (_historyPollTimer) { clearTimeout(_historyPollTimer); _historyPollTimer = null; }
     const list = document.getElementById('historyList');
-    list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
+    if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
     try {
       const token = localStorage.getItem('lookbook_token') || '';
       const res = await fetch('/api/generation/history', { headers: { 'X-Session-Token': token } });
@@ -1596,7 +1598,8 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       const data = await res.json();
       const logs = data.logs || [];
       if (!logs.length) {
-        list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
+        const emptyHtml = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
+        if (!silent || list.innerHTML !== emptyHtml) list.innerHTML = emptyHtml;
         return;
       }
 
@@ -1736,15 +1739,17 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         });
       });
 
-      list.innerHTML = rows.join('');
+      const newHtml = rows.join('');
+      if (!silent || list.innerHTML !== newHtml) list.innerHTML = newHtml;
 
-      // 처리 중인 영상이 남아있으면 20초 후 자동으로 다시 확인 (모두 해소되면 자동 중단)
+      // 처리 중인 영상이 남아있으면 20초 후 조용히(silent) 다시 확인 — 내용이 바뀌지 않는 한
+      // 화면을 다시 그리지 않으므로 깜빡이지 않는다. 모두 해소되면 자동으로 재확인을 멈춘다.
       const stillPending = logs.some(l => l.kind === 'video' && !l.video_url && l.status !== 'failed');
       if (stillPending) {
-        _historyPollTimer = setTimeout(loadHistory, 20000);
+        _historyPollTimer = setTimeout(() => loadHistory(true), 20000);
       }
     } catch (e) {
-      list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
+      if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
     }
   }
 
