@@ -4,6 +4,46 @@
    =================================================== */
 
 // ─────────────────────────────────────────────────────────
+// GA4 이벤트 헬퍼 — GA4_MEASUREMENT_ID 미설정 시 gtag가 없어 조용히 무시됨
+// ─────────────────────────────────────────────────────────
+function gaEvent(name, params) {
+  try {
+    if (typeof gtag === 'function') gtag('event', name, params || {});
+  } catch (e) {}
+}
+
+// ─────────────────────────────────────────────────────────
+// UTM 파라미터 캡처 — 랜딩 시점에 저장해두었다가 가입 시점에 함께 전송(어트리뷰션)
+// 30일 이내 첫 방문 UTM을 우선 유지(last-touch가 아닌 first-touch 방식)
+// ─────────────────────────────────────────────────────────
+(function captureUtm() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const utm = {};
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((k) => {
+      if (params.get(k)) utm[k] = params.get(k);
+    });
+    if (Object.keys(utm).length === 0) return;
+    const existing = JSON.parse(localStorage.getItem('lookbook_utm') || 'null');
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    if (existing && Date.now() - (existing.ts || 0) < THIRTY_DAYS) return; // 기존 어트리뷰션 유지
+    utm.ts = Date.now();
+    localStorage.setItem('lookbook_utm', JSON.stringify(utm));
+  } catch (e) {}
+})();
+
+function getStoredUtm() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('lookbook_utm') || 'null');
+    if (!raw) return {};
+    const { ts, ...utm } = raw;
+    return utm;
+  } catch (e) {
+    return {};
+  }
+}
+
+// ─────────────────────────────────────────────────────────
 // i18n — 다국어 번역 테이블
 // ─────────────────────────────────────────────────────────
 const I18N = {
@@ -1018,6 +1058,9 @@ function oauthLogin(provider, btn) {
     updateUserUI();
     closeModal('loginModal');
     showToast(t('welcome', user.name), 'success');
+    if (data.isNewUser) {
+      gaEvent('sign_up', Object.assign({ method: data.provider || 'oauth' }, getStoredUtm()));
+    }
     if (AppState.pendingGeneration) {
       AppState.pendingGeneration = false;
       setTimeout(() => startGeneration(), 300);
@@ -1099,6 +1142,9 @@ function checkOAuthRedirectResult() {
       localStorage.setItem('lookbook_user', JSON.stringify(user));
       updateUserUI();
       showToast(t('welcome', user.name), 'success');
+      if (data.isNewUser) {
+        gaEvent('sign_up', Object.assign({ method: data.provider || 'oauth' }, getStoredUtm()));
+      }
       if (pending.pendingGeneration) {
         AppState.pendingGeneration = false;
         // 전체 페이지 리다이렉트로 날아간 의류/모델/배경 선택 상태 복원 후 생성 재개
@@ -1293,6 +1339,7 @@ async function handleSignup(e) {
       updateUserUI();
       closeModal('loginModal');
       showToast(t('signupDone'), 'success');
+      gaEvent('sign_up', Object.assign({ method: 'email' }, getStoredUtm()));
       // 가입 후 생성 재개
       if (AppState.pendingGeneration) {
         AppState.pendingGeneration = false;
@@ -2626,6 +2673,7 @@ function completeGeneration(images, isFallback = false) {
   if (isFallback) {
     showToast(t('genAnalysisErr'), 'error');
   }
+  gaEvent('generate_lookbook', { image_count: images.length, is_fallback: !!isFallback });
 
   // Atlas Cloud 이미지 URL을 서버사이드 프록시로 변환 (CORS 우회)
   const proxiedImages = images.map(img => {

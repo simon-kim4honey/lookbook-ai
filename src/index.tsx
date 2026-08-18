@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
+import leadsApp from './leads'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
 // → 배포할 때마다 값이 바뀌어 브라우저가 새 파일로 인식 (캐시 자동 무효화)
@@ -28,6 +29,23 @@ type Bindings = {
   ATLAS_API_KEY: string
   // OpenAI (이미지 분류/라벨링 전용 — gpt-4o-mini, AtlasCloud엔 없는 모델)
   OPENAI_API_KEY: string
+  // 브랜드 리드 분석/초안 생성 고도화(선택) — 미설정 시 휴리스틱/템플릿으로 자동 폴백
+  ANTHROPIC_API_KEY?: string
+  // GA4 측정 ID (예: G-XXXXXXXXXX) — 미설정 시 GA 스니펫 자체를 삽입하지 않음
+  GA4_MEASUREMENT_ID?: string
+}
+
+// GA4 gtag.js 스니펫 — GA4_MEASUREMENT_ID 미설정 시 빈 문자열(추적 없음)
+const gaSnippet = (gaId?: string) => {
+  if (!gaId) return ''
+  return `
+  <script async src="https://www.googletagmanager.com/gtag/js?id=${gaId}"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '${gaId}');
+  </script>`
 }
 
 const app = new Hono<{ Bindings: Bindings }>()
@@ -46,6 +64,9 @@ app.use('*', async (c, next) => {
   }
   await next()
 })
+
+// 브랜드 리드(영업) 파이프라인 — 수집·분류·분석·아웃리치 초안 (관리자 전용, X-Admin-Password 필요)
+app.route('/api/admin/leads', leadsApp)
 
 // ────────────────────────────────────────────────────
 // Constants
@@ -1635,6 +1656,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
     const kakaoAvatar = profile.kakao_account?.profile?.profile_image_url || null
 
     // 기존 사용자 조회 또는 신규 생성
+    let isNewUser = false
     let user: any = await db.prepare(`SELECT * FROM users WHERE provider = 'kakao' AND provider_id = ?`).bind(providerId).first()
     if (!user) {
       user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(kakaoEmail).first()
@@ -1644,6 +1666,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
         const id = genUserId()
         await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 200, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
+        isNewUser = true
       }
     }
     if (!user || user.status !== 'active') throw new Error('계정이 정지 상태입니다.')
@@ -1663,7 +1686,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
 <p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 이동합니다...</p>
 <script>
 (function(){
-  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson}};
+  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson},isNewUser:${isNewUser}};
   try { localStorage.setItem('oauth_result', JSON.stringify(payload)); } catch(e) {}
   var pending = {};
   try { pending = JSON.parse(localStorage.getItem('oauth_redirect_pending') || '{}'); } catch(e) {}
@@ -1682,7 +1705,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
 <p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 후 창이 닫힙니다...</p>
 <script>
 (function() {
-  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson}};
+  var payload = {type:'oauth_success',provider:'kakao',token:'${token}',user:${userJson},isNewUser:${isNewUser}};
   function tryClose() { try { window.close(); } catch(e) {} }
   function sendMsg() {
     try {
@@ -1777,6 +1800,7 @@ app.get('/api/auth/google/callback', async (c) => {
     const googleName  = profile.name || '구글 사용자'
     const googleAvatar = profile.picture || null
 
+    let isNewUser = false
     let user: any = await db.prepare(`SELECT * FROM users WHERE provider = 'google' AND provider_id = ?`).bind(providerId).first()
     if (!user) {
       user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(googleEmail).first()
@@ -1786,6 +1810,7 @@ app.get('/api/auth/google/callback', async (c) => {
         const id = genUserId()
         await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 200, 'user')`).bind(id, googleEmail, googleName, providerId, googleAvatar).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
+        isNewUser = true
       }
     }
     if (!user || user.status !== 'active') throw new Error('계정이 정지 상태입니다.')
@@ -1805,7 +1830,7 @@ app.get('/api/auth/google/callback', async (c) => {
 <p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 이동합니다...</p>
 <script>
 (function(){
-  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson}};
+  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson},isNewUser:${isNewUser}};
   try { localStorage.setItem('oauth_result', JSON.stringify(payload)); } catch(e) {}
   var pending = {};
   try { pending = JSON.parse(localStorage.getItem('oauth_redirect_pending') || '{}'); } catch(e) {}
@@ -1824,7 +1849,7 @@ app.get('/api/auth/google/callback', async (c) => {
 <p style="font-family:sans-serif;text-align:center;padding:40px;color:#333;">✅ 로그인 성공! 잠시 후 창이 닫힙니다...</p>
 <script>
 (function() {
-  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson}};
+  var payload = {type:'oauth_success',provider:'google',token:'${token}',user:${userJson},isNewUser:${isNewUser}};
   function tryClose() { try { window.close(); } catch(e) {} }
   function sendMsg() {
     try {
@@ -3732,7 +3757,8 @@ app.post('/api/admin/auth', async (c) => {
 // ────────────────────────────────────────────────────
 const DEFAULT_DESCRIPTION = '의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요.'
 
-const htmlShell = (title: string, bodyContent: string, extraHead: string = '', description: string = DEFAULT_DESCRIPTION) => `<!DOCTYPE html>
+const htmlShell = (title: string, bodyContent: string, extraHead: string = '', description: string = DEFAULT_DESCRIPTION, gaId?: string) => `<!DOCTYPE html>
+
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
@@ -3756,6 +3782,7 @@ const htmlShell = (title: string, bodyContent: string, extraHead: string = '', d
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
   <link href="/static/style.css?v=${BUILD_VERSION}" rel="stylesheet" />
+  ${gaSnippet(gaId)}
   <!-- app.js는 head에 defer — body 인라인 script보다 항상 먼저 파싱·실행됨 -->
   <script src="/static/app.js?v=${BUILD_VERSION}" defer></script>
   ${extraHead}
@@ -4777,7 +4804,7 @@ app.get('/', (c) => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
-  `, homeExtraHead, homeDescription))
+  `, homeExtraHead, homeDescription, c.env.GA4_MEASUREMENT_ID))
 })
 
 // ─── Dashboard Page ───
@@ -5400,7 +5427,7 @@ app.get('/dashboard', (c) => {
   }
 
   </script>
-  `))
+  `, c.env.GA4_MEASUREMENT_ID))
 })
 
 
@@ -5785,7 +5812,7 @@ app.get('/generator', (c) => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 이용약관 및 개인정보처리방침에 동의합니다.</p>
     </div>
   </div>
-  `, '', generatorDescription))
+  `, '', generatorDescription, c.env.GA4_MEASUREMENT_ID))
 })
 
 // ────────────────────────────────────────────────────
@@ -7221,6 +7248,354 @@ document.addEventListener('DOMContentLoaded', () => {
 </html>`)
 })
 
+// ── /admin/leads: 브랜드 리드(영업) 파이프라인 대시보드 ──
+app.get('/admin/leads', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Leads | LookbookAI Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:#e0e0f0;min-height:100vh;}
+#loginOverlay{position:fixed;inset:0;background:#0f0f1a;display:flex;align-items:center;justify-content:center;z-index:100;}
+.login-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center;}
+.login-card h2{font-size:20px;font-weight:700;margin-bottom:4px;}
+.login-card p{font-size:13px;color:#8b8ba0;margin-bottom:28px;}
+.login-card input{width:100%;padding:12px 16px;background:#252540;border:1px solid #3a3a60;border-radius:10px;color:#e0e0f0;font-size:15px;outline:none;margin-bottom:12px;}
+.login-card .err{font-size:13px;color:#ef4444;margin-bottom:10px;min-height:18px;}
+button{cursor:pointer;font-family:inherit;}
+#main{display:none;}
+.header{background:#1a1a2e;border-bottom:1px solid #2e2e50;padding:14px 28px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50;}
+.header .logo{font-size:18px;font-weight:700;color:#6c47ff;}
+.header .badge{font-size:11px;background:#6c47ff22;color:#9b7cff;padding:3px 10px;border-radius:20px;border:1px solid #6c47ff44;}
+.header .logout{margin-left:auto;font-size:13px;padding:6px 14px;border:1px solid #3a3a60;border-radius:8px;background:none;color:#e0e0f0;}
+.tab-bar{display:flex;gap:4px;background:#1a1a2e;border-bottom:1px solid #2e2e50;padding:0 28px;overflow-x:auto;}
+.tab-btn{padding:14px 18px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;color:#8b8ba0;border-bottom:2px solid transparent;white-space:nowrap;}
+.tab-btn.active{color:#9b7cff;border-bottom-color:#6c47ff;}
+.tab-panel{display:none;padding:24px 28px;max-width:1200px;margin:0 auto;}
+.tab-panel.active{display:block;}
+.notice{background:#2a2410;border:1px solid #6c5a1a;color:#e8d78a;border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;margin-bottom:20px;}
+.card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;padding:18px 20px;margin-bottom:16px;}
+.card h3{font-size:14px;font-weight:600;margin-bottom:10px;}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+input,select,textarea{background:#0f0f1a;border:1px solid #3a3a60;border-radius:8px;color:#e0e0f0;font-size:13px;padding:9px 12px;outline:none;font-family:inherit;}
+textarea{width:100%;min-height:90px;resize:vertical;line-height:1.6;}
+.btn{background:#6c47ff;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;}
+.btn:hover{background:#5a38e0;}
+.btn.secondary{background:#252540;border:1px solid #3a3a60;color:#e0e0f0;}
+.btn.small{padding:5px 10px;font-size:12px;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th{text-align:left;color:#8b8ba0;font-weight:600;padding:8px;border-bottom:1px solid #2e2e50;}
+td{padding:8px;border-bottom:1px solid #22223a;vertical-align:top;}
+tr:hover td{background:#1f1f38;}
+.tag{display:inline-block;background:#6c47ff22;color:#9b7cff;border-radius:10px;padding:1px 8px;font-size:11px;margin:1px;}
+.pill{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600;}
+.pill.new{background:#3a3a60;color:#c0c0e0;}
+.pill.analyzed{background:#1a4a3a;color:#4ade80;}
+.pill.drafted{background:#4a3a1a;color:#facc15;}
+.pill.reviewed,.pill.sent{background:#1a3a4a;color:#38bdf8;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
+.stat-box{background:#0f0f1a;border:1px solid #2e2e50;border-radius:10px;padding:14px;}
+.stat-box .num{font-size:22px;font-weight:700;color:#9b7cff;}
+.stat-box .label{font-size:11px;color:#8b8ba0;margin-top:2px;}
+.hint{font-size:11.5px;color:#8b8ba0;margin-top:4px;}
+</style>
+</head>
+<body>
+<div id="loginOverlay">
+  <div class="login-card">
+    <div style="font-size:32px;margin-bottom:8px;">🎯</div>
+    <h2>Leads Admin</h2>
+    <p>브랜드 리드 파이프라인 관리자 로그인</p>
+    <input type="password" id="pwInput" placeholder="관리자 비밀번호" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <div class="err" id="loginErr"></div>
+    <button class="btn" style="width:100%" onclick="doLogin()">로그인</button>
+  </div>
+</div>
+
+<div id="main">
+  <div class="header">
+    <span class="logo">🎯 Leads</span>
+    <span class="badge">Brand Outreach Pipeline</span>
+    <button class="logout" onclick="location.reload()">로그아웃</button>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="dashboard">대시보드</button>
+    <button class="tab-btn" data-tab="platforms">플랫폼 설정</button>
+    <button class="tab-btn" data-tab="collect">브랜드 수집</button>
+    <button class="tab-btn" data-tab="brands">브랜드 목록/분석</button>
+    <button class="tab-btn" data-tab="drafts">아웃리치 초안</button>
+  </div>
+
+  <div class="tab-panel active" id="panel-dashboard">
+    <div class="notice"><i class="fas fa-shield-halved"></i> 이 도구는 <b>공개된 브랜드 디렉토리 정보</b>(브랜드명·카테고리·URL)만 수집하도록 설계되어 있습니다. 담당자 개인 연락처 등은 자동 수집하지 않으며, 아웃리치 메일은 모두 <b>초안(draft)</b> 상태로만 생성되어 실제 발송은 사람이 검토 후 직접 진행해야 합니다. 각 플랫폼의 이용약관 및 국가별 전자상거래/스팸 관련 법령(정보통신망법·CAN-SPAM·特定電子メール法 등)을 준수해 주세요.</div>
+    <div class="card"><h3>국가별 현황</h3><div id="statsCountry" class="stat-grid"></div></div>
+    <div class="card"><h3>초안 상태별 현황</h3><div id="statsDrafts" class="stat-grid"></div></div>
+    <div class="card"><h3>최근 수집 작업</h3><div style="overflow-x:auto"><table id="jobsTable"><thead><tr><th>시각</th><th>플랫폼</th><th>방식</th><th>상태</th><th>수집 건수</th></tr></thead><tbody></tbody></table></div></div>
+  </div>
+
+  <div class="tab-panel" id="panel-platforms">
+    <div class="card">
+      <h3>플랫폼 등록/수정</h3>
+      <div class="row">
+        <select id="pCountry"><option value="KR">한국</option><option value="US">미국</option><option value="JP">일본</option></select>
+        <input id="pCode" placeholder="코드 (예: musinsa)"/>
+        <input id="pName" placeholder="이름 (예: 무신사)"/>
+      </div>
+      <div class="row"><input id="pUrl" placeholder="공개 브랜드 디렉토리 URL" style="flex:1;min-width:260px"/></div>
+      <div class="row">
+        <input id="pListSel" placeholder="list_selector (예: a.brand-link)" style="flex:1"/>
+        <input id="pCatSel" placeholder="category_selector (선택)" style="flex:1"/>
+      </div>
+      <div class="row">
+        <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;"><input type="checkbox" id="pScrapable" style="width:auto"/> 셀렉터/약관 검증 완료 — 스크래핑 허용</label>
+      </div>
+      <div class="row"><input id="pNotes" placeholder="메모" style="flex:1"/></div>
+      <button class="btn" onclick="savePlatform()">저장</button>
+      <div class="hint">list_selector는 브랜드 링크(&lt;a&gt;) 요소 자체를 가리켜야 합니다. 텍스트=브랜드명, href=브랜드 URL로 사용됩니다.</div>
+    </div>
+    <div class="card"><h3>등록된 플랫폼</h3><div style="overflow-x:auto"><table id="platformsTable"><thead><tr><th>국가</th><th>코드</th><th>이름</th><th>디렉토리 URL</th><th>스크래핑 허용</th></tr></thead><tbody></tbody></table></div></div>
+  </div>
+
+  <div class="tab-panel" id="panel-collect">
+    <div class="card">
+      <h3>CSV로 브랜드 가져오기 (권장)</h3>
+      <div class="row">
+        <select id="csvPlatform"></select>
+      </div>
+      <div class="hint">형식: 헤더 포함 CSV — name,category,brand_url,contact_email (name만 필수)</div>
+      <div class="row"><input type="file" id="csvFile" accept=".csv"/></div>
+      <textarea id="csvPaste" placeholder="또는 여기에 CSV 내용을 붙여넣기"></textarea>
+      <button class="btn" style="margin-top:8px" onclick="importCsv()">가져오기</button>
+      <div class="hint" id="csvResult"></div>
+    </div>
+    <div class="card">
+      <h3>공개 디렉토리 스크래핑 실행</h3>
+      <div class="row"><select id="scrapePlatform"></select><button class="btn secondary" onclick="runScrape()">수집 실행</button></div>
+      <div class="hint">플랫폼 설정에서 "스크래핑 허용"이 체크된 경우에만 동작하며, robots.txt를 자동 확인합니다.</div>
+      <div class="hint" id="scrapeResult"></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="panel-brands">
+    <div class="card">
+      <div class="row">
+        <select id="fCountry"><option value="">전체 국가</option><option value="KR">한국</option><option value="US">미국</option><option value="JP">일본</option></select>
+        <select id="fStatus"><option value="">전체 상태</option><option value="new">new</option><option value="analyzed">analyzed</option><option value="drafted">drafted</option><option value="reviewed">reviewed</option><option value="contacted">contacted</option></select>
+        <input id="fSearch" placeholder="브랜드명 검색"/>
+        <button class="btn secondary small" onclick="loadBrands()">조회</button>
+        <button class="btn small" onclick="analyzeSelected()">선택 분석 실행</button>
+        <button class="btn small" onclick="draftSelected()">선택 초안 생성</button>
+        <a class="btn secondary small" href="/api/admin/leads/export.csv" id="exportLink" style="text-decoration:none;display:inline-block;">CSV 내보내기</a>
+      </div>
+      <div style="overflow-x:auto"><table id="brandsTable"><thead><tr><th><input type="checkbox" id="selAll"/></th><th>브랜드</th><th>국가/플랫폼</th><th>카테고리</th><th>스타일</th><th>가격대</th><th>우선순위</th><th>상태</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="panel-drafts">
+    <div class="card">
+      <div class="row">
+        <select id="dStatus"><option value="">전체 상태</option><option value="draft">draft</option><option value="reviewed">reviewed</option><option value="sent">sent</option><option value="skipped">skipped</option></select>
+        <button class="btn secondary small" onclick="loadDrafts()">조회</button>
+      </div>
+      <div id="draftsList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let pw = ''
+async function doLogin() {
+  const p = document.getElementById('pwInput').value
+  const res = await fetch('/api/admin/auth', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({password:p}) })
+  const data = await res.json()
+  if (data.success) {
+    pw = p
+    document.getElementById('loginOverlay').style.display = 'none'
+    document.getElementById('main').style.display = 'block'
+    initAll()
+  } else {
+    document.getElementById('loginErr').textContent = '비밀번호가 올바르지 않습니다.'
+  }
+}
+function api(path, opts) {
+  opts = opts || {}
+  opts.headers = Object.assign({'X-Admin-Password': pw, 'Content-Type':'application/json'}, opts.headers||{})
+  return fetch('/api/admin/leads' + path, opts).then(r => r.json())
+}
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'))
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'))
+    btn.classList.add('active')
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active')
+    if (btn.dataset.tab === 'dashboard') loadStats()
+    if (btn.dataset.tab === 'brands') loadBrands()
+    if (btn.dataset.tab === 'drafts') loadDrafts()
+  })
+})
+
+async function initAll() {
+  await loadPlatforms()
+  await loadStats()
+}
+
+async function loadStats() {
+  const data = await api('/stats')
+  if (!data.success) return
+  document.getElementById('statsCountry').innerHTML = data.byCountry.map(r => \`
+    <div class="stat-box"><div class="num">\${r.total}</div><div class="label">\${r.country} · new \${r.new_count} / analyzed \${r.analyzed_count} / drafted \${r.drafted_count}</div></div>
+  \`).join('') || '<div class="hint">수집된 브랜드가 없습니다.</div>'
+  document.getElementById('statsDrafts').innerHTML = data.draftsByStatus.map(r => \`
+    <div class="stat-box"><div class="num">\${r.total}</div><div class="label">\${r.status}</div></div>
+  \`).join('') || '<div class="hint">생성된 초안이 없습니다.</div>'
+  const jobs = await api('/jobs')
+  const tbody = document.querySelector('#jobsTable tbody')
+  tbody.innerHTML = (jobs.jobs||[]).map(j => \`<tr><td>\${j.started_at}</td><td>\${j.platform_name||'-'}</td><td>\${j.method}</td><td>\${j.status}\${j.error?(' — '+j.error):''}</td><td>\${j.collected_count}</td></tr>\`).join('')
+}
+
+let platformsCache = []
+async function loadPlatforms() {
+  const data = await api('/platforms')
+  platformsCache = data.platforms || []
+  const tbody = document.querySelector('#platformsTable tbody')
+  tbody.innerHTML = platformsCache.map(p => \`<tr><td>\${p.country}</td><td>\${p.code}</td><td>\${p.name}</td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\${p.directory_url||''}</td><td>\${p.is_scrapable ? '✅' : '❌'}</td></tr>\`).join('')
+  const opts = platformsCache.map(p => \`<option value="\${p.code}" data-id="\${p.id}">[\${p.country}] \${p.name}</option>\`).join('')
+  document.getElementById('csvPlatform').innerHTML = opts
+  document.getElementById('scrapePlatform').innerHTML = platformsCache.map(p => \`<option value="\${p.id}">[\${p.country}] \${p.name} \${p.is_scrapable?'':'(비허용)'}</option>\`).join('')
+}
+
+async function savePlatform() {
+  const body = {
+    country: document.getElementById('pCountry').value,
+    code: document.getElementById('pCode').value.trim(),
+    name: document.getElementById('pName').value.trim(),
+    directory_url: document.getElementById('pUrl').value.trim(),
+    list_selector: document.getElementById('pListSel').value.trim(),
+    category_selector: document.getElementById('pCatSel').value.trim(),
+    is_scrapable: document.getElementById('pScrapable').checked,
+    notes: document.getElementById('pNotes').value.trim(),
+  }
+  if (!body.code || !body.name) { alert('코드와 이름은 필수입니다.'); return }
+  const data = await api('/platforms', { method:'POST', body: JSON.stringify(body) })
+  if (data.success) { loadPlatforms(); alert('저장되었습니다.') } else { alert(data.message||'오류') }
+}
+
+function parseCsv(text) {
+  const lines = text.trim().split(/\\r?\\n/)
+  if (lines.length < 2) return []
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''))
+  return lines.slice(1).filter(l=>l.trim()).map(line => {
+    const cells = line.split(',').map(c => c.trim().replace(/^"|"$/g,''))
+    const row = {}
+    headers.forEach((h,i) => row[h] = cells[i] || '')
+    return row
+  })
+}
+
+async function importCsv() {
+  const select = document.getElementById('csvPlatform')
+  const platformCode = select.value
+  const file = document.getElementById('csvFile').files[0]
+  let text = document.getElementById('csvPaste').value
+  if (file) text = await file.text()
+  if (!text.trim()) { alert('CSV 파일 또는 붙여넣기 내용이 필요합니다.'); return }
+  const rows = parseCsv(text)
+  const data = await api('/collect/csv', { method:'POST', body: JSON.stringify({ platformCode, rows }) })
+  document.getElementById('csvResult').textContent = data.success ? \`\${data.inserted}건 추가됨 (총 \${rows.length}행 처리)\` : ('오류: ' + data.message)
+  if (data.success) loadStats()
+}
+
+async function runScrape() {
+  const platformId = document.getElementById('scrapePlatform').value
+  document.getElementById('scrapeResult').textContent = '수집 중...'
+  const data = await api('/collect/scrape', { method:'POST', body: JSON.stringify({ platformId: Number(platformId) }) })
+  document.getElementById('scrapeResult').textContent = data.success ? \`\${data.inserted}건 추가됨 (파싱 \${data.totalParsed}건)\` : ('오류: ' + data.message)
+  if (data.success) loadStats()
+}
+
+let brandsCache = []
+async function loadBrands() {
+  const params = new URLSearchParams()
+  const country = document.getElementById('fCountry').value
+  const status = document.getElementById('fStatus').value
+  const search = document.getElementById('fSearch').value
+  if (country) params.set('country', country)
+  if (status) params.set('status', status)
+  if (search) params.set('search', search)
+  const data = await api('/brands?' + params.toString())
+  brandsCache = data.brands || []
+  const tbody = document.querySelector('#brandsTable tbody')
+  tbody.innerHTML = brandsCache.map(b => \`<tr>
+    <td><input type="checkbox" class="bsel" value="\${b.id}"/></td>
+    <td>\${b.name}\${b.brand_url?(' <a href="'+b.brand_url+'" target="_blank" style="color:#6c47ff"><i class="fas fa-arrow-up-right-from-square" style="font-size:10px"></i></a>'):''}</td>
+    <td>\${b.country} / \${b.platform_name||'-'}</td>
+    <td>\${b.category||'-'}</td>
+    <td>\${(b.style_tags? JSON.parse(b.style_tags):[]).map(t=>'<span class="tag">'+t+'</span>').join('')}</td>
+    <td>\${b.price_tier||'-'}</td>
+    <td>\${b.priority_score ?? '-'}</td>
+    <td><span class="pill \${b.status}">\${b.status}</span></td>
+  </tr>\`).join('') || '<tr><td colspan="8" class="hint">브랜드가 없습니다. 먼저 CSV 가져오기 또는 스크래핑을 실행하세요.</td></tr>'
+  document.getElementById('selAll').onclick = (e) => document.querySelectorAll('.bsel').forEach(cb=>cb.checked=e.target.checked)
+}
+function selectedBrandIds() { return Array.from(document.querySelectorAll('.bsel:checked')).map(cb=>Number(cb.value)) }
+async function analyzeSelected() {
+  const ids = selectedBrandIds()
+  if (!ids.length) { alert('브랜드를 선택하세요.'); return }
+  const data = await api('/analyze', { method:'POST', body: JSON.stringify({ brandIds: ids }) })
+  alert(data.success ? (data.analyzed + '건 분석 완료 (' + data.method + ')') : ('오류: ' + data.message))
+  loadBrands()
+}
+async function draftSelected() {
+  const ids = selectedBrandIds()
+  if (!ids.length) { alert('브랜드를 선택하세요.'); return }
+  const data = await api('/drafts/generate', { method:'POST', body: JSON.stringify({ brandIds: ids }) })
+  alert(data.success ? (data.created + '건 초안 생성 완료 (' + data.method + ')') : ('오류: ' + data.message))
+  loadBrands()
+}
+
+async function loadDrafts() {
+  const status = document.getElementById('dStatus').value
+  const params = new URLSearchParams()
+  if (status) params.set('status', status)
+  const data = await api('/drafts?' + params.toString())
+  const list = document.getElementById('draftsList')
+  list.innerHTML = (data.drafts||[]).map(d => \`
+    <div class="card" style="background:#151528">
+      <div class="row" style="justify-content:space-between">
+        <div><b>\${d.brand_name}</b> <span class="tag">\${d.country}</span> <span class="tag">\${d.language}</span> <span class="pill \${d.status}">\${d.status}</span></div>
+        <div>
+          <button class="btn small secondary" onclick="updateDraft(\${d.id}, this)">저장</button>
+          <button class="btn small" onclick="setDraftStatus(\${d.id}, 'reviewed')">검토완료</button>
+          <button class="btn small secondary" onclick="setDraftStatus(\${d.id}, 'sent')">발송완료 표시</button>
+          <button class="btn small secondary" onclick="setDraftStatus(\${d.id}, 'skipped')">건너뛰기</button>
+        </div>
+      </div>
+      <input data-field="subject" value="\${(d.subject||'').replace(/"/g,'&quot;')}" style="width:100%;margin:8px 0"/>
+      <textarea data-field="body" style="min-height:140px">\${d.body||''}</textarea>
+    </div>
+  \`).join('') || '<div class="hint">초안이 없습니다.</div>'
+}
+async function updateDraft(id, btn) {
+  const card = btn.closest('.card')
+  const subject = card.querySelector('[data-field=subject]').value
+  const body = card.querySelector('[data-field=body]').value
+  await api('/drafts/' + id, { method:'PATCH', body: JSON.stringify({ subject, body }) })
+  alert('저장되었습니다.')
+}
+async function setDraftStatus(id, status) {
+  await api('/drafts/' + id, { method:'PATCH', body: JSON.stringify({ status }) })
+  loadDrafts()
+}
+</script>
+</body>
+</html>`)
+})
+
 // ── /admin → /admin02 포워드 (도메인이 www 하나로 통합됨) ──
 app.get('/admin', (c) => {
   return c.redirect('/admin02', 302)
@@ -7251,6 +7626,7 @@ app.get('/payment/success', (c) => {
     body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }
     .card { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid rgba(255,255,255,0.08); }
   </style>
+  ${gaSnippet(c.env.GA4_MEASUREMENT_ID)}
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
   <div class="card rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
@@ -7310,6 +7686,14 @@ app.get('/payment/success', (c) => {
           document.getElementById('successState').classList.remove('hidden')
           // 세션스토리지에 갱신 신호
           sessionStorage.setItem('creditsRefresh', '1')
+          try {
+            if (typeof gtag === 'function') {
+              gtag('event', 'purchase', {
+                transaction_id: orderId,
+                items: [{ item_name: 'credits', quantity: data.credits }],
+              })
+            }
+          } catch (e) {}
           return
         }
         // Stripe는 웹훅이 비동기로 도착하므로, 아직 pending이면 잠깐 재시도 (최대 5회, 1.5초 간격)
@@ -7351,6 +7735,7 @@ app.get('/payment/fail', (c) => {
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }</style>
+  ${gaSnippet(c.env.GA4_MEASUREMENT_ID)}
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
   <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,255,255,0.08)" class="rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
