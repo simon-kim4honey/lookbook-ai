@@ -20,5 +20,8 @@
       "id": "2aab8e4e250840e0b3327d4a8e776ed9",
       "preview_id": "6a5dcf373bfb43aea55c958a2b7e7886"
     }
-  ]
+  ],
+  "vars": {
+    "GA4_MEASUREMENT_ID": "G-R2WKD5NZBX"
+  }
 }
