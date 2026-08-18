@@ -2716,8 +2716,8 @@ button, a { touch-action: manipulation; }
   .navbar-inner { padding: 0 12px; }
   .navbar-logo span { font-size: 15px; }
   .logo-icon { width: 28px; height: 28px; font-size: 14px; }
-  #navLoginBtn { display: none; }
-  .navbar-actions .btn { padding: 8px 14px; font-size: 12px; }
+  .navbar-actions { gap: 6px; }
+  .navbar-actions .btn { padding: 7px 12px; font-size: 12px; }
 }
 
 /* Step 헤더 모바일 */
