@@ -5562,10 +5562,12 @@ app.get('/dashboard', (c) => {
     } catch (e) { /* 조용히 무시 — 다음 재확인 때 재시도 */ }
   }
 
-  async function loadHistory() {
+  // silent=true: 20초 자동 재확인용 — 로딩 placeholder를 띄우지 않고, 내용이 실제로
+  //바뀌었을 때만 DOM을 교체해 화면이 깜빡이지 않도록 한다.
+  async function loadHistory(silent) {
     if (_historyPollTimer) { clearTimeout(_historyPollTimer); _historyPollTimer = null; }
     const list = document.getElementById('historyList');
-    list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
+    if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
     try {
       const token = localStorage.getItem('lookbook_token') || '';
       const res = await fetch('/api/generation/history', { headers: { 'X-Session-Token': token } });
@@ -5573,7 +5575,8 @@ app.get('/dashboard', (c) => {
       const data = await res.json();
       const logs = data.logs || [];
       if (!logs.length) {
-        list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
+        const emptyHtml = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
+        if (!silent || list.innerHTML !== emptyHtml) list.innerHTML = emptyHtml;
         return;
       }
 
@@ -5713,15 +5716,17 @@ app.get('/dashboard', (c) => {
         });
       });
 
-      list.innerHTML = rows.join('');
+      const newHtml = rows.join('');
+      if (!silent || list.innerHTML !== newHtml) list.innerHTML = newHtml;
 
-      // 처리 중인 영상이 남아있으면 20초 후 자동으로 다시 확인 (모두 해소되면 자동 중단)
+      // 처리 중인 영상이 남아있으면 20초 후 조용히(silent) 다시 확인 — 내용이 바뀌지 않는 한
+      // 화면을 다시 그리지 않으므로 깜빡이지 않는다. 모두 해소되면 자동으로 재확인을 멈춘다.
       const stillPending = logs.some(l => l.kind === 'video' && !l.video_url && l.status !== 'failed');
       if (stillPending) {
-        _historyPollTimer = setTimeout(loadHistory, 20000);
+        _historyPollTimer = setTimeout(() => loadHistory(true), 20000);
       }
     } catch (e) {
-      list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
+      if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
     }
   }
 
