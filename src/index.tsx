@@ -1227,6 +1227,99 @@ app.delete('/api/admin/home-howto-video/:slot', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// ── 이미지 생성 로딩화면 하단 영상 슬롯 (최대 5개, 순서대로 반복 재생) ──
+const GEN_LOADING_VIDEO_SLOTS = [1, 2, 3, 4, 5]
+const GEN_LOADING_VIDEO_MAX_BYTES = 22 * 1024 * 1024 // KV 25MB 한도 대비 여유
+
+// GET /api/gen-loading-videos — 공개 엔드포인트(생성 로딩화면 + 관리자 목록 조회 공용). 슬롯별 재생 URL(미등록 시 null) 맵 반환
+app.get('/api/gen-loading-videos', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const result: Record<string, string | null> = {}
+  if (kv) {
+    for (const slot of GEN_LOADING_VIDEO_SLOTS) {
+      const meta = await kv.getWithMetadata(`gen_loading_video_${slot}`)
+      result[slot] = meta.value != null ? `/api/gen-loading-video/${slot}` : null
+    }
+  } else {
+    GEN_LOADING_VIDEO_SLOTS.forEach(slot => { result[slot] = null })
+  }
+  return c.json({ videos: result })
+})
+
+// GET /api/gen-loading-video/:slot — 영상 바이너리 스트리밍 (Range 요청 지원)
+app.get('/api/gen-loading-video/:slot', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.notFound()
+  const slot = Number(c.req.param('slot'))
+  if (!GEN_LOADING_VIDEO_SLOTS.includes(slot)) return c.notFound()
+  const { value, metadata } = await kv.getWithMetadata(`gen_loading_video_${slot}`, 'arrayBuffer')
+  if (!value) return c.notFound()
+  const buf = value as ArrayBuffer
+  const contentType = (metadata as any)?.contentType || 'video/mp4'
+  const total = buf.byteLength
+
+  const range = c.req.header('range')
+  if (range) {
+    const m = range.match(/bytes=(\d*)-(\d*)/)
+    if (m) {
+      const start = m[1] ? parseInt(m[1], 10) : 0
+      const end = m[2] ? parseInt(m[2], 10) : total - 1
+      const safeStart = Math.max(0, Math.min(start, total - 1))
+      const safeEnd = Math.max(safeStart, Math.min(end, total - 1))
+      const chunk = buf.slice(safeStart, safeEnd + 1)
+      return new Response(chunk, {
+        status: 206,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Range': `bytes ${safeStart}-${safeEnd}/${total}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': String(chunk.byteLength),
+          'Cache-Control': 'public, max-age=3600',
+        },
+      })
+    }
+  }
+
+  return new Response(buf, {
+    headers: {
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'public, max-age=3600',
+      'Content-Length': String(total),
+    },
+  })
+})
+
+// PUT /api/admin/gen-loading-video/:slot — 슬롯별 영상 등록/교체 (바이너리 바디)
+app.put('/api/admin/gen-loading-video/:slot', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const slot = Number(c.req.param('slot'))
+  if (!GEN_LOADING_VIDEO_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  try {
+    const body = await c.req.arrayBuffer()
+    if (!body || body.byteLength === 0) return c.json({ success: false, message: '영상 파일이 필요합니다.' }, 400)
+    if (body.byteLength > GEN_LOADING_VIDEO_MAX_BYTES) {
+      return c.json({ success: false, message: `영상 용량은 ${Math.floor(GEN_LOADING_VIDEO_MAX_BYTES / 1024 / 1024)}MB 이하만 가능합니다.` }, 400)
+    }
+    const contentType = c.req.header('content-type') || 'video/mp4'
+    await kv.put(`gen_loading_video_${slot}`, body, { metadata: { contentType } })
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
+// DELETE /api/admin/gen-loading-video/:slot — 슬롯 영상 제거
+app.delete('/api/admin/gen-loading-video/:slot', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const slot = Number(c.req.param('slot'))
+  if (!GEN_LOADING_VIDEO_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  await kv.delete(`gen_loading_video_${slot}`)
+  return c.json({ success: true })
+})
+
 // ────────────────────────────────────────────────────
 // 패션 뉴스 (생성 대기 화면 로테이터용) — 구글 뉴스 RSS 파싱 + KV 캐시
 // ────────────────────────────────────────────────────
@@ -2144,14 +2237,27 @@ app.get('/api/generation/history', async (c) => {
     ).bind(sessionToken).first() as any
     if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
 
-    const logs = await db.prepare(
-      `SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
-              image_urls, expires_at, created_at, downloaded_indices, kind, video_url
-       FROM generation_logs
-       WHERE user_id = ?
-       ORDER BY created_at DESC
-       LIMIT 100`
-    ).bind(sess.user_id).all()
+    // status 컬럼 마이그레이션(0019) 전 구 스키마 환경 대비 try-catch
+    let logs: any
+    try {
+      logs = await db.prepare(
+        `SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
+                image_urls, expires_at, created_at, downloaded_indices, kind, video_url, status
+         FROM generation_logs
+         WHERE user_id = ?
+         ORDER BY created_at DESC
+         LIMIT 100`
+      ).bind(sess.user_id).all()
+    } catch {
+      logs = await db.prepare(
+        `SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
+                image_urls, expires_at, created_at, downloaded_indices, kind, video_url
+         FROM generation_logs
+         WHERE user_id = ?
+         ORDER BY created_at DESC
+         LIMIT 100`
+      ).bind(sess.user_id).all()
+    }
 
     return c.json({ success: true, logs: logs.results || [] })
   } catch (err: any) {
@@ -3099,6 +3205,31 @@ function buildClothingReplaceInstructions(
 const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
 const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
 
+// 영상 생성 실패(또는 15분 이상 응답 없음) 확인 시 크레딧을 환불하고 생성내역을
+// 'failed'로 전환한다. status='processing' → 'failed' 전환은 원자적 UPDATE로 수행해
+// 동시에 여러 번 폴링이 들어와도 환불이 중복되지 않도록 한다.
+async function markVideoFailedAndRefund(db: D1Database, jobId: string): Promise<{ creditsRemaining?: number }> {
+  let row: any
+  try {
+    row = await db.prepare(`SELECT user_id, status FROM generation_logs WHERE job_id = ?`).bind(jobId).first()
+  } catch {
+    return {} // status 컬럼 마이그레이션(0019) 전 구 스키마 환경 — 환불 로직 건너뜀
+  }
+  if (!row || row.status !== 'processing') return {}
+
+  const upd = await db.prepare(`UPDATE generation_logs SET status = 'failed' WHERE job_id = ? AND status = 'processing'`).bind(jobId).run()
+  if ((upd.meta?.changes ?? 0) === 0) return {} // 다른 요청이 먼저 처리함 — 중복 환불 방지
+
+  await db.prepare(`UPDATE users SET credits = credits + ?, updated_at = datetime('now') WHERE id = ?`).bind(CREDITS_PER_VIDEO, row.user_id).run()
+  const userRow: any = await db.prepare(`SELECT credits FROM users WHERE id = ?`).bind(row.user_id).first()
+  const newBalance = userRow?.credits ?? null
+  await db.prepare(
+    `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id) VALUES (?, 'refund', ?, ?, 'video_generation_failed', ?)`
+  ).bind(row.user_id, CREDITS_PER_VIDEO, newBalance, jobId).run()
+
+  return { creditsRemaining: newBalance ?? undefined }
+}
+
 app.post('/api/generation/start', async (c) => {
   try {
     const body: any = await c.req.json()
@@ -3684,9 +3815,34 @@ app.post('/api/video/start', async (c) => {
 })
 
 // GET /api/video/:jobId/status — 영상 생성 상태 폴링
+// 실패(또는 15분 이상 무응답 = 타임아웃)가 확인되면 크레딧을 자동 환불하고
+// 생성내역을 'failed'로 전환한다(markVideoFailedAndRefund, 중복 환불 방지 내장).
 app.get('/api/video/:jobId/status', async (c) => {
   const jobId = c.req.param('jobId')
+  const db: D1Database = c.env.LOOKBOOK_DB
   try {
+    // 이미 종결된 작업(완료/실패)이면 Atlas Cloud를 다시 조회하지 않고 DB 상태를 그대로 반환
+    // (status 컬럼 마이그레이션(0019) 전 구 스키마 환경에서는 조회 실패 시 기존 방식대로 진행)
+    let existing: any = null
+    try {
+      existing = await db.prepare(`SELECT status, video_url, created_at FROM generation_logs WHERE job_id = ?`).bind(jobId).first()
+    } catch { existing = null }
+    if (existing?.status === 'completed' && existing.video_url) {
+      return c.json({ status: 'completed', progress: 100, videoUrl: existing.video_url })
+    }
+    if (existing?.status === 'failed') {
+      return c.json({ status: 'failed', progress: 100, error: '영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)' })
+    }
+
+    // 15분 이상 처리 중 상태로 방치된 작업은 응답 없는 실패로 간주하고 즉시 환불 처리
+    if (existing?.created_at) {
+      const elapsedMs = Date.now() - new Date(existing.created_at.replace(' ', 'T') + 'Z').getTime()
+      if (elapsedMs > 15 * 60 * 1000) {
+        const refund = await markVideoFailedAndRefund(db, jobId)
+        return c.json({ status: 'failed', progress: 100, error: '영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)', ...refund })
+      }
+    }
+
     const pollRes: any = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
       headers: { 'Authorization': `Bearer ${c.env.ATLAS_API_KEY}` },
     }).then(r => r.json())
@@ -3700,7 +3856,8 @@ app.get('/api/video/:jobId/status', async (c) => {
 
     if (status !== 'completed' && status !== 'succeeded') {
       console.error('video status 실패:', status, pollRes)
-      return c.json({ status: 'failed', progress: 100, error: '영상 생성에 실패했습니다.' })
+      const refund = await markVideoFailedAndRefund(db, jobId)
+      return c.json({ status: 'failed', progress: 100, error: '영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)', ...refund })
     }
 
     const rawOut = pollRes.data?.outputs ?? pollRes.data?.output ?? pollRes.data?.video ?? pollRes.data?.videos ?? pollRes.output ?? null
@@ -3710,17 +3867,22 @@ app.get('/api/video/:jobId/status', async (c) => {
 
     if (!videoUrl) {
       console.error('video 완료했지만 URL 없음:', pollRes)
-      return c.json({ status: 'failed', progress: 100, error: '영상 URL을 찾을 수 없습니다.' })
+      const refund = await markVideoFailedAndRefund(db, jobId)
+      return c.json({ status: 'failed', progress: 100, error: '영상 URL을 찾을 수 없습니다. (크레딧은 차감되지 않았습니다)', ...refund })
     }
 
     // 완료 즉시 생성내역에 URL 저장
-    const db: D1Database = c.env.LOOKBOOK_DB
-    await db.prepare(`UPDATE generation_logs SET video_url = ? WHERE job_id = ?`).bind(videoUrl, jobId).run()
+    await db.prepare(`UPDATE generation_logs SET video_url = ?, status = 'completed' WHERE job_id = ?`).bind(videoUrl, jobId).run()
 
     return c.json({ status: 'completed', progress: 100, videoUrl })
   } catch (err: any) {
     console.error('video status poll error:', err)
-    return c.json({ status: 'failed', progress: 100, error: err.message })
+    try {
+      const refund = await markVideoFailedAndRefund(db, jobId)
+      return c.json({ status: 'failed', progress: 100, error: err.message, ...refund })
+    } catch {
+      return c.json({ status: 'failed', progress: 100, error: err.message })
+    }
   }
 })
 
@@ -5153,6 +5315,11 @@ app.get('/dashboard', (c) => {
     <video id="histModalVideo" src="" autoplay loop muted playsinline controls controlsList="nodownload" disablePictureInPicture
       style="max-width:min(420px,90vw);max-height:calc(100dvh - 140px);object-fit:contain;border-radius:14px;display:none;"></video>
     <div id="histModalExpiry" style="font-size:11px;color:#f87171;margin-top:8px;text-align:center;"></div>
+    <button id="histModalVideoBtn" class="result-nav-btn primary" onclick="startHistVideoGeneration()" style="display:none;width:100%;max-width:220px;margin:14px auto 0;">
+      <span class="rnb-badge">50%↓</span>
+      <span class="rnb-main"><i class="fas fa-film"></i> 영상 생성</span>
+      <span class="rnb-sub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
+    </button>
   </div>
 
   <!-- Action Progress Modal (다운로드 진행 중 + 완료 팝업 — generator 페이지와 동일 구조 공유) -->
@@ -5231,16 +5398,20 @@ app.get('/dashboard', (c) => {
 
   // ── 히스토리 이미지 모달 상태 ──
   let _histModalUrl = null;
+  let _histModalVideoGenCtx = null; // { imageUrl, modelName, bgName } — "다시보기"에서 영상 생성 시 사용
 
-  function openHistModal(imgUrl, expiresAt, isVideo) {
+  function openHistModal(imgUrl, expiresAt, isVideo, originalUrl, modelName, bgName) {
     _histModalUrl = imgUrl;
     const modal = document.getElementById('histImgModal');
     const imgEl = document.getElementById('histModalImg');
     const vidEl = document.getElementById('histModalVideo');
+    const videoBtn = document.getElementById('histModalVideoBtn');
     if (isVideo) {
       imgEl.style.display = 'none';
       vidEl.style.display = 'block';
       vidEl.src = imgUrl;
+      _histModalVideoGenCtx = null;
+      if (videoBtn) videoBtn.style.display = 'none';
     } else {
       vidEl.pause();
       vidEl.removeAttribute('src');
@@ -5248,6 +5419,17 @@ app.get('/dashboard', (c) => {
       vidEl.style.display = 'none';
       imgEl.style.display = 'block';
       imgEl.src = imgUrl;
+      // 이미지 다시보기일 때만 하단에 "영상 생성" 버튼 노출 (이미 영상인 항목은 대상 아님)
+      if (originalUrl && videoBtn) {
+        _histModalVideoGenCtx = { imageUrl: originalUrl, modelName: modelName || '패션 모델', bgName: bgName || '스튜디오' };
+        videoBtn.style.display = '';
+        videoBtn.disabled = false;
+        const main = videoBtn.querySelector('.rnb-main');
+        if (main) main.innerHTML = '<i class="fas fa-film"></i> 영상 생성';
+      } else {
+        _histModalVideoGenCtx = null;
+        if (videoBtn) videoBtn.style.display = 'none';
+      }
     }
     const expLabel = expiresAt ? expiryLabel(expiresAt) : null;
     document.getElementById('histModalExpiry').textContent = expLabel ? \`만료: \${expLabel}\` : '';
@@ -5260,7 +5442,115 @@ app.get('/dashboard', (c) => {
     vidEl.removeAttribute('src');
     vidEl.load();
     _histModalUrl = null;
+    _histModalVideoGenCtx = null;
   }
+
+  // "다시보기" 모달에서 영상 생성 — /api/video/start를 직접 호출 (generator 페이지의
+  // 영상 생성 로딩화면 없이, 대시보드 공용 진행 모달(actionProgressModal)을 재사용)
+  async function startHistVideoGeneration() {
+    const ctx = _histModalVideoGenCtx;
+    if (!ctx) return;
+    const token = localStorage.getItem('lookbook_token') || '';
+    if (!token) { showToast('로그인이 필요합니다.', 'error'); return; }
+
+    const btn = document.getElementById('histModalVideoBtn');
+    if (btn) btn.disabled = true;
+    openActionProgress('영상 생성 요청 중...');
+
+    try {
+      const startRes = await fetch('/api/video/start', {
+        method: 'POST',
+        headers: { 'X-Session-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: ctx.imageUrl, modelName: ctx.modelName, bgName: ctx.bgName }),
+      });
+      if (startRes.status === 401) {
+        closeActionProgress();
+        showToast('로그인이 필요합니다.', 'error');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      if (startRes.status === 402) {
+        closeActionProgress();
+        const errData = await startRes.json();
+        showToast(\`크레딧이 부족합니다. (보유: \${errData.available ?? 0}크레딧 / 필요: \${errData.required ?? 600}크레딧)\`, 'error');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      if (!startRes.ok) {
+        closeActionProgress();
+        const errData = await startRes.json().catch(() => ({}));
+        showToast(errData.message || '영상 생성 요청에 실패했습니다.', 'error');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      const startData = await startRes.json();
+      if (startData.creditsRemaining !== undefined) {
+        const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+        if (cachedUser) { cachedUser.credits = startData.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+        if (AppState.user) AppState.user.credits = startData.creditsRemaining;
+        const dbCredEl = document.getElementById('dbCredits');
+        if (dbCredEl) dbCredEl.textContent = (startData.creditsRemaining ?? 0).toLocaleString();
+      }
+      openActionProgress('AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
+      await _pollHistVideoStatus(startData.jobId, btn);
+    } catch (err) {
+      console.error('영상 생성 오류:', err);
+      closeActionProgress();
+      showToast('영상 생성 중 오류가 발생했습니다.', 'error');
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  async function _pollHistVideoStatus(jobId, btn) {
+    try {
+      const res = await fetch(\`/api/video/\${jobId}/status\`);
+      const data = await res.json();
+      if (data.status === 'completed' && data.videoUrl) {
+        setActionComplete('영상 생성이 완료되었습니다!');
+        closeHistModal();
+        loadHistory();
+        return;
+      }
+      if (data.status === 'failed') {
+        closeActionProgress();
+        if (data.creditsRemaining !== undefined) {
+          const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+          if (cachedUser) { cachedUser.credits = data.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+          if (AppState.user) AppState.user.credits = data.creditsRemaining;
+          const dbCredEl = document.getElementById('dbCredits');
+          if (dbCredEl) dbCredEl.textContent = (data.creditsRemaining ?? 0).toLocaleString();
+        }
+        showToast(data.error || '영상 생성에 실패했습니다.', 'error');
+        if (btn) btn.disabled = false;
+        loadHistory();
+        return;
+      }
+      setTimeout(() => _pollHistVideoStatus(jobId, btn), 4000);
+    } catch (err) {
+      console.error('영상 생성 폴링 오류:', err);
+      setTimeout(() => _pollHistVideoStatus(jobId, btn), 5000);
+    }
+  }
+  // "영상을 생성하는 중입니다..." 상태로 방치된 항목을 대시보드 방문 시 자동으로
+  // 재확인 — 서버가 실패를 확인하면 크레딧 환불 + status='failed' 전환까지 처리하므로
+  // 여기서는 상태 엔드포인트를 한 번 호출하고, 결과가 바뀌었으면 목록만 새로고침한다.
+  const _selfHealedJobIds = new Set();
+  async function _selfHealStuckVideo(jobId) {
+    if (!jobId || _selfHealedJobIds.has(jobId)) return;
+    _selfHealedJobIds.add(jobId);
+    try {
+      const res = await fetch(\`/api/video/\${jobId}/status\`);
+      const data = await res.json();
+      if (data.status === 'completed' || data.status === 'failed') {
+        if (data.creditsRemaining !== undefined) {
+          const dbCredEl = document.getElementById('dbCredits');
+          if (dbCredEl) dbCredEl.textContent = (data.creditsRemaining ?? 0).toLocaleString();
+        }
+        loadHistory();
+      }
+    } catch (e) { /* 조용히 무시 — 다음 방문 때 재시도 */ }
+  }
+
   async function loadHistory() {
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
@@ -5298,6 +5588,21 @@ app.get('/dashboard', (c) => {
             return;
           }
           if (!log.video_url) {
+            if (log.status === 'failed') {
+              rows.push(\`<div class="hist-row">
+                <div class="hist-thumb hist-thumb--empty"><i class="fas fa-triangle-exclamation"></i></div>
+                <div class="hist-body">
+                  <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
+                  <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
+                  <div class="hist-actions">
+                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  </div>
+                </div>
+              </div>\`);
+              return;
+            }
+            // 처리 중으로 방치된 작업은 대시보드 방문 시 상태를 재확인해 자동으로 실패/환불 처리되도록 함
+            _selfHealStuckVideo(log.job_id);
             rows.push(\`<div class="hist-row">
               <div class="hist-thumb hist-thumb--empty"><i class="fas fa-film"></i></div>
               <div class="hist-body">
@@ -5320,7 +5625,7 @@ app.get('/dashboard', (c) => {
           const vThumbEsc = vThumbProxy.replace(/'/g,"\\\\'");
           rows.push(\`<div class="hist-row">
             <div class="hist-thumb hist-thumb--video" onclick="openHistModal('\${vUrlEsc}','\${expEsc}',true)">
-              <video src="\${vProxyUrl}" muted preload="metadata" onerror="this.parentNode.innerHTML='<i class=\\"fas fa-film\\"></i>'"></video>
+              <video src="\${vProxyUrl}" muted preload="metadata" onerror="this.parentNode.innerHTML='<i class=&quot;fas fa-film&quot;></i>'"></video>
               <i class="fas fa-play hist-thumb-play"></i>
             </div>
             <div class="hist-body">
@@ -5344,10 +5649,10 @@ app.get('/dashboard', (c) => {
 
         if (urls.length === 0) {
           rows.push(\`<div class="hist-row">
-            <div class="hist-thumb hist-thumb--empty"><i class="fas fa-image"></i></div>
+            <div class="hist-thumb hist-thumb--empty"><i class="fas fa-triangle-exclamation"></i></div>
             <div class="hist-body">
               <div class="hist-meta">#\${seqLabel} · \${dateStr}</div>
-              <div class="hist-meta-sub">이미지 준비 중이거나 저장 전 세션이 종료되었습니다</div>
+              <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
               <div class="hist-actions">
                 <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
               </div>
@@ -5362,6 +5667,8 @@ app.get('/dashboard', (c) => {
           const urlEsc = proxyUrl.replace(/'/g,"\\\\'");
           const origEsc = u.replace(/'/g,"\\\\'");
           const jobIdEsc = (log.job_id || '').replace(/'/g,"\\\\'");
+          const modelEsc = (log.model_name || '패션 모델').replace(/'/g,"\\\\'");
+          const bgEsc = (log.bg_name || '스튜디오').replace(/'/g,"\\\\'");
 
           if (expired) {
             rows.push(\`<div class="hist-row hist-row--expired">
@@ -5379,13 +5686,13 @@ app.get('/dashboard', (c) => {
           const dlLabel = downloadedIdx.includes(ui) ? '재다운로드' : '다운로드';
 
           rows.push(\`<div class="hist-row">
-            <div class="hist-thumb" onclick="openHistModal('\${urlEsc}','\${expEsc}')">
-              <img src="\${proxyUrl}" alt="생성 이미지" onerror="this.parentNode.innerHTML='<i class=\\"fas fa-image\\"></i>'" />
+            <div class="hist-thumb" onclick="openHistModal('\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}')">
+              <img src="\${proxyUrl}" alt="생성 이미지" onerror="this.parentNode.innerHTML='<i class=&quot;fas fa-image&quot;></i>'" />
             </div>
             <div class="hist-body">
               <div class="hist-meta">#\${rowSeq} · \${dateStr} · \${expLabel || ''}</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal('\${urlEsc}','\${expEsc}')"><i class="fas fa-eye"></i> 다시보기</button>
+                <button class="hist-action-btn" onclick="openHistModal('\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}')"><i class="fas fa-eye"></i> 다시보기</button>
                 <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)"><i class="fas fa-download"></i> \${dlLabel}</button>
                 <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
               </div>
@@ -5674,17 +5981,19 @@ app.get('/generator', (c) => {
         </div>
         <!-- 생성 중 오버레이 (step-3 내부) -->
         <div class="generating-view" id="generatingView">
-          <div class="gen-news-tag" id="genViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
-          <div class="gen-news" id="genViewNews" style="display:none;"></div>
           <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 이미지를 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
-          <div class="gen-status-text" id="genStatusText" data-i18n="gen-status-init">시작 중...</div>
+          <div class="gen-status-text" id="genStatusText" data-i18n="gen-status-init" style="display:none;">시작 중...</div>
           <div class="gen-status-msgs">
             <div class="gen-msg current" id="msg1"><div class="dot"></div> 의류 이미지 분석 중...</div>
             <div class="gen-msg" id="msg2"><div class="dot"></div> AI 모델 피팅 적용 중...</div>
             <div class="gen-msg" id="msg3"><div class="dot"></div> 배경 합성 중...</div>
             <div class="gen-msg" id="msg4"><div class="dot"></div> 이미지 품질 향상 중...</div>
             <div class="gen-msg" id="msg5"><div class="dot"></div> 최종 렌더링 중...</div>
+          </div>
+          <div class="gen-video-promo-box">
+            <p class="gen-video-promo-text"><i class="fas fa-film"></i> 이미지가 생성되면 클릭한번으로 2K 고화질 영상 생성이 가능합니다.</p>
+            <div class="gen-video-promo-player" id="genLoadingVideoPlayer" style="display:none;"></div>
           </div>
         </div>
         <div class="gslide-nav" id="step3Nav">
@@ -6242,6 +6551,12 @@ app.get('/admin02', (c) => {
         <h3><i class="fas fa-film" style="color:#ff6b6b;"></i> 이용방법 소개 영상 <span style="font-size:13px;font-weight:400;color:#888;">(4:3 가로 영상 1개, 20MB 이하, 미등록 시 빈 박스 유지)</span></h3>
         <div id="howtoVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
+
+      <!-- 이미지 생성 로딩화면 하단 영상 슬롯 -->
+      <div class="upload-form">
+        <h3><i class="fas fa-clapperboard" style="color:#9b7cff;"></i> 생성 로딩화면 영상 <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 반복 재생, 20MB 이하, 미등록 시 노출 안 함)</span></h3>
+        <div id="genLoadingVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
+      </div>
     </div>
   </div>
 
@@ -6465,7 +6780,7 @@ function switchTab(name) {
   document.getElementById('tabLeads').classList.toggle('active', name === 'leads')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
-  if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos() }
+  if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos() }
   if (name === 'users')  loadUsers()
   if (name === 'leads')  leadsInitAll()
 }
@@ -7522,6 +7837,74 @@ async function deleteHowtoVideo(slot) {
   const data = await res.json()
   if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
   await loadHowtoVideos()
+}
+
+// ══════════════════════════════════════════════
+//  이미지 생성 로딩화면 영상 (최대 5슬롯, 등록된 순서대로 반복재생)
+// ══════════════════════════════════════════════
+const GEN_LOADING_VIDEO_LABELS = { 1: '영상 1', 2: '영상 2', 3: '영상 3', 4: '영상 4', 5: '영상 5' }
+
+async function loadGenLoadingVideos() {
+  const grid = document.getElementById('genLoadingVideoGrid')
+  try {
+    const res = await fetch('/api/gen-loading-videos')
+    const data = await res.json()
+    const videos = data.videos || {}
+    grid.innerHTML = Object.keys(GEN_LOADING_VIDEO_LABELS).map(slot => {
+      const src = videos[slot]
+      return '<div style="border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden;">' +
+        '<div style="position:relative;width:100%;aspect-ratio:9/16;background:#f2f2f5;display:flex;align-items:center;justify-content:center;">' +
+        (src ? '<video src="' + src + '" muted loop playsinline autoplay style="width:100%;height:100%;object-fit:cover;"></video>' : '<i class="fas fa-video" style="color:#ccc;font-size:24px;"></i>') +
+        '</div>' +
+        '<div style="padding:8px;">' +
+        '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + GEN_LOADING_VIDEO_LABELS[slot] + '</div>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<button onclick="pickGenLoadingVideo(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
+        (src ? '<button onclick="deleteGenLoadingVideo(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
+        '</div></div></div>'
+    }).join('')
+  } catch(e) { console.error('loadGenLoadingVideos error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+let _pendingGenLoadingVideoSlot = null
+function pickGenLoadingVideo(slot) {
+  _pendingGenLoadingVideoSlot = slot
+  let input = document.getElementById('genLoadingVideoInput')
+  if (!input) {
+    input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'video/*'
+    input.id = 'genLoadingVideoInput'
+    input.style.display = 'none'
+    input.addEventListener('change', onGenLoadingVideoSelect)
+    document.body.appendChild(input)
+  }
+  input.value = ''
+  input.click()
+}
+
+async function onGenLoadingVideoSelect(e) {
+  const file = e.target.files?.[0]
+  if (!file || !_pendingGenLoadingVideoSlot) return
+  if (file.size > 20 * 1024 * 1024) { alert('영상 용량이 너무 큽니다. 20MB 이하 파일을 사용해주세요.'); return }
+  try {
+    const res = await fetch('/api/admin/gen-loading-video/' + _pendingGenLoadingVideoSlot, {
+      method: 'PUT',
+      headers: {'Content-Type': file.type || 'video/mp4', 'X-Admin-Password':adminPassword},
+      body: file,
+    })
+    const data = await res.json()
+    if (!data.success) { alert('업로드 실패: ' + (data.message || '알 수 없는 오류')); return }
+    await loadGenLoadingVideos()
+  } catch(err) { alert('오류: ' + err.message) }
+}
+
+async function deleteGenLoadingVideo(slot) {
+  if (!confirm('이 슬롯의 영상을 삭제하시겠습니까?')) return
+  const res = await fetch('/api/admin/gen-loading-video/' + slot, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+  const data = await res.json()
+  if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
+  await loadGenLoadingVideos()
 }
 
 // ─── 배경 "생성용"(얼굴 마스킹) 이미지 등록/교체 ───
