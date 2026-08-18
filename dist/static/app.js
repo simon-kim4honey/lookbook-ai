@@ -3228,9 +3228,11 @@ async function startVideoGeneration() {
     if (sub) sub.textContent = '생성 중...';
     _pollVideoStatus();
   } catch (err) {
+    // 네트워크 오류로 요청/응답이 유실된 경우, 서버에는 이미 요청이 접수되어 정상
+    // 진행 중일 수 있다 — "실패"로 단정하지 않고 생성내역에서 확인하도록 안내한다.
     console.error('Video start error:', err);
     _hideVideoGeneratingView();
-    showToast('영상 생성 중 오류가 발생했습니다.', 'error');
+    showToast('영상 생성 요청 중 네트워크 오류가 발생했습니다. 잠시 후 생성내역에서 확인해주세요.', 'error');
     _resetVideoBtn();
   }
 }

@@ -38,7 +38,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
      LEFT JOIN brand_analysis a ON a.id = (SELECT id FROM brand_analysis WHERE brand_id=b.id ORDER BY analyzed_at DESC LIMIT 1)
      LEFT JOIN outreach_drafts d ON d.id = (SELECT id FROM outreach_drafts WHERE brand_id=b.id ORDER BY created_at DESC LIMIT 1)
      ORDER BY a.priority_score DESC`).all(),n=e=>`"${String(e??``).replace(/"/g,`""`)}"`,r=[`id`,`country`,`platform`,`brand`,`category`,`brand_url`,`contact_email`,`status`,`price_tier`,`priority_score`,`language`,`subject`,`draft_body`,`draft_status`],i=[r.join(`,`)];for(let e of t)i.push(r.map(t=>n(e[t])).join(`,`));return e.text(i.join(`
-`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`msyq19yg`,We=e=>e?`
+`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`msyqjbxq`,We=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -214,7 +214,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
        JOIN users u ON u.id = s.user_id
        WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`,code:`UNAUTHORIZED`},401);let{imageUrl:i,modelName:a,bgName:o}=await e.req.json();if(!i)return e.json({error:`imageUrl 필수`},400);let s=Kt;if(r.credits<s)return e.json({error:`크레딧이 부족합니다. (보유: ${r.credits}크레딧, 필요: ${s}크레딧)`,code:`INSUFFICIENT_CREDITS`,available:r.credits,required:s},402);let l=await fetch(`${G}/api/v1/model/generateVideo`,{method:`POST`,headers:lt(e.env.ATLAS_API_KEY),body:JSON.stringify({model:`bytedance/seedance-2.5/image-to-video`,prompt:`The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements at normal real-time speed: gentle weight shifts, a natural turn, relaxed hand and hair movement, as if in a live fashion shoot. The camera is NOT static — apply a slow, subtle cinematic camera movement throughout the shot (a gentle push-in/dolly-in, slow pan, or slight orbit around the subject), the way a real videographer would shoot a fashion editorial, adding depth and a sense of motion beyond the model's own movement. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Keep the person's identity, outfit, and scene/background setting unchanged throughout the video — only the camera framing and the model's pose may shift naturally. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.`,image:i,duration:7,resolution:`1080p-esr`,ratio:`adaptive`,output_format:`mp4`,generate_audio:!0,watermark:!1})}),u=await l.json(),d=u?.data?.id||u?.id||null;if(!l.ok||!d)return console.error(`video/start Atlas 요청 실패:`,u),e.json({success:!1,message:u?.msg||u?.message||`영상 생성 요청 실패`},502);let f=r.credits-s;await t.prepare(`UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`).bind(f,r.user_id).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
        VALUES (?, 'deduct', ?, ?, 'video_generation', ?)`).bind(r.user_id,-600,f,d).run();let p=((await t.prepare(`SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`).bind(r.user_id).first())?.last_seq||0)+1;return await t.prepare(`INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, kind, expires_at, image_urls)
-       VALUES (?, ?, 1, ?, ?, '9:16', ?, 'video', datetime('now', '+14 days'), ?)`).bind(r.user_id,d,a||`패션 모델`,o||`스튜디오`,p,JSON.stringify([i])).run(),e.json({success:!0,jobId:d,creditsRemaining:f})}catch(t){return console.error(`video/start error:`,t),e.json({success:!1,message:t.message},500)}}),W.get(`/api/video/:jobId/status`,async e=>{let t=e.req.param(`jobId`),n=e.env.LOOKBOOK_DB;try{let r=null;try{r=await n.prepare(`SELECT status, video_url, created_at FROM generation_logs WHERE job_id = ?`).bind(t).first()}catch{r=null}if(r?.status===`completed`&&r.video_url)return e.json({status:`completed`,progress:100,videoUrl:r.video_url});if(r?.status===`failed`)return e.json({status:`failed`,progress:100,error:`영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)`});if(r?.created_at&&Date.now()-new Date(r.created_at.replace(` `,`T`)+`Z`).getTime()>900*1e3){let r=await qt(n,t);return e.json({status:`failed`,progress:100,error:`영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)`,...r})}let i=await fetch(`${G}/api/v1/model/prediction/${t}`,{headers:{Authorization:`Bearer ${e.env.ATLAS_API_KEY}`}}).then(e=>e.json()),a=i.data?.status??i.status;if(!new Set([`completed`,`succeeded`,`failed`,`timeout`,`canceled`,`error`]).has(a))return e.json({status:`processing`,progress:50});if(a!==`completed`&&a!==`succeeded`){console.error(`video status 실패:`,a,i);let r=await qt(n,t);return e.json({status:`failed`,progress:100,error:`영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)`,...r})}let o=i.data?.outputs??i.data?.output??i.data?.video??i.data?.videos??i.output??null,s=Array.isArray(o)?o.find(e=>typeof e==`string`&&e.startsWith(`http`))||null:typeof o==`string`&&o.startsWith(`http`)?o:null;if(!s){console.error(`video 완료했지만 URL 없음:`,i);let r=await qt(n,t);return e.json({status:`failed`,progress:100,error:`영상 URL을 찾을 수 없습니다. (크레딧은 차감되지 않았습니다)`,...r})}return await n.prepare(`UPDATE generation_logs SET video_url = ?, status = 'completed' WHERE job_id = ?`).bind(s,t).run(),e.json({status:`completed`,progress:100,videoUrl:s})}catch(r){console.error(`video status poll error:`,r);try{let i=await qt(n,t);return e.json({status:`failed`,progress:100,error:r.message,...i})}catch{return e.json({status:`failed`,progress:100,error:r.message})}}});async function Yt(e){try{let t=await e.prepare(`SELECT value FROM app_settings WHERE key = 'admin_prompt_config'`).first();if(t?.value){let e=JSON.parse(t.value);return{enabled:typeof e.enabled==`boolean`?e.enabled:J.enabled,prefix:typeof e.prefix==`string`?e.prefix:J.prefix,suffix:typeof e.suffix==`string`?e.suffix:J.suffix,styleGuide:typeof e.styleGuide==`string`?e.styleGuide:J.styleGuide,technicalSpec:typeof e.technicalSpec==`string`?e.technicalSpec:J.technicalSpec,updatedAt:e.updatedAt||J.updatedAt}}}catch(e){console.warn(`d1GetPromptConfig fallback to memory:`,e)}return J}async function Xt(e,t){await e.prepare(`INSERT INTO app_settings (key, value, updated_at) VALUES ('admin_prompt_config', ?, datetime('now'))
+       VALUES (?, ?, 1, ?, ?, '9:16', ?, 'video', datetime('now', '+14 days'), ?)`).bind(r.user_id,d,a||`패션 모델`,o||`스튜디오`,p,JSON.stringify([i])).run(),e.json({success:!0,jobId:d,creditsRemaining:f})}catch(t){return console.error(`video/start error:`,t),e.json({success:!1,message:t.message},500)}}),W.get(`/api/video/:jobId/status`,async e=>{let t=e.req.param(`jobId`),n=e.env.LOOKBOOK_DB;try{let r=null;try{r=await n.prepare(`SELECT status, video_url, created_at FROM generation_logs WHERE job_id = ?`).bind(t).first()}catch{r=null}if(r?.status===`completed`&&r.video_url)return e.json({status:`completed`,progress:100,videoUrl:r.video_url});if(r?.status===`failed`)return e.json({status:`failed`,progress:100,error:`영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)`});if(r?.created_at&&Date.now()-new Date(r.created_at.replace(` `,`T`)+`Z`).getTime()>900*1e3){let r=await qt(n,t);return e.json({status:`failed`,progress:100,error:`영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)`,...r})}let i;try{i=await fetch(`${G}/api/v1/model/prediction/${t}`,{headers:{Authorization:`Bearer ${e.env.ATLAS_API_KEY}`}}).then(e=>e.json())}catch(t){return console.error(`Atlas 상태 조회 일시 실패 (재시도 예정):`,t),e.json({status:`processing`,progress:50})}let a=i.data?.status??i.status;if(!new Set([`completed`,`succeeded`,`failed`,`timeout`,`canceled`,`error`]).has(a))return e.json({status:`processing`,progress:50});if(a!==`completed`&&a!==`succeeded`){console.error(`video status 실패:`,a,i);let r=await qt(n,t);return e.json({status:`failed`,progress:100,error:`영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)`,...r})}let o=i.data?.outputs??i.data?.output??i.data?.video??i.data?.videos??i.output??null,s=Array.isArray(o)?o.find(e=>typeof e==`string`&&e.startsWith(`http`))||null:typeof o==`string`&&o.startsWith(`http`)?o:null;return s?(await n.prepare(`UPDATE generation_logs SET video_url = ?, status = 'completed' WHERE job_id = ?`).bind(s,t).run(),e.json({status:`completed`,progress:100,videoUrl:s})):(console.error(`video 완료 응답이지만 URL 파싱 실패 — 재시도 예정:`,JSON.stringify(i).slice(0,500)),e.json({status:`processing`,progress:90}))}catch(t){return console.error(`video status poll error (재시도 예정):`,t),e.json({status:`processing`,progress:50})}});async function Yt(e){try{let t=await e.prepare(`SELECT value FROM app_settings WHERE key = 'admin_prompt_config'`).first();if(t?.value){let e=JSON.parse(t.value);return{enabled:typeof e.enabled==`boolean`?e.enabled:J.enabled,prefix:typeof e.prefix==`string`?e.prefix:J.prefix,suffix:typeof e.suffix==`string`?e.suffix:J.suffix,styleGuide:typeof e.styleGuide==`string`?e.styleGuide:J.styleGuide,technicalSpec:typeof e.technicalSpec==`string`?e.technicalSpec:J.technicalSpec,updatedAt:e.updatedAt||J.updatedAt}}}catch(e){console.warn(`d1GetPromptConfig fallback to memory:`,e)}return J}async function Xt(e,t){await e.prepare(`INSERT INTO app_settings (key, value, updated_at) VALUES ('admin_prompt_config', ?, datetime('now'))
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`).bind(JSON.stringify(t)).run()}W.get(`/api/admin/prompt`,q,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await Yt(t);return e.json({success:!0,config:n})}catch{return e.json({success:!0,config:J})}}),W.put(`/api/admin/prompt`,q,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await e.req.json(),r=await Yt(t),i={enabled:typeof n.enabled==`boolean`?n.enabled:r.enabled,prefix:typeof n.prefix==`string`?n.prefix:r.prefix,suffix:typeof n.suffix==`string`?n.suffix:r.suffix,styleGuide:typeof n.styleGuide==`string`?n.styleGuide:r.styleGuide,technicalSpec:typeof n.technicalSpec==`string`?n.technicalSpec:r.technicalSpec,updatedAt:new Date().toISOString()};return await Xt(t,i),J=i,console.log(`Admin prompt config saved to D1:`,i.updatedAt),e.json({success:!0,config:i})}catch(t){return e.json({success:!1,message:t.message},400)}}),W.post(`/api/admin/auth`,async e=>{let t=await e.req.json(),n=e.env.ADMIN_PASSWORD;return n?t.password===n?e.json({success:!0}):e.json({success:!1,message:`비밀번호가 올바르지 않습니다.`},401):e.json({success:!1,message:`서버 설정 오류: ADMIN_PASSWORD 환경변수가 설정되지 않았습니다.`},500)});var Zt=`의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요.`,Qt=(e,t,n=``,r=Zt,i)=>`<!DOCTYPE html>
 
 <html lang="ko">
@@ -1525,9 +1525,11 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       openActionProgress('AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
       await _pollHistVideoStatus(startData.jobId, btn);
     } catch (err) {
+      // 네트워크 오류로 요청/응답이 유실된 경우, 서버에는 이미 요청이 접수되어 정상
+      // 진행 중일 수 있다 — "실패"로 단정하지 않고 생성내역에서 확인하도록 안내한다.
       console.error('영상 생성 오류:', err);
       closeActionProgress();
-      showToast('영상 생성 중 오류가 발생했습니다.', 'error');
+      showToast('영상 생성 요청 중 네트워크 오류가 발생했습니다. 잠시 후 생성내역에서 확인해주세요.', 'error');
       if (btn) btn.disabled = false;
     }
   }
@@ -1562,13 +1564,14 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       setTimeout(() => _pollHistVideoStatus(jobId, btn), 5000);
     }
   }
-  // "영상을 생성하는 중입니다..." 상태로 방치된 항목을 대시보드 방문 시 자동으로
-  // 재확인 — 서버가 실패를 확인하면 크레딧 환불 + status='failed' 전환까지 처리하므로
-  // 여기서는 상태 엔드포인트를 한 번 호출하고, 결과가 바뀌었으면 목록만 새로고침한다.
-  const _selfHealedJobIds = new Set();
+  // "영상을 생성하는 중입니다..." 상태로 방치된 항목을 대시보드에 머무는 동안 주기적으로
+  // 재확인한다. 원래 요청을 보낸 브라우저 탭이 네트워크 오류 등으로 폴링을 놓쳐도
+  // (예: /api/video/start 응답이 유실되어 클라이언트는 실패로 보이지만 서버·Atlas
+  // 쪽에서는 실제로는 정상 진행/완료된 경우), 생성내역 화면에 머무는 동안 자동으로
+  // 상태가 바로잡히도록 하기 위함. 처리 중인 영상이 하나도 없으면 재확인을 멈춘다.
+  let _historyPollTimer = null;
   async function _selfHealStuckVideo(jobId) {
-    if (!jobId || _selfHealedJobIds.has(jobId)) return;
-    _selfHealedJobIds.add(jobId);
+    if (!jobId) return;
     try {
       const res = await fetch(\`/api/video/\${jobId}/status\`);
       const data = await res.json();
@@ -1579,10 +1582,11 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         }
         loadHistory();
       }
-    } catch (e) { /* 조용히 무시 — 다음 방문 때 재시도 */ }
+    } catch (e) { /* 조용히 무시 — 다음 재확인 때 재시도 */ }
   }
 
   async function loadHistory() {
+    if (_historyPollTimer) { clearTimeout(_historyPollTimer); _historyPollTimer = null; }
     const list = document.getElementById('historyList');
     list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
     try {
@@ -1733,6 +1737,12 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       });
 
       list.innerHTML = rows.join('');
+
+      // 처리 중인 영상이 남아있으면 20초 후 자동으로 다시 확인 (모두 해소되면 자동 중단)
+      const stillPending = logs.some(l => l.kind === 'video' && !l.video_url && l.status !== 'failed');
+      if (stillPending) {
+        _historyPollTimer = setTimeout(loadHistory, 20000);
+      }
     } catch (e) {
       list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
     }
