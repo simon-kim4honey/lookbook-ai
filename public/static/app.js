@@ -714,6 +714,52 @@ function stopNewsRotator() {
 }
 
 // ─────────────────────────────────────────────────────────
+// 이미지 생성 로딩화면 하단 영상 슬롯 — 관리자 등록 영상을 순서대로 반복재생
+// ─────────────────────────────────────────────────────────
+let _genLoadingVideoList = null;
+let _genLoadingVideoIdx = 0;
+
+async function _loadGenLoadingVideoList() {
+  if (_genLoadingVideoList) return _genLoadingVideoList;
+  try {
+    const res = await fetch('/api/gen-loading-videos');
+    const data = await res.json();
+    const videos = data.videos || {};
+    _genLoadingVideoList = [1, 2, 3, 4, 5].map(s => videos[s]).filter(Boolean);
+  } catch (e) {
+    console.warn('생성 로딩화면 영상 로딩 실패:', e);
+    _genLoadingVideoList = [];
+  }
+  return _genLoadingVideoList;
+}
+
+async function startGenLoadingVideoPlaylist() {
+  const player = document.getElementById('genLoadingVideoPlayer');
+  const videoEl = document.getElementById('genLoadingVideoEl');
+  if (!player || !videoEl) return;
+  const list = await _loadGenLoadingVideoList();
+  if (!list.length) { player.style.display = 'none'; return; }
+  player.style.display = '';
+  _genLoadingVideoIdx = 0;
+  videoEl.loop = list.length === 1; // 영상이 1개뿐이면 네이티브 반복재생 사용
+  videoEl.onended = () => {
+    if (list.length <= 1) return;
+    _genLoadingVideoIdx = (_genLoadingVideoIdx + 1) % list.length;
+    videoEl.src = list[_genLoadingVideoIdx];
+    videoEl.play().catch(() => {});
+  };
+  videoEl.src = list[_genLoadingVideoIdx];
+  videoEl.play().catch(() => {});
+}
+
+function stopGenLoadingVideoPlaylist() {
+  const player = document.getElementById('genLoadingVideoPlayer');
+  const videoEl = document.getElementById('genLoadingVideoEl');
+  if (player) player.style.display = 'none';
+  if (videoEl) { videoEl.onended = null; videoEl.pause(); videoEl.removeAttribute('src'); videoEl.load(); }
+}
+
+// ─────────────────────────────────────────────────────────
 // TOAST NOTIFICATIONS
 // ─────────────────────────────────────────────────────────
 function showToast(message, type = 'info', duration = 4000) {
@@ -2382,7 +2428,7 @@ async function startGeneration() {
   // 진행 상태 초기화
   updateProgress(0, '시작 중...');
   setMsgState('msg1', 'current');
-  startNewsRotator('genViewNews');
+  startGenLoadingVideoPlaylist();
 
   try {
     // 선택된 모델의 description 생성
@@ -2505,7 +2551,7 @@ async function startGeneration() {
       await sleep(1000);
       updateProgress(100, '완료!');
       setMsgState('msg4', 'done');
-      setMsgState('msg5', 'done');
+      setMsgState('msg5', 'current');
 
       // 폴백 결과 표시 — Atlas Cloud가 이미지를 받지 못했거나 요청 실패 시 (isFallback: true 필수 전달)
       const fallbackImages = generateFallbackImages(count);
@@ -2532,6 +2578,7 @@ async function startGeneration() {
     showToast(t('genError', err.message), 'error');
     AppState.isGenerating = false;
     stopNewsRotator();
+    stopGenLoadingVideoPlaylist();
     localStorage.removeItem('lookbook_pending_gen');
 
     // UI 복원
@@ -2570,7 +2617,7 @@ async function resumePendingGeneration() {
   updateProgress(30, '이전 생성 작업을 이어서 확인하는 중...');
   setMsgState('msg1', 'done');
   setMsgState('msg2', 'current');
-  startNewsRotator('genViewNews');
+  startGenLoadingVideoPlaylist();
   showToast('이전에 시작한 생성 작업을 이어서 진행합니다.', 'info');
 
   try {
@@ -2579,6 +2626,7 @@ async function resumePendingGeneration() {
     console.error('Resume generation error:', err);
     AppState.isGenerating = false;
     stopNewsRotator();
+    stopGenLoadingVideoPlaylist();
     localStorage.removeItem('lookbook_pending_gen');
     if (step3Nav) step3Nav.style.display = '';
     if (genView) genView.classList.remove('active');
@@ -2659,6 +2707,7 @@ async function pollGenerationStatus(jobId, count) {
 function completeGeneration(images, isFallback = false) {
   AppState.isGenerating = false;
   stopNewsRotator();
+  stopGenLoadingVideoPlaylist();
   localStorage.removeItem('lookbook_pending_gen');
 
   console.log('completeGeneration called — isFallback:', isFallback, '| images count:', images.length, '| images:', JSON.stringify(images.map(i => ({id:i.id, url: i.url ? i.url.substring(0,80) : null, placeholder: i.placeholder}))));

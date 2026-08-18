@@ -2243,7 +2243,27 @@ footer {
 .gen-msg.current .dot { background: var(--primary); animation: pulse 1s infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-/* 로딩 중 패션 뉴스 로테이터 */
+/* 이미지 생성 로딩화면(#generatingView)은 현재 단계 1줄만 노출 — 영상 생성 로딩화면(#videoGeneratingView)은 기존 5줄 목록 유지 */
+#generatingView .gen-msg { display: none; }
+#generatingView .gen-msg.current { display: flex; }
+
+/* 이미지 생성 로딩화면 하단 — 영상 생성 유도 문구 + 관리자 등록 영상 재생 박스 */
+.gen-video-promo-box {
+  margin-top: 28px;
+  padding: 16px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  max-width: 480px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+}
+.gen-video-promo-text { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.5; margin: 0; }
+.gen-video-promo-player { margin-top: 12px; width: 100%; border-radius: 8px; overflow: hidden; background: #000; }
+.gen-video-promo-player video { display: block; width: 100%; max-height: 50vh; object-fit: contain; }
+
+/* 로딩 중 패션 뉴스 로테이터 (영상 생성 로딩화면에서만 사용) */
 .gen-news {
   margin-top: 20px;
   padding: 14px 16px;
@@ -2257,7 +2277,7 @@ footer {
   animation: gen-news-fade 0.4s ease;
 }
 @keyframes gen-news-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-#genViewNews, #videoGenViewNews { margin-top: 0; margin-bottom: 40px; }
+#videoGenViewNews { margin-top: 0; margin-bottom: 40px; }
 .gen-news-tag { font-size: 11px; font-weight: 700; color: var(--primary); margin-bottom: 6px; letter-spacing: 0.02em; }
 .gen-news-headline {
   display: -webkit-box;
