@@ -16,6 +16,9 @@
 node_modules/
 .wrangler
 
+# generated types
+worker-configuration.d.ts
+
 # env
 .env
 .env.production
