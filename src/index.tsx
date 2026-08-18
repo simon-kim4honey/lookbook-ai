@@ -6317,7 +6317,7 @@ app.get('/admin02', (c) => {
         <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;"><input type="checkbox" id="pScrapable" style="width:auto"/> 셀렉터/약관 검증 완료 — 스크래핑 허용</label>
       </div>
       <div class="leads-row"><input id="pNotes" placeholder="메모" style="flex:1"/></div>
-      <button class="leads-btn" onclick="savePlatform()">저장</button>
+      <button class="leads-btn" onclick="leadsSavePlatform()">저장</button>
       <div class="leads-hint">list_selector는 브랜드 링크(&lt;a&gt;) 요소 자체를 가리켜야 합니다. 텍스트=브랜드명, href=브랜드 URL로 사용됩니다.</div>
     </div>
     <div class="leads-card"><h3>등록된 플랫폼</h3><div style="overflow-x:auto"><table id="platformsTable"><thead><tr><th>국가</th><th>코드</th><th>이름</th><th>디렉토리 URL</th><th>스크래핑 허용</th></tr></thead><tbody></tbody></table></div></div>
@@ -6332,12 +6332,12 @@ app.get('/admin02', (c) => {
       <div class="leads-hint">형식: 헤더 포함 CSV — name,category,brand_url,contact_email (name만 필수)</div>
       <div class="leads-row"><input type="file" id="csvFile" accept=".csv"/></div>
       <textarea id="csvPaste" placeholder="또는 여기에 CSV 내용을 붙여넣기"></textarea>
-      <button class="leads-btn" style="margin-top:8px" onclick="importCsv()">가져오기</button>
+      <button class="leads-btn" style="margin-top:8px" onclick="leadsImportCsv()">가져오기</button>
       <div class="leads-hint" id="csvResult"></div>
     </div>
     <div class="leads-card">
       <h3>공개 디렉토리 스크래핑 실행</h3>
-      <div class="leads-row"><select id="scrapePlatform"></select><button class="leads-btn secondary" onclick="runScrape()">수집 실행</button></div>
+      <div class="leads-row"><select id="scrapePlatform"></select><button class="leads-btn secondary" onclick="leadsRunScrape()">수집 실행</button></div>
       <div class="leads-hint">플랫폼 설정에서 "스크래핑 허용"이 체크된 경우에만 동작하며, robots.txt를 자동 확인합니다.</div>
       <div class="leads-hint" id="scrapeResult"></div>
     </div>
@@ -6349,9 +6349,9 @@ app.get('/admin02', (c) => {
         <select id="fCountry"><option value="">전체 국가</option><option value="KR">한국</option><option value="US">미국</option><option value="JP">일본</option></select>
         <select id="fStatus"><option value="">전체 상태</option><option value="new">new</option><option value="analyzed">analyzed</option><option value="drafted">drafted</option><option value="reviewed">reviewed</option><option value="contacted">contacted</option></select>
         <input id="fSearch" placeholder="브랜드명 검색"/>
-        <button class="leads-btn secondary small" onclick="loadBrands()">조회</button>
-        <button class="leads-btn small" onclick="analyzeSelected()">선택 분석 실행</button>
-        <button class="leads-btn small" onclick="draftSelected()">선택 초안 생성</button>
+        <button class="leads-btn secondary small" onclick="leadsLoadBrands()">조회</button>
+        <button class="leads-btn small" onclick="leadsAnalyzeSelected()">선택 분석 실행</button>
+        <button class="leads-btn small" onclick="leadsDraftSelected()">선택 초안 생성</button>
         <a class="leads-btn secondary small" href="/api/admin/leads/export.csv" id="exportLink" style="text-decoration:none;display:inline-block;">CSV 내보내기</a>
       </div>
       <div style="overflow-x:auto"><table id="brandsTable"><thead><tr><th><input type="checkbox" id="selAll"/></th><th>브랜드</th><th>국가/플랫폼</th><th>카테고리</th><th>스타일</th><th>가격대</th><th>우선순위</th><th>상태</th></tr></thead><tbody></tbody></table></div>
@@ -6362,7 +6362,7 @@ app.get('/admin02', (c) => {
     <div class="leads-card">
       <div class="leads-row">
         <select id="dStatus"><option value="">전체 상태</option><option value="draft">draft</option><option value="reviewed">reviewed</option><option value="sent">sent</option><option value="skipped">skipped</option></select>
-        <button class="leads-btn secondary small" onclick="loadDrafts()">조회</button>
+        <button class="leads-btn secondary small" onclick="leadsLoadDrafts()">조회</button>
       </div>
       <div id="draftsList"></div>
     </div>
