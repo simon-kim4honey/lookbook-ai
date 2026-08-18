@@ -7281,7 +7281,7 @@ async function loadCustomBgs() {
         '<div class="media-card bg-card-item">' +
         '<img src="/api/proxy/custom-bg/' + b.id + '" alt="' + b.name + '" loading="lazy"/>' +
         '<span class="custom-badge">커스텀</span>' +
-        (b.isDefault ? '<span class="custom-badge" style="left:auto;right:8px;background:#111;color:#fff;">그리드 고정 1번</span>' : '') +
+        (b.isDefault ? '<span class="custom-badge" style="left:auto;right:8px;background:#111;color:#fff;"><i class="fas fa-thumbtack"></i> 1번 슬롯 고정 중</span>' : '') +
         '<button class="del-btn" onclick="event.stopPropagation();deleteBg(' + "'" + b.id + "'" + ')"><i class="fas fa-times"></i></button>' +
         '<div class="meta"><div class="name">' + b.name + '</div><div class="desc">' + b.category + ' · ' + (b.bgDesc || '-') + '</div>' +
         '<div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
@@ -7290,8 +7290,9 @@ async function loadCustomBgs() {
           : '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fef3c7;color:#92400e;font-weight:600;">생성용 미등록 (원본 사용)</span>') +
         '<button onclick="event.stopPropagation();pickBgGenImage(' + "'" + b.id + "'" + ')" style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid #ccc;background:#fff;cursor:pointer;">' +
         (b.hasGenImage ? '생성용 이미지 교체' : '생성용 이미지 등록') + '</button>' +
-        '<button onclick="event.stopPropagation();toggleBgDefault(' + "'" + b.id + "'" + ')" style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid ' + (b.isDefault ? '#111;background:#111;color:#fff;' : '#ccc;background:#fff;color:#333;') + 'cursor:pointer;">' +
-        (b.isDefault ? '그리드 1번 고정 해제' : '그리드 1번에 고정') + '</button>' +
+        '<button onclick="event.stopPropagation();toggleBgDefault(' + "'" + b.id + "'" + ')" style="font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;' + (b.isDefault ? 'border:1px solid #111;background:#111;color:#fff;' : 'border:1px dashed #999;background:transparent;color:#666;') + '">' +
+        '<i class="fas fa-thumbtack" style="margin-right:3px;' + (b.isDefault ? '' : 'opacity:.5;') + '"></i>' +
+        (b.isDefault ? '1번 슬롯 고정됨 (클릭해서 해제)' : '클릭해서 1번 슬롯에 고정') + '</button>' +
         '</div></div>' +
         '</div>'
       ).join('') + '</div>'
