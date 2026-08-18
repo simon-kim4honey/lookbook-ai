@@ -3762,7 +3762,7 @@ app.post('/api/video/start', async (c) => {
     // Atlas Cloud 영상 생성 요청 — 모델이 자연스럽게 포즈를 취하는 7초 영상
     // (공식 API 문서 기준 파라미터 — resolution은 480p/720p/*-esr만 지원,
     //  ratio는 'adaptive' 고정으로 원본 이미지 비율을 그대로 따라감)
-    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements at normal real-time speed: gentle weight shifts, a natural turn, relaxed hand and hair movement, as if in a live fashion shoot. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Keep the face, outfit, and background unchanged throughout the video. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.'
+    const prompt = 'The person begins exactly as shown in the image and performs natural, subtle fashion-model posing movements at normal real-time speed: gentle weight shifts, a natural turn, relaxed hand and hair movement, as if in a live fashion shoot. The camera is NOT static — apply a slow, subtle cinematic camera movement throughout the shot (a gentle push-in/dolly-in, slow pan, or slight orbit around the subject), the way a real videographer would shoot a fashion editorial, adding depth and a sense of motion beyond the model\'s own movement. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Keep the person\'s identity, outfit, and scene/background setting unchanged throughout the video — only the camera framing and the model\'s pose may shift naturally. Add soft, tasteful ambient background music suited for a fashion runway/showcase — no vocals, no jarring sound effects.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
@@ -5317,7 +5317,7 @@ app.get('/dashboard', (c) => {
     <div id="histModalExpiry" style="font-size:11px;color:#f87171;margin-top:8px;text-align:center;"></div>
     <button id="histModalVideoBtn" class="result-nav-btn primary" onclick="startHistVideoGeneration()" style="display:none;width:100%;max-width:220px;margin:14px auto 0;">
       <span class="rnb-badge">50%↓</span>
-      <span class="rnb-main"><i class="fas fa-film"></i> 영상 생성</span>
+      <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
       <span class="rnb-sub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
     </button>
   </div>
@@ -5425,7 +5425,7 @@ app.get('/dashboard', (c) => {
         videoBtn.style.display = '';
         videoBtn.disabled = false;
         const main = videoBtn.querySelector('.rnb-main');
-        if (main) main.innerHTML = '<i class="fas fa-film"></i> 영상 생성';
+        if (main) main.innerHTML = '<i class="fas fa-film"></i> 2K 영상 생성';
       } else {
         _histModalVideoGenCtx = null;
         if (videoBtn) videoBtn.style.display = 'none';
@@ -6040,7 +6040,7 @@ app.get('/generator', (c) => {
             </button>
             <button class="result-nav-btn primary" id="videoActionBtn" onclick="startVideoGeneration()">
               <span class="rnb-badge">50%↓</span>
-              <span class="rnb-main"><i class="fas fa-film"></i> 영상 생성</span>
+              <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
               <span class="rnb-sub" id="videoActionSub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
             </button>
             <button class="result-nav-btn" onclick="window.location.href='/generator'">

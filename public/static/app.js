@@ -2865,7 +2865,7 @@ function renderResults(images) {
   if (videoBtn) {
     videoBtn.disabled = false;
     const main = videoBtn.querySelector('.rnb-main');
-    if (main) main.innerHTML = '<i class="fas fa-film"></i> 영상 생성';
+    if (main) main.innerHTML = '<i class="fas fa-film"></i> 2K 영상 생성';
   }
   const videoSub = document.getElementById('videoActionSub');
   if (videoSub) videoSub.innerHTML = '7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600';
