@@ -5427,7 +5427,7 @@ app.get('/dashboard', (c) => {
   }
 
   </script>
-  `, c.env.GA4_MEASUREMENT_ID))
+  `, '', DEFAULT_DESCRIPTION, c.env.GA4_MEASUREMENT_ID))
 })
 
 

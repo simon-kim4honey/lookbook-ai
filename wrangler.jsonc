@@ -21,5 +21,8 @@
       "binding": "LOOKBOOK_KV",
       "id": "6a5dcf373bfb43aea55c958a2b7e7886"
     }
-  ]
+  ],
+  "vars": {
+    "GA4_MEASUREMENT_ID": "G-R2WKD5NZBX"
+  }
 }
