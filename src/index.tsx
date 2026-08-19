@@ -3844,6 +3844,16 @@ app.get('/api/video/:jobId/status', async (c) => {
       ? (Date.now() - new Date(existing.created_at.replace(' ', 'T') + 'Z').getTime()) > 15 * 60 * 1000
       : false
 
+    // Atlas 응답이 불명확한 3가지 경우(조회 실패 / 비종결 상태 / URL 파싱 실패)에서 공통으로 쓰는
+    // 판정: 15분 타임아웃 전이면 "처리 중"으로 유지해 다음 폴링을 기다리고, 타임아웃 후에만 최종 실패 처리한다.
+    const waitOrGiveUp = async (progress: number, timeoutError: string) => {
+      if (isTimedOut) {
+        const refund = await markVideoFailedAndRefund(db, jobId)
+        return c.json({ status: 'failed', progress: 100, error: timeoutError, ...refund })
+      }
+      return c.json({ status: 'processing', progress })
+    }
+
     let pollRes: any
     try {
       pollRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
@@ -3851,25 +3861,19 @@ app.get('/api/video/:jobId/status', async (c) => {
       }).then(r => r.json())
     } catch (fetchErr: any) {
       console.error('Atlas 상태 조회 일시 실패:', fetchErr)
-      if (isTimedOut) {
-        const refund = await markVideoFailedAndRefund(db, jobId)
-        return c.json({ status: 'failed', progress: 100, error: '영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)', ...refund })
-      }
-      return c.json({ status: 'processing', progress: 50 })
+      return await waitOrGiveUp(50, '영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)')
     }
 
-    const status = pollRes.data?.status ?? pollRes.status
-    const terminalStatuses = new Set(['completed', 'succeeded', 'failed', 'timeout', 'canceled', 'error'])
+    // 모델/제공사에 따라 상태 문자열의 대소문자가 다를 수 있어 소문자로 정규화한다
+    // (예: 이 대소문자 불일치 하나 때문에 실제로 완료된 영상이 영원히 "처리 중"으로 남는 사고가 있었음)
+    const status = String(pollRes.data?.status ?? pollRes.status ?? '').toLowerCase()
+    const terminalStatuses = new Set(['completed', 'succeeded', 'success', 'failed', 'failure', 'timeout', 'canceled', 'cancelled', 'error'])
 
     if (!terminalStatuses.has(status)) {
-      if (isTimedOut) {
-        const refund = await markVideoFailedAndRefund(db, jobId)
-        return c.json({ status: 'failed', progress: 100, error: '영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)', ...refund })
-      }
-      return c.json({ status: 'processing', progress: 50 })
+      return await waitOrGiveUp(50, '영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)')
     }
 
-    if (status !== 'completed' && status !== 'succeeded') {
+    if (status !== 'completed' && status !== 'succeeded' && status !== 'success') {
       console.error('video status 실패:', status, pollRes)
       const refund = await markVideoFailedAndRefund(db, jobId)
       return c.json({ status: 'failed', progress: 100, error: '영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)', ...refund })
@@ -3884,11 +3888,7 @@ app.get('/api/video/:jobId/status', async (c) => {
       // Atlas는 완료라고 응답했지만 URL 파싱에 실패한 경우 — 응답 구조가 예상과 다를 수 있으므로
       // 곧바로 환불하지 않고, 15분을 넘기지 않았다면 처리 중으로 유지해 다음 폴링에서 재확인한다.
       console.error('video 완료 응답이지만 URL 파싱 실패:', JSON.stringify(pollRes).slice(0, 500))
-      if (isTimedOut) {
-        const refund = await markVideoFailedAndRefund(db, jobId)
-        return c.json({ status: 'failed', progress: 100, error: '영상 URL을 찾을 수 없습니다. (크레딧은 차감되지 않았습니다)', ...refund })
-      }
-      return c.json({ status: 'processing', progress: 90 })
+      return await waitOrGiveUp(90, '영상 URL을 찾을 수 없습니다. (크레딧은 차감되지 않았습니다)')
     }
 
     // 완료 즉시 생성내역에 URL 저장
