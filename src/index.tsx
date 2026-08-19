@@ -55,10 +55,12 @@ app.use('/static/*', serveStatic({ root: './public' }))
 
 // studiob.aifashion.co.kr → www.aifashion.co.kr 전체 경로 리다이렉트
 // studiob 도메인은 더 이상 별도 서비스로 쓰지 않고, www 하나로 통합 (경로/쿼리 그대로 유지)
-// 진행 중인 API 요청(세션 유지 등)은 리다이렉트에서 제외
+// 진행 중인 API 요청(세션 유지 등)과 PG 웹훅/콜백(/payment/*)은 리다이렉트에서 제외 —
+// 웹훅 발신 서버는 302를 따라가지 않는 경우가 많아, 등록된 웹훅 URL이 구 도메인이면
+// 통보 자체가 조용히 유실될 수 있다(예: 나이스페이 결제취소 통보가 관리자에게 전달되지 않던 사고).
 app.use('*', async (c, next) => {
   const host = c.req.header('host') || ''
-  if (host.includes('studiob.aifashion.co.kr') && !c.req.path.startsWith('/api/')) {
+  if (host.includes('studiob.aifashion.co.kr') && !c.req.path.startsWith('/api/') && !c.req.path.startsWith('/payment/')) {
     const url = new URL(c.req.url)
     return c.redirect(`https://www.aifashion.co.kr${url.pathname}${url.search}`, 302)
   }
@@ -3920,6 +3922,35 @@ app.get('/api/video/:jobId/status', async (c) => {
     // 다음 폴링에서 재시도하도록 한다. 실제 타임아웃 판정은 이 함수 상단의 15분 체크가 담당한다.
     console.error('video status poll error (재시도 예정):', err)
     return c.json({ status: 'processing', progress: 50 })
+  }
+})
+
+// GET /api/admin/debug/atlas-job/:jobId — Atlas Cloud의 원본 응답을 그대로 확인 (진단용)
+// 이 샌드박스는 Atlas Cloud에 네트워크 접근이 불가능해 실제 응답 구조를 직접 볼 방법이 없다 —
+// 배포된 Worker는 실제 인터넷 접근이 가능하므로, 이 엔드포인트로 실제 응답을 그대로 받아
+// status/video URL 필드 구조가 우리 파싱 로직과 맞는지 확인한다.
+app.get('/api/admin/debug/atlas-job/:jobId', adminAuth, async (c) => {
+  const jobId = c.req.param('jobId')
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const dbRow = await db.prepare(
+      `SELECT id, job_id, kind, status, video_url, created_at FROM generation_logs WHERE job_id = ?`
+    ).bind(jobId).first()
+
+    const atlasRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
+      headers: { 'Authorization': `Bearer ${c.env.ATLAS_API_KEY}` },
+    })
+    const atlasText = await atlasRes.text()
+    let atlasJson: any = null
+    try { atlasJson = JSON.parse(atlasText) } catch {}
+
+    return c.json({
+      dbRow,
+      atlasHttpStatus: atlasRes.status,
+      atlasRaw: atlasJson ?? atlasText,
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
   }
 })
 

@@ -905,6 +905,8 @@ footer {
   padding: 48px 40px;
   width: 100%;
   max-width: 440px;
+  max-height: 90dvh;
+  overflow-y: auto;
   position: relative;
   transform: translateY(20px);
   transition: var(--transition);
