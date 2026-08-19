@@ -2261,11 +2261,14 @@ footer {
 }
 .gen-video-promo-text { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.5; margin: 0; }
 .gen-video-promo-player {
+  /* width:100% + aspect-ratio + max-height를 각각 독립적으로 주면, 화면이 짧아 max-height가
+     실제로 높이를 잘라낼 때 너비는 그대로 100%로 남아 9:16 비율이 깨진다(실제로 발생 확인됨) —
+     대신 max-height 상당의 값을 max-width로 환산해 너비 쪽에서 비율을 지키며 제한한다. */
   position: relative;
-  margin-top: 12px;
   width: 100%;
+  max-width: calc(50vh * 9 / 16);
   aspect-ratio: 9 / 16;
-  max-height: 50vh;
+  margin: 12px auto 0;
   border-radius: 8px;
   overflow: hidden;
   background: #000;
