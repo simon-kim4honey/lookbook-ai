@@ -5306,7 +5306,7 @@ app.get('/dashboard', (c) => {
       </a>
 
       <!-- 크레딧 상세 -->
-      <a href="/dashboard#credits" class="db-menu-item" id="menuCredits">
+      <a href="/credits" class="db-menu-item">
         <span class="db-menu-label">크레딧 상세</span>
         <span class="db-menu-arrow">›</span>
       </a>
@@ -5357,35 +5357,6 @@ app.get('/dashboard', (c) => {
         <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
           <div style="font-size:40px;margin-bottom:12px;">🎨</div>
           생성 내역을 불러오는 중...
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 크레딧 상세 패널 (해시 #credits) -->
-  <div id="creditsPanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;overflow-y:auto;">
-    <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
-      <!-- 헤더 -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-        <button onclick="document.getElementById('creditsPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
-        <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">크레딧 상세</h2>
-      </div>
-      <!-- 잔여 크레딧 -->
-      <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;">
-        <div>
-          <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">잔여 크레딧</div>
-          <div id="creditsPanelBalance" style="font-size:28px;font-weight:800;color:#a78bfa;">-</div>
-        </div>
-        <button class="db-charge-btn" onclick="openChargePanel()">충전</button>
-      </div>
-      <!-- 유효기간/환불 안내 -->
-      <div style="background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;">
-        <span style="font-size:12px;color:#c4b5fd;line-height:1.5;">충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다.</span>
-      </div>
-      <div id="creditsList" style="display:flex;flex-direction:column;gap:10px;">
-        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
-          <div style="font-size:40px;margin-bottom:12px;">💎</div>
-          크레딧 내역을 불러오는 중...
         </div>
       </div>
     </div>
@@ -5443,14 +5414,9 @@ app.get('/dashboard', (c) => {
 
     // 해시 처리
     if (location.hash === '#history') openHistory();
-    if (location.hash === '#credits') openCredits();
     document.getElementById('menuHistory').addEventListener('click', (e) => {
       e.preventDefault();
       openHistory();
-    });
-    document.getElementById('menuCredits').addEventListener('click', (e) => {
-      e.preventDefault();
-      openCredits();
     });
   });
 
@@ -5458,67 +5424,6 @@ app.get('/dashboard', (c) => {
     history.replaceState(null,'','/dashboard#history');
     document.getElementById('historyPanel').style.display = 'block';
     loadHistory();
-  }
-
-  function openCredits() {
-    history.replaceState(null,'','/dashboard#credits');
-    document.getElementById('creditsPanel').style.display = 'block';
-    loadCreditHistory();
-  }
-
-  // ── 크레딧 내역 사유 코드 → 화면 표시 라벨 ──
-  const CREDIT_REASON_LABEL = {
-    payment:                 '크레딧 충전',
-    signup_bonus:            '가입 축하 크레딧',
-    admin_grant:             '관리자 지급',
-    admin_set:               '관리자 조정',
-    image_download:          '이미지 다운로드',
-    video_generation:        '2K 영상 생성',
-    video_generation_failed: '영상 생성 실패 환불',
-    payment_refund:          '결제 환불',
-    payment_cancel:          '결제 취소 회수',
-  };
-
-  async function loadCreditHistory() {
-    const listEl = document.getElementById('creditsList');
-    try {
-      const token = localStorage.getItem('lookbook_token') || '';
-      const res = await fetch('/api/credits/history', { headers: { 'X-Session-Token': token } });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error || data.message || '조회 실패');
-
-      document.getElementById('creditsPanelBalance').textContent = (data.credits ?? 0).toLocaleString() + ' 크레딧';
-
-      const logs = data.logs || [];
-      if (logs.length === 0) {
-        listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역이 없습니다.</div>';
-        return;
-      }
-
-      listEl.innerHTML = logs.map(row => {
-        const isPositive = row.amount > 0;
-        const dateStr = (row.created_at || '').replace('T', ' ').slice(0, 16);
-        const label = CREDIT_REASON_LABEL[row.reason] || row.reason || '크레딧 변동';
-        const krwLine = row.reason === 'payment' && row.krw_amount
-          ? \`<div style="font-size:11px;color:#8b8ba0;margin-top:2px;">\${Number(row.krw_amount).toLocaleString()}\${row.pg_currency === 'KRW' || !row.pg_currency ? '원' : ' ' + row.pg_currency} 결제</div>\`
-          : '';
-        return \`
-          <div style="background:#16162a;border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
-            <div style="min-width:0;">
-              <div style="font-size:14px;font-weight:600;color:#e0e0f0;">\${label}</div>
-              <div style="font-size:11px;color:#5a5a7a;margin-top:2px;">\${dateStr}</div>
-              \${krwLine}
-            </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-size:15px;font-weight:800;color:\${isPositive ? '#4ade80' : '#f87171'};">\${isPositive ? '+' : ''}\${row.amount.toLocaleString()}</div>
-              <div style="font-size:11px;color:#8b8ba0;margin-top:2px;">잔여 \${row.balance.toLocaleString()}</div>
-            </div>
-          </div>\`;
-      }).join('');
-    } catch (err) {
-      console.error('크레딧 내역 조회 실패:', err);
-      listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역을 불러오지 못했습니다.</div>';
-    }
   }
 
   // ── 순번 포맷: YYYYMMDDHHMM + zero-padded seq_no ──
@@ -5984,6 +5889,91 @@ app.get('/dashboard', (c) => {
 
   </script>
   `, '', DEFAULT_DESCRIPTION, c.env.GA4_MEASUREMENT_ID))
+})
+
+// ─── 크레딧 상세 페이지 (충전/사용/환불 내역, 잔여 크레딧) ───
+// 로그인 필요 — 결제서비스(PG) 심사 등에서 직접 접근 가능한 URL로 요구되어 별도 라우트로 분리.
+app.get('/credits', (c) => {
+  return c.html(htmlShell('크레딧 상세', `
+  <div class="toast-container" id="toastContainer"></div>
+
+  <style>
+    body { background: #0d0d1a; }
+    .cr-wrap {
+      min-height: 100vh;
+      padding: 48px 16px 80px;
+      background: #0d0d1a;
+    }
+    .cr-inner { max-width: 480px; margin: 0 auto; }
+    .cr-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 32px;
+      text-decoration: none;
+    }
+    .cr-logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg,#6c47ff,#a855f7);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .cr-logo-text { font-size: 18px; font-weight: 800; color: #f0f0f8; }
+    .cr-back {
+      width: 36px; height: 36px; border: none; background: #2a2a45; border-radius: 50%;
+      color: #e0e0f0; font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      text-decoration: none;
+    }
+  </style>
+
+  <div class="cr-wrap">
+    <div class="cr-inner">
+      <a href="/generator" class="cr-logo">
+        <div class="cr-logo-icon">✨</div>
+        <span class="cr-logo-text">EZlook</span>
+      </a>
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <a href="/dashboard" class="cr-back">‹</a>
+        <h1 style="font-size:18px;font-weight:700;color:#f0f0f8;margin:0;">크레딧 상세</h1>
+      </div>
+
+      <!-- 잔여 크레딧 -->
+      <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">잔여 크레딧</div>
+          <div id="creditsPanelBalance" style="font-size:28px;font-weight:800;color:#a78bfa;">-</div>
+        </div>
+        <button class="db-charge-btn" onclick="openChargePanel()" style="padding:9px 20px;background:#6c47ff;color:white;border:none;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;">충전</button>
+      </div>
+
+      <!-- 유효기간/환불 안내 -->
+      <div style="background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;">
+        <span style="font-size:12px;color:#c4b5fd;line-height:1.5;">충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다. 환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#a78bfa;">환불정책</a>을 확인해주세요.</span>
+      </div>
+
+      <div id="creditsList" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
+          <div style="font-size:40px;margin-bottom:12px;">💎</div>
+          크레딧 내역을 불러오는 중...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      await verifySession();
+      if (!AppState.user) {
+        window.location.href = '/';
+        return;
+      }
+      loadCreditHistory();
+    });
+  </script>
+  `, '', '내 크레딧 충전/사용 내역과 잔여 크레딧을 확인하세요.', c.env.GA4_MEASUREMENT_ID))
 })
 
 

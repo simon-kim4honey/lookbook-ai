@@ -1518,6 +1518,67 @@ function updateUserUI(partial) {
   }
 }
 
+// ─────────────────────────────────────────────────────────
+// 크레딧 상세 내역 (/credits 페이지 전용)
+// ─────────────────────────────────────────────────────────
+
+// 크레딧 내역 사유 코드 → 화면 표시 라벨
+const CREDIT_REASON_LABEL = {
+  payment:                 '크레딧 충전',
+  signup_bonus:            '가입 축하 크레딧',
+  admin_grant:             '관리자 지급',
+  admin_set:               '관리자 조정',
+  image_download:          '이미지 다운로드',
+  video_generation:        '2K 영상 생성',
+  video_generation_failed: '영상 생성 실패 환불',
+  payment_refund:          '결제 환불',
+  payment_cancel:          '결제 취소 회수',
+};
+
+async function loadCreditHistory() {
+  const listEl = document.getElementById('creditsList');
+  if (!listEl) return;
+  try {
+    const token = localStorage.getItem('lookbook_token') || '';
+    const res = await fetch('/api/credits/history', { headers: { 'X-Session-Token': token } });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || data.message || '조회 실패');
+
+    const balanceEl = document.getElementById('creditsPanelBalance');
+    if (balanceEl) balanceEl.textContent = (data.credits ?? 0).toLocaleString() + ' 크레딧';
+
+    const logs = data.logs || [];
+    if (logs.length === 0) {
+      listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역이 없습니다.</div>';
+      return;
+    }
+
+    listEl.innerHTML = logs.map(row => {
+      const isPositive = row.amount > 0;
+      const dateStr = (row.created_at || '').replace('T', ' ').slice(0, 16);
+      const label = CREDIT_REASON_LABEL[row.reason] || row.reason || '크레딧 변동';
+      const krwLine = row.reason === 'payment' && row.krw_amount
+        ? `<div style="font-size:11px;color:#8b8ba0;margin-top:2px;">${Number(row.krw_amount).toLocaleString()}${row.pg_currency === 'KRW' || !row.pg_currency ? '원' : ' ' + row.pg_currency} 결제</div>`
+        : '';
+      return `
+        <div style="background:#16162a;border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="min-width:0;">
+            <div style="font-size:14px;font-weight:600;color:#e0e0f0;">${label}</div>
+            <div style="font-size:11px;color:#5a5a7a;margin-top:2px;">${dateStr}</div>
+            ${krwLine}
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:15px;font-weight:800;color:${isPositive ? '#4ade80' : '#f87171'};">${isPositive ? '+' : ''}${row.amount.toLocaleString()}</div>
+            <div style="font-size:11px;color:#8b8ba0;margin-top:2px;">잔여 ${row.balance.toLocaleString()}</div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch (err) {
+    console.error('크레딧 내역 조회 실패:', err);
+    listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역을 불러오지 못했습니다.</div>';
+  }
+}
+
 /** 세션 서버 검증 (페이지 로드 시) — 항상 Promise 반환 */
 async function verifySession() {
   const token = localStorage.getItem('lookbook_token');
