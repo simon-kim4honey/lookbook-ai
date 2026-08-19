@@ -38,7 +38,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
      LEFT JOIN brand_analysis a ON a.id = (SELECT id FROM brand_analysis WHERE brand_id=b.id ORDER BY analyzed_at DESC LIMIT 1)
      LEFT JOIN outreach_drafts d ON d.id = (SELECT id FROM outreach_drafts WHERE brand_id=b.id ORDER BY created_at DESC LIMIT 1)
      ORDER BY a.priority_score DESC`).all(),n=e=>`"${String(e??``).replace(/"/g,`""`)}"`,r=[`id`,`country`,`platform`,`brand`,`category`,`brand_url`,`contact_email`,`status`,`price_tier`,`priority_score`,`language`,`subject`,`draft_body`,`draft_status`],i=[r.join(`,`)];for(let e of t)i.push(r.map(t=>n(e[t])).join(`,`));return e.text(i.join(`
-`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszoevca`,We=e=>e?`
+`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszoeyvk`,We=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1382,8 +1382,18 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
   <div class="modal-overlay" id="actionProgressModal" style="z-index:10500;">
     <div class="action-progress-box">
       <div id="actionProgressSpinner" class="action-progress-spinner"></div>
+      <div id="actionProgressCheck" class="action-progress-check" style="display:none;"><i class="fas fa-check"></i></div>
       <div id="actionProgressText" class="action-progress-text">처리 중...</div>
+      <div id="actionProgressShare" class="action-progress-share" style="display:none;">
+        <button class="action-progress-share-btn link" onclick="copyShareLink()">
+          <i class="fas fa-link"></i> 링크복사
+        </button>
+        <button id="actionProgressKakaoBtn" class="action-progress-share-btn kakao" onclick="shareToKakao()" style="display:none;">
+          <i class="fas fa-comment"></i> 카카오톡 공유
+        </button>
+      </div>
       <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
+      <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
   </div>
 
@@ -1850,13 +1860,13 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     const a = document.createElement('a');
     a.href = dlUrl; a.download = \`lookbook_ai_video_\${Date.now()}.mp4\`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    showToast('영상 다운로드를 시작합니다.', 'success');
 
-    // 이미지 다운로드와 동일하게 공유(링크복사/카카오톡) 옵션을 토스트로 노출
+    // 이미지 다운로드와 동일하게 공유(링크복사/카카오톡) 팝업 노출
     // 카카오톡 카드는 영상을 미리보기로 못 그리므로 정지 이미지(첫 프레임)를 사용
     if (jobId) {
+      openModal('actionProgressModal');
       setActionComplete('영상 다운로드가 시작되었습니다.', { showShare: true, jobId: jobId, idx: 0, imageUrl: thumbUrl || videoUrl });
-    } else {
-      showToast('영상 다운로드를 시작합니다.', 'success');
     }
 
     if (btn) btn.innerHTML = '<i class="fas fa-download"></i> 재다운로드';
@@ -2249,8 +2259,18 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
   <div class="modal-overlay" id="actionProgressModal" style="z-index:10500;">
     <div class="action-progress-box">
       <div id="actionProgressSpinner" class="action-progress-spinner"></div>
+      <div id="actionProgressCheck" class="action-progress-check" style="display:none;"><i class="fas fa-check"></i></div>
       <div id="actionProgressText" class="action-progress-text">처리 중...</div>
+      <div id="actionProgressShare" class="action-progress-share" style="display:none;">
+        <button class="action-progress-share-btn link" onclick="copyShareLink()">
+          <i class="fas fa-link"></i> 링크복사
+        </button>
+        <button id="actionProgressKakaoBtn" class="action-progress-share-btn kakao" onclick="shareToKakao()" style="display:none;">
+          <i class="fas fa-comment"></i> 카카오톡 공유
+        </button>
+      </div>
       <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
+      <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
   </div>
 

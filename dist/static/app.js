@@ -851,29 +851,36 @@ let _kakaoJsKey = null;
 
 function openActionProgress(text) {
   const spinner = document.getElementById('actionProgressSpinner');
+  const check = document.getElementById('actionProgressCheck');
   const textEl = document.getElementById('actionProgressText');
+  const share = document.getElementById('actionProgressShare');
+  const closeBtn = document.getElementById('actionProgressCloseBtn');
   if (spinner) spinner.style.display = '';
+  if (check) check.style.display = 'none';
   if (textEl) textEl.textContent = text;
+  if (share) share.style.display = 'none';
+  if (closeBtn) closeBtn.style.display = 'none';
   openModal('actionProgressModal');
 }
 
-// 완료 알림 + 공유 버튼을 모달 대신 토스트로 표시 (진행 중 스피너 모달은 그대로 닫음)
 function setActionComplete(text, opts) {
   opts = opts || {};
-  closeActionProgress();
-
+  const spinner = document.getElementById('actionProgressSpinner');
+  const check = document.getElementById('actionProgressCheck');
+  const textEl = document.getElementById('actionProgressText');
+  const share = document.getElementById('actionProgressShare');
+  const closeBtn = document.getElementById('actionProgressCloseBtn');
+  const kakaoBtn = document.getElementById('actionProgressKakaoBtn');
+  if (spinner) spinner.style.display = 'none';
+  if (check) check.style.display = 'flex';
+  if (textEl) textEl.textContent = text;
+  if (closeBtn) closeBtn.style.display = '';
   if (opts.showShare && opts.jobId && opts.idx != null && opts.idx >= 0) {
     _shareCtx = { jobId: opts.jobId, idx: opts.idx, imageUrl: opts.imageUrl || '' };
-    const kakaoBtnHtml = _kakaoJsKey
-      ? `<button class="toast-share-btn kakao" onclick="shareToKakao()"><i class="fas fa-comment"></i> 카카오톡 공유</button>`
-      : '';
-    const html = `${text}<div class="toast-share-actions">
-      <button class="toast-share-btn link" onclick="copyShareLink()"><i class="fas fa-link"></i> 링크복사</button>
-      ${kakaoBtnHtml}
-    </div>`;
-    showToast(html, 'success', 6000);
-  } else {
-    showToast(text, 'success');
+    if (share) share.style.display = 'flex';
+    if (kakaoBtn) kakaoBtn.style.display = _kakaoJsKey ? '' : 'none';
+  } else if (share) {
+    share.style.display = 'none';
   }
 }
 
@@ -3370,10 +3377,13 @@ function downloadVideo() {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  showToast('영상 다운로드를 시작합니다.', 'success');
 
-  // 다운로드 후 이미지와 동일하게 공유(링크복사/카카오톡) 옵션을 토스트로 노출
+  // 다운로드 후 이미지와 동일하게 공유(링크복사/카카오톡) 옵션 노출
+  // (setActionComplete는 모달을 열지 않고 상태만 바꾸므로 먼저 열어줘야 함)
   // 카카오톡 카드는 영상을 미리보기로 못 그리므로 소스 정지 이미지를 사용
   const sourceImg = AppState.generatedImages[0];
+  openModal('actionProgressModal');
   setActionComplete('영상 다운로드가 시작되었습니다.', {
     showShare: true,
     jobId: _videoState.jobId,

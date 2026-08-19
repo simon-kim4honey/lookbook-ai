@@ -2670,25 +2670,6 @@ footer {
 .toast.error { border-left-color: #f87171; }
 .toast.warning { border-left-color: #fbbf24; }
 .toast button { color: rgba(255,255,255,0.5) !important; }
-.toast-share-actions { display: flex; gap: 8px; margin-top: 10px; }
-.toast-share-btn {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 9px 10px;
-  border-radius: 10px;
-  border: none;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: var(--transition);
-}
-.toast-share-btn.link { background: rgba(255,255,255,0.1); color: #e0e0f0 !important; }
-.toast-share-btn.link:hover { background: rgba(255,255,255,0.16); }
-.toast-share-btn.kakao { background: #FEE500; color: #3C1E1E !important; }
-.toast-share-btn.kakao:hover { filter: brightness(0.96); }
 @keyframes toastSlideUp {
   from { transform: translateY(100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
