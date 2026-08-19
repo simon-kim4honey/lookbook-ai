@@ -38,7 +38,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
      LEFT JOIN brand_analysis a ON a.id = (SELECT id FROM brand_analysis WHERE brand_id=b.id ORDER BY analyzed_at DESC LIMIT 1)
      LEFT JOIN outreach_drafts d ON d.id = (SELECT id FROM outreach_drafts WHERE brand_id=b.id ORDER BY created_at DESC LIMIT 1)
      ORDER BY a.priority_score DESC`).all(),n=e=>`"${String(e??``).replace(/"/g,`""`)}"`,r=[`id`,`country`,`platform`,`brand`,`category`,`brand_url`,`contact_email`,`status`,`price_tier`,`priority_score`,`language`,`subject`,`draft_body`,`draft_status`],i=[r.join(`,`)];for(let e of t)i.push(r.map(t=>n(e[t])).join(`,`));return e.text(i.join(`
-`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszoxpa6`,We=e=>e?`
+`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszqnvbx`,We=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1383,6 +1383,23 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     </button>
   </div>
 
+  <!-- 영상 생성 중 오버레이 (generator 페이지의 영상 생성 로딩 화면과 동일 — 대시보드에서는
+       position:fixed로 뷰포트 전체를 덮도록 조정) -->
+  <div class="generating-view" id="videoGeneratingView" style="position:fixed;z-index:10500;">
+    <div class="gen-news-tag" id="videoGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
+    <div class="gen-news" id="videoGenViewNews" style="display:none;"></div>
+    <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 영상을 생성 중입니다...</h2>
+    <div class="gen-progress-bar"><div class="gen-progress-fill" id="videoGenProgressFill" style="width:0%"></div></div>
+    <div class="gen-status-text" id="videoGenStatusText">시작 중...</div>
+    <div class="gen-status-msgs">
+      <div class="gen-msg current" id="vmsg1"><div class="dot"></div> 영상 생성 요청 중...</div>
+      <div class="gen-msg" id="vmsg2"><div class="dot"></div> 자연스러운 포즈 동작 생성 중...</div>
+      <div class="gen-msg" id="vmsg3"><div class="dot"></div> 배경음악 합성 중...</div>
+      <div class="gen-msg" id="vmsg4"><div class="dot"></div> 영상 렌더링 중...</div>
+      <div class="gen-msg" id="vmsg5"><div class="dot"></div> 최종 인코딩 중...</div>
+    </div>
+  </div>
+
   <!-- Action Progress Modal (다운로드 진행 중 + 완료 팝업 — generator 페이지와 동일 구조 공유) -->
   <div class="modal-overlay" id="actionProgressModal" style="z-index:10500;">
     <div class="action-progress-box">
@@ -1516,7 +1533,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 
     const btn = document.getElementById('histModalVideoBtn');
     if (btn) btn.disabled = true;
-    openActionProgress('영상 생성 요청 중...');
+    _showVideoGeneratingView();
 
     try {
       const startRes = await fetch('/api/video/start', {
@@ -1525,20 +1542,20 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         body: JSON.stringify({ imageUrl: ctx.imageUrl, modelName: ctx.modelName, bgName: ctx.bgName }),
       });
       if (startRes.status === 401) {
-        closeActionProgress();
+        _hideVideoGeneratingView();
         showToast('로그인이 필요합니다.', 'error');
         if (btn) btn.disabled = false;
         return;
       }
       if (startRes.status === 402) {
-        closeActionProgress();
+        _hideVideoGeneratingView();
         const errData = await startRes.json();
         showToast(\`크레딧이 부족합니다. (보유: \${errData.available ?? 0}크레딧 / 필요: \${errData.required ?? 600}크레딧)\`, 'error');
         if (btn) btn.disabled = false;
         return;
       }
       if (!startRes.ok) {
-        closeActionProgress();
+        _hideVideoGeneratingView();
         const errData = await startRes.json().catch(() => ({}));
         showToast(errData.message || '영상 생성 요청에 실패했습니다.', 'error');
         if (btn) btn.disabled = false;
@@ -1552,13 +1569,13 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         const dbCredEl = document.getElementById('dbCredits');
         if (dbCredEl) dbCredEl.textContent = (startData.creditsRemaining ?? 0).toLocaleString();
       }
-      openActionProgress('AI가 영상을 생성 중입니다... (최대 2~3분 소요)');
+      _startVideoFakeProgress();
       await _pollHistVideoStatus(startData.jobId, btn);
     } catch (err) {
       // 네트워크 오류로 요청/응답이 유실된 경우, 서버에는 이미 요청이 접수되어 정상
       // 진행 중일 수 있다 — "실패"로 단정하지 않고 생성내역에서 확인하도록 안내한다.
       console.error('영상 생성 오류:', err);
-      closeActionProgress();
+      _hideVideoGeneratingView();
       showToast('영상 생성 요청 중 네트워크 오류가 발생했습니다. 잠시 후 생성내역에서 확인해주세요.', 'error');
       if (btn) btn.disabled = false;
     }
@@ -1569,13 +1586,14 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       const res = await fetch(\`/api/video/\${jobId}/status\`);
       const data = await res.json();
       if (data.status === 'completed' && data.videoUrl) {
-        setActionComplete('영상 생성이 완료되었습니다!');
+        _hideVideoGeneratingView();
+        showToast('영상 생성이 완료되었습니다!', 'success');
         closeHistModal();
         loadHistory();
         return;
       }
       if (data.status === 'failed') {
-        closeActionProgress();
+        _hideVideoGeneratingView();
         if (data.creditsRemaining !== undefined) {
           const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
           if (cachedUser) { cachedUser.credits = data.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
