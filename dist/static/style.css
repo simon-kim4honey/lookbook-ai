@@ -2271,14 +2271,16 @@ footer {
   background: #000;
 }
 /* 여러 영상을 겹쳐 두고 opacity 크로스페이드로 전환 — src 교체 시 생기는 깜빡임(블랙 프레임) 방지.
-   object-fit: cover로 원본 비율과 무관하게 박스를 항상 꽉 채움(여백 없이 크롭). */
+   업로드 영상은 박스와 동일한 9:16 세로 비율로 등록하는 것을 전제로 함 —
+   비율이 정확히 맞으면 object-fit: cover가 크롭 없이 박스를 꽉 채운다.
+   (혹시 비율이 살짝 다른 영상이 올라와도 여백 없이 채워지도록 cover는 유지하되,
+   위/아래 어느 한쪽으로 치우쳐 자르지 않도록 object-position은 기본값(중앙)을 사용) */
 .gen-video-promo-player video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 20%; /* 인물 영상은 보통 얼굴이 위쪽에 있어 하단보다 상단 위주로 크롭 */
   opacity: 0;
   transition: opacity 0.4s ease;
 }
