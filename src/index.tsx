@@ -3925,6 +3925,35 @@ app.get('/api/video/:jobId/status', async (c) => {
   }
 })
 
+// GET /api/admin/debug/atlas-job/:jobId — Atlas Cloud의 원본 응답을 그대로 확인 (진단용)
+// 이 샌드박스는 Atlas Cloud에 네트워크 접근이 불가능해 실제 응답 구조를 직접 볼 방법이 없다 —
+// 배포된 Worker는 실제 인터넷 접근이 가능하므로, 이 엔드포인트로 실제 응답을 그대로 받아
+// status/video URL 필드 구조가 우리 파싱 로직과 맞는지 확인한다.
+app.get('/api/admin/debug/atlas-job/:jobId', adminAuth, async (c) => {
+  const jobId = c.req.param('jobId')
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const dbRow = await db.prepare(
+      `SELECT id, job_id, kind, status, video_url, created_at FROM generation_logs WHERE job_id = ?`
+    ).bind(jobId).first()
+
+    const atlasRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
+      headers: { 'Authorization': `Bearer ${c.env.ATLAS_API_KEY}` },
+    })
+    const atlasText = await atlasRes.text()
+    let atlasJson: any = null
+    try { atlasJson = JSON.parse(atlasText) } catch {}
+
+    return c.json({
+      dbRow,
+      atlasHttpStatus: atlasRes.status,
+      atlasRaw: atlasJson ?? atlasText,
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 // ────────────────────────────────────────────────────
 // ────────────────────────────────────────────────────
 // Admin API Routes
