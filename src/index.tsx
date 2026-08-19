@@ -55,10 +55,12 @@ app.use('/static/*', serveStatic({ root: './public' }))
 
 // studiob.aifashion.co.kr → www.aifashion.co.kr 전체 경로 리다이렉트
 // studiob 도메인은 더 이상 별도 서비스로 쓰지 않고, www 하나로 통합 (경로/쿼리 그대로 유지)
-// 진행 중인 API 요청(세션 유지 등)은 리다이렉트에서 제외
+// 진행 중인 API 요청(세션 유지 등)과 PG 웹훅/콜백(/payment/*)은 리다이렉트에서 제외 —
+// 웹훅 발신 서버는 302를 따라가지 않는 경우가 많아, 등록된 웹훅 URL이 구 도메인이면
+// 통보 자체가 조용히 유실될 수 있다(예: 나이스페이 결제취소 통보가 관리자에게 전달되지 않던 사고).
 app.use('*', async (c, next) => {
   const host = c.req.header('host') || ''
-  if (host.includes('studiob.aifashion.co.kr') && !c.req.path.startsWith('/api/')) {
+  if (host.includes('studiob.aifashion.co.kr') && !c.req.path.startsWith('/api/') && !c.req.path.startsWith('/payment/')) {
     const url = new URL(c.req.url)
     return c.redirect(`https://www.aifashion.co.kr${url.pathname}${url.search}`, 302)
   }
