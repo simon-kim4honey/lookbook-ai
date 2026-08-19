@@ -2856,6 +2856,65 @@ app.post('/payment/webhook', async (c) => {
   }
 })
 
+// GET /api/admin/debug/recent-payments — 최근 결제 내역 조회 (진단용)
+// 나이스페이 웹훅이 안 들어와서 취소 처리가 누락된 건을 찾을 때, user_id를 몰라도
+// order_id를 바로 찾을 수 있도록 회원 이메일/이름과 함께 반환한다.
+app.get('/api/admin/debug/recent-payments', adminAuth, async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const rows = await db.prepare(
+      `SELECT p.order_id, p.user_id, u.email, u.name, p.amount, p.credits, p.status,
+              p.pg_provider, p.currency, p.created_at, p.paid_at
+       FROM payment_logs p
+       LEFT JOIN users u ON u.id = p.user_id
+       ORDER BY p.created_at DESC
+       LIMIT 30`
+    ).all()
+    return c.json({ success: true, payments: rows.results || [] })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// POST /api/admin/payments/:orderId/force-cancel — 결제취소 수동 처리 (진단/복구용)
+// 나이스페이 웹훅이 도달하지 못해(예: 등록 실패, 네트워크 문제 등) 결제취소 통보가
+// 안 들어온 경우, 관리자가 수동으로 /payment/webhook과 동일한 크레딧 회수 로직을
+// 실행할 수 있도록 한다. 서명 검증 없이 관리자 인증만으로 실행하므로 adminAuth 필수.
+// 이미 취소 처리된 건은 중복 회수 없이 그대로 응답한다.
+app.post('/api/admin/payments/:orderId/force-cancel', adminAuth, async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  const orderId = c.req.param('orderId')
+  try {
+    const log = await db.prepare(
+      `SELECT id, user_id, credits, status FROM payment_logs WHERE order_id = ?`
+    ).bind(orderId).first() as any
+
+    if (!log) return c.json({ success: false, message: '해당 order_id의 결제 내역을 찾을 수 없습니다.' }, 404)
+    if (log.status === 'canceled') return c.json({ success: true, message: '이미 취소 처리된 건입니다.', revokeAmount: 0 })
+
+    const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(log.user_id).first() as any
+    const currentBalance = userRow?.credits ?? 0
+    const originallyGranted = Number(log.credits) || 0
+    const revokeAmount = Math.min(originallyGranted, currentBalance)
+    const newBalance = Math.max(0, currentBalance - revokeAmount)
+
+    if (revokeAmount > 0) {
+      await db.prepare(`UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`).bind(newBalance, log.user_id).run()
+      await db.prepare(
+        `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+         VALUES (?, 'revoke', ?, ?, 'payment_cancel_manual', ?)`
+      ).bind(log.user_id, -revokeAmount, newBalance, orderId).run()
+    }
+
+    await db.prepare(`UPDATE payment_logs SET status='canceled' WHERE id=?`).bind(log.id).run()
+
+    console.log(`관리자 수동 결제취소 처리 완료 — orderId=${orderId}, 회수 크레딧=${revokeAmount}`)
+    return c.json({ success: true, revokeAmount, newBalance })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 // GET /api/payments/status — 결제 결과 페이지에서 승인 결과 조회 (세션 인증)
 app.get('/api/payments/status', async (c) => {
   try {

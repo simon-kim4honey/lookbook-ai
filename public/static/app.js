@@ -1533,6 +1533,7 @@ const CREDIT_REASON_LABEL = {
   video_generation_failed: '영상 생성 실패 환불',
   payment_refund:          '결제 환불',
   payment_cancel:          '결제 취소 회수',
+  payment_cancel_manual:   '결제 취소 회수',
 };
 
 async function loadCreditHistory() {
