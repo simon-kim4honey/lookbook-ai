@@ -1668,6 +1668,10 @@ app.post('/api/auth/signup', async (c) => {
       INSERT INTO users (id, email, name, password_hash, provider, status, credits, role, agree_marketing, referrer)
       VALUES (?, ?, ?, ?, 'email', 'active', ?, 'user', ?, ?)
     `).bind(id, email.toLowerCase(), name, hash, initialCredits, marketingFlag, referrer).run()
+    await db.prepare(
+      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       VALUES (?, 'grant', ?, ?, 'signup_bonus', ?)`
+    ).bind(id, initialCredits, initialCredits, `signup_${id}`).run()
 
     const token = await createSession(db, id)
     const user = { id, name, email: email.toLowerCase(), role: 'user', credits: initialCredits, avatar_url: null, provider: 'email', referrer }
@@ -1816,6 +1820,10 @@ app.get('/api/auth/kakao/callback', async (c) => {
       } else {
         const id = genUserId()
         await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 200, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
+        await db.prepare(
+          `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+           VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`
+        ).bind(id, `signup_${id}`).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
         isNewUser = true
       }
@@ -1960,6 +1968,10 @@ app.get('/api/auth/google/callback', async (c) => {
       } else {
         const id = genUserId()
         await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 200, 'user')`).bind(id, googleEmail, googleName, providerId, googleAvatar).run()
+        await db.prepare(
+          `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+           VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`
+        ).bind(id, `signup_${id}`).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
         isNewUser = true
       }
@@ -2207,19 +2219,25 @@ app.get('/api/credits/history', async (c) => {
     if (!sessionToken) return c.json({ error: '로그인이 필요합니다.' }, 401)
 
     const sess = await db.prepare(
-      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+      `SELECT s.user_id, u.credits FROM user_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token = ? AND s.expires_at > datetime('now')`
     ).bind(sessionToken).first() as any
     if (!sess) return c.json({ error: '세션이 만료되었습니다.' }, 401)
 
+    // 충전(payment) 내역은 결제 금액(원)도 함께 보여주기 위해 payment_logs를 조인한다
+    // (credit_logs.ref_id === payment_logs.order_id)
     const logs = await db.prepare(
-      `SELECT type, amount, balance, reason, ref_id, created_at
-       FROM credit_logs
-       WHERE user_id = ?
-       ORDER BY created_at DESC
-       LIMIT 100`
+      `SELECT cl.type, cl.amount, cl.balance, cl.reason, cl.ref_id, cl.created_at,
+              p.amount AS krw_amount, p.currency AS pg_currency
+       FROM credit_logs cl
+       LEFT JOIN payment_logs p ON cl.reason = 'payment' AND cl.ref_id = p.order_id
+       WHERE cl.user_id = ?
+       ORDER BY cl.created_at DESC, cl.id DESC
+       LIMIT 200`
     ).bind(sess.user_id).all()
 
-    return c.json({ success: true, logs: logs.results || [] })
+    return c.json({ success: true, credits: sess.credits, logs: logs.results || [] })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -4095,6 +4113,11 @@ ${bodyContent}
       <span id="ctaLabel" data-i18n="pkg-btn">패키지를 선택하세요</span>
     </button>
 
+    <p style="margin-top:14px;font-size:11px;line-height:1.6;color:#8b8ba0;text-align:center;">
+      충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다.<br />
+      환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#a78bfa;">환불정책</a>을 확인해주세요.
+    </p>
+
   </div>
 </div>
 
@@ -4328,6 +4351,8 @@ app.get('/terms', (c) => {
   <p>③ 서비스 오류(AI 생성 실패, 결제 중복 등) 등 회사의 귀책사유로 정상적인 서비스 제공이 불가능한 경우, 이용자는 사용 여부와 관계없이 전액 환불을 요청할 수 있습니다.</p>
   <p>④ 환불 신청은 아래 문의처로 결제 정보(주문번호, 결제일시, 결제수단)와 함께 요청해 주시기 바랍니다. 환불은 신청 접수 후 3영업일 이내에 결제 수단과 동일한 방법으로 처리됩니다.</p>
   <p>⑤ 이용자의 단순 변심에 의한 환불 시, 이미 사용한 크레딧에 해당하는 금액은 환불 대상에서 제외됩니다.</p>
+  <p>⑥ 환불은 결제에 사용된 결제수단(카드) 승인 취소 방식으로만 처리되며, 현금 지급이나 계좌이체를 통한 환불은 불가합니다.</p>
+  <p>⑦ 충전된 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 사용하지 않은 크레딧은 별도 안내 없이 소멸됩니다.</p>
 
   <h2>제9조 (분쟁 해결)</h2>
   <p>본 약관과 관련한 분쟁은 대한민국 법률을 적용하며, 관할 법원은 민사소송법에 따릅니다.</p>
@@ -4938,6 +4963,11 @@ app.get('/', (c) => {
           사업장주소 : 충청북도 청주시 서원구 무심서로 377-3&nbsp;&nbsp;
           전화번호 : 070-4581-8166
         </p>
+        <p>
+          모든 거래에 대한 책임과 환불, 민원 등은 벌거벗은호랑이에서 진행합니다.&nbsp;&nbsp;
+          민원 담당자 : 박민호&nbsp;&nbsp;
+          담당자 연락처 : 070-4581-8166
+        </p>
       </div>
 
       <div class="footer-bottom">
@@ -5275,6 +5305,12 @@ app.get('/dashboard', (c) => {
         <span class="db-menu-arrow">›</span>
       </a>
 
+      <!-- 크레딧 상세 -->
+      <a href="/dashboard#credits" class="db-menu-item" id="menuCredits">
+        <span class="db-menu-label">크레딧 상세</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
       <!-- 카톡 문의 -->
       <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" class="db-menu-item">
         <span class="db-menu-label">카톡 문의</span>
@@ -5321,6 +5357,35 @@ app.get('/dashboard', (c) => {
         <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
           <div style="font-size:40px;margin-bottom:12px;">🎨</div>
           생성 내역을 불러오는 중...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 크레딧 상세 패널 (해시 #credits) -->
+  <div id="creditsPanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;overflow-y:auto;">
+    <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
+      <!-- 헤더 -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <button onclick="document.getElementById('creditsPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+        <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">크레딧 상세</h2>
+      </div>
+      <!-- 잔여 크레딧 -->
+      <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">잔여 크레딧</div>
+          <div id="creditsPanelBalance" style="font-size:28px;font-weight:800;color:#a78bfa;">-</div>
+        </div>
+        <button class="db-charge-btn" onclick="openChargePanel()">충전</button>
+      </div>
+      <!-- 유효기간/환불 안내 -->
+      <div style="background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;">
+        <span style="font-size:12px;color:#c4b5fd;line-height:1.5;">충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다.</span>
+      </div>
+      <div id="creditsList" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
+          <div style="font-size:40px;margin-bottom:12px;">💎</div>
+          크레딧 내역을 불러오는 중...
         </div>
       </div>
     </div>
@@ -5378,9 +5443,14 @@ app.get('/dashboard', (c) => {
 
     // 해시 처리
     if (location.hash === '#history') openHistory();
+    if (location.hash === '#credits') openCredits();
     document.getElementById('menuHistory').addEventListener('click', (e) => {
       e.preventDefault();
       openHistory();
+    });
+    document.getElementById('menuCredits').addEventListener('click', (e) => {
+      e.preventDefault();
+      openCredits();
     });
   });
 
@@ -5388,6 +5458,67 @@ app.get('/dashboard', (c) => {
     history.replaceState(null,'','/dashboard#history');
     document.getElementById('historyPanel').style.display = 'block';
     loadHistory();
+  }
+
+  function openCredits() {
+    history.replaceState(null,'','/dashboard#credits');
+    document.getElementById('creditsPanel').style.display = 'block';
+    loadCreditHistory();
+  }
+
+  // ── 크레딧 내역 사유 코드 → 화면 표시 라벨 ──
+  const CREDIT_REASON_LABEL = {
+    payment:                 '크레딧 충전',
+    signup_bonus:            '가입 축하 크레딧',
+    admin_grant:             '관리자 지급',
+    admin_set:               '관리자 조정',
+    image_download:          '이미지 다운로드',
+    video_generation:        '2K 영상 생성',
+    video_generation_failed: '영상 생성 실패 환불',
+    payment_refund:          '결제 환불',
+    payment_cancel:          '결제 취소 회수',
+  };
+
+  async function loadCreditHistory() {
+    const listEl = document.getElementById('creditsList');
+    try {
+      const token = localStorage.getItem('lookbook_token') || '';
+      const res = await fetch('/api/credits/history', { headers: { 'X-Session-Token': token } });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || data.message || '조회 실패');
+
+      document.getElementById('creditsPanelBalance').textContent = (data.credits ?? 0).toLocaleString() + ' 크레딧';
+
+      const logs = data.logs || [];
+      if (logs.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역이 없습니다.</div>';
+        return;
+      }
+
+      listEl.innerHTML = logs.map(row => {
+        const isPositive = row.amount > 0;
+        const dateStr = (row.created_at || '').replace('T', ' ').slice(0, 16);
+        const label = CREDIT_REASON_LABEL[row.reason] || row.reason || '크레딧 변동';
+        const krwLine = row.reason === 'payment' && row.krw_amount
+          ? \`<div style="font-size:11px;color:#8b8ba0;margin-top:2px;">\${Number(row.krw_amount).toLocaleString()}\${row.pg_currency === 'KRW' || !row.pg_currency ? '원' : ' ' + row.pg_currency} 결제</div>\`
+          : '';
+        return \`
+          <div style="background:#16162a;border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+            <div style="min-width:0;">
+              <div style="font-size:14px;font-weight:600;color:#e0e0f0;">\${label}</div>
+              <div style="font-size:11px;color:#5a5a7a;margin-top:2px;">\${dateStr}</div>
+              \${krwLine}
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:15px;font-weight:800;color:\${isPositive ? '#4ade80' : '#f87171'};">\${isPositive ? '+' : ''}\${row.amount.toLocaleString()}</div>
+              <div style="font-size:11px;color:#8b8ba0;margin-top:2px;">잔여 \${row.balance.toLocaleString()}</div>
+            </div>
+          </div>\`;
+      }).join('');
+    } catch (err) {
+      console.error('크레딧 내역 조회 실패:', err);
+      listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역을 불러오지 못했습니다.</div>';
+    }
   }
 
   // ── 순번 포맷: YYYYMMDDHHMM + zero-padded seq_no ──
