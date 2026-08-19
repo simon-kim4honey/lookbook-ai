@@ -3925,6 +3925,25 @@ app.get('/api/video/:jobId/status', async (c) => {
   }
 })
 
+// GET /api/admin/debug/stuck-videos — 현재 'processing' 상태로 멈춰있는 영상 작업 목록 (진단용)
+// 사용자가 다음 발생을 기다리지 않고, 지금 이미 멈춰있는 작업이 있는지 바로 확인하기 위함.
+app.get('/api/admin/debug/stuck-videos', adminAuth, async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const rows = await db.prepare(
+      `SELECT id, user_id, job_id, status, video_url, created_at,
+              CAST((julianday('now') - julianday(created_at)) * 24 * 60 AS INTEGER) AS minutes_elapsed
+       FROM generation_logs
+       WHERE kind = 'video' AND (status = 'processing' OR status IS NULL)
+       ORDER BY created_at ASC
+       LIMIT 50`
+    ).all()
+    return c.json({ success: true, jobs: rows.results || [] })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 // GET /api/admin/debug/atlas-job/:jobId — Atlas Cloud의 원본 응답을 그대로 확인 (진단용)
 // 이 샌드박스는 Atlas Cloud에 네트워크 접근이 불가능해 실제 응답 구조를 직접 볼 방법이 없다 —
 // 배포된 Worker는 실제 인터넷 접근이 가능하므로, 이 엔드포인트로 실제 응답을 그대로 받아
