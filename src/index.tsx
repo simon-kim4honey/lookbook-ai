@@ -5381,18 +5381,8 @@ app.get('/dashboard', (c) => {
   <div class="modal-overlay" id="actionProgressModal" style="z-index:10500;">
     <div class="action-progress-box">
       <div id="actionProgressSpinner" class="action-progress-spinner"></div>
-      <div id="actionProgressCheck" class="action-progress-check" style="display:none;"><i class="fas fa-check"></i></div>
       <div id="actionProgressText" class="action-progress-text">처리 중...</div>
-      <div id="actionProgressShare" class="action-progress-share" style="display:none;">
-        <button class="action-progress-share-btn link" onclick="copyShareLink()">
-          <i class="fas fa-link"></i> 링크복사
-        </button>
-        <button id="actionProgressKakaoBtn" class="action-progress-share-btn kakao" onclick="shareToKakao()" style="display:none;">
-          <i class="fas fa-comment"></i> 카카오톡 공유
-        </button>
-      </div>
       <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
-      <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
   </div>
 
@@ -5859,13 +5849,13 @@ app.get('/dashboard', (c) => {
     const a = document.createElement('a');
     a.href = dlUrl; a.download = \`lookbook_ai_video_\${Date.now()}.mp4\`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    showToast('영상 다운로드를 시작합니다.', 'success');
 
-    // 이미지 다운로드와 동일하게 공유(링크복사/카카오톡) 팝업 노출
+    // 이미지 다운로드와 동일하게 공유(링크복사/카카오톡) 옵션을 토스트로 노출
     // 카카오톡 카드는 영상을 미리보기로 못 그리므로 정지 이미지(첫 프레임)를 사용
     if (jobId) {
-      openModal('actionProgressModal');
       setActionComplete('영상 다운로드가 시작되었습니다.', { showShare: true, jobId: jobId, idx: 0, imageUrl: thumbUrl || videoUrl });
+    } else {
+      showToast('영상 다운로드를 시작합니다.', 'success');
     }
 
     if (btn) btn.innerHTML = '<i class="fas fa-download"></i> 재다운로드';
@@ -6271,18 +6261,8 @@ app.get('/generator', (c) => {
   <div class="modal-overlay" id="actionProgressModal" style="z-index:10500;">
     <div class="action-progress-box">
       <div id="actionProgressSpinner" class="action-progress-spinner"></div>
-      <div id="actionProgressCheck" class="action-progress-check" style="display:none;"><i class="fas fa-check"></i></div>
       <div id="actionProgressText" class="action-progress-text">처리 중...</div>
-      <div id="actionProgressShare" class="action-progress-share" style="display:none;">
-        <button class="action-progress-share-btn link" onclick="copyShareLink()">
-          <i class="fas fa-link"></i> 링크복사
-        </button>
-        <button id="actionProgressKakaoBtn" class="action-progress-share-btn kakao" onclick="shareToKakao()" style="display:none;">
-          <i class="fas fa-comment"></i> 카카오톡 공유
-        </button>
-      </div>
       <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
-      <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
   </div>
 
