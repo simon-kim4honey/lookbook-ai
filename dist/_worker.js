@@ -38,7 +38,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
      LEFT JOIN brand_analysis a ON a.id = (SELECT id FROM brand_analysis WHERE brand_id=b.id ORDER BY analyzed_at DESC LIMIT 1)
      LEFT JOIN outreach_drafts d ON d.id = (SELECT id FROM outreach_drafts WHERE brand_id=b.id ORDER BY created_at DESC LIMIT 1)
      ORDER BY a.priority_score DESC`).all(),n=e=>`"${String(e??``).replace(/"/g,`""`)}"`,r=[`id`,`country`,`platform`,`brand`,`category`,`brand_url`,`contact_email`,`status`,`price_tier`,`priority_score`,`language`,`subject`,`draft_body`,`draft_status`],i=[r.join(`,`)];for(let e of t)i.push(r.map(t=>n(e[t])).join(`,`));return e.text(i.join(`
-`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszfxbvb`,We=e=>e?`
+`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszlodlb`,We=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -78,7 +78,9 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
   )`).bind(t,t).run(),await e.prepare(`INSERT INTO user_sessions (token, user_id, expires_at) VALUES (?, ?, ?)`).bind(n,t,r).run(),n}function Nt(e){return{id:e.id,name:e.name,email:e.email,role:e.role,credits:e.credits,avatar_url:e.avatar_url,provider:e.provider,referrer:e.referrer??null}}var Pt=[`BFM회원`,`코오롱 FnC`,`한섬`],Ft=500,It={BFM회원:.2};W.post(`/api/auth/signup`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await e.req.json(),{name:r,email:i,password:a,agreeMarketing:o}=n,s=Pt.includes(n?.referrer)?n.referrer:null;if(!r||!i||!a)return e.json({success:!1,message:`모든 항목을 입력해주세요.`},400);if(a.length<8)return e.json({success:!1,message:`비밀번호는 8자 이상이어야 합니다.`},400);if(await t.prepare(`SELECT id FROM users WHERE email = ?`).bind(i).first())return e.json({success:!1,message:`이미 가입된 이메일입니다.`},409);let l=Ot(),u=await kt(a),d=+!!o,f=s===`BFM회원`?Ft:200;await t.prepare(`
       INSERT INTO users (id, email, name, password_hash, provider, status, credits, role, agree_marketing, referrer)
       VALUES (?, ?, ?, ?, 'email', 'active', ?, 'user', ?, ?)
-    `).bind(l,i.toLowerCase(),r,u,f,d,s).run();let p=await Mt(t,l),m={id:l,name:r,email:i.toLowerCase(),role:`user`,credits:f,avatar_url:null,provider:`email`,referrer:s};return e.json({success:!0,user:m,token:p})}catch(t){return console.error(`signup error:`,t),e.json({success:!1,message:`서버 오류가 발생했습니다.`},500)}}),W.post(`/api/auth/login`,async e=>{try{let t=e.env.LOOKBOOK_DB,{email:n,password:r}=await e.req.json();if(!n||!r)return e.json({success:!1,message:`이메일과 비밀번호를 입력해주세요.`},400);let i=await t.prepare(`SELECT * FROM users WHERE email = ? AND provider = 'email'`).bind(n.toLowerCase()).first();if(!i)return e.json({success:!1,message:`이메일 또는 비밀번호가 올바르지 않습니다.`},401);if(i.status!==`active`)return e.json({success:!1,message:`정지된 계정입니다. 관리자에게 문의하세요.`},403);if(!i.password_hash)return e.json({success:!1,message:`소셜 계정으로 가입된 이메일입니다.`},400);if(!await At(r,i.password_hash))return e.json({success:!1,message:`이메일 또는 비밀번호가 올바르지 않습니다.`},401);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(i.id).run();let a=await Mt(t,i.id);return e.json({success:!0,user:Nt(i),token:a})}catch(t){return console.error(`login error:`,t),e.json({success:!1,message:`서버 오류가 발생했습니다.`},500)}}),W.get(`/api/auth/me`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await jt(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);return n?e.json({success:!0,user:Nt(n)}):e.json({success:!1,message:`로그인이 필요합니다.`},401)}catch{return e.json({success:!1,message:`서버 오류`},500)}}),W.post(`/api/auth/logout`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`);return n&&await t.prepare(`DELETE FROM user_sessions WHERE token = ?`).bind(n).run(),e.json({success:!0})}catch{return e.json({success:!0})}});function $(e){let t=e.req.header(`host`)||e.req.header(`x-forwarded-host`)||``;return`${t.startsWith(`localhost`)?`http`:`https`}://${t}`}W.get(`/api/auth/kakao`,e=>{let t=$(e),n=e.req.query(`mode`)||`popup`,r=`${t}/api/auth/kakao/callback`,i=e.env.KAKAO_CLIENT_ID||``;if(!i)return n===`redirect`?e.redirect(`/?oauth_error=kakao_no_key`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다.'},'*');window.close();<\/script>`);let a=`https://kauth.kakao.com/oauth/authorize?client_id=${i}&redirect_uri=${encodeURIComponent(r)}&response_type=code&state=${n}`;return e.redirect(a)}),W.get(`/api/auth/kakao/callback`,async e=>{let t=e.env.LOOKBOOK_DB,n=$(e),r=e.req.query(`code`),i=e.req.query(`error`),a=e.req.query(`state`)||`popup`;function o(t){return a===`redirect`?e.redirect(`/?oauth_error=${encodeURIComponent(t)}`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${t}'},'*');window.close();<\/script>`)}if(i||!r)return o(i||`cancelled`);try{let i=`${n}/api/auth/kakao/callback`,o=await(await fetch(`https://kauth.kakao.com/oauth/token`,{method:`POST`,headers:{"Content-Type":`application/x-www-form-urlencoded`},body:new URLSearchParams({grant_type:`authorization_code`,code:r,client_id:e.env.KAKAO_CLIENT_ID||``,client_secret:e.env.KAKAO_CLIENT_SECRET||``,redirect_uri:i})})).json();if(!o.access_token)throw Error(`카카오 토큰 발급 실패`);let s=await(await fetch(`https://kapi.kakao.com/v2/user/me`,{headers:{Authorization:`Bearer ${o.access_token}`}})).json(),l=String(s.id),u=s.kakao_account?.email||`kakao_${l}@kakao.local`,d=s.kakao_account?.profile?.nickname||`카카오 사용자`,f=s.kakao_account?.profile?.profile_image_url||null,p=!1,m=await t.prepare(`SELECT * FROM users WHERE provider = 'kakao' AND provider_id = ?`).bind(l).first();if(!m)if(m=await t.prepare(`SELECT * FROM users WHERE email = ?`).bind(u).first(),m)await t.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(l,f,m.id).run();else{let e=Ot();await t.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 200, 'user')`).bind(e,u,d,l,f).run(),m=await t.prepare(`SELECT * FROM users WHERE id = ?`).bind(e).first(),p=!0}if(!m||m.status!==`active`)throw Error(`계정이 정지 상태입니다.`);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(m.id).run();let h=await Mt(t,m.id),g=JSON.stringify(Nt(m));return a===`redirect`?e.html(`<!DOCTYPE html>
+    `).bind(l,i.toLowerCase(),r,u,f,d,s).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       VALUES (?, 'grant', ?, ?, 'signup_bonus', ?)`).bind(l,f,f,`signup_${l}`).run();let p=await Mt(t,l),m={id:l,name:r,email:i.toLowerCase(),role:`user`,credits:f,avatar_url:null,provider:`email`,referrer:s};return e.json({success:!0,user:m,token:p})}catch(t){return console.error(`signup error:`,t),e.json({success:!1,message:`서버 오류가 발생했습니다.`},500)}}),W.post(`/api/auth/login`,async e=>{try{let t=e.env.LOOKBOOK_DB,{email:n,password:r}=await e.req.json();if(!n||!r)return e.json({success:!1,message:`이메일과 비밀번호를 입력해주세요.`},400);let i=await t.prepare(`SELECT * FROM users WHERE email = ? AND provider = 'email'`).bind(n.toLowerCase()).first();if(!i)return e.json({success:!1,message:`이메일 또는 비밀번호가 올바르지 않습니다.`},401);if(i.status!==`active`)return e.json({success:!1,message:`정지된 계정입니다. 관리자에게 문의하세요.`},403);if(!i.password_hash)return e.json({success:!1,message:`소셜 계정으로 가입된 이메일입니다.`},400);if(!await At(r,i.password_hash))return e.json({success:!1,message:`이메일 또는 비밀번호가 올바르지 않습니다.`},401);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(i.id).run();let a=await Mt(t,i.id);return e.json({success:!0,user:Nt(i),token:a})}catch(t){return console.error(`login error:`,t),e.json({success:!1,message:`서버 오류가 발생했습니다.`},500)}}),W.get(`/api/auth/me`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await jt(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);return n?e.json({success:!0,user:Nt(n)}):e.json({success:!1,message:`로그인이 필요합니다.`},401)}catch{return e.json({success:!1,message:`서버 오류`},500)}}),W.post(`/api/auth/logout`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`);return n&&await t.prepare(`DELETE FROM user_sessions WHERE token = ?`).bind(n).run(),e.json({success:!0})}catch{return e.json({success:!0})}});function $(e){let t=e.req.header(`host`)||e.req.header(`x-forwarded-host`)||``;return`${t.startsWith(`localhost`)?`http`:`https`}://${t}`}W.get(`/api/auth/kakao`,e=>{let t=$(e),n=e.req.query(`mode`)||`popup`,r=`${t}/api/auth/kakao/callback`,i=e.env.KAKAO_CLIENT_ID||``;if(!i)return n===`redirect`?e.redirect(`/?oauth_error=kakao_no_key`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다.'},'*');window.close();<\/script>`);let a=`https://kauth.kakao.com/oauth/authorize?client_id=${i}&redirect_uri=${encodeURIComponent(r)}&response_type=code&state=${n}`;return e.redirect(a)}),W.get(`/api/auth/kakao/callback`,async e=>{let t=e.env.LOOKBOOK_DB,n=$(e),r=e.req.query(`code`),i=e.req.query(`error`),a=e.req.query(`state`)||`popup`;function o(t){return a===`redirect`?e.redirect(`/?oauth_error=${encodeURIComponent(t)}`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${t}'},'*');window.close();<\/script>`)}if(i||!r)return o(i||`cancelled`);try{let i=`${n}/api/auth/kakao/callback`,o=await(await fetch(`https://kauth.kakao.com/oauth/token`,{method:`POST`,headers:{"Content-Type":`application/x-www-form-urlencoded`},body:new URLSearchParams({grant_type:`authorization_code`,code:r,client_id:e.env.KAKAO_CLIENT_ID||``,client_secret:e.env.KAKAO_CLIENT_SECRET||``,redirect_uri:i})})).json();if(!o.access_token)throw Error(`카카오 토큰 발급 실패`);let s=await(await fetch(`https://kapi.kakao.com/v2/user/me`,{headers:{Authorization:`Bearer ${o.access_token}`}})).json(),l=String(s.id),u=s.kakao_account?.email||`kakao_${l}@kakao.local`,d=s.kakao_account?.profile?.nickname||`카카오 사용자`,f=s.kakao_account?.profile?.profile_image_url||null,p=!1,m=await t.prepare(`SELECT * FROM users WHERE provider = 'kakao' AND provider_id = ?`).bind(l).first();if(!m)if(m=await t.prepare(`SELECT * FROM users WHERE email = ?`).bind(u).first(),m)await t.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(l,f,m.id).run();else{let e=Ot();await t.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 200, 'user')`).bind(e,u,d,l,f).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+           VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`).bind(e,`signup_${e}`).run(),m=await t.prepare(`SELECT * FROM users WHERE id = ?`).bind(e).first(),p=!0}if(!m||m.status!==`active`)throw Error(`계정이 정지 상태입니다.`);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(m.id).run();let h=await Mt(t,m.id),g=JSON.stringify(Nt(m));return a===`redirect`?e.html(`<!DOCTYPE html>
 <html lang="ko">
 <head><meta charset="UTF-8"><title>로그인 성공</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -121,7 +123,8 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
   else { window.addEventListener('load', sendMsg); }
 })();
 <\/script>
-</body></html>`)}catch(e){return console.error(`kakao callback error:`,e),o(e.message||`로그인 오류`)}}),W.get(`/api/auth/google`,e=>{let t=$(e),n=e.req.query(`mode`)||`popup`,r=`${t}/api/auth/google/callback`,i=e.env.GOOGLE_CLIENT_ID||``;if(!i)return n===`redirect`?e.redirect(`/?oauth_error=google_no_key`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다.'},'*');window.close();<\/script>`);let a=new URLSearchParams({client_id:i,redirect_uri:r,response_type:`code`,scope:`openid email profile`,access_type:`offline`,prompt:`select_account`,state:n});return e.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${a}`)}),W.get(`/api/auth/google/callback`,async e=>{let t=e.env.LOOKBOOK_DB,n=$(e),r=e.req.query(`code`),i=e.req.query(`error`),a=e.req.query(`state`)||`popup`;function o(t){return a===`redirect`?e.redirect(`/?oauth_error=${encodeURIComponent(t)}`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'${t}'},'*');window.close();<\/script>`)}if(i||!r)return o(i||`cancelled`);try{let i=`${n}/api/auth/google/callback`,o=await(await fetch(`https://oauth2.googleapis.com/token`,{method:`POST`,headers:{"Content-Type":`application/x-www-form-urlencoded`},body:new URLSearchParams({grant_type:`authorization_code`,code:r,client_id:e.env.GOOGLE_CLIENT_ID||``,client_secret:e.env.GOOGLE_CLIENT_SECRET||``,redirect_uri:i})})).json();if(!o.access_token)throw Error(`구글 토큰 발급 실패`);let s=await(await fetch(`https://www.googleapis.com/oauth2/v2/userinfo`,{headers:{Authorization:`Bearer ${o.access_token}`}})).json(),l=s.id,u=s.email,d=s.name||`구글 사용자`,f=s.picture||null,p=!1,m=await t.prepare(`SELECT * FROM users WHERE provider = 'google' AND provider_id = ?`).bind(l).first();if(!m)if(m=await t.prepare(`SELECT * FROM users WHERE email = ?`).bind(u).first(),m)await t.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(l,f,m.id).run();else{let e=Ot();await t.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 200, 'user')`).bind(e,u,d,l,f).run(),m=await t.prepare(`SELECT * FROM users WHERE id = ?`).bind(e).first(),p=!0}if(!m||m.status!==`active`)throw Error(`계정이 정지 상태입니다.`);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(m.id).run();let h=await Mt(t,m.id),g=JSON.stringify(Nt(m));return a===`redirect`?e.html(`<!DOCTYPE html>
+</body></html>`)}catch(e){return console.error(`kakao callback error:`,e),o(e.message||`로그인 오류`)}}),W.get(`/api/auth/google`,e=>{let t=$(e),n=e.req.query(`mode`)||`popup`,r=`${t}/api/auth/google/callback`,i=e.env.GOOGLE_CLIENT_ID||``;if(!i)return n===`redirect`?e.redirect(`/?oauth_error=google_no_key`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다.'},'*');window.close();<\/script>`);let a=new URLSearchParams({client_id:i,redirect_uri:r,response_type:`code`,scope:`openid email profile`,access_type:`offline`,prompt:`select_account`,state:n});return e.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${a}`)}),W.get(`/api/auth/google/callback`,async e=>{let t=e.env.LOOKBOOK_DB,n=$(e),r=e.req.query(`code`),i=e.req.query(`error`),a=e.req.query(`state`)||`popup`;function o(t){return a===`redirect`?e.redirect(`/?oauth_error=${encodeURIComponent(t)}`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'${t}'},'*');window.close();<\/script>`)}if(i||!r)return o(i||`cancelled`);try{let i=`${n}/api/auth/google/callback`,o=await(await fetch(`https://oauth2.googleapis.com/token`,{method:`POST`,headers:{"Content-Type":`application/x-www-form-urlencoded`},body:new URLSearchParams({grant_type:`authorization_code`,code:r,client_id:e.env.GOOGLE_CLIENT_ID||``,client_secret:e.env.GOOGLE_CLIENT_SECRET||``,redirect_uri:i})})).json();if(!o.access_token)throw Error(`구글 토큰 발급 실패`);let s=await(await fetch(`https://www.googleapis.com/oauth2/v2/userinfo`,{headers:{Authorization:`Bearer ${o.access_token}`}})).json(),l=s.id,u=s.email,d=s.name||`구글 사용자`,f=s.picture||null,p=!1,m=await t.prepare(`SELECT * FROM users WHERE provider = 'google' AND provider_id = ?`).bind(l).first();if(!m)if(m=await t.prepare(`SELECT * FROM users WHERE email = ?`).bind(u).first(),m)await t.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(l,f,m.id).run();else{let e=Ot();await t.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 200, 'user')`).bind(e,u,d,l,f).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+           VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`).bind(e,`signup_${e}`).run(),m=await t.prepare(`SELECT * FROM users WHERE id = ?`).bind(e).first(),p=!0}if(!m||m.status!==`active`)throw Error(`계정이 정지 상태입니다.`);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(m.id).run();let h=await Mt(t,m.id),g=JSON.stringify(Nt(m));return a===`redirect`?e.html(`<!DOCTYPE html>
 <html lang="ko">
 <head><meta charset="UTF-8"><title>로그인 성공</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -168,11 +171,15 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
        FROM payment_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`).bind(e.req.param(`id`)).all();return e.json({success:!0,payments:t.results})}catch(t){return e.json({success:!1,message:t.message},500)}}),W.get(`/api/admin/users/:id/generations`,q,async e=>{try{let t=await e.env.LOOKBOOK_DB.prepare(`SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, created_at
        FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`).bind(e.req.param(`id`)).all();return e.json({success:!0,generations:t.results})}catch(t){return e.json({success:!1,message:t.message},500)}}),W.patch(`/api/admin/users/:id`,q,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await e.req.json(),r=e.req.param(`id`),i=[],a=[];if(n.status!==void 0&&(i.push(`status = ?`),a.push(n.status)),n.role!==void 0&&(i.push(`role = ?`),a.push(n.role)),n.add_credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.add_credits),l=Math.max(0,o+s);return i.push(`credits = ?`),a.push(l),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
          VALUES (?, 'grant', ?, ?, 'admin_grant', ?)`).bind(r,s,l,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:l})}if(n.credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.credits),l=s-o;return i.push(`credits = ?`),a.push(s),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),l!==0&&await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-           VALUES (?, ?, ?, ?, 'admin_set', ?)`).bind(r,l>0?`grant`:`deduct`,l,s,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:s})}return i.length===0?e.json({success:!1,message:`변경할 항목이 없습니다.`},400):(i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0}))}catch(t){return e.json({success:!1,message:t.message},500)}}),W.delete(`/api/admin/users/:id`,q,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`);return await t.prepare(`UPDATE users SET status = 'deleted', updated_at = datetime('now') WHERE id = ?`).bind(n).run(),await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(n).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),W.get(`/api/admin/stats`,q,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status != 'deleted'`).first(),r=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'active'`).first(),i=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'suspended'`).first(),a=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE date(created_at) = date('now') AND status != 'deleted'`).first(),o=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'kakao' AND status = 'active'`).first(),s=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'google' AND status = 'active'`).first(),l=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'email' AND status = 'active'`).first();return e.json({success:!0,stats:{total:n?.cnt||0,active:r?.cnt||0,suspended:i?.cnt||0,today:a?.cnt||0,by_provider:{kakao:o?.cnt||0,google:s?.cnt||0,email:l?.cnt||0}}})}catch(t){return e.json({success:!1,message:t.message},500)}}),W.get(`/api/credits/history`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`},401);let r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`},401);let i=await t.prepare(`SELECT type, amount, balance, reason, ref_id, created_at
-       FROM credit_logs
-       WHERE user_id = ?
-       ORDER BY created_at DESC
-       LIMIT 100`).bind(r.user_id).all();return e.json({success:!0,logs:i.results||[]})}catch(t){return e.json({success:!1,message:t.message},500)}}),W.get(`/api/generation/history`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`},401);let r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`},401);let i;try{i=await t.prepare(`SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
+           VALUES (?, ?, ?, ?, 'admin_set', ?)`).bind(r,l>0?`grant`:`deduct`,l,s,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:s})}return i.length===0?e.json({success:!1,message:`변경할 항목이 없습니다.`},400):(i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0}))}catch(t){return e.json({success:!1,message:t.message},500)}}),W.delete(`/api/admin/users/:id`,q,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`);return await t.prepare(`UPDATE users SET status = 'deleted', updated_at = datetime('now') WHERE id = ?`).bind(n).run(),await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(n).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),W.get(`/api/admin/stats`,q,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status != 'deleted'`).first(),r=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'active'`).first(),i=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'suspended'`).first(),a=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE date(created_at) = date('now') AND status != 'deleted'`).first(),o=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'kakao' AND status = 'active'`).first(),s=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'google' AND status = 'active'`).first(),l=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'email' AND status = 'active'`).first();return e.json({success:!0,stats:{total:n?.cnt||0,active:r?.cnt||0,suspended:i?.cnt||0,today:a?.cnt||0,by_provider:{kakao:o?.cnt||0,google:s?.cnt||0,email:l?.cnt||0}}})}catch(t){return e.json({success:!1,message:t.message},500)}}),W.get(`/api/credits/history`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`},401);let r=await t.prepare(`SELECT s.user_id, u.credits FROM user_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`},401);let i=await t.prepare(`SELECT cl.type, cl.amount, cl.balance, cl.reason, cl.ref_id, cl.created_at,
+              p.amount AS krw_amount, p.currency AS pg_currency
+       FROM credit_logs cl
+       LEFT JOIN payment_logs p ON cl.reason = 'payment' AND cl.ref_id = p.order_id
+       WHERE cl.user_id = ?
+       ORDER BY cl.created_at DESC, cl.id DESC
+       LIMIT 200`).bind(r.user_id).all();return e.json({success:!0,credits:r.credits,logs:i.results||[]})}catch(t){return e.json({success:!1,message:t.message},500)}}),W.get(`/api/generation/history`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`},401);let r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`},401);let i;try{i=await t.prepare(`SELECT id, seq_no, job_id, image_count, model_name, bg_name, ratio,
                 image_urls, expires_at, created_at, downloaded_indices, kind, video_url, status
          FROM generation_logs
          WHERE user_id = ?
@@ -316,6 +323,11 @@ ${t}
       <span id="ctaLabel" data-i18n="pkg-btn">패키지를 선택하세요</span>
     </button>
 
+    <p style="margin-top:14px;font-size:11px;line-height:1.6;color:#8b8ba0;text-align:center;">
+      충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다.<br />
+      환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#a78bfa;">환불정책</a>을 확인해주세요.
+    </p>
+
   </div>
 </div>
 
@@ -456,6 +468,8 @@ ${t}
   <p>③ 서비스 오류(AI 생성 실패, 결제 중복 등) 등 회사의 귀책사유로 정상적인 서비스 제공이 불가능한 경우, 이용자는 사용 여부와 관계없이 전액 환불을 요청할 수 있습니다.</p>
   <p>④ 환불 신청은 아래 문의처로 결제 정보(주문번호, 결제일시, 결제수단)와 함께 요청해 주시기 바랍니다. 환불은 신청 접수 후 3영업일 이내에 결제 수단과 동일한 방법으로 처리됩니다.</p>
   <p>⑤ 이용자의 단순 변심에 의한 환불 시, 이미 사용한 크레딧에 해당하는 금액은 환불 대상에서 제외됩니다.</p>
+  <p>⑥ 환불은 결제에 사용된 결제수단(카드) 승인 취소 방식으로만 처리되며, 현금 지급이나 계좌이체를 통한 환불은 불가합니다.</p>
+  <p>⑦ 충전된 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 사용하지 않은 크레딧은 별도 안내 없이 소멸됩니다.</p>
 
   <h2>제9조 (분쟁 해결)</h2>
   <p>본 약관과 관련한 분쟁은 대한민국 법률을 적용하며, 관할 법원은 민사소송법에 따릅니다.</p>
@@ -955,6 +969,11 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           사업장주소 : 충청북도 청주시 서원구 무심서로 377-3&nbsp;&nbsp;
           전화번호 : 070-4581-8166
         </p>
+        <p>
+          모든 거래에 대한 책임과 환불, 민원 등은 벌거벗은호랑이에서 진행합니다.&nbsp;&nbsp;
+          민원 담당자 : 박민호&nbsp;&nbsp;
+          담당자 연락처 : 070-4581-8166
+        </p>
       </div>
 
       <div class="footer-bottom">
@@ -1287,6 +1306,12 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <span class="db-menu-arrow">›</span>
       </a>
 
+      <!-- 크레딧 상세 -->
+      <a href="/dashboard#credits" class="db-menu-item" id="menuCredits">
+        <span class="db-menu-label">크레딧 상세</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
       <!-- 카톡 문의 -->
       <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" class="db-menu-item">
         <span class="db-menu-label">카톡 문의</span>
@@ -1333,6 +1358,35 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
           <div style="font-size:40px;margin-bottom:12px;">🎨</div>
           생성 내역을 불러오는 중...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 크레딧 상세 패널 (해시 #credits) -->
+  <div id="creditsPanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;overflow-y:auto;">
+    <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
+      <!-- 헤더 -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <button onclick="document.getElementById('creditsPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+        <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">크레딧 상세</h2>
+      </div>
+      <!-- 잔여 크레딧 -->
+      <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">잔여 크레딧</div>
+          <div id="creditsPanelBalance" style="font-size:28px;font-weight:800;color:#a78bfa;">-</div>
+        </div>
+        <button class="db-charge-btn" onclick="openChargePanel()">충전</button>
+      </div>
+      <!-- 유효기간/환불 안내 -->
+      <div style="background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;">
+        <span style="font-size:12px;color:#c4b5fd;line-height:1.5;">충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다.</span>
+      </div>
+      <div id="creditsList" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
+          <div style="font-size:40px;margin-bottom:12px;">💎</div>
+          크레딧 내역을 불러오는 중...
         </div>
       </div>
     </div>
@@ -1390,9 +1444,14 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 
     // 해시 처리
     if (location.hash === '#history') openHistory();
+    if (location.hash === '#credits') openCredits();
     document.getElementById('menuHistory').addEventListener('click', (e) => {
       e.preventDefault();
       openHistory();
+    });
+    document.getElementById('menuCredits').addEventListener('click', (e) => {
+      e.preventDefault();
+      openCredits();
     });
   });
 
@@ -1400,6 +1459,67 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     history.replaceState(null,'','/dashboard#history');
     document.getElementById('historyPanel').style.display = 'block';
     loadHistory();
+  }
+
+  function openCredits() {
+    history.replaceState(null,'','/dashboard#credits');
+    document.getElementById('creditsPanel').style.display = 'block';
+    loadCreditHistory();
+  }
+
+  // ── 크레딧 내역 사유 코드 → 화면 표시 라벨 ──
+  const CREDIT_REASON_LABEL = {
+    payment:                 '크레딧 충전',
+    signup_bonus:            '가입 축하 크레딧',
+    admin_grant:             '관리자 지급',
+    admin_set:               '관리자 조정',
+    image_download:          '이미지 다운로드',
+    video_generation:        '2K 영상 생성',
+    video_generation_failed: '영상 생성 실패 환불',
+    payment_refund:          '결제 환불',
+    payment_cancel:          '결제 취소 회수',
+  };
+
+  async function loadCreditHistory() {
+    const listEl = document.getElementById('creditsList');
+    try {
+      const token = localStorage.getItem('lookbook_token') || '';
+      const res = await fetch('/api/credits/history', { headers: { 'X-Session-Token': token } });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || data.message || '조회 실패');
+
+      document.getElementById('creditsPanelBalance').textContent = (data.credits ?? 0).toLocaleString() + ' 크레딧';
+
+      const logs = data.logs || [];
+      if (logs.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역이 없습니다.</div>';
+        return;
+      }
+
+      listEl.innerHTML = logs.map(row => {
+        const isPositive = row.amount > 0;
+        const dateStr = (row.created_at || '').replace('T', ' ').slice(0, 16);
+        const label = CREDIT_REASON_LABEL[row.reason] || row.reason || '크레딧 변동';
+        const krwLine = row.reason === 'payment' && row.krw_amount
+          ? \`<div style="font-size:11px;color:#8b8ba0;margin-top:2px;">\${Number(row.krw_amount).toLocaleString()}\${row.pg_currency === 'KRW' || !row.pg_currency ? '원' : ' ' + row.pg_currency} 결제</div>\`
+          : '';
+        return \`
+          <div style="background:#16162a;border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+            <div style="min-width:0;">
+              <div style="font-size:14px;font-weight:600;color:#e0e0f0;">\${label}</div>
+              <div style="font-size:11px;color:#5a5a7a;margin-top:2px;">\${dateStr}</div>
+              \${krwLine}
+            </div>
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-size:15px;font-weight:800;color:\${isPositive ? '#4ade80' : '#f87171'};">\${isPositive ? '+' : ''}\${row.amount.toLocaleString()}</div>
+              <div style="font-size:11px;color:#8b8ba0;margin-top:2px;">잔여 \${row.balance.toLocaleString()}</div>
+            </div>
+          </div>\`;
+      }).join('');
+    } catch (err) {
+      console.error('크레딧 내역 조회 실패:', err);
+      listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역을 불러오지 못했습니다.</div>';
+    }
   }
 
   // ── 순번 포맷: YYYYMMDDHHMM + zero-padded seq_no ──
