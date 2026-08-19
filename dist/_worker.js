@@ -38,7 +38,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
      LEFT JOIN brand_analysis a ON a.id = (SELECT id FROM brand_analysis WHERE brand_id=b.id ORDER BY analyzed_at DESC LIMIT 1)
      LEFT JOIN outreach_drafts d ON d.id = (SELECT id FROM outreach_drafts WHERE brand_id=b.id ORDER BY created_at DESC LIMIT 1)
      ORDER BY a.priority_score DESC`).all(),n=e=>`"${String(e??``).replace(/"/g,`""`)}"`,r=[`id`,`country`,`platform`,`brand`,`category`,`brand_url`,`contact_email`,`status`,`price_tier`,`priority_score`,`language`,`subject`,`draft_body`,`draft_status`],i=[r.join(`,`)];for(let e of t)i.push(r.map(t=>n(e[t])).join(`,`));return e.text(i.join(`
-`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszc552e`,We=e=>e?`
+`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszcqbwi`,We=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1570,19 +1570,28 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
   // 쪽에서는 실제로는 정상 진행/완료된 경우), 생성내역 화면에 머무는 동안 자동으로
   // 상태가 바로잡히도록 하기 위함. 처리 중인 영상이 하나도 없으면 재확인을 멈춘다.
   let _historyPollTimer = null;
+  // ⚠️ _selfHealStuckVideo는 절대 loadHistory()를 다시 호출하지 않는다.
+  // 예전 버전은 상태가 바뀌면 곧바로 loadHistory()를 재호출했는데, 그 loadHistory()가
+  // 다시 각 처리중 항목마다 _selfHealStuckVideo를 호출하는 구조라 — 만약 서버 쪽
+  // 완료 처리(video_url 저장)가 바로 다음 히스토리 조회에 아직 반영되기 전이면
+  // (레이스 컨디션 등 어떤 이유로든) 이 둘이 서로를 지연 없이 무한히 재호출하는
+  // 폭주 루프가 될 수 있었다 — 실제로 재현됨(초당 수십 회 요청). 이게 "계속
+  // 깜빡인다"는 리포트의 진짜 원인으로 추정된다.
+  // 이제 이 함수는 서버 쪽 상태(및 필요시 크레딧 환불)만 갱신해두고, 화면 반영은
+  // 오직 20초 주기 스케줄러(loadHistory 하단)에만 맡긴다 — 재귀 호출 경로 자체를 제거.
+  const _selfHealInFlight = new Set();
   async function _selfHealStuckVideo(jobId) {
-    if (!jobId) return;
+    if (!jobId || _selfHealInFlight.has(jobId)) return;
+    _selfHealInFlight.add(jobId);
     try {
       const res = await fetch(\`/api/video/\${jobId}/status\`);
       const data = await res.json();
-      if (data.status === 'completed' || data.status === 'failed') {
-        if (data.creditsRemaining !== undefined) {
-          const dbCredEl = document.getElementById('dbCredits');
-          if (dbCredEl) dbCredEl.textContent = (data.creditsRemaining ?? 0).toLocaleString();
-        }
-        loadHistory();
+      if ((data.status === 'completed' || data.status === 'failed') && data.creditsRemaining !== undefined) {
+        const dbCredEl = document.getElementById('dbCredits');
+        if (dbCredEl) dbCredEl.textContent = (data.creditsRemaining ?? 0).toLocaleString();
       }
     } catch (e) { /* 조용히 무시 — 다음 재확인 때 재시도 */ }
+    finally { _selfHealInFlight.delete(jobId); }
   }
 
   // silent=true: 20초 자동 재확인용 — 로딩 placeholder를 띄우지 않고, 실제 데이터가
@@ -1592,7 +1601,14 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
   //  슬래시가 사라짐) 항상 다르다고 오판할 수 있어 신뢰할 수 없다 — 대신 로그
   //  데이터 자체의 signature를 비교한다.)
   let _historySignature = null;
+  let _loadHistoryInFlight = false;
   async function loadHistory(silent) {
+    // 여러 stuck 영상 항목이 시차를 두고 각자 self-heal되면 loadHistory가 겹쳐 호출될 수 있다.
+    // 겹치면 _historyPollTimer/_historySignature를 서로 덮어써 재확인 주기가 꼬일 수 있으므로,
+    // 이미 진행 중이면 비-silent 호출만 재시도하고(사용자가 방금 직접 연 경우 놓치지 않도록)
+    // silent 호출은 그냥 건너뛴다(다음 20초 주기에 다시 시도됨).
+    if (_loadHistoryInFlight) { if (!silent) setTimeout(() => loadHistory(false), 300); return; }
+    _loadHistoryInFlight = true;
     if (_historyPollTimer) { clearTimeout(_historyPollTimer); _historyPollTimer = null; }
     const list = document.getElementById('historyList');
     if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
@@ -1760,6 +1776,8 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       }
     } catch (e) {
       if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
+    } finally {
+      _loadHistoryInFlight = false;
     }
   }
 
