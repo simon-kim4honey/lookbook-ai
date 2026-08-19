@@ -38,7 +38,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
      LEFT JOIN brand_analysis a ON a.id = (SELECT id FROM brand_analysis WHERE brand_id=b.id ORDER BY analyzed_at DESC LIMIT 1)
      LEFT JOIN outreach_drafts d ON d.id = (SELECT id FROM outreach_drafts WHERE brand_id=b.id ORDER BY created_at DESC LIMIT 1)
      ORDER BY a.priority_score DESC`).all(),n=e=>`"${String(e??``).replace(/"/g,`""`)}"`,r=[`id`,`country`,`platform`,`brand`,`category`,`brand_url`,`contact_email`,`status`,`price_tier`,`priority_score`,`language`,`subject`,`draft_body`,`draft_status`],i=[r.join(`,`)];for(let e of t)i.push(r.map(t=>n(e[t])).join(`,`));return e.text(i.join(`
-`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`msyro7rk`,We=e=>e?`
+`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszc552e`,We=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1585,8 +1585,13 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     } catch (e) { /* 조용히 무시 — 다음 재확인 때 재시도 */ }
   }
 
-  // silent=true: 20초 자동 재확인용 — 로딩 placeholder를 띄우지 않고, 내용이 실제로
-  //바뀌었을 때만 DOM을 교체해 화면이 깜빡이지 않도록 한다.
+  // silent=true: 20초 자동 재확인용 — 로딩 placeholder를 띄우지 않고, 실제 데이터가
+  // 바뀌었을 때만 DOM을 교체해 화면이 깜빡이지 않도록 한다.
+  // (렌더링된 HTML 문자열을 element.innerHTML과 직접 비교하는 방식은 브라우저가
+  //  마크업을 재직렬화하며 자체 정규화하기 때문에(예: <img ... /> 의 self-close
+  //  슬래시가 사라짐) 항상 다르다고 오판할 수 있어 신뢰할 수 없다 — 대신 로그
+  //  데이터 자체의 signature를 비교한다.)
+  let _historySignature = null;
   async function loadHistory(silent) {
     if (_historyPollTimer) { clearTimeout(_historyPollTimer); _historyPollTimer = null; }
     const list = document.getElementById('historyList');
@@ -1597,9 +1602,15 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       if (!res.ok) throw new Error('서버 오류');
       const data = await res.json();
       const logs = data.logs || [];
+
+      const signature = JSON.stringify(logs.map(l => [l.id, l.status, l.video_url, l.image_urls, l.downloaded_indices, l.expires_at]));
+      const changed = signature !== _historySignature;
+      _historySignature = signature;
+
       if (!logs.length) {
-        const emptyHtml = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
-        if (!silent || list.innerHTML !== emptyHtml) list.innerHTML = emptyHtml;
+        if (!silent || changed) {
+          list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
+        }
         return;
       }
 
@@ -1739,10 +1750,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         });
       });
 
-      const newHtml = rows.join('');
-      if (!silent || list.innerHTML !== newHtml) list.innerHTML = newHtml;
+      if (!silent || changed) list.innerHTML = rows.join('');
 
-      // 처리 중인 영상이 남아있으면 20초 후 조용히(silent) 다시 확인 — 내용이 바뀌지 않는 한
+      // 처리 중인 영상이 남아있으면 20초 후 조용히(silent) 다시 확인 — 데이터가 바뀌지 않는 한
       // 화면을 다시 그리지 않으므로 깜빡이지 않는다. 모두 해소되면 자동으로 재확인을 멈춘다.
       const stillPending = logs.some(l => l.kind === 'video' && !l.video_url && l.status !== 'failed');
       if (stillPending) {
