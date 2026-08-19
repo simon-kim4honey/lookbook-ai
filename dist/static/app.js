@@ -3,6 +3,13 @@
    aifashion.co.kr + Atlas Cloud AI 실API 연동
    =================================================== */
 
+// 새로고침 시 브라우저가 이전 스크롤 위치를 복원하지 않도록 함
+// (모바일에서 새로고침하면 페이지 중간으로 튀는 문제 방지) — 가능한 한 빨리(스크립트 최상단)
+// 설정해야 브라우저의 자동 복원이 적용되기 전에 끼어들 수 있다.
+if ('scrollRestoration' in history) {
+  history.scrollRestoration = 'manual';
+}
+
 // ─────────────────────────────────────────────────────────
 // GA4 이벤트 헬퍼 — GA4_MEASUREMENT_ID 미설정 시 gtag가 없어 조용히 무시됨
 // ─────────────────────────────────────────────────────────
@@ -547,6 +554,8 @@ function initPage() {
   // 모든 페이지에서 세션 복원 (자동 로그인)
   verifySession().then(() => {
     if (path === '/' || path === '') {
+      // Landing — 새로고침 시 항상 최상단에서 시작 (모바일 스크롤 위치 복원 방지)
+      window.scrollTo(0, 0);
       // Landing — verifySession 후 UI만 업데이트됨
       initHomeShowcase();
       initHomeFeatureBgs();
