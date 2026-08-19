@@ -370,11 +370,11 @@ app.post('/api/admin/models', adminAuth, async (c) => {
 // (강아지, 풍경 등 옷이 아닌 이미지를 올려 이상한 결과가 나오는 것을 사전 차단)
 // 검증 자체가 실패/타임아웃 나면 사용자 플로우를 막지 않도록 fail-open으로 통과 처리
 const CLOTHING_SLOT_PROMPTS: Record<string, string> = {
-  TOP: `You are an image classifier for a fashion shopping app upload slot labeled "상의" (TOP). Does this image show a TOP garment (shirt, blouse, t-shirt, jacket, coat, sweater, hoodie, etc.) as its clearly identifiable main subject — whether laid flat, on a hanger, or worn by a person?
-Answer NO if: the image has no clothing at all; the main garment shown is a BOTTOM only (pants, skirt, shorts) with no top visible; or it's a full-outfit/full-body shot where a top AND a bottom are BOTH clearly staged/visible together as a complete look (that belongs in the "전체" slot, not here).
+  TOP: `You are an image classifier for a fashion shopping app upload slot labeled "상의" (TOP). Does this image contain a TOP garment (shirt, blouse, t-shirt, jacket, coat, sweater, hoodie, etc.) that is clearly identifiable somewhere in the image — whether laid flat, on a hanger, worn alone, or worn together with a bottom in a full-outfit/styled photo? A full-outfit shot showing both a top and a bottom together is fine as long as a top is present — the app will extract only the top from it.
+Answer NO only if: the image has no clothing at all; or the ONLY garment visible is a BOTTOM (pants, skirt, shorts) with no top anywhere in the frame.
 Respond with ONLY one word: YES or NO.`,
-  BOTTOM: `You are an image classifier for a fashion shopping app upload slot labeled "하의" (BOTTOM). Does this image show a BOTTOM garment (pants, jeans, skirt, shorts, etc.) as its clearly identifiable main subject — whether laid flat, on a hanger, or worn by a person?
-Answer NO if: the image has no clothing at all; the main garment shown is a TOP only (shirt, jacket, sweater) with no bottom visible; or it's a full-outfit/full-body shot where a top AND a bottom are BOTH clearly staged/visible together as a complete look (that belongs in the "전체" slot, not here).
+  BOTTOM: `You are an image classifier for a fashion shopping app upload slot labeled "하의" (BOTTOM). Does this image contain a BOTTOM garment (pants, jeans, skirt, shorts, etc.) that is clearly identifiable somewhere in the image — whether laid flat, on a hanger, worn alone, or worn together with a top in a full-outfit/styled photo? A full-outfit shot showing both a top and a bottom together is fine as long as a bottom is present — the app will extract only the bottom from it.
+Answer NO only if: the image has no clothing at all; or the ONLY garment visible is a TOP (shirt, jacket, sweater) with no bottom anywhere in the frame.
 Respond with ONLY one word: YES or NO.`,
   DRESS: `You are an image classifier for a fashion shopping app upload slot labeled "전체" (FULL OUTFIT). Does this image show a FULL OUTFIT as its clearly identifiable main subject — either (a) a one-piece garment (dress, jumpsuit, overalls), or (b) a photo where a TOP and a BOTTOM are BOTH clearly visible/identifiable together as a complete styled look?
 Answer NO if: the image has no clothing at all; or it shows only a single separate garment piece (just a top with no bottom visible, or just a bottom with no top visible).
@@ -1507,9 +1507,11 @@ app.get('/api/projects', (c) => {
 // 국내(한국)는 나이스페이먼츠, 해외는 전부 Stripe로 이원화 — 글로벌 로컬라이제이션 기획 참고.
 function resolveLocaleProfile(country: string) {
   const cc = (country || '').toUpperCase()
-  if (cc === 'KR') return { locale: 'ko', currency: 'KRW', pg: 'nicepay', messenger: 'kakao' }
+  // 국가를 판별할 수 없는 경우(CF-IPCountry 헤더 누락 등)에는 서비스 기본 시장인
+  // 한국어로 대체한다 — 감지 실패를 곧바로 영어로 떨어뜨리지 않는다.
+  if (cc === 'KR' || !cc) return { locale: 'ko', currency: 'KRW', pg: 'nicepay', messenger: 'kakao' }
   if (cc === 'JP') return { locale: 'ja', currency: 'JPY', pg: 'stripe', messenger: 'line' }
-  // 그 외 국가(미국 포함) — 기본값. 서비스 대상 시장은 en/USD/Stripe로 수렴
+  // 그 외 국가(미국 포함) — 서비스 대상 해외 시장은 en/USD/Stripe로 수렴
   return { locale: 'en', currency: 'USD', pg: 'stripe', messenger: 'web-share' }
 }
 
@@ -5240,7 +5242,7 @@ app.get('/dashboard', (c) => {
   <div class="db-wrap">
 
     <!-- 로고 -->
-    <a href="/" class="db-logo">
+    <a href="/generator" class="db-logo">
       <div class="db-logo-icon">✨</div>
       <span class="db-logo-text">EZlook</span>
     </a>
@@ -5873,7 +5875,7 @@ app.get('/generator', (c) => {
 
     <!-- ── 상단 바 (고정) ── -->
     <header id="gapp-header">
-      <a href="/" class="gapp-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <a href="/generator" class="gapp-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
       <!-- 로그인 상태 표시 -->
       <div style="display:flex;align-items:center;gap:8px;position:relative;">
         <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:12px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
