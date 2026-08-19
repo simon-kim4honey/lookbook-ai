@@ -38,7 +38,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
      LEFT JOIN brand_analysis a ON a.id = (SELECT id FROM brand_analysis WHERE brand_id=b.id ORDER BY analyzed_at DESC LIMIT 1)
      LEFT JOIN outreach_drafts d ON d.id = (SELECT id FROM outreach_drafts WHERE brand_id=b.id ORDER BY created_at DESC LIMIT 1)
      ORDER BY a.priority_score DESC`).all(),n=e=>`"${String(e??``).replace(/"/g,`""`)}"`,r=[`id`,`country`,`platform`,`brand`,`category`,`brand_url`,`contact_email`,`status`,`price_tier`,`priority_score`,`language`,`subject`,`draft_body`,`draft_status`],i=[r.join(`,`)];for(let e of t)i.push(r.map(t=>n(e[t])).join(`,`));return e.text(i.join(`
-`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszczq2z`,We=e=>e?`
+`),200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="brand_leads_export.csv"`})});var Ue=`mszd8wb5`,We=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
