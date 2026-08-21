@@ -6631,6 +6631,7 @@ app.get('/admin02', (c) => {
     .biz-stat-box .label{font-size:11px;color:#8b8ba0;margin-top:2px;}
     .biz-stat-box-highlight{border-color:#3a2e6e;background:#161129;}
     .biz-stat-box-highlight .num{color:#4ade80;}
+    .leads-notice-err{background:#3a1414;border:1px solid #6c1a1a;color:#fca5a5;border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;}
     .biz-filter-btn{cursor:pointer;border:1px solid #3a3a60;border-radius:9px;padding:7px 13px;font-size:12px;color:#8b8ba0;background:#15152a;transition:.15s;}
     .biz-filter-btn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
     .biz-pill{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap;}
@@ -6989,6 +6990,7 @@ app.get('/admin02', (c) => {
       <div class="page-title">🏢 의류·패션·잡화 통신판매업 사업자 리드</div>
       <div class="page-sub">공정거래위원회 공공데이터(통신판매업 신고) 기반 사업자 조회 도구입니다. 조회·CSV 내보내기 전용이며, 발송 기능은 포함되어 있지 않습니다.</div>
 
+      <div id="bizErrorBanner" class="leads-notice-err" style="display:none"></div>
       <div id="bizStatGrid" class="biz-stat-grid"></div>
 
       <div class="leads-card">
@@ -7103,10 +7105,23 @@ function switchTab(name) {
 let bizCurPage = 1, bizTotalPages = 1, bizDebT = null, bizInited = false
 let bizFilters = { valid: false, email: false, tel: false }
 
-function bizApi(path, opts) {
+async function bizApi(path, opts) {
   opts = opts || {}
   opts.headers = Object.assign({'X-Admin-Password': adminPassword}, opts.headers||{})
-  return fetch('/api/admin/bizleads' + path, opts).then(r => r.json())
+  let res
+  try {
+    res = await fetch('/api/admin/bizleads' + path, opts)
+  } catch (e) {
+    return { success: false, message: '네트워크 오류: ' + e.message }
+  }
+  let data
+  try {
+    data = await res.json()
+  } catch (e) {
+    return { success: false, message: 'HTTP ' + res.status + ' — 서버가 JSON이 아닌 응답을 반환했습니다 (DB 마이그레이션 미적용일 가능성이 높습니다).' }
+  }
+  if (!res.ok && data.success === undefined) data.success = false
+  return data
 }
 
 function bizFmtTel(raw) {
@@ -7156,6 +7171,13 @@ async function bizInit() {
     bizApi('/stats'),
     bizApi('/list?limit=100&page=1'),
   ])
+  const banner = document.getElementById('bizErrorBanner')
+  if (!st.success || !li.success) {
+    banner.style.display = 'block'
+    banner.textContent = '데이터를 불러오지 못했습니다: ' + (st.message || li.message || '알 수 없는 오류')
+  } else {
+    banner.style.display = 'none'
+  }
   if (st.success) {
     const vs = st.validStats || {}, cs = st.contactStats || {}, crs = st.crawlStats || {}
     const cards = [
