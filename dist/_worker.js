@@ -90,7 +90,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
     WHERE crawled_insta IS NOT NULL AND crawled_insta != '' ORDER BY id
   `).all(),n=`﻿번호,상호명,도메인,인스타그램\r
 `+t.map(e=>[e.id,e.bzmnNm,e.domain_clean,e.crawled_insta].map(e=>`"${String(e??``).replace(/"/g,`""`)}"`).join(`,`)).join(`\r
-`);return e.text(n,200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="fashion_biz_instagram.csv"`})});var qe=`mt2zdci1`,Je=e=>e?`
+`);return e.text(n,200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="fashion_biz_instagram.csv"`})});var qe=`mt309kho`,Je=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2538,14 +2538,8 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     .modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,20,.7);align-items:center;justify-content:center;padding:20px;z-index:2000;}
     .modal-overlay.open{display:flex;}
     .modal-box{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;padding:24px;width:100%;max-width:480px;}
-    /* ── 리드(영업) 파이프라인 탭 ── */
+    /* ── 리드(영업) 파이프라인 탭에서 쓰던 공용 스타일 (사업자 리드 탭이 재사용) ── */
     .leads-tabroot{max-width:1200px;margin:0 auto;padding:28px 24px;}
-    .leads-tab-nav{display:flex;gap:4px;background:#15152a;border:1px solid #2e2e50;border-radius:10px;padding:4px;margin-bottom:20px;overflow-x:auto;}
-    .leads-subtab-btn{padding:9px 14px;font-size:12.5px;font-weight:500;cursor:pointer;border:none;background:none;color:#8b8ba0;border-radius:7px;white-space:nowrap;}
-    .leads-subtab-btn.active{color:#fff;background:#6c47ff;}
-    .leads-subpanel{display:none;}
-    .leads-subpanel.active{display:block;}
-    .leads-notice{background:#2a2410;border:1px solid #6c5a1a;color:#e8d78a;border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;margin-bottom:20px;}
     .leads-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;padding:18px 20px;margin-bottom:16px;}
     .leads-card h3{font-size:14px;font-weight:600;margin-bottom:10px;}
     .leads-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
@@ -2559,16 +2553,6 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     .leads-tabroot th{text-align:left;color:#8b8ba0;font-weight:600;padding:8px;border-bottom:1px solid #2e2e50;}
     .leads-tabroot td{padding:8px;border-bottom:1px solid #22223a;vertical-align:top;}
     .leads-tabroot tr:hover td{background:#1f1f38;}
-    .leads-tag{display:inline-block;background:#6c47ff22;color:#9b7cff;border-radius:10px;padding:1px 8px;font-size:11px;margin:1px;}
-    .leads-pill{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600;}
-    .leads-pill.new{background:#3a3a60;color:#c0c0e0;}
-    .leads-pill.analyzed{background:#1a4a3a;color:#4ade80;}
-    .leads-pill.drafted{background:#4a3a1a;color:#facc15;}
-    .leads-pill.reviewed,.leads-pill.sent{background:#1a3a4a;color:#38bdf8;}
-    .leads-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
-    .leads-stat-box{background:#0f0f1a;border:1px solid #2e2e50;border-radius:10px;padding:14px;}
-    .leads-stat-box .num{font-size:22px;font-weight:700;color:#9b7cff;}
-    .leads-stat-box .label{font-size:11px;color:#8b8ba0;margin-top:2px;}
     .leads-hint{font-size:11.5px;color:#8b8ba0;margin-top:4px;}
     /* ── 사업자 리드(구 Genspark) 탭 ── */
     .biz-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
@@ -2634,7 +2618,6 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     <button class="tab-btn" onclick="switchTab('bgs')"><i class="fas fa-image"></i> 배경 관리</button>
     <button class="tab-btn" onclick="switchTab('home')"><i class="fas fa-home"></i> 홈페이지 관리</button>
     <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
-    <button class="tab-btn" onclick="switchTab('leads')"><i class="fas fa-bullhorn"></i> 리드 관리</button>
     <button class="tab-btn" onclick="switchTab('bizleads')"><i class="fas fa-building"></i> 사업자 리드</button>
   </div>
 
@@ -2931,95 +2914,6 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     </div>
   </div>
 
-  <div class="tab-panel" id="tabLeads">
-    <div class="leads-tabroot">
-      <div class="page-title">🎯 브랜드 리드(영업) 파이프라인</div>
-      <div class="page-sub">한국·미국·일본 패션 브랜드 수집 → 분류 → 분석 → 아웃리치 초안 생성. 발송은 자동화하지 않으며, 모든 이메일은 검토 후 직접 발송합니다.</div>
-      <div class="leads-tab-nav">
-        <button class="leads-subtab-btn active" data-leadstab="dashboard" onclick="switchLeadsTab('dashboard')">대시보드</button>
-        <button class="leads-subtab-btn" data-leadstab="platforms" onclick="switchLeadsTab('platforms')">플랫폼 설정</button>
-        <button class="leads-subtab-btn" data-leadstab="collect" onclick="switchLeadsTab('collect')">브랜드 수집</button>
-        <button class="leads-subtab-btn" data-leadstab="brands" onclick="switchLeadsTab('brands')">브랜드 목록/분석</button>
-        <button class="leads-subtab-btn" data-leadstab="drafts" onclick="switchLeadsTab('drafts')">아웃리치 초안</button>
-      </div>
-  <div class="leads-subpanel active" id="leadspanel-dashboard">
-    <div class="leads-notice"><i class="fas fa-shield-halved"></i> 이 도구는 <b>공개된 브랜드 디렉토리 정보</b>(브랜드명·카테고리·URL)만 수집하도록 설계되어 있습니다. 담당자 개인 연락처 등은 자동 수집하지 않으며, 아웃리치 메일은 모두 <b>초안(draft)</b> 상태로만 생성되어 실제 발송은 사람이 검토 후 직접 진행해야 합니다. 각 플랫폼의 이용약관 및 국가별 전자상거래/스팸 관련 법령(정보통신망법·CAN-SPAM·特定電子メール法 등)을 준수해 주세요.</div>
-    <div class="leads-card"><h3>국가별 현황</h3><div id="statsCountry" class="leads-stat-grid"></div></div>
-    <div class="leads-card"><h3>초안 상태별 현황</h3><div id="statsDrafts" class="leads-stat-grid"></div></div>
-    <div class="leads-card"><h3>최근 수집 작업</h3><div style="overflow-x:auto"><table id="jobsTable"><thead><tr><th>시각</th><th>플랫폼</th><th>방식</th><th>상태</th><th>수집 건수</th></tr></thead><tbody></tbody></table></div></div>
-  </div>
-
-  <div class="leads-subpanel" id="leadspanel-platforms">
-    <div class="leads-card">
-      <h3>플랫폼 등록/수정</h3>
-      <div class="leads-row">
-        <select id="pCountry"><option value="KR">한국</option><option value="US">미국</option><option value="JP">일본</option></select>
-        <input id="pCode" placeholder="코드 (예: musinsa)"/>
-        <input id="pName" placeholder="이름 (예: 무신사)"/>
-      </div>
-      <div class="leads-row"><input id="pUrl" placeholder="공개 브랜드 디렉토리 URL" style="flex:1;min-width:260px"/></div>
-      <div class="leads-row">
-        <input id="pListSel" placeholder="list_selector (예: a.brand-link)" style="flex:1"/>
-        <input id="pCatSel" placeholder="category_selector (선택)" style="flex:1"/>
-      </div>
-      <div class="leads-row">
-        <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;"><input type="checkbox" id="pScrapable" style="width:auto"/> 셀렉터/약관 검증 완료 — 스크래핑 허용</label>
-      </div>
-      <div class="leads-row"><input id="pNotes" placeholder="메모" style="flex:1"/></div>
-      <button class="leads-btn" onclick="leadsSavePlatform()">저장</button>
-      <div class="leads-hint">list_selector는 브랜드 링크(&lt;a&gt;) 요소 자체를 가리켜야 합니다. 텍스트=브랜드명, href=브랜드 URL로 사용됩니다.</div>
-    </div>
-    <div class="leads-card"><h3>등록된 플랫폼</h3><div style="overflow-x:auto"><table id="platformsTable"><thead><tr><th>국가</th><th>코드</th><th>이름</th><th>디렉토리 URL</th><th>스크래핑 허용</th></tr></thead><tbody></tbody></table></div></div>
-  </div>
-
-  <div class="leads-subpanel" id="leadspanel-collect">
-    <div class="leads-card">
-      <h3>CSV로 브랜드 가져오기 (권장)</h3>
-      <div class="leads-row">
-        <select id="csvPlatform"></select>
-      </div>
-      <div class="leads-hint">형식: 헤더 포함 CSV — name,category,brand_url,contact_email (name만 필수)</div>
-      <div class="leads-row"><input type="file" id="csvFile" accept=".csv"/></div>
-      <textarea id="csvPaste" placeholder="또는 여기에 CSV 내용을 붙여넣기"></textarea>
-      <button class="leads-btn" style="margin-top:8px" onclick="leadsImportCsv()">가져오기</button>
-      <div class="leads-hint" id="csvResult"></div>
-    </div>
-    <div class="leads-card">
-      <h3>공개 디렉토리 스크래핑 실행</h3>
-      <div class="leads-row"><select id="scrapePlatform"></select><button class="leads-btn secondary" onclick="leadsRunScrape()">수집 실행</button></div>
-      <div class="leads-hint">플랫폼 설정에서 "스크래핑 허용"이 체크된 경우에만 동작하며, robots.txt를 자동 확인합니다.</div>
-      <div class="leads-hint" id="scrapeResult"></div>
-    </div>
-  </div>
-
-  <div class="leads-subpanel" id="leadspanel-brands">
-    <div class="leads-card">
-      <div class="leads-row">
-        <select id="fCountry"><option value="">전체 국가</option><option value="KR">한국</option><option value="US">미국</option><option value="JP">일본</option></select>
-        <select id="fStatus"><option value="">전체 상태</option><option value="new">new</option><option value="analyzed">analyzed</option><option value="drafted">drafted</option><option value="reviewed">reviewed</option><option value="contacted">contacted</option></select>
-        <input id="fSearch" placeholder="브랜드명 검색"/>
-        <button class="leads-btn secondary small" onclick="leadsLoadBrands()">조회</button>
-        <button class="leads-btn small" onclick="leadsAnalyzeSelected()">선택 분석 실행</button>
-        <button class="leads-btn small" onclick="leadsDraftSelected()">선택 초안 생성</button>
-        <a class="leads-btn secondary small" href="/api/admin/leads/export.csv" id="exportLink" style="text-decoration:none;display:inline-block;">CSV 내보내기</a>
-      </div>
-      <div style="overflow-x:auto"><table id="brandsTable"><thead><tr><th><input type="checkbox" id="selAll"/></th><th>브랜드</th><th>국가/플랫폼</th><th>카테고리</th><th>스타일</th><th>가격대</th><th>우선순위</th><th>상태</th></tr></thead><tbody></tbody></table></div>
-    </div>
-  </div>
-
-  <div class="leads-subpanel" id="leadspanel-drafts">
-    <div class="leads-card">
-      <div class="leads-row">
-        <select id="dStatus"><option value="">전체 상태</option><option value="draft">draft</option><option value="reviewed">reviewed</option><option value="sent">sent</option><option value="skipped">skipped</option></select>
-        <button class="leads-btn secondary small" onclick="leadsLoadDrafts()">조회</button>
-      </div>
-      <div id="draftsList"></div>
-    </div>
-  </div>
-
-    </div>
-  </div>
-
   <div class="tab-panel" id="tabBizLeads">
     <div class="leads-tabroot">
       <div class="page-title">🏢 의류·패션·잡화 통신판매업 사업자 리드</div>
@@ -3117,7 +3011,7 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs','home','users','leads','bizleads']
+    const names = ['prompt','models','bgs','home','users','bizleads']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
@@ -3125,33 +3019,12 @@ function switchTab(name) {
   document.getElementById('tabBgs').classList.toggle('active', name === 'bgs')
   document.getElementById('tabHome').classList.toggle('active', name === 'home')
   document.getElementById('tabUsers').classList.toggle('active', name === 'users')
-  document.getElementById('tabLeads').classList.toggle('active', name === 'leads')
   document.getElementById('tabBizLeads').classList.toggle('active', name === 'bizleads')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos() }
   if (name === 'users')  loadUsers()
-  if (name === 'leads')  leadsInitAll()
   if (name === 'bizleads') bizInit()
-}
-
-function switchLeadsTab(name) {
-  document.querySelectorAll('.leads-subtab-btn').forEach(b => b.classList.toggle('active', b.dataset.leadstab === name))
-  document.querySelectorAll('.leads-subpanel').forEach(p => p.classList.remove('active'))
-  document.getElementById('leadspanel-' + name).classList.add('active')
-  if (name === 'dashboard') leadsLoadStats()
-  if (name === 'brands')    leadsLoadBrands()
-  if (name === 'drafts')    leadsLoadDrafts()
-}
-
-function leadsApi(path, opts) {
-  opts = opts || {}
-  opts.headers = Object.assign({'X-Admin-Password': adminPassword, 'Content-Type':'application/json'}, opts.headers||{})
-  return fetch('/api/admin/leads' + path, opts).then(r => r.json())
-}
-async function leadsInitAll() {
-  await leadsLoadPlatforms()
-  await leadsLoadStats()
 }
 
 // ══════════════════════════════════════════════
@@ -3400,155 +3273,6 @@ function bizDownloadFile(url, filename) {
       URL.revokeObjectURL(a.href)
     })
 }
-
-async function leadsLoadStats() {
-  const data = await leadsApi('/stats')
-  if (!data.success) return
-  document.getElementById('statsCountry').innerHTML = data.byCountry.map(r => \`
-    <div class="leads-stat-box"><div class="num">\${r.total}</div><div class="label">\${r.country} · new \${r.new_count} / analyzed \${r.analyzed_count} / drafted \${r.drafted_count}</div></div>
-  \`).join('') || '<div class="leads-hint">수집된 브랜드가 없습니다.</div>'
-  document.getElementById('statsDrafts').innerHTML = data.draftsByStatus.map(r => \`
-    <div class="leads-stat-box"><div class="num">\${r.total}</div><div class="label">\${r.status}</div></div>
-  \`).join('') || '<div class="leads-hint">생성된 초안이 없습니다.</div>'
-  const jobs = await leadsApi('/jobs')
-  const tbody = document.querySelector('#jobsTable tbody')
-  tbody.innerHTML = (jobs.jobs||[]).map(j => \`<tr><td>\${j.started_at}</td><td>\${j.platform_name||'-'}</td><td>\${j.method}</td><td>\${j.status}\${j.error?(' — '+j.error):''}</td><td>\${j.collected_count}</td></tr>\`).join('')
-}
-
-let leadsPlatformsCache = []
-async function leadsLoadPlatforms() {
-  const data = await leadsApi('/platforms')
-  leadsPlatformsCache = data.platforms || []
-  const tbody = document.querySelector('#platformsTable tbody')
-  tbody.innerHTML = leadsPlatformsCache.map(p => \`<tr><td>\${p.country}</td><td>\${p.code}</td><td>\${p.name}</td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\${p.directory_url||''}</td><td>\${p.is_scrapable ? '✅' : '❌'}</td></tr>\`).join('')
-  const opts = leadsPlatformsCache.map(p => \`<option value="\${p.code}" data-id="\${p.id}">[\${p.country}] \${p.name}</option>\`).join('')
-  document.getElementById('csvPlatform').innerHTML = opts
-  document.getElementById('scrapePlatform').innerHTML = leadsPlatformsCache.map(p => \`<option value="\${p.id}">[\${p.country}] \${p.name} \${p.is_scrapable?'':'(비허용)'}</option>\`).join('')
-}
-
-async function leadsSavePlatform() {
-  const body = {
-    country: document.getElementById('pCountry').value,
-    code: document.getElementById('pCode').value.trim(),
-    name: document.getElementById('pName').value.trim(),
-    directory_url: document.getElementById('pUrl').value.trim(),
-    list_selector: document.getElementById('pListSel').value.trim(),
-    category_selector: document.getElementById('pCatSel').value.trim(),
-    is_scrapable: document.getElementById('pScrapable').checked,
-    notes: document.getElementById('pNotes').value.trim(),
-  }
-  if (!body.code || !body.name) { alert('코드와 이름은 필수입니다.'); return }
-  const data = await leadsApi('/platforms', { method:'POST', body: JSON.stringify(body) })
-  if (data.success) { leadsLoadPlatforms(); alert('저장되었습니다.') } else { alert(data.message||'오류') }
-}
-
-function leadsParseCsv(text) {
-  const lines = text.trim().split(/\\r?\\n/)
-  if (lines.length < 2) return []
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''))
-  return lines.slice(1).filter(l=>l.trim()).map(line => {
-    const cells = line.split(',').map(c => c.trim().replace(/^"|"$/g,''))
-    const row = {}
-    headers.forEach((h,i) => row[h] = cells[i] || '')
-    return row
-  })
-}
-
-async function leadsImportCsv() {
-  const select = document.getElementById('csvPlatform')
-  const platformCode = select.value
-  const file = document.getElementById('csvFile').files[0]
-  let text = document.getElementById('csvPaste').value
-  if (file) text = await file.text()
-  if (!text.trim()) { alert('CSV 파일 또는 붙여넣기 내용이 필요합니다.'); return }
-  const rows = leadsParseCsv(text)
-  const data = await leadsApi('/collect/csv', { method:'POST', body: JSON.stringify({ platformCode, rows }) })
-  document.getElementById('csvResult').textContent = data.success ? \`\${data.inserted}건 추가됨 (총 \${rows.length}행 처리)\` : ('오류: ' + data.message)
-  if (data.success) leadsLoadStats()
-}
-
-async function leadsRunScrape() {
-  const platformId = document.getElementById('scrapePlatform').value
-  document.getElementById('scrapeResult').textContent = '수집 중...'
-  const data = await leadsApi('/collect/scrape', { method:'POST', body: JSON.stringify({ platformId: Number(platformId) }) })
-  document.getElementById('scrapeResult').textContent = data.success ? \`\${data.inserted}건 추가됨 (파싱 \${data.totalParsed}건)\` : ('오류: ' + data.message)
-  if (data.success) leadsLoadStats()
-}
-
-let leadsBrandsCache = []
-async function leadsLoadBrands() {
-  const params = new URLSearchParams()
-  const country = document.getElementById('fCountry').value
-  const status = document.getElementById('fStatus').value
-  const search = document.getElementById('fSearch').value
-  if (country) params.set('country', country)
-  if (status) params.set('status', status)
-  if (search) params.set('search', search)
-  const data = await leadsApi('/brands?' + params.toString())
-  leadsBrandsCache = data.brands || []
-  const tbody = document.querySelector('#brandsTable tbody')
-  tbody.innerHTML = leadsBrandsCache.map(b => \`<tr>
-    <td><input type="checkbox" class="bsel" value="\${b.id}"/></td>
-    <td>\${b.name}\${b.brand_url?(' <a href="'+b.brand_url+'" target="_blank" style="color:#6c47ff"><i class="fas fa-arrow-up-right-from-square" style="font-size:10px"></i></a>'):''}</td>
-    <td>\${b.country} / \${b.platform_name||'-'}</td>
-    <td>\${b.category||'-'}</td>
-    <td>\${(b.style_tags? JSON.parse(b.style_tags):[]).map(t=>'<span class="leads-tag">'+t+'</span>').join('')}</td>
-    <td>\${b.price_tier||'-'}</td>
-    <td>\${b.priority_score ?? '-'}</td>
-    <td><span class="leads-pill \${b.status}">\${b.status}</span></td>
-  </tr>\`).join('') || '<tr><td colspan="8" class="leads-hint">브랜드가 없습니다. 먼저 CSV 가져오기 또는 스크래핑을 실행하세요.</td></tr>'
-  document.getElementById('selAll').onclick = (e) => document.querySelectorAll('.bsel').forEach(cb=>cb.checked=e.target.checked)
-}
-function leadsSelectedBrandIds() { return Array.from(document.querySelectorAll('.bsel:checked')).map(cb=>Number(cb.value)) }
-async function leadsAnalyzeSelected() {
-  const ids = leadsSelectedBrandIds()
-  if (!ids.length) { alert('브랜드를 선택하세요.'); return }
-  const data = await leadsApi('/analyze', { method:'POST', body: JSON.stringify({ brandIds: ids }) })
-  alert(data.success ? (data.analyzed + '건 분석 완료 (' + data.method + ')') : ('오류: ' + data.message))
-  leadsLoadBrands()
-}
-async function leadsDraftSelected() {
-  const ids = leadsSelectedBrandIds()
-  if (!ids.length) { alert('브랜드를 선택하세요.'); return }
-  const data = await leadsApi('/drafts/generate', { method:'POST', body: JSON.stringify({ brandIds: ids }) })
-  alert(data.success ? (data.created + '건 초안 생성 완료 (' + data.method + ')') : ('오류: ' + data.message))
-  leadsLoadBrands()
-}
-
-async function leadsLoadDrafts() {
-  const status = document.getElementById('dStatus').value
-  const params = new URLSearchParams()
-  if (status) params.set('status', status)
-  const data = await leadsApi('/drafts?' + params.toString())
-  const list = document.getElementById('draftsList')
-  list.innerHTML = (data.drafts||[]).map(d => \`
-    <div class="leads-card" style="background:#151528">
-      <div class="leads-row" style="justify-content:space-between">
-        <div><b>\${d.brand_name}</b> <span class="leads-tag">\${d.country}</span> <span class="leads-tag">\${d.language}</span> <span class="leads-pill \${d.status}">\${d.status}</span></div>
-        <div>
-          <button class="leads-btn small secondary" onclick="leadsUpdateDraft(\${d.id}, this)">저장</button>
-          <button class="leads-btn small" onclick="leadsSetDraftStatus(\${d.id}, 'reviewed')">검토완료</button>
-          <button class="leads-btn small secondary" onclick="leadsSetDraftStatus(\${d.id}, 'sent')">발송완료 표시</button>
-          <button class="leads-btn small secondary" onclick="leadsSetDraftStatus(\${d.id}, 'skipped')">건너뛰기</button>
-        </div>
-      </div>
-      <input data-field="subject" value="\${(d.subject||'').replace(/"/g,'&quot;')}" style="width:100%;margin:8px 0"/>
-      <textarea data-field="body" style="min-height:140px">\${d.body||''}</textarea>
-    </div>
-  \`).join('') || '<div class="leads-hint">초안이 없습니다.</div>'
-}
-async function leadsUpdateDraft(id, btn) {
-  const card = btn.closest('.leads-card')
-  const subject = card.querySelector('[data-field=subject]').value
-  const body = card.querySelector('[data-field=body]').value
-  await leadsApi('/drafts/' + id, { method:'PATCH', body: JSON.stringify({ subject, body }) })
-  alert('저장되었습니다.')
-}
-async function leadsSetDraftStatus(id, status) {
-  await leadsApi('/drafts/' + id, { method:'PATCH', body: JSON.stringify({ status }) })
-  leadsLoadDrafts()
-}
-
 
 // ─── 회원 관리 ───
 let allUsers = []
