@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
 import leadsApp from './leads'
+import bizLeadsApp from './bizleads'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
 // → 배포할 때마다 값이 바뀌어 브라우저가 새 파일로 인식 (캐시 자동 무효화)
@@ -69,6 +70,9 @@ app.use('*', async (c, next) => {
 
 // 브랜드 리드(영업) 파이프라인 — 수집·분류·분석·아웃리치 초안 (관리자 전용, X-Admin-Password 필요)
 app.route('/api/admin/leads', leadsApp)
+
+// 의류·패션 사업자 리드 조회 (구 Genspark 프로젝트 이관, 관리자 전용, X-Admin-Password 필요)
+app.route('/api/admin/bizleads', bizLeadsApp)
 
 // ────────────────────────────────────────────────────
 // Constants
@@ -6636,6 +6640,37 @@ app.get('/admin02', (c) => {
     .leads-stat-box .num{font-size:22px;font-weight:700;color:#9b7cff;}
     .leads-stat-box .label{font-size:11px;color:#8b8ba0;margin-top:2px;}
     .leads-hint{font-size:11.5px;color:#8b8ba0;margin-top:4px;}
+    /* ── 사업자 리드(구 Genspark) 탭 ── */
+    .biz-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
+    .biz-stat-box{background:#0f0f1a;border:1px solid #2e2e50;border-radius:12px;padding:14px 16px;}
+    .biz-stat-box .num{font-size:20px;font-weight:700;color:#9b7cff;}
+    .biz-stat-box .label{font-size:11px;color:#8b8ba0;margin-top:2px;}
+    .biz-filter-btn{cursor:pointer;border:1px solid #3a3a60;border-radius:9px;padding:7px 13px;font-size:12px;color:#8b8ba0;background:#15152a;transition:.15s;}
+    .biz-filter-btn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
+    .biz-pill{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap;}
+    .biz-pill-green{background:#1a4a3a;color:#4ade80;}
+    .biz-pill-red{background:#4a1a1a;color:#f87171;}
+    .biz-pill-yellow{background:#4a3a1a;color:#facc15;}
+    .biz-pill-gray{background:#2e2e50;color:#c0c0e0;}
+    .biz-masked{color:#f87171;font-size:11px;font-style:italic;}
+    .biz-copy-btn{cursor:pointer;opacity:.5;font-size:11px;border:none;background:none;color:#9b7cff;padding:0 0 0 5px;}
+    .biz-copy-btn:hover{opacity:1;}
+    .biz-tablewrap{overflow:auto;max-height:calc(100vh - 420px);}
+    .biz-tablewrap th{position:sticky;top:0;background:#1a1a2e;z-index:2;}
+    .biz-tablewrap tr{cursor:pointer;}
+    .biz-pagebtn{min-width:30px;height:28px;border-radius:7px;border:1px solid #3a3a60;background:#15152a;color:#8b8ba0;font-size:11.5px;cursor:pointer;padding:0 6px;}
+    .biz-pagebtn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
+    .biz-pagebtn:disabled{opacity:.35;cursor:default;}
+    .biz-modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);align-items:center;justify-content:center;padding:20px;z-index:2100;}
+    .biz-modal-overlay.open{display:flex;}
+    .biz-modal-box{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;padding:0;}
+    .biz-modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #2e2e50;}
+    .biz-modal-close{background:#252540;border:1px solid #3a3a60;color:#8b8ba0;border-radius:8px;width:28px;height:28px;cursor:pointer;}
+    .biz-modal-body{padding:16px 20px;}
+    .biz-mfield{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #22223a;font-size:12.5px;}
+    .biz-mfield:last-child{border-bottom:none;}
+    .biz-mlabel{width:100px;flex-shrink:0;color:#8b8ba0;font-weight:600;}
+    .biz-mvalue{color:#e0e0f0;word-break:break-all;}
   </style>
 </head>
 <body>
@@ -6668,6 +6703,7 @@ app.get('/admin02', (c) => {
     <button class="tab-btn" onclick="switchTab('home')"><i class="fas fa-home"></i> 홈페이지 관리</button>
     <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
     <button class="tab-btn" onclick="switchTab('leads')"><i class="fas fa-bullhorn"></i> 리드 관리</button>
+    <button class="tab-btn" onclick="switchTab('bizleads')"><i class="fas fa-building"></i> 사업자 리드</button>
   </div>
 
   <!-- ▼ 탭: 프롬프트 -->
@@ -7052,6 +7088,76 @@ app.get('/admin02', (c) => {
     </div>
   </div>
 
+  <div class="tab-panel" id="tabBizLeads">
+    <div class="leads-tabroot">
+      <div class="page-title">🏢 의류·패션·잡화 통신판매업 사업자 리드</div>
+      <div class="page-sub">공정거래위원회 공공데이터(통신판매업 신고) 기반 사업자 조회 도구입니다. 조회·CSV 내보내기 전용이며, 발송 기능은 포함되어 있지 않습니다.</div>
+
+      <div id="bizStatGrid" class="biz-stat-grid"></div>
+
+      <div class="leads-card">
+        <div class="leads-row">
+          <input id="bizQ" placeholder="상호명, 도메인, 이메일, 주소, 대표자, 사업자번호..." style="flex:1;min-width:220px" oninput="bizDebounce()"/>
+          <select id="bizRegion" onchange="bizSearch(1)"><option value="">전체 지역</option></select>
+          <select id="bizStatus" onchange="bizSearch(1)">
+            <option value="">전체 상태</option>
+            <option value="정상영업">정상영업</option>
+            <option value="휴업처리">휴업처리</option>
+            <option value="영업재개">영업재개</option>
+          </select>
+          <select id="bizLimit" onchange="bizSearch(1)">
+            <option value="50">50건</option>
+            <option value="100" selected>100건</option>
+            <option value="200">200건</option>
+          </select>
+          <button class="leads-btn small" onclick="bizSearch(1)">검색</button>
+          <button class="leads-btn secondary small" onclick="bizReset()">초기화</button>
+        </div>
+        <div class="leads-row">
+          <span class="leads-hint">빠른 필터:</span>
+          <button id="biz-btn-valid" class="biz-filter-btn" onclick="bizToggleFilter('valid')">유효 도메인만</button>
+          <button id="biz-btn-email" class="biz-filter-btn" onclick="bizToggleFilter('email')">이메일 공개만</button>
+          <button id="biz-btn-tel" class="biz-filter-btn" onclick="bizToggleFilter('tel')">전화번호 공개만</button>
+          <a class="leads-btn secondary small" style="text-decoration:none;display:inline-block;" onclick="bizDownload()">CSV 내보내기</a>
+          <a class="leads-btn secondary small" style="text-decoration:none;display:inline-block;" onclick="bizDownloadKakao()">카카오채널 CSV</a>
+          <a class="leads-btn secondary small" style="text-decoration:none;display:inline-block;" onclick="bizDownloadInsta()">인스타그램 CSV</a>
+        </div>
+      </div>
+
+      <div class="leads-card">
+        <div class="leads-row" style="justify-content:space-between;margin-bottom:6px;">
+          <div class="leads-hint">결과: <b id="bizRCount" style="color:#e0e0f0">-</b>건 <span id="bizPInfo"></span></div>
+        </div>
+        <div class="biz-tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>상호명 / 대표자</th><th>상태</th><th>지역</th><th>도메인</th>
+                <th>이메일</th><th>전화번호</th><th>사업자번호</th><th>주소</th><th>신고일자</th>
+              </tr>
+            </thead>
+            <tbody id="bizTbody"></tbody>
+          </table>
+        </div>
+        <div class="leads-row" style="justify-content:center;margin-top:10px;">
+          <button class="biz-pagebtn" id="bizPrevBtn" onclick="bizGoPage(bizCurPage-1)">‹</button>
+          <div id="bizPageBtns" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+          <button class="biz-pagebtn" id="bizNextBtn" onclick="bizGoPage(bizCurPage+1)">›</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="biz-modal-overlay" id="bizModal" onclick="bizCloseModal(event)">
+    <div class="biz-modal-box" onclick="event.stopPropagation()">
+      <div class="biz-modal-head">
+        <div style="font-weight:700;color:#fff;" id="bizModalTitle"></div>
+        <button class="biz-modal-close" onclick="document.getElementById('bizModal').classList.remove('open')">✕</button>
+      </div>
+      <div class="biz-modal-body" id="bizModalFields"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -7079,7 +7185,7 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs','home','users','leads']
+    const names = ['prompt','models','bgs','home','users','leads','bizleads']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
@@ -7088,11 +7194,13 @@ function switchTab(name) {
   document.getElementById('tabHome').classList.toggle('active', name === 'home')
   document.getElementById('tabUsers').classList.toggle('active', name === 'users')
   document.getElementById('tabLeads').classList.toggle('active', name === 'leads')
+  document.getElementById('tabBizLeads').classList.toggle('active', name === 'bizleads')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos() }
   if (name === 'users')  loadUsers()
   if (name === 'leads')  leadsInitAll()
+  if (name === 'bizleads') bizInit()
 }
 
 function switchLeadsTab(name) {
@@ -7112,6 +7220,252 @@ function leadsApi(path, opts) {
 async function leadsInitAll() {
   await leadsLoadPlatforms()
   await leadsLoadStats()
+}
+
+// ══════════════════════════════════════════════
+// 사업자 리드(구 Genspark "fashion-biz" 프로젝트 이관)
+// ══════════════════════════════════════════════
+let bizCurPage = 1, bizTotalPages = 1, bizDebT = null, bizInited = false
+let bizFilters = { valid: false, email: false, tel: false }
+
+function bizApi(path, opts) {
+  opts = opts || {}
+  opts.headers = Object.assign({'X-Admin-Password': adminPassword}, opts.headers||{})
+  return fetch('/api/admin/bizleads' + path, opts).then(r => r.json())
+}
+
+function bizFmtTel(raw) {
+  if (!raw) return ''
+  const d = raw.replace(/[^0-9]/g,'')
+  if (d.length < 7) return raw
+  if (d.startsWith('02')) {
+    if (d.length===9)  return d.replace(/(\d{2})(\d{3})(\d{4})/,'$1-$2-$3')
+    if (d.length===10) return d.replace(/(\d{2})(\d{4})(\d{4})/,'$1-$2-$3')
+  }
+  if (d.startsWith('0')) {
+    if (d.length===9)  return d.replace(/(\d{3})(\d{2})(\d{4})/,'$1-$2-$3')
+    if (d.length===10) return d.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3')
+    if (d.length===11) return d.replace(/(\d{3})(\d{4})(\d{4})/,'$1-$2-$3')
+  }
+  if (!d.startsWith('0') && d.length>=7) {
+    const p='0'+d
+    if (p.startsWith('02')) {
+      if (p.length===9)  return p.replace(/(\d{2})(\d{3})(\d{4})/,'$1-$2-$3')
+      if (p.length===10) return p.replace(/(\d{2})(\d{4})(\d{4})/,'$1-$2-$3')
+    }
+    if (p.length===10) return p.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3')
+    if (p.length===11) return p.replace(/(\d{3})(\d{4})(\d{4})/,'$1-$2-$3')
+  }
+  return raw
+}
+function bizFmtBrno(raw) {
+  if (!raw) return ''
+  const d = raw.replace(/[^0-9]/g,'')
+  if (d.length===10) return d.slice(0,3)+'-'+d.slice(3,5)+'-'+d.slice(5)
+  return raw
+}
+function bizAttrEsc(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function bizCopyFromBtn(btn) { bizCopyText(btn.getAttribute('data-copy') || '') }
+function bizCopyText(txt) {
+  navigator.clipboard.writeText(txt).then(() => {
+    const t = document.createElement('div')
+    t.textContent = '복사됨!'
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#6c47ff;color:#fff;font-size:13px;padding:8px 16px;border-radius:10px;z-index:9999;'
+    document.body.appendChild(t)
+    setTimeout(() => t.remove(), 1500)
+  })
+}
+
+async function bizInit() {
+  const [st, li] = await Promise.all([
+    bizApi('/stats'),
+    bizApi('/list?limit=100&page=1'),
+  ])
+  if (st.success) {
+    const vs = st.validStats || {}, cs = st.contactStats || {}
+    const cards = [
+      ['bizTotal', st.total || 0, '전체 사업자'],
+      ['bizValid', vs.valid || 0, '도메인 유효'],
+      ['bizEmailFull', cs.email_full || 0, '이메일 공개'],
+      ['bizEmailMasked', cs.email_masked || 0, '이메일 마스킹'],
+      ['bizTelFull', cs.tel_full || 0, '전화번호 공개'],
+      ['bizAddr', cs.addr_ok || 0, '주소 보유'],
+    ]
+    document.getElementById('bizStatGrid').innerHTML = cards.map(c =>
+      '<div class="biz-stat-box"><div class="num">' + c[1].toLocaleString() + '</div><div class="label">' + c[2] + '</div></div>'
+    ).join('')
+    if (!bizInited) {
+      const sel = document.getElementById('bizRegion')
+      ;(st.regions || []).forEach(r => {
+        if (!r.region || r.region === 'N/A') return
+        const o = document.createElement('option')
+        o.value = r.region; o.textContent = r.region + ' (' + r.n.toLocaleString() + ')'
+        sel.appendChild(o)
+      })
+      bizInited = true
+    }
+  }
+  bizRenderList(li)
+}
+
+async function bizSearch(page) {
+  bizCurPage = page || 1
+  const q = document.getElementById('bizQ').value.trim()
+  const region = document.getElementById('bizRegion').value
+  const status = document.getElementById('bizStatus').value
+  const limit = document.getElementById('bizLimit').value
+  const sp = new URLSearchParams({
+    q, region, status, limit, page: bizCurPage,
+    validOnly: bizFilters.valid ? '1' : '',
+    emailOnly: bizFilters.email ? '1' : '',
+    telOnly: bizFilters.tel ? '1' : '',
+  })
+  const data = await bizApi('/list?' + sp.toString())
+  bizRenderList(data)
+}
+function bizDebounce() { clearTimeout(bizDebT); bizDebT = setTimeout(() => bizSearch(1), 380) }
+
+function bizToggleFilter(key) {
+  bizFilters[key] = !bizFilters[key]
+  document.getElementById('biz-btn-' + key).classList.toggle('on', bizFilters[key])
+  bizSearch(1)
+}
+function bizReset() {
+  bizFilters = { valid: false, email: false, tel: false }
+  ;['valid','email','tel'].forEach(k => document.getElementById('biz-btn-'+k).classList.remove('on'))
+  document.getElementById('bizQ').value = ''
+  document.getElementById('bizRegion').value = ''
+  document.getElementById('bizStatus').value = ''
+  bizSearch(1)
+}
+
+function bizRenderList(data) {
+  const lim = parseInt(document.getElementById('bizLimit').value || '100')
+  const total = data.total || 0
+  bizTotalPages = Math.max(1, Math.ceil(total / lim))
+  const rows = data.rows || [], offset = (bizCurPage - 1) * lim
+  document.getElementById('bizRCount').textContent = total.toLocaleString()
+  document.getElementById('bizPInfo').textContent = bizTotalPages > 1 ? '(' + bizCurPage + '/' + bizTotalPages + ' 페이지)' : ''
+  const na = v => (v && v !== 'N/A' && v !== 'NULL' && v !== '') ? v : null
+
+  document.getElementById('bizTbody').innerHTML = rows.map((r, i) => {
+    const stCls = r.status === '정상영업' ? 'biz-pill-green' : r.status === '휴업처리' ? 'biz-pill-yellow' : 'biz-pill-gray'
+    const dom = na(r.domain_clean) || na(r.domain)
+    const domHtml = dom
+      ? '<a href="https://' + dom + '" target="_blank" rel="noopener" style="color:#9b7cff;font-size:12px;" onclick="event.stopPropagation()">' + dom + '</a>'
+      : '<span style="color:#54546e;font-size:12px;">-</span>'
+    const vb = r.is_valid === 1 ? '<span class="biz-pill biz-pill-green">유효</span>'
+      : r.is_valid === 0 ? '<span class="biz-pill biz-pill-red">불가</span>'
+      : '<span class="biz-pill biz-pill-gray">미검증</span>'
+    const emailRaw = na(r.email) || ''
+    const emailMasked = emailRaw.includes('**') || !emailRaw.includes('@')
+    const emailHtml = emailMasked
+      ? '<span class="biz-masked">' + (emailRaw || '마스킹됨') + '</span>'
+      : emailRaw
+        ? '<span style="color:#9b7cff;">' + emailRaw + '</span><button class="biz-copy-btn" data-copy="' + bizAttrEsc(emailRaw) + '" onclick="event.stopPropagation();bizCopyFromBtn(this)">복사</button>'
+        : '<span style="color:#54546e;font-size:12px;">-</span>'
+    const telRaw = na(r.tel) || ''
+    const telMasked = telRaw.includes('개인정보')
+    const telHtml = telMasked
+      ? '<span class="biz-masked">' + telRaw + '</span>'
+      : telRaw
+        ? '<span style="color:#38bdf8;">' + bizFmtTel(telRaw) + '</span><button class="biz-copy-btn" data-copy="' + bizAttrEsc(bizFmtTel(telRaw)) + '" onclick="event.stopPropagation();bizCopyFromBtn(this)">복사</button>'
+        : '<span style="color:#54546e;font-size:12px;">-</span>'
+    const addrRaw = na(r.addr) || ''
+    const addrShort = addrRaw.length > 26 ? addrRaw.slice(0, 26) + '…' : addrRaw
+
+    return '<tr onclick="bizOpenModal(' + r.id + ')" title="클릭하여 전체 정보 보기">' +
+      '<td>' + (offset + i + 1) + '</td>' +
+      '<td><div style="font-weight:600;color:#fff;">' + (na(r.bzmnNm) || '-') + '</div><div style="font-size:11px;color:#8b8ba0;">' + (na(r.ceo) || '대표 미상') + '</div></td>' +
+      '<td><span class="biz-pill ' + stCls + '">' + (na(r.status) || '-') + '</span><br/>' + vb + '</td>' +
+      '<td>' + (na(r.region) || na(r.inst) || '-') + '</td>' +
+      '<td>' + domHtml + '</td>' +
+      '<td>' + emailHtml + '</td>' +
+      '<td>' + telHtml + '</td>' +
+      '<td>' + bizFmtBrno(na(r.brno) || '') + '</td>' +
+      '<td title="' + (r.addr || '') + '">' + (addrShort || '-') + '</td>' +
+      '<td>' + (na(r.declDate) || '-') + '</td>' +
+    '</tr>'
+  }).join('')
+  bizRenderPagination()
+}
+
+function bizRenderPagination() {
+  const MAX = 9
+  let ps = []
+  if (bizTotalPages <= MAX) { for (let i=1;i<=bizTotalPages;i++) ps.push(i) }
+  else {
+    const s = Math.max(1, bizCurPage-4), e = Math.min(bizTotalPages, s+MAX-1)
+    for (let i=s;i<=e;i++) ps.push(i)
+    if (ps[0] > 1) ps = ['f', ...ps]
+    if (ps[ps.length-1] < bizTotalPages) ps = [...ps, 'l']
+  }
+  document.getElementById('bizPageBtns').innerHTML = ps.map(p => {
+    if (p==='f') return '<button class="biz-pagebtn" onclick="bizGoPage(1)">1…</button>'
+    if (p==='l') return '<button class="biz-pagebtn" onclick="bizGoPage(' + bizTotalPages + ')">…' + bizTotalPages + '</button>'
+    return '<button class="biz-pagebtn' + (p===bizCurPage?' on':'') + '" onclick="bizGoPage(' + p + ')">' + p + '</button>'
+  }).join('')
+  document.getElementById('bizPrevBtn').disabled = bizCurPage <= 1
+  document.getElementById('bizNextBtn').disabled = bizCurPage >= bizTotalPages
+}
+function bizGoPage(p) {
+  if (p < 1 || p > bizTotalPages) return
+  bizSearch(p)
+}
+
+async function bizOpenModal(id) {
+  const r = await bizApi('/detail/' + id)
+  if (!r.success) return
+  document.getElementById('bizModalTitle').textContent = r.bzmnNm || '-'
+  document.getElementById('bizModal').classList.add('open')
+  const validLabel = r.is_valid === 1 ? '<span class="biz-pill biz-pill-green">유효</span>'
+    : r.is_valid === 0 ? '<span class="biz-pill biz-pill-red">불가</span>'
+    : '<span class="biz-pill biz-pill-gray">미검증</span>'
+  const fields = [
+    ['상호명', r.bzmnNm], ['대표자', r.ceo], ['사업자번호', bizFmtBrno(r.brno||'')],
+    ['신고기관', r.inst], ['지역', r.region], ['영업상태', r.status], ['신고일자', r.declDate],
+    ['판매방식', r.method], ['취급품목', r.codeRaw || r.codeName],
+    ['도메인(원본)', r.domain], ['도메인(정규화)', r.domain_clean], ['도메인 유효', validLabel, true],
+    ['이메일(원본)', r.email || '정보없음'], ['전화번호(원본)', r.tel || '정보없음'],
+    ['크롤링 이메일', r.crawled_email || '-'], ['크롤링 전화', r.crawled_tel || '-'],
+    ['카카오채널', r.crawled_kakao || '-'], ['인스타그램', r.crawled_insta || '-'],
+    ['사업장 주소', r.addr], ['서버 소재지', r.server],
+  ]
+  document.getElementById('bizModalFields').innerHTML = fields.map(f => {
+    const [label, val, isHtml] = f
+    const valHtml = isHtml ? val : (val ? val : '<span style="color:#54546e;">-</span>')
+    return '<div class="biz-mfield"><span class="biz-mlabel">' + label + '</span><span class="biz-mvalue">' + valHtml + '</span></div>'
+  }).join('')
+}
+function bizCloseModal(e) {
+  if (e.target === document.getElementById('bizModal')) document.getElementById('bizModal').classList.remove('open')
+}
+
+function bizDownload() {
+  const q = document.getElementById('bizQ').value.trim()
+  const region = document.getElementById('bizRegion').value
+  const status = document.getElementById('bizStatus').value
+  const sp = new URLSearchParams({
+    q, region, status,
+    validOnly: bizFilters.valid ? '1' : '',
+    emailOnly: bizFilters.email ? '1' : '',
+    telOnly: bizFilters.tel ? '1' : '',
+  })
+  const url = '/api/admin/bizleads/download.csv?' + sp.toString()
+  bizDownloadFile(url, 'fashion_biz_leads.csv')
+}
+function bizDownloadKakao() { bizDownloadFile('/api/admin/bizleads/export/kakao.csv', 'fashion_biz_kakao.csv') }
+function bizDownloadInsta() { bizDownloadFile('/api/admin/bizleads/export/insta.csv', 'fashion_biz_instagram.csv') }
+function bizDownloadFile(url, filename) {
+  fetch(url, { headers: { 'X-Admin-Password': adminPassword } })
+    .then(r => r.blob())
+    .then(blob => {
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(a.href)
+    })
 }
 
 async function leadsLoadStats() {
