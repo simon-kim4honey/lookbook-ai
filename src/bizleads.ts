@@ -78,7 +78,11 @@ biz.get('/stats', async (c) => {
       SUM(CASE WHEN email LIKE '%**%' THEN 1 ELSE 0 END) AS email_masked,
       SUM(CASE WHEN tel NOT LIKE '%개인정보%' AND tel != 'N/A' AND tel != '' AND tel IS NOT NULL THEN 1 ELSE 0 END) AS tel_full,
       SUM(CASE WHEN tel LIKE '%개인정보%' THEN 1 ELSE 0 END) AS tel_masked,
-      SUM(CASE WHEN addr != 'N/A' AND addr != '' AND addr IS NOT NULL THEN 1 ELSE 0 END) AS addr_ok
+      SUM(CASE WHEN addr != 'N/A' AND addr != '' AND addr IS NOT NULL THEN 1 ELSE 0 END) AS addr_ok,
+      SUM(CASE WHEN (email LIKE '%@%' AND email NOT LIKE '%**%')
+               OR (crawled_email IS NOT NULL AND crawled_email != '') THEN 1 ELSE 0 END) AS email_any,
+      SUM(CASE WHEN (tel NOT LIKE '%개인정보%' AND tel != 'N/A' AND tel != '' AND tel IS NOT NULL)
+               OR (crawled_tel IS NOT NULL AND crawled_tel != '') THEN 1 ELSE 0 END) AS tel_any
     FROM biz_leads WHERE is_valid = 1
   `).first()
   const crawlStats = await db.prepare(`
