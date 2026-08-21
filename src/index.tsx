@@ -6645,6 +6645,8 @@ app.get('/admin02', (c) => {
     .biz-stat-box{background:#0f0f1a;border:1px solid #2e2e50;border-radius:12px;padding:14px 16px;}
     .biz-stat-box .num{font-size:20px;font-weight:700;color:#9b7cff;}
     .biz-stat-box .label{font-size:11px;color:#8b8ba0;margin-top:2px;}
+    .biz-stat-box-highlight{border-color:#3a2e6e;background:#161129;}
+    .biz-stat-box-highlight .num{color:#4ade80;}
     .biz-filter-btn{cursor:pointer;border:1px solid #3a3a60;border-radius:9px;padding:7px 13px;font-size:12px;color:#8b8ba0;background:#15152a;transition:.15s;}
     .biz-filter-btn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
     .biz-pill{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap;}
@@ -7282,17 +7284,18 @@ async function bizInit() {
     bizApi('/list?limit=100&page=1'),
   ])
   if (st.success) {
-    const vs = st.validStats || {}, cs = st.contactStats || {}
+    const vs = st.validStats || {}, cs = st.contactStats || {}, crs = st.crawlStats || {}
     const cards = [
-      ['bizTotal', st.total || 0, '전체 사업자'],
-      ['bizValid', vs.valid || 0, '도메인 유효'],
-      ['bizEmailFull', cs.email_full || 0, '이메일 공개'],
-      ['bizEmailMasked', cs.email_masked || 0, '이메일 마스킹'],
-      ['bizTelFull', cs.tel_full || 0, '전화번호 공개'],
-      ['bizAddr', cs.addr_ok || 0, '주소 보유'],
+      ['전체', st.total || 0, false],
+      ['유효 리드 (도메인 유효)', vs.valid || 0, true],
+      ['이메일 확보 (원본+크롤링)', cs.email_any || 0, true],
+      ['전화 확보 (원본+크롤링)', cs.tel_any || 0, true],
+      ['카카오채널 확보', crs.crawl_kakao || 0, true],
+      ['인스타그램 확보', crs.crawl_insta || 0, true],
+      ['도메인 불가 (2차 검증 대상)', vs.invalid || 0, false],
     ]
     document.getElementById('bizStatGrid').innerHTML = cards.map(c =>
-      '<div class="biz-stat-box"><div class="num">' + c[1].toLocaleString() + '</div><div class="label">' + c[2] + '</div></div>'
+      '<div class="biz-stat-box' + (c[2] ? ' biz-stat-box-highlight' : '') + '"><div class="num">' + c[1].toLocaleString() + '</div><div class="label">' + c[0] + '</div></div>'
     ).join('')
     if (!bizInited) {
       const sel = document.getElementById('bizRegion')
