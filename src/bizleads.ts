@@ -109,6 +109,8 @@ function buildListWhere(c: any) {
   const validOnly = c.req.query('validOnly') || ''
   const emailOnly = c.req.query('emailOnly') || ''
   const telOnly = c.req.query('telOnly') || ''
+  const notSentOnly = c.req.query('notSentOnly') || ''
+  const sentOnly = c.req.query('sentOnly') || ''
 
   const wheres: string[] = []
   const params: any[] = []
@@ -122,6 +124,8 @@ function buildListWhere(c: any) {
   if (validOnly === '1') wheres.push('is_valid = 1')
   if (emailOnly === '1') wheres.push("email LIKE '%@%' AND email NOT LIKE '%**%'")
   if (telOnly === '1') wheres.push("tel NOT LIKE '%개인정보%' AND tel != 'N/A' AND tel != '' AND tel IS NOT NULL")
+  if (notSentOnly === '1') wheres.push('outreach_sent_at IS NULL')
+  if (sentOnly === '1') wheres.push('outreach_sent_at IS NOT NULL')
 
   const where = wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''
   return { where, params }
@@ -139,7 +143,8 @@ biz.get('/list', async (c) => {
     SELECT id, bzmnNm, codeName, status, inst, region, ceo, brno, declDate,
            method, domain, domain_clean, is_valid,
            addr, tel, email, server,
-           crawled_email, crawled_tel, crawled_kakao, crawled_insta, crawl_status
+           crawled_email, crawled_tel, crawled_kakao, crawled_insta, crawl_status,
+           outreach_sent_at, outreach_campaign
     FROM biz_leads ${where} ORDER BY id LIMIT ? OFFSET ?
   `).bind(...params, limit, offset).all()
 
@@ -151,6 +156,22 @@ biz.get('/detail/:id', async (c) => {
   const row = await c.env.LOOKBOOK_DB.prepare(`SELECT * FROM biz_leads WHERE id = ?`).bind(id).first()
   if (!row) return c.json({ success: false, message: '찾을 수 없습니다.' }, 404)
   return c.json({ success: true, ...row })
+})
+
+// ────────────────────────────────────────────────────
+// 아웃리치(이메일 발송) 이력 — 발송은 이 앱이 하지 않으며, 외부에서 발송한 뒤 이력만 기록
+// ────────────────────────────────────────────────────
+biz.post('/outreach/mark-sent', async (c) => {
+  const body = await c.req.json<{ ids?: number[]; campaign?: string }>().catch(() => ({}))
+  const ids = Array.isArray(body.ids) ? body.ids.filter((n) => Number.isInteger(n)) : []
+  if (!ids.length) return c.json({ success: false, message: 'ids가 필요합니다.' }, 400)
+  const campaign = body.campaign || null
+  const now = new Date().toISOString()
+  const placeholders = ids.map(() => '?').join(',')
+  const result = await c.env.LOOKBOOK_DB.prepare(
+    `UPDATE biz_leads SET outreach_sent_at = ?, outreach_campaign = ? WHERE id IN (${placeholders})`
+  ).bind(now, campaign, ...ids).run()
+  return c.json({ success: true, updated: result.meta.changes ?? ids.length })
 })
 
 // ────────────────────────────────────────────────────
