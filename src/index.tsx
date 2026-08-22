@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
 import leadsApp from './leads'
+import bizLeadsApp from './bizleads'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
 // → 배포할 때마다 값이 바뀌어 브라우저가 새 파일로 인식 (캐시 자동 무효화)
@@ -69,6 +70,9 @@ app.use('*', async (c, next) => {
 
 // 브랜드 리드(영업) 파이프라인 — 수집·분류·분석·아웃리치 초안 (관리자 전용, X-Admin-Password 필요)
 app.route('/api/admin/leads', leadsApp)
+
+// 의류·패션 사업자 리드 조회 (구 Genspark 프로젝트 이관, 관리자 전용, X-Admin-Password 필요)
+app.route('/api/admin/bizleads', bizLeadsApp)
 
 // ────────────────────────────────────────────────────
 // Constants
@@ -4782,7 +4786,7 @@ app.get('/', (c) => {
               </div>
             </a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
@@ -5421,7 +5425,7 @@ app.get('/dashboard', (c) => {
       </a>
 
       <!-- 카톡 문의 -->
-      <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" class="db-menu-item">
+      <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" class="db-menu-item" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm()))">
         <span class="db-menu-label">카톡 문의</span>
         <span class="db-menu-arrow">›</span>
       </a>
@@ -6141,7 +6145,7 @@ app.get('/generator', (c) => {
               </div>
             </a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
@@ -6604,14 +6608,8 @@ app.get('/admin02', (c) => {
     .modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,20,.7);align-items:center;justify-content:center;padding:20px;z-index:2000;}
     .modal-overlay.open{display:flex;}
     .modal-box{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;padding:24px;width:100%;max-width:480px;}
-    /* ── 리드(영업) 파이프라인 탭 ── */
+    /* ── 리드(영업) 파이프라인 탭에서 쓰던 공용 스타일 (사업자 리드 탭이 재사용) ── */
     .leads-tabroot{max-width:1200px;margin:0 auto;padding:28px 24px;}
-    .leads-tab-nav{display:flex;gap:4px;background:#15152a;border:1px solid #2e2e50;border-radius:10px;padding:4px;margin-bottom:20px;overflow-x:auto;}
-    .leads-subtab-btn{padding:9px 14px;font-size:12.5px;font-weight:500;cursor:pointer;border:none;background:none;color:#8b8ba0;border-radius:7px;white-space:nowrap;}
-    .leads-subtab-btn.active{color:#fff;background:#6c47ff;}
-    .leads-subpanel{display:none;}
-    .leads-subpanel.active{display:block;}
-    .leads-notice{background:#2a2410;border:1px solid #6c5a1a;color:#e8d78a;border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;margin-bottom:20px;}
     .leads-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;padding:18px 20px;margin-bottom:16px;}
     .leads-card h3{font-size:14px;font-weight:600;margin-bottom:10px;}
     .leads-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
@@ -6625,17 +6623,41 @@ app.get('/admin02', (c) => {
     .leads-tabroot th{text-align:left;color:#8b8ba0;font-weight:600;padding:8px;border-bottom:1px solid #2e2e50;}
     .leads-tabroot td{padding:8px;border-bottom:1px solid #22223a;vertical-align:top;}
     .leads-tabroot tr:hover td{background:#1f1f38;}
-    .leads-tag{display:inline-block;background:#6c47ff22;color:#9b7cff;border-radius:10px;padding:1px 8px;font-size:11px;margin:1px;}
-    .leads-pill{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600;}
-    .leads-pill.new{background:#3a3a60;color:#c0c0e0;}
-    .leads-pill.analyzed{background:#1a4a3a;color:#4ade80;}
-    .leads-pill.drafted{background:#4a3a1a;color:#facc15;}
-    .leads-pill.reviewed,.leads-pill.sent{background:#1a3a4a;color:#38bdf8;}
-    .leads-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;}
-    .leads-stat-box{background:#0f0f1a;border:1px solid #2e2e50;border-radius:10px;padding:14px;}
-    .leads-stat-box .num{font-size:22px;font-weight:700;color:#9b7cff;}
-    .leads-stat-box .label{font-size:11px;color:#8b8ba0;margin-top:2px;}
     .leads-hint{font-size:11.5px;color:#8b8ba0;margin-top:4px;}
+    /* ── 사업자 리드(구 Genspark) 탭 ── */
+    .biz-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
+    .biz-stat-box{background:#0f0f1a;border:1px solid #2e2e50;border-radius:12px;padding:14px 16px;}
+    .biz-stat-box .num{font-size:20px;font-weight:700;color:#9b7cff;}
+    .biz-stat-box .label{font-size:11px;color:#8b8ba0;margin-top:2px;}
+    .biz-stat-box-highlight{border-color:#3a2e6e;background:#161129;}
+    .biz-stat-box-highlight .num{color:#4ade80;}
+    .leads-notice-err{background:#3a1414;border:1px solid #6c1a1a;color:#fca5a5;border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;}
+    .biz-filter-btn{cursor:pointer;border:1px solid #3a3a60;border-radius:9px;padding:7px 13px;font-size:12px;color:#8b8ba0;background:#15152a;transition:.15s;}
+    .biz-filter-btn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
+    .biz-pill{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap;}
+    .biz-pill-green{background:#1a4a3a;color:#4ade80;}
+    .biz-pill-red{background:#4a1a1a;color:#f87171;}
+    .biz-pill-yellow{background:#4a3a1a;color:#facc15;}
+    .biz-pill-gray{background:#2e2e50;color:#c0c0e0;}
+    .biz-masked{color:#f87171;font-size:11px;font-style:italic;}
+    .biz-copy-btn{cursor:pointer;opacity:.5;font-size:11px;border:none;background:none;color:#9b7cff;padding:0 0 0 5px;}
+    .biz-copy-btn:hover{opacity:1;}
+    .biz-tablewrap{overflow:auto;max-height:calc(100vh - 420px);}
+    .biz-tablewrap th{position:sticky;top:0;background:#1a1a2e;z-index:2;}
+    .biz-tablewrap tr{cursor:pointer;}
+    .biz-pagebtn{min-width:30px;height:28px;border-radius:7px;border:1px solid #3a3a60;background:#15152a;color:#8b8ba0;font-size:11.5px;cursor:pointer;padding:0 6px;}
+    .biz-pagebtn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
+    .biz-pagebtn:disabled{opacity:.35;cursor:default;}
+    .biz-modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);align-items:center;justify-content:center;padding:20px;z-index:2100;}
+    .biz-modal-overlay.open{display:flex;}
+    .biz-modal-box{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;padding:0;}
+    .biz-modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #2e2e50;}
+    .biz-modal-close{background:#252540;border:1px solid #3a3a60;color:#8b8ba0;border-radius:8px;width:28px;height:28px;cursor:pointer;}
+    .biz-modal-body{padding:16px 20px;}
+    .biz-mfield{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #22223a;font-size:12.5px;}
+    .biz-mfield:last-child{border-bottom:none;}
+    .biz-mlabel{width:100px;flex-shrink:0;color:#8b8ba0;font-weight:600;}
+    .biz-mvalue{color:#e0e0f0;word-break:break-all;}
   </style>
 </head>
 <body>
@@ -6667,7 +6689,7 @@ app.get('/admin02', (c) => {
     <button class="tab-btn" onclick="switchTab('bgs')"><i class="fas fa-image"></i> 배경 관리</button>
     <button class="tab-btn" onclick="switchTab('home')"><i class="fas fa-home"></i> 홈페이지 관리</button>
     <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
-    <button class="tab-btn" onclick="switchTab('leads')"><i class="fas fa-bullhorn"></i> 리드 관리</button>
+    <button class="tab-btn" onclick="switchTab('bizleads')"><i class="fas fa-building"></i> 사업자 리드</button>
   </div>
 
   <!-- ▼ 탭: 프롬프트 -->
@@ -6963,92 +6985,74 @@ app.get('/admin02', (c) => {
     </div>
   </div>
 
-  <div class="tab-panel" id="tabLeads">
+  <div class="tab-panel" id="tabBizLeads">
     <div class="leads-tabroot">
-      <div class="page-title">🎯 브랜드 리드(영업) 파이프라인</div>
-      <div class="page-sub">한국·미국·일본 패션 브랜드 수집 → 분류 → 분석 → 아웃리치 초안 생성. 발송은 자동화하지 않으며, 모든 이메일은 검토 후 직접 발송합니다.</div>
-      <div class="leads-tab-nav">
-        <button class="leads-subtab-btn active" data-leadstab="dashboard" onclick="switchLeadsTab('dashboard')">대시보드</button>
-        <button class="leads-subtab-btn" data-leadstab="platforms" onclick="switchLeadsTab('platforms')">플랫폼 설정</button>
-        <button class="leads-subtab-btn" data-leadstab="collect" onclick="switchLeadsTab('collect')">브랜드 수집</button>
-        <button class="leads-subtab-btn" data-leadstab="brands" onclick="switchLeadsTab('brands')">브랜드 목록/분석</button>
-        <button class="leads-subtab-btn" data-leadstab="drafts" onclick="switchLeadsTab('drafts')">아웃리치 초안</button>
-      </div>
-  <div class="leads-subpanel active" id="leadspanel-dashboard">
-    <div class="leads-notice"><i class="fas fa-shield-halved"></i> 이 도구는 <b>공개된 브랜드 디렉토리 정보</b>(브랜드명·카테고리·URL)만 수집하도록 설계되어 있습니다. 담당자 개인 연락처 등은 자동 수집하지 않으며, 아웃리치 메일은 모두 <b>초안(draft)</b> 상태로만 생성되어 실제 발송은 사람이 검토 후 직접 진행해야 합니다. 각 플랫폼의 이용약관 및 국가별 전자상거래/스팸 관련 법령(정보통신망법·CAN-SPAM·特定電子メール法 등)을 준수해 주세요.</div>
-    <div class="leads-card"><h3>국가별 현황</h3><div id="statsCountry" class="leads-stat-grid"></div></div>
-    <div class="leads-card"><h3>초안 상태별 현황</h3><div id="statsDrafts" class="leads-stat-grid"></div></div>
-    <div class="leads-card"><h3>최근 수집 작업</h3><div style="overflow-x:auto"><table id="jobsTable"><thead><tr><th>시각</th><th>플랫폼</th><th>방식</th><th>상태</th><th>수집 건수</th></tr></thead><tbody></tbody></table></div></div>
-  </div>
+      <div class="page-title">🏢 의류·패션·잡화 통신판매업 사업자 리드</div>
+      <div class="page-sub">공정거래위원회 공공데이터(통신판매업 신고) 기반 사업자 조회 도구입니다. 조회·CSV 내보내기 전용이며, 발송 기능은 포함되어 있지 않습니다.</div>
 
-  <div class="leads-subpanel" id="leadspanel-platforms">
-    <div class="leads-card">
-      <h3>플랫폼 등록/수정</h3>
-      <div class="leads-row">
-        <select id="pCountry"><option value="KR">한국</option><option value="US">미국</option><option value="JP">일본</option></select>
-        <input id="pCode" placeholder="코드 (예: musinsa)"/>
-        <input id="pName" placeholder="이름 (예: 무신사)"/>
-      </div>
-      <div class="leads-row"><input id="pUrl" placeholder="공개 브랜드 디렉토리 URL" style="flex:1;min-width:260px"/></div>
-      <div class="leads-row">
-        <input id="pListSel" placeholder="list_selector (예: a.brand-link)" style="flex:1"/>
-        <input id="pCatSel" placeholder="category_selector (선택)" style="flex:1"/>
-      </div>
-      <div class="leads-row">
-        <label style="font-size:12.5px;display:flex;align-items:center;gap:6px;"><input type="checkbox" id="pScrapable" style="width:auto"/> 셀렉터/약관 검증 완료 — 스크래핑 허용</label>
-      </div>
-      <div class="leads-row"><input id="pNotes" placeholder="메모" style="flex:1"/></div>
-      <button class="leads-btn" onclick="leadsSavePlatform()">저장</button>
-      <div class="leads-hint">list_selector는 브랜드 링크(&lt;a&gt;) 요소 자체를 가리켜야 합니다. 텍스트=브랜드명, href=브랜드 URL로 사용됩니다.</div>
-    </div>
-    <div class="leads-card"><h3>등록된 플랫폼</h3><div style="overflow-x:auto"><table id="platformsTable"><thead><tr><th>국가</th><th>코드</th><th>이름</th><th>디렉토리 URL</th><th>스크래핑 허용</th></tr></thead><tbody></tbody></table></div></div>
-  </div>
+      <div id="bizErrorBanner" class="leads-notice-err" style="display:none"></div>
+      <div id="bizStatGrid" class="biz-stat-grid"></div>
 
-  <div class="leads-subpanel" id="leadspanel-collect">
-    <div class="leads-card">
-      <h3>CSV로 브랜드 가져오기 (권장)</h3>
-      <div class="leads-row">
-        <select id="csvPlatform"></select>
+      <div class="leads-card">
+        <div class="leads-row">
+          <input id="bizQ" placeholder="상호명, 도메인, 이메일, 주소, 대표자, 사업자번호..." style="flex:1;min-width:220px" oninput="bizDebounce()"/>
+          <select id="bizRegion" onchange="bizSearch(1)"><option value="">전체 지역</option></select>
+          <select id="bizStatus" onchange="bizSearch(1)">
+            <option value="">전체 상태</option>
+            <option value="정상영업">정상영업</option>
+            <option value="휴업처리">휴업처리</option>
+            <option value="영업재개">영업재개</option>
+          </select>
+          <select id="bizLimit" onchange="bizSearch(1)">
+            <option value="50">50건</option>
+            <option value="100" selected>100건</option>
+            <option value="200">200건</option>
+          </select>
+          <button class="leads-btn small" onclick="bizSearch(1)">검색</button>
+          <button class="leads-btn secondary small" onclick="bizReset()">초기화</button>
+        </div>
+        <div class="leads-row">
+          <span class="leads-hint">빠른 필터:</span>
+          <button id="biz-btn-valid" class="biz-filter-btn" onclick="bizToggleFilter('valid')">유효 도메인만</button>
+          <button id="biz-btn-email" class="biz-filter-btn" onclick="bizToggleFilter('email')">이메일 공개만</button>
+          <button id="biz-btn-tel" class="biz-filter-btn" onclick="bizToggleFilter('tel')">전화번호 공개만</button>
+          <a class="leads-btn secondary small" style="text-decoration:none;display:inline-block;" onclick="bizDownload()">CSV 내보내기</a>
+          <a class="leads-btn secondary small" style="text-decoration:none;display:inline-block;" onclick="bizDownloadKakao()">카카오채널 CSV</a>
+          <a class="leads-btn secondary small" style="text-decoration:none;display:inline-block;" onclick="bizDownloadInsta()">인스타그램 CSV</a>
+        </div>
       </div>
-      <div class="leads-hint">형식: 헤더 포함 CSV — name,category,brand_url,contact_email (name만 필수)</div>
-      <div class="leads-row"><input type="file" id="csvFile" accept=".csv"/></div>
-      <textarea id="csvPaste" placeholder="또는 여기에 CSV 내용을 붙여넣기"></textarea>
-      <button class="leads-btn" style="margin-top:8px" onclick="leadsImportCsv()">가져오기</button>
-      <div class="leads-hint" id="csvResult"></div>
-    </div>
-    <div class="leads-card">
-      <h3>공개 디렉토리 스크래핑 실행</h3>
-      <div class="leads-row"><select id="scrapePlatform"></select><button class="leads-btn secondary" onclick="leadsRunScrape()">수집 실행</button></div>
-      <div class="leads-hint">플랫폼 설정에서 "스크래핑 허용"이 체크된 경우에만 동작하며, robots.txt를 자동 확인합니다.</div>
-      <div class="leads-hint" id="scrapeResult"></div>
-    </div>
-  </div>
 
-  <div class="leads-subpanel" id="leadspanel-brands">
-    <div class="leads-card">
-      <div class="leads-row">
-        <select id="fCountry"><option value="">전체 국가</option><option value="KR">한국</option><option value="US">미국</option><option value="JP">일본</option></select>
-        <select id="fStatus"><option value="">전체 상태</option><option value="new">new</option><option value="analyzed">analyzed</option><option value="drafted">drafted</option><option value="reviewed">reviewed</option><option value="contacted">contacted</option></select>
-        <input id="fSearch" placeholder="브랜드명 검색"/>
-        <button class="leads-btn secondary small" onclick="leadsLoadBrands()">조회</button>
-        <button class="leads-btn small" onclick="leadsAnalyzeSelected()">선택 분석 실행</button>
-        <button class="leads-btn small" onclick="leadsDraftSelected()">선택 초안 생성</button>
-        <a class="leads-btn secondary small" href="/api/admin/leads/export.csv" id="exportLink" style="text-decoration:none;display:inline-block;">CSV 내보내기</a>
+      <div class="leads-card">
+        <div class="leads-row" style="justify-content:space-between;margin-bottom:6px;">
+          <div class="leads-hint">결과: <b id="bizRCount" style="color:#e0e0f0">-</b>건 <span id="bizPInfo"></span></div>
+        </div>
+        <div class="biz-tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>상호명 / 대표자</th><th>상태</th><th>지역</th><th>도메인</th>
+                <th>이메일</th><th>전화번호</th><th>사업자번호</th><th>주소</th><th>신고일자</th>
+              </tr>
+            </thead>
+            <tbody id="bizTbody"></tbody>
+          </table>
+        </div>
+        <div class="leads-row" style="justify-content:center;margin-top:10px;">
+          <button class="biz-pagebtn" id="bizPrevBtn" onclick="bizGoPage(bizCurPage-1)">‹</button>
+          <div id="bizPageBtns" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+          <button class="biz-pagebtn" id="bizNextBtn" onclick="bizGoPage(bizCurPage+1)">›</button>
+        </div>
       </div>
-      <div style="overflow-x:auto"><table id="brandsTable"><thead><tr><th><input type="checkbox" id="selAll"/></th><th>브랜드</th><th>국가/플랫폼</th><th>카테고리</th><th>스타일</th><th>가격대</th><th>우선순위</th><th>상태</th></tr></thead><tbody></tbody></table></div>
     </div>
   </div>
 
-  <div class="leads-subpanel" id="leadspanel-drafts">
-    <div class="leads-card">
-      <div class="leads-row">
-        <select id="dStatus"><option value="">전체 상태</option><option value="draft">draft</option><option value="reviewed">reviewed</option><option value="sent">sent</option><option value="skipped">skipped</option></select>
-        <button class="leads-btn secondary small" onclick="leadsLoadDrafts()">조회</button>
+  <div class="biz-modal-overlay" id="bizModal" onclick="bizCloseModal(event)">
+    <div class="biz-modal-box" onclick="event.stopPropagation()">
+      <div class="biz-modal-head">
+        <div style="font-weight:700;color:#fff;" id="bizModalTitle"></div>
+        <button class="biz-modal-close" onclick="document.getElementById('bizModal').classList.remove('open')">✕</button>
       </div>
-      <div id="draftsList"></div>
-    </div>
-  </div>
-
+      <div class="biz-modal-body" id="bizModalFields"></div>
     </div>
   </div>
 
@@ -7079,7 +7083,7 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs','home','users','leads']
+    const names = ['prompt','models','bgs','home','users','bizleads']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
@@ -7087,181 +7091,280 @@ function switchTab(name) {
   document.getElementById('tabBgs').classList.toggle('active', name === 'bgs')
   document.getElementById('tabHome').classList.toggle('active', name === 'home')
   document.getElementById('tabUsers').classList.toggle('active', name === 'users')
-  document.getElementById('tabLeads').classList.toggle('active', name === 'leads')
+  document.getElementById('tabBizLeads').classList.toggle('active', name === 'bizleads')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos() }
   if (name === 'users')  loadUsers()
-  if (name === 'leads')  leadsInitAll()
+  if (name === 'bizleads') bizInit()
 }
 
-function switchLeadsTab(name) {
-  document.querySelectorAll('.leads-subtab-btn').forEach(b => b.classList.toggle('active', b.dataset.leadstab === name))
-  document.querySelectorAll('.leads-subpanel').forEach(p => p.classList.remove('active'))
-  document.getElementById('leadspanel-' + name).classList.add('active')
-  if (name === 'dashboard') leadsLoadStats()
-  if (name === 'brands')    leadsLoadBrands()
-  if (name === 'drafts')    leadsLoadDrafts()
-}
+// ══════════════════════════════════════════════
+// 사업자 리드(구 Genspark "fashion-biz" 프로젝트 이관)
+// ══════════════════════════════════════════════
+let bizCurPage = 1, bizTotalPages = 1, bizDebT = null, bizInited = false
+let bizFilters = { valid: false, email: false, tel: false }
 
-function leadsApi(path, opts) {
+async function bizApi(path, opts) {
   opts = opts || {}
-  opts.headers = Object.assign({'X-Admin-Password': adminPassword, 'Content-Type':'application/json'}, opts.headers||{})
-  return fetch('/api/admin/leads' + path, opts).then(r => r.json())
-}
-async function leadsInitAll() {
-  await leadsLoadPlatforms()
-  await leadsLoadStats()
-}
-
-async function leadsLoadStats() {
-  const data = await leadsApi('/stats')
-  if (!data.success) return
-  document.getElementById('statsCountry').innerHTML = data.byCountry.map(r => \`
-    <div class="leads-stat-box"><div class="num">\${r.total}</div><div class="label">\${r.country} · new \${r.new_count} / analyzed \${r.analyzed_count} / drafted \${r.drafted_count}</div></div>
-  \`).join('') || '<div class="leads-hint">수집된 브랜드가 없습니다.</div>'
-  document.getElementById('statsDrafts').innerHTML = data.draftsByStatus.map(r => \`
-    <div class="leads-stat-box"><div class="num">\${r.total}</div><div class="label">\${r.status}</div></div>
-  \`).join('') || '<div class="leads-hint">생성된 초안이 없습니다.</div>'
-  const jobs = await leadsApi('/jobs')
-  const tbody = document.querySelector('#jobsTable tbody')
-  tbody.innerHTML = (jobs.jobs||[]).map(j => \`<tr><td>\${j.started_at}</td><td>\${j.platform_name||'-'}</td><td>\${j.method}</td><td>\${j.status}\${j.error?(' — '+j.error):''}</td><td>\${j.collected_count}</td></tr>\`).join('')
-}
-
-let leadsPlatformsCache = []
-async function leadsLoadPlatforms() {
-  const data = await leadsApi('/platforms')
-  leadsPlatformsCache = data.platforms || []
-  const tbody = document.querySelector('#platformsTable tbody')
-  tbody.innerHTML = leadsPlatformsCache.map(p => \`<tr><td>\${p.country}</td><td>\${p.code}</td><td>\${p.name}</td><td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">\${p.directory_url||''}</td><td>\${p.is_scrapable ? '✅' : '❌'}</td></tr>\`).join('')
-  const opts = leadsPlatformsCache.map(p => \`<option value="\${p.code}" data-id="\${p.id}">[\${p.country}] \${p.name}</option>\`).join('')
-  document.getElementById('csvPlatform').innerHTML = opts
-  document.getElementById('scrapePlatform').innerHTML = leadsPlatformsCache.map(p => \`<option value="\${p.id}">[\${p.country}] \${p.name} \${p.is_scrapable?'':'(비허용)'}</option>\`).join('')
-}
-
-async function leadsSavePlatform() {
-  const body = {
-    country: document.getElementById('pCountry').value,
-    code: document.getElementById('pCode').value.trim(),
-    name: document.getElementById('pName').value.trim(),
-    directory_url: document.getElementById('pUrl').value.trim(),
-    list_selector: document.getElementById('pListSel').value.trim(),
-    category_selector: document.getElementById('pCatSel').value.trim(),
-    is_scrapable: document.getElementById('pScrapable').checked,
-    notes: document.getElementById('pNotes').value.trim(),
+  opts.headers = Object.assign({'X-Admin-Password': adminPassword}, opts.headers||{})
+  let res
+  try {
+    res = await fetch('/api/admin/bizleads' + path, opts)
+  } catch (e) {
+    return { success: false, message: '네트워크 오류: ' + e.message }
   }
-  if (!body.code || !body.name) { alert('코드와 이름은 필수입니다.'); return }
-  const data = await leadsApi('/platforms', { method:'POST', body: JSON.stringify(body) })
-  if (data.success) { leadsLoadPlatforms(); alert('저장되었습니다.') } else { alert(data.message||'오류') }
+  let data
+  try {
+    data = await res.json()
+  } catch (e) {
+    return { success: false, message: 'HTTP ' + res.status + ' — 서버가 JSON이 아닌 응답을 반환했습니다 (DB 마이그레이션 미적용일 가능성이 높습니다).' }
+  }
+  if (!res.ok && data.success === undefined) data.success = false
+  return data
 }
 
-function leadsParseCsv(text) {
-  const lines = text.trim().split(/\\r?\\n/)
-  if (lines.length < 2) return []
-  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''))
-  return lines.slice(1).filter(l=>l.trim()).map(line => {
-    const cells = line.split(',').map(c => c.trim().replace(/^"|"$/g,''))
-    const row = {}
-    headers.forEach((h,i) => row[h] = cells[i] || '')
-    return row
+function bizFmtTel(raw) {
+  if (!raw) return ''
+  const d = raw.replace(/[^0-9]/g,'')
+  if (d.length < 7) return raw
+  if (d.startsWith('02')) {
+    if (d.length===9)  return d.replace(/(\d{2})(\d{3})(\d{4})/,'$1-$2-$3')
+    if (d.length===10) return d.replace(/(\d{2})(\d{4})(\d{4})/,'$1-$2-$3')
+  }
+  if (d.startsWith('0')) {
+    if (d.length===9)  return d.replace(/(\d{3})(\d{2})(\d{4})/,'$1-$2-$3')
+    if (d.length===10) return d.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3')
+    if (d.length===11) return d.replace(/(\d{3})(\d{4})(\d{4})/,'$1-$2-$3')
+  }
+  if (!d.startsWith('0') && d.length>=7) {
+    const p='0'+d
+    if (p.startsWith('02')) {
+      if (p.length===9)  return p.replace(/(\d{2})(\d{3})(\d{4})/,'$1-$2-$3')
+      if (p.length===10) return p.replace(/(\d{2})(\d{4})(\d{4})/,'$1-$2-$3')
+    }
+    if (p.length===10) return p.replace(/(\d{3})(\d{3})(\d{4})/,'$1-$2-$3')
+    if (p.length===11) return p.replace(/(\d{3})(\d{4})(\d{4})/,'$1-$2-$3')
+  }
+  return raw
+}
+function bizFmtBrno(raw) {
+  if (!raw) return ''
+  const d = raw.replace(/[^0-9]/g,'')
+  if (d.length===10) return d.slice(0,3)+'-'+d.slice(3,5)+'-'+d.slice(5)
+  return raw
+}
+function bizAttrEsc(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function bizCopyFromBtn(btn) { bizCopyText(btn.getAttribute('data-copy') || '') }
+function bizCopyText(txt) {
+  navigator.clipboard.writeText(txt).then(() => {
+    const t = document.createElement('div')
+    t.textContent = '복사됨!'
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#6c47ff;color:#fff;font-size:13px;padding:8px 16px;border-radius:10px;z-index:9999;'
+    document.body.appendChild(t)
+    setTimeout(() => t.remove(), 1500)
   })
 }
 
-async function leadsImportCsv() {
-  const select = document.getElementById('csvPlatform')
-  const platformCode = select.value
-  const file = document.getElementById('csvFile').files[0]
-  let text = document.getElementById('csvPaste').value
-  if (file) text = await file.text()
-  if (!text.trim()) { alert('CSV 파일 또는 붙여넣기 내용이 필요합니다.'); return }
-  const rows = leadsParseCsv(text)
-  const data = await leadsApi('/collect/csv', { method:'POST', body: JSON.stringify({ platformCode, rows }) })
-  document.getElementById('csvResult').textContent = data.success ? \`\${data.inserted}건 추가됨 (총 \${rows.length}행 처리)\` : ('오류: ' + data.message)
-  if (data.success) leadsLoadStats()
+async function bizInit() {
+  const [st, li] = await Promise.all([
+    bizApi('/stats'),
+    bizApi('/list?limit=100&page=1'),
+  ])
+  const banner = document.getElementById('bizErrorBanner')
+  if (!st.success || !li.success) {
+    banner.style.display = 'block'
+    banner.textContent = '데이터를 불러오지 못했습니다: ' + (st.message || li.message || '알 수 없는 오류')
+  } else {
+    banner.style.display = 'none'
+  }
+  if (st.success) {
+    const vs = st.validStats || {}, cs = st.contactStats || {}, crs = st.crawlStats || {}
+    const cards = [
+      ['전체', st.total || 0, false],
+      ['유효 리드 (도메인 유효)', vs.valid || 0, true],
+      ['이메일 확보 (원본+크롤링)', cs.email_any || 0, true],
+      ['전화 확보 (원본+크롤링)', cs.tel_any || 0, true],
+      ['카카오채널 확보', crs.crawl_kakao || 0, true],
+      ['인스타그램 확보', crs.crawl_insta || 0, true],
+      ['도메인 불가 (2차 검증 대상)', vs.invalid || 0, false],
+    ]
+    document.getElementById('bizStatGrid').innerHTML = cards.map(c =>
+      '<div class="biz-stat-box' + (c[2] ? ' biz-stat-box-highlight' : '') + '"><div class="num">' + c[1].toLocaleString() + '</div><div class="label">' + c[0] + '</div></div>'
+    ).join('')
+    if (!bizInited) {
+      const sel = document.getElementById('bizRegion')
+      ;(st.regions || []).forEach(r => {
+        if (!r.region || r.region === 'N/A') return
+        const o = document.createElement('option')
+        o.value = r.region; o.textContent = r.region + ' (' + r.n.toLocaleString() + ')'
+        sel.appendChild(o)
+      })
+      bizInited = true
+    }
+  }
+  bizRenderList(li)
 }
 
-async function leadsRunScrape() {
-  const platformId = document.getElementById('scrapePlatform').value
-  document.getElementById('scrapeResult').textContent = '수집 중...'
-  const data = await leadsApi('/collect/scrape', { method:'POST', body: JSON.stringify({ platformId: Number(platformId) }) })
-  document.getElementById('scrapeResult').textContent = data.success ? \`\${data.inserted}건 추가됨 (파싱 \${data.totalParsed}건)\` : ('오류: ' + data.message)
-  if (data.success) leadsLoadStats()
+async function bizSearch(page) {
+  bizCurPage = page || 1
+  const q = document.getElementById('bizQ').value.trim()
+  const region = document.getElementById('bizRegion').value
+  const status = document.getElementById('bizStatus').value
+  const limit = document.getElementById('bizLimit').value
+  const sp = new URLSearchParams({
+    q, region, status, limit, page: bizCurPage,
+    validOnly: bizFilters.valid ? '1' : '',
+    emailOnly: bizFilters.email ? '1' : '',
+    telOnly: bizFilters.tel ? '1' : '',
+  })
+  const data = await bizApi('/list?' + sp.toString())
+  bizRenderList(data)
+}
+function bizDebounce() { clearTimeout(bizDebT); bizDebT = setTimeout(() => bizSearch(1), 380) }
+
+function bizToggleFilter(key) {
+  bizFilters[key] = !bizFilters[key]
+  document.getElementById('biz-btn-' + key).classList.toggle('on', bizFilters[key])
+  bizSearch(1)
+}
+function bizReset() {
+  bizFilters = { valid: false, email: false, tel: false }
+  ;['valid','email','tel'].forEach(k => document.getElementById('biz-btn-'+k).classList.remove('on'))
+  document.getElementById('bizQ').value = ''
+  document.getElementById('bizRegion').value = ''
+  document.getElementById('bizStatus').value = ''
+  bizSearch(1)
 }
 
-let leadsBrandsCache = []
-async function leadsLoadBrands() {
-  const params = new URLSearchParams()
-  const country = document.getElementById('fCountry').value
-  const status = document.getElementById('fStatus').value
-  const search = document.getElementById('fSearch').value
-  if (country) params.set('country', country)
-  if (status) params.set('status', status)
-  if (search) params.set('search', search)
-  const data = await leadsApi('/brands?' + params.toString())
-  leadsBrandsCache = data.brands || []
-  const tbody = document.querySelector('#brandsTable tbody')
-  tbody.innerHTML = leadsBrandsCache.map(b => \`<tr>
-    <td><input type="checkbox" class="bsel" value="\${b.id}"/></td>
-    <td>\${b.name}\${b.brand_url?(' <a href="'+b.brand_url+'" target="_blank" style="color:#6c47ff"><i class="fas fa-arrow-up-right-from-square" style="font-size:10px"></i></a>'):''}</td>
-    <td>\${b.country} / \${b.platform_name||'-'}</td>
-    <td>\${b.category||'-'}</td>
-    <td>\${(b.style_tags? JSON.parse(b.style_tags):[]).map(t=>'<span class="leads-tag">'+t+'</span>').join('')}</td>
-    <td>\${b.price_tier||'-'}</td>
-    <td>\${b.priority_score ?? '-'}</td>
-    <td><span class="leads-pill \${b.status}">\${b.status}</span></td>
-  </tr>\`).join('') || '<tr><td colspan="8" class="leads-hint">브랜드가 없습니다. 먼저 CSV 가져오기 또는 스크래핑을 실행하세요.</td></tr>'
-  document.getElementById('selAll').onclick = (e) => document.querySelectorAll('.bsel').forEach(cb=>cb.checked=e.target.checked)
-}
-function leadsSelectedBrandIds() { return Array.from(document.querySelectorAll('.bsel:checked')).map(cb=>Number(cb.value)) }
-async function leadsAnalyzeSelected() {
-  const ids = leadsSelectedBrandIds()
-  if (!ids.length) { alert('브랜드를 선택하세요.'); return }
-  const data = await leadsApi('/analyze', { method:'POST', body: JSON.stringify({ brandIds: ids }) })
-  alert(data.success ? (data.analyzed + '건 분석 완료 (' + data.method + ')') : ('오류: ' + data.message))
-  leadsLoadBrands()
-}
-async function leadsDraftSelected() {
-  const ids = leadsSelectedBrandIds()
-  if (!ids.length) { alert('브랜드를 선택하세요.'); return }
-  const data = await leadsApi('/drafts/generate', { method:'POST', body: JSON.stringify({ brandIds: ids }) })
-  alert(data.success ? (data.created + '건 초안 생성 완료 (' + data.method + ')') : ('오류: ' + data.message))
-  leadsLoadBrands()
+function bizRenderList(data) {
+  const lim = parseInt(document.getElementById('bizLimit').value || '100')
+  const total = data.total || 0
+  bizTotalPages = Math.max(1, Math.ceil(total / lim))
+  const rows = data.rows || [], offset = (bizCurPage - 1) * lim
+  document.getElementById('bizRCount').textContent = total.toLocaleString()
+  document.getElementById('bizPInfo').textContent = bizTotalPages > 1 ? '(' + bizCurPage + '/' + bizTotalPages + ' 페이지)' : ''
+  const na = v => (v && v !== 'N/A' && v !== 'NULL' && v !== '') ? v : null
+
+  document.getElementById('bizTbody').innerHTML = rows.map((r, i) => {
+    const stCls = r.status === '정상영업' ? 'biz-pill-green' : r.status === '휴업처리' ? 'biz-pill-yellow' : 'biz-pill-gray'
+    const dom = na(r.domain_clean) || na(r.domain)
+    const domHtml = dom
+      ? '<a href="https://' + dom + '" target="_blank" rel="noopener" style="color:#9b7cff;font-size:12px;" onclick="event.stopPropagation()">' + dom + '</a>'
+      : '<span style="color:#54546e;font-size:12px;">-</span>'
+    const vb = r.is_valid === 1 ? '<span class="biz-pill biz-pill-green">유효</span>'
+      : r.is_valid === 0 ? '<span class="biz-pill biz-pill-red">불가</span>'
+      : '<span class="biz-pill biz-pill-gray">미검증</span>'
+    const emailRaw = na(r.email) || ''
+    const emailMasked = emailRaw.includes('**') || !emailRaw.includes('@')
+    const emailHtml = emailMasked
+      ? '<span class="biz-masked">' + (emailRaw || '마스킹됨') + '</span>'
+      : emailRaw
+        ? '<span style="color:#9b7cff;">' + emailRaw + '</span><button class="biz-copy-btn" data-copy="' + bizAttrEsc(emailRaw) + '" onclick="event.stopPropagation();bizCopyFromBtn(this)">복사</button>'
+        : '<span style="color:#54546e;font-size:12px;">-</span>'
+    const telRaw = na(r.tel) || ''
+    const telMasked = telRaw.includes('개인정보')
+    const telHtml = telMasked
+      ? '<span class="biz-masked">' + telRaw + '</span>'
+      : telRaw
+        ? '<span style="color:#38bdf8;">' + bizFmtTel(telRaw) + '</span><button class="biz-copy-btn" data-copy="' + bizAttrEsc(bizFmtTel(telRaw)) + '" onclick="event.stopPropagation();bizCopyFromBtn(this)">복사</button>'
+        : '<span style="color:#54546e;font-size:12px;">-</span>'
+    const addrRaw = na(r.addr) || ''
+    const addrShort = addrRaw.length > 26 ? addrRaw.slice(0, 26) + '…' : addrRaw
+
+    return '<tr onclick="bizOpenModal(' + r.id + ')" title="클릭하여 전체 정보 보기">' +
+      '<td>' + (offset + i + 1) + '</td>' +
+      '<td><div style="font-weight:600;color:#fff;">' + (na(r.bzmnNm) || '-') + '</div><div style="font-size:11px;color:#8b8ba0;">' + (na(r.ceo) || '대표 미상') + '</div></td>' +
+      '<td><span class="biz-pill ' + stCls + '">' + (na(r.status) || '-') + '</span><br/>' + vb + '</td>' +
+      '<td>' + (na(r.region) || na(r.inst) || '-') + '</td>' +
+      '<td>' + domHtml + '</td>' +
+      '<td>' + emailHtml + '</td>' +
+      '<td>' + telHtml + '</td>' +
+      '<td>' + bizFmtBrno(na(r.brno) || '') + '</td>' +
+      '<td title="' + (r.addr || '') + '">' + (addrShort || '-') + '</td>' +
+      '<td>' + (na(r.declDate) || '-') + '</td>' +
+    '</tr>'
+  }).join('')
+  bizRenderPagination()
 }
 
-async function leadsLoadDrafts() {
-  const status = document.getElementById('dStatus').value
-  const params = new URLSearchParams()
-  if (status) params.set('status', status)
-  const data = await leadsApi('/drafts?' + params.toString())
-  const list = document.getElementById('draftsList')
-  list.innerHTML = (data.drafts||[]).map(d => \`
-    <div class="leads-card" style="background:#151528">
-      <div class="leads-row" style="justify-content:space-between">
-        <div><b>\${d.brand_name}</b> <span class="leads-tag">\${d.country}</span> <span class="leads-tag">\${d.language}</span> <span class="leads-pill \${d.status}">\${d.status}</span></div>
-        <div>
-          <button class="leads-btn small secondary" onclick="leadsUpdateDraft(\${d.id}, this)">저장</button>
-          <button class="leads-btn small" onclick="leadsSetDraftStatus(\${d.id}, 'reviewed')">검토완료</button>
-          <button class="leads-btn small secondary" onclick="leadsSetDraftStatus(\${d.id}, 'sent')">발송완료 표시</button>
-          <button class="leads-btn small secondary" onclick="leadsSetDraftStatus(\${d.id}, 'skipped')">건너뛰기</button>
-        </div>
-      </div>
-      <input data-field="subject" value="\${(d.subject||'').replace(/"/g,'&quot;')}" style="width:100%;margin:8px 0"/>
-      <textarea data-field="body" style="min-height:140px">\${d.body||''}</textarea>
-    </div>
-  \`).join('') || '<div class="leads-hint">초안이 없습니다.</div>'
+function bizRenderPagination() {
+  const MAX = 9
+  let ps = []
+  if (bizTotalPages <= MAX) { for (let i=1;i<=bizTotalPages;i++) ps.push(i) }
+  else {
+    const s = Math.max(1, bizCurPage-4), e = Math.min(bizTotalPages, s+MAX-1)
+    for (let i=s;i<=e;i++) ps.push(i)
+    if (ps[0] > 1) ps = ['f', ...ps]
+    if (ps[ps.length-1] < bizTotalPages) ps = [...ps, 'l']
+  }
+  document.getElementById('bizPageBtns').innerHTML = ps.map(p => {
+    if (p==='f') return '<button class="biz-pagebtn" onclick="bizGoPage(1)">1…</button>'
+    if (p==='l') return '<button class="biz-pagebtn" onclick="bizGoPage(' + bizTotalPages + ')">…' + bizTotalPages + '</button>'
+    return '<button class="biz-pagebtn' + (p===bizCurPage?' on':'') + '" onclick="bizGoPage(' + p + ')">' + p + '</button>'
+  }).join('')
+  document.getElementById('bizPrevBtn').disabled = bizCurPage <= 1
+  document.getElementById('bizNextBtn').disabled = bizCurPage >= bizTotalPages
 }
-async function leadsUpdateDraft(id, btn) {
-  const card = btn.closest('.leads-card')
-  const subject = card.querySelector('[data-field=subject]').value
-  const body = card.querySelector('[data-field=body]').value
-  await leadsApi('/drafts/' + id, { method:'PATCH', body: JSON.stringify({ subject, body }) })
-  alert('저장되었습니다.')
-}
-async function leadsSetDraftStatus(id, status) {
-  await leadsApi('/drafts/' + id, { method:'PATCH', body: JSON.stringify({ status }) })
-  leadsLoadDrafts()
+function bizGoPage(p) {
+  if (p < 1 || p > bizTotalPages) return
+  bizSearch(p)
 }
 
+async function bizOpenModal(id) {
+  const r = await bizApi('/detail/' + id)
+  if (!r.success) return
+  document.getElementById('bizModalTitle').textContent = r.bzmnNm || '-'
+  document.getElementById('bizModal').classList.add('open')
+  const validLabel = r.is_valid === 1 ? '<span class="biz-pill biz-pill-green">유효</span>'
+    : r.is_valid === 0 ? '<span class="biz-pill biz-pill-red">불가</span>'
+    : '<span class="biz-pill biz-pill-gray">미검증</span>'
+  const fields = [
+    ['상호명', r.bzmnNm], ['대표자', r.ceo], ['사업자번호', bizFmtBrno(r.brno||'')],
+    ['신고기관', r.inst], ['지역', r.region], ['영업상태', r.status], ['신고일자', r.declDate],
+    ['판매방식', r.method], ['취급품목', r.codeRaw || r.codeName],
+    ['도메인(원본)', r.domain], ['도메인(정규화)', r.domain_clean], ['도메인 유효', validLabel, true],
+    ['이메일(원본)', r.email || '정보없음'], ['전화번호(원본)', r.tel || '정보없음'],
+    ['크롤링 이메일', r.crawled_email || '-'], ['크롤링 전화', r.crawled_tel || '-'],
+    ['카카오채널', r.crawled_kakao || '-'], ['인스타그램', r.crawled_insta || '-'],
+    ['사업장 주소', r.addr], ['서버 소재지', r.server],
+  ]
+  document.getElementById('bizModalFields').innerHTML = fields.map(f => {
+    const [label, val, isHtml] = f
+    const valHtml = isHtml ? val : (val ? val : '<span style="color:#54546e;">-</span>')
+    return '<div class="biz-mfield"><span class="biz-mlabel">' + label + '</span><span class="biz-mvalue">' + valHtml + '</span></div>'
+  }).join('')
+}
+function bizCloseModal(e) {
+  if (e.target === document.getElementById('bizModal')) document.getElementById('bizModal').classList.remove('open')
+}
+
+function bizDownload() {
+  const q = document.getElementById('bizQ').value.trim()
+  const region = document.getElementById('bizRegion').value
+  const status = document.getElementById('bizStatus').value
+  const sp = new URLSearchParams({
+    q, region, status,
+    validOnly: bizFilters.valid ? '1' : '',
+    emailOnly: bizFilters.email ? '1' : '',
+    telOnly: bizFilters.tel ? '1' : '',
+  })
+  const url = '/api/admin/bizleads/download.csv?' + sp.toString()
+  bizDownloadFile(url, 'fashion_biz_leads.csv')
+}
+function bizDownloadKakao() { bizDownloadFile('/api/admin/bizleads/export/kakao.csv', 'fashion_biz_kakao.csv') }
+function bizDownloadInsta() { bizDownloadFile('/api/admin/bizleads/export/insta.csv', 'fashion_biz_instagram.csv') }
+function bizDownloadFile(url, filename) {
+  fetch(url, { headers: { 'X-Admin-Password': adminPassword } })
+    .then(r => r.blob())
+    .then(blob => {
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(a.href)
+    })
+}
 
 // ─── 회원 관리 ───
 let allUsers = []
