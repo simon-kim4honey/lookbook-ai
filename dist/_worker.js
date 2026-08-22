@@ -90,7 +90,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
     WHERE crawled_insta IS NOT NULL AND crawled_insta != '' ORDER BY id
   `).all(),n=`﻿번호,상호명,도메인,인스타그램\r
 `+t.map(e=>[e.id,e.bzmnNm,e.domain_clean,e.crawled_insta].map(e=>`"${String(e??``).replace(/"/g,`""`)}"`).join(`,`)).join(`\r
-`);return e.text(n,200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="fashion_biz_instagram.csv"`})});var qe=`mt40vec2`,Je=e=>e?`
+`);return e.text(n,200,{"Content-Type":`text/csv; charset=utf-8`,"Content-Disposition":`attachment; filename="fashion_biz_instagram.csv"`})});var qe=`mt42x16p`,Je=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -722,7 +722,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           </div>
         </div>
         <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')" data-i18n="nav-login">로그인</button>
-        <button class="btn btn-primary" id="navSignupBtn" onclick="switchAuthTab('signup');openModal('loginModal')" data-i18n="nav-signup">무료 시작</button>
+        <button class="btn btn-primary" id="navSignupBtn" onclick="location.href='/generator'" data-i18n="nav-signup">무료 시작</button>
         <button class="navbar-toggle" id="navbarToggle" onclick="toggleMobileNav()" aria-label="메뉴 열기" aria-expanded="false">
           <i class="fas fa-bars"></i>
         </button>

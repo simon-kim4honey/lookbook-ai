@@ -2957,6 +2957,7 @@ function renderResults(images) {
             alt="${img.title || `피팅컷 #${idx + 1}`}"
             style="width:100%;height:auto;display:block;"
             draggable="false"
+            oncontextmenu="return false"
             onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패</span></div>');"
           />`
       : `<div style="width:100%;aspect-ratio:3/4;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
