@@ -1036,12 +1036,13 @@ function shareToKakao() {
     return;
   }
   const shareUrl = _shareUrlFor(_shareCtx.jobId, _shareCtx.idx);
+  const isGc = window.__EZLOOK_MODE__ === 'ghostcut';
   try { if (typeof gtag === 'function') gtag('event', 'share', { method: 'kakao', content_type: 'lookbook_image' }); } catch (e) {}
   Kakao.Share.sendDefault({
     objectType: 'feed',
     content: {
-      title: '상품 이미지로 모델컷 만들기',
-      description: '클릭4번으로 AI모델컷이 무료로 만들어 진다고?',
+      title: isGc ? '상품 이미지로 고스트컷 만들기' : '상품 이미지로 모델컷 만들기',
+      description: isGc ? '클릭1번으로 AI고스트컷이 무료로 만들어 진다고?' : '클릭4번으로 AI모델컷이 무료로 만들어 진다고?',
       imageUrl: _shareCtx.imageUrl,
       link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
     },

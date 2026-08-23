@@ -4380,10 +4380,14 @@ app.post('/api/ghostcut/video/start', async (c) => {
 
     // 사람이나 배경은 전혀 새로 만들어지지 않는다 — 고스트컷 결과 이미지 1장(imageUrl)만 입력으로
     // 쓰고, 그 안의 옷 자체가 제자리에서 미풍에 살랑살랑 흔들리는 연출. 배경은 순백색·무그림자를 끝까지 유지.
-    // ⚠️ 2026-08-23 회귀: "매우 미세한 움직임만" 표현은 오히려 옷 안쪽에서 공기가 들어차
-    //   부풀어 오르는(풍선처럼 팽창) 부자연스러운 영상을 유발했다. 옷 표면/끝단이 바람에
-    //   자연스럽게 살랑거리는 것은 허용하되, 옷 전체 부피가 부풀어 오르는 것은 명시적으로 금지.
-    const prompt = 'The garment shown in the image keeps the ghost-mannequin (invisible-body) effect and stays in the exact same position and framing throughout — it does NOT walk, float away, spin, or change position. The garment sways gently as if a light natural breeze is passing through the scene — the hem, cuffs, collar, and any loose or flowing parts of the fabric drift and flutter softly and rhythmically, with realistic cloth physics, similar to how a garment gently sways on a hanger in a breeze. CRITICAL: the garment must NEVER inflate, balloon, puff up, or expand in volume as if air were being blown INSIDE it from within — the garment\'s overall silhouette and volume must stay exactly as filled by the invisible body in the first frame at all times; only the fabric surface and loose edges move, the garment never grows larger, rounder, or puffier than the first frame. This must look like a professional e-commerce product video with natural, believable fabric motion — NOT a static photo, NOT a strong gust with dramatic flapping, and NOT an inflating/ballooning motion. The garment\'s color, pattern, print, texture, and design remain exactly as shown in the first frame, completely unchanged throughout the entire video. The background remains pure solid white (#FFFFFF), completely flat and even, with absolutely no shadow, no gradient, no vignette, and no change at any point — identical to the first frame from start to finish. Do NOT introduce any person, human body, face, hands, model, or visible mannequin form at any point in the video — nothing is added to the scene beyond what is already in the source image. The camera stays essentially static — no zoom, no dolly, no pan, no orbital movement — only the fabric itself moves. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Add soft, tasteful ambient background music suited for a clean e-commerce product showcase — no vocals, no jarring sound effects.'
+    // ⚠️ 2026-08-23 회귀 이력:
+    //   1차) "매우 미세한 움직임만" 표현이 오히려 옷 안쪽에서 공기가 들어차 부풀어 오르는
+    //        (풍선처럼 팽창) 영상을 유발함 → "미풍에 자연스럽게 살랑" + "부풀어 오르는 것 금지"로 수정.
+    //   2차) 위 수정 후에도 패딩 점퍼(퀄팅/패딩류) 상품에서는 여전히 옷 전체가 부풀어 오르는
+    //        현상이 재발함(패딩류는 원래도 통통한 형태라 AI가 "더 부풀리는" 쪽으로 해석하기 쉬움).
+    //        → "외부 바람에 흩날리는 실제 물리 현상"(빨랫줄에 걸린 옷이 바람에 나부끼는 모습)에
+    //        빗대어 더 구체적으로 지시하고, 패딩/퀄팅류는 볼륨이 첫 프레임 그대로 고정임을 별도 명시.
+    const prompt = 'The garment shown in the image keeps the ghost-mannequin (invisible-body) effect and stays in the exact same position and framing throughout — it does NOT walk, float away, spin, or change position. Treat the garment as a real physical object being blown by a gentle EXTERNAL breeze, like a jacket hanging outdoors on a clothesline or hanger in light wind: only the outer fabric surface, hem, cuffs, collar, and any loose or flowing parts flutter and ripple softly and rhythmically because the wind is hitting them from OUTSIDE, with realistic cloth physics. CRITICAL: the garment\'s internal volume, loft, and thickness are 100% FIXED exactly as shown in the first frame and must NEVER change — it must NOT inflate, balloon, puff up, expand, grow rounder, or look like it is filling with air from within, at any point in the video. This applies especially to padded, quilted, or puffer-style garments (e.g. a padded jumper/jacket) — their padding and loft must look exactly as filled and rigid as in the first frame from start to finish, with zero growth in volume; only the thin outer fabric surface shows gentle ripples from the external wind, the way fabric moves over a fixed solid shape, never like an airbag or balloon inflating. This must look like a professional e-commerce product video with natural, believable fabric motion — NOT a static photo, NOT a strong gust with dramatic flapping, and absolutely NOT any inflating, expanding, or ballooning motion. The garment\'s color, pattern, print, texture, and design remain exactly as shown in the first frame, completely unchanged throughout the entire video. The background remains pure solid white (#FFFFFF), completely flat and even, with absolutely no shadow, no gradient, no vignette, and no change at any point — identical to the first frame from start to finish. Do NOT introduce any person, human body, face, hands, model, or visible mannequin form at any point in the video — nothing is added to the scene beyond what is already in the source image. The camera stays essentially static — no zoom, no dolly, no pan, no orbital movement — only the fabric surface itself moves. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Add soft, tasteful ambient background music suited for a clean e-commerce product showcase — no vocals, no jarring sound effects.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
@@ -4778,9 +4782,12 @@ app.get('/share/:jobId/:idx', async (c) => {
   const jobId = c.req.param('jobId')
   const idx = parseInt(c.req.param('idx') || '0', 10)
 
-  const renderSharePage = (opts: { state: 'ok' | 'expired' | 'notfound'; imageUrl?: string; isVideo?: boolean; sourceTabs?: { label: string; url: string }[]; resultTab?: { label: string; url: string } }) => {
+  const renderSharePage = (opts: { state: 'ok' | 'expired' | 'notfound'; imageUrl?: string; isVideo?: boolean; sourceTabs?: { label: string; url: string }[]; resultTab?: { label: string; url: string }; isGhostCut?: boolean }) => {
     const origin = getOrigin(c)
     const pageUrl = `${origin}/share/${jobId}/${idx}`
+    const shareTitle = opts.isGhostCut ? '상품 이미지로 고스트컷 만들기' : '상품 이미지로 모델컷 만들기'
+    const shareDesc = opts.isGhostCut ? '클릭1번으로 AI고스트컷이 무료로 만들어 진다고?' : '클릭4번으로 AI모델컷이 무료로 만들어 진다고?'
+    const shareCtaHref = opts.isGhostCut ? '/ghostcut' : '/generator'
     let body = ''
     if (opts.state === 'ok') {
       const sourceTabs = opts.sourceTabs || []
@@ -4803,9 +4810,9 @@ app.get('/share/:jobId/:idx', async (c) => {
             ${mediaHtml}
           </div>
           <div class="share-info">
-            <p class="share-title">상품 이미지로 모델컷 만들기</p>
-            <p class="share-desc">클릭4번으로 AI모델컷이 무료로 만들어 진다고?</p>
-            <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 해보기</a>
+            <p class="share-title">${shareTitle}</p>
+            <p class="share-desc">${shareDesc}</p>
+            <a href="${shareCtaHref}" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 해보기</a>
           </div>
         </div>
         <script>
@@ -4839,8 +4846,8 @@ app.get('/share/:jobId/:idx', async (c) => {
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>EZlook - 공유된 피팅컷</title>
-  <meta property="og:title" content="상품 이미지로 모델컷 만들기" />
-  <meta property="og:description" content="클릭4번으로 AI모델컷이 무료로 만들어 진다고?" />
+  <meta property="og:title" content="${shareTitle}" />
+  <meta property="og:description" content="${shareDesc}" />
   ${opts.state === 'ok' ? (opts.isVideo ? `<meta property="og:video" content="${opts.imageUrl}" /><meta property="og:type" content="video.other" />` : `<meta property="og:image" content="${opts.imageUrl}" />`) : ''}
   <meta property="og:url" content="${pageUrl}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -4880,10 +4887,11 @@ app.get('/share/:jobId/:idx', async (c) => {
 
   try {
     const log = await db.prepare(
-      `SELECT image_urls, expires_at, model_id, bg_id, kind, video_url FROM generation_logs WHERE job_id = ? ORDER BY id DESC LIMIT 1`
+      `SELECT image_urls, expires_at, model_id, bg_id, kind, video_url, model_name FROM generation_logs WHERE job_id = ? ORDER BY id DESC LIMIT 1`
     ).bind(jobId).first() as any
 
     const isVideo = log?.kind === 'video'
+    const isGhostCut = !!(log?.model_name && String(log.model_name).startsWith('고스트컷·'))
     if (!log || (isVideo ? !log.video_url : !log.image_urls)) return c.html(renderSharePage({ state: 'notfound' }), 404)
 
     if (log.expires_at) {
@@ -4930,6 +4938,7 @@ app.get('/share/:jobId/:idx', async (c) => {
       isVideo,
       sourceTabs,
       resultTab: { label: isVideo ? '생성결과 영상' : '생성결과', url: proxiedUrl },
+      isGhostCut,
     }))
   } catch (err: any) {
     console.error('Share page error:', err)

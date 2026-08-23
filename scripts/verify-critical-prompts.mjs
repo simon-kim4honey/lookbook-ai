@@ -89,8 +89,13 @@ const GUARDS = [
   },
   {
     name: '고스트컷 영상 — 옷이 안에서 공기가 들어차 부풀어 오르는(풍선 효과) 것 금지',
-    must: 'the garment must NEVER inflate, balloon, puff up, or expand in volume as if air were being blown INSIDE it from within',
+    must: 'it must NOT inflate, balloon, puff up, expand, grow rounder, or look like it is filling with air from within',
     why: '2026-08-23 실제 발견된 회귀: 미풍 표현을 지나치게 약하게("very subtle, minimal movement") 서술했더니 오히려 AI가 옷 안쪽에서 공기가 들어차 부풀어 오르는 부자연스러운 영상을 만들었다. 옷 표면이 자연스럽게 살랑거리는 것은 허용하되, 옷 전체 부피가 풍선처럼 팽창하는 것은 명시적으로 금지해야 함.',
+  },
+  {
+    name: '고스트컷 영상 — 패딩/퀄팅류는 볼륨이 첫 프레임 그대로 고정(재발 방지)',
+    must: 'This applies especially to padded, quilted, or puffer-style garments (e.g. a padded jumper/jacket) — their padding and loft must look exactly as filled and rigid as in the first frame from start to finish, with zero growth in volume',
+    why: '2026-08-23 재발 사례: 위 풍선 효과 금지 문구를 추가한 뒤에도 패딩 점퍼 상품에서는 옷 전체가 다시 부풀어 오르는 현상이 재발함. 패딩류는 원래 형태 자체가 통통해서 AI가 "더 부풀리는" 쪽으로 해석하기 쉬우므로, 패딩/퀄팅류를 별도로 콕 집어 볼륨 고정을 강조하는 문구를 추가함.',
   },
   {
     name: '고스트컷 영상 — 배경 화이트를 영상 끝까지 유지',
