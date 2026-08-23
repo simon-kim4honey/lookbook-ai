@@ -2307,15 +2307,15 @@ footer {
   animation: gen-news-fade 0.4s ease;
 }
 @keyframes gen-news-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-#videoGenViewNews { margin-top: 0; margin-bottom: 40px; }
+#videoGenViewNews, #detailCutGenViewNews { margin-top: 0; margin-bottom: 40px; }
 .gen-news-tag { font-size: 12px; font-weight: 700; color: #a78bfa; margin-bottom: 6px; letter-spacing: 0.02em; }
 .gen-news-headline {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 39px; /* 13px * 1.5줄간격 * 2줄 — 헤드라인이 1줄이어도 박스 높이가 줄어들지 않도록 고정 */
-  font-size: 13px;
+  min-height: 42px; /* 14px * 1.5줄간격 * 2줄 — 헤드라인이 1줄이어도 박스 높이가 줄어들지 않도록 고정 */
+  font-size: 14px;
   font-weight: 600;
   color: #fff;
   text-decoration: none;

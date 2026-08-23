@@ -2637,10 +2637,11 @@ app.post('/api/credits/deduct', async (c) => {
     }
 
     // 고스트컷 결과 이미지는 model_name에 "고스트컷·" 접두어를 붙여 저장해뒀다 (별도 마이그레이션 없이 재사용)
-    // 디테일컷("고스트컷디테일·")은 생성 요청 시점에 이미 과금했으므로 다운로드는 무료(0크레딧)로 처리
+    // 디테일컷("고스트컷디테일·")은 다른 이미지와 동일하게 다운로드 시점에 차감되며, 장당 고정가(60)로
+    // 장수와 무관하게 항상 동일하다(볼륨 할인 없음).
     const isGhostCutDetailDownload = !!(genLog?.model_name && String(genLog.model_name).startsWith('고스트컷디테일·'))
     const isGhostCutDownload = !!(genLog?.model_name && String(genLog.model_name).startsWith('고스트컷·'))
-    const COST = isGhostCutDetailDownload ? 0 : (isGhostCutDownload ? CREDITS_PER_GHOSTCUT_IMAGE : CREDITS_PER_IMAGE)
+    const COST = isGhostCutDetailDownload ? CREDITS_PER_GHOSTCUT_DETAIL_IMAGE : (isGhostCutDownload ? CREDITS_PER_GHOSTCUT_IMAGE : CREDITS_PER_IMAGE)
     if (sess.credits < COST) {
       return c.json({
         error: `크레딧이 부족합니다. (보유: ${sess.credits}크레딧, 필요: ${COST}크레딧)`,
@@ -3574,9 +3575,9 @@ const CREDITS_PER_GHOSTCUT_IMAGE = 70  // 고스트컷 이미지 1장당 차감 
 const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
 const CREDITS_PER_GHOSTCUT_VIDEO = 250 // 고스트컷 영상(5초)당 차감 크레딧 — 모델컷과 별도 요금
 
-// 고스트컷 디테일컷(클로즈업) 추가 생성 — 장수별 고정가(볼륨 할인 구조).
-// 다운로드가 아닌 "생성 요청 시점"에 즉시 차감(영상과 동일한 방식) — 다운로드는 무료.
-const CREDITS_PER_GHOSTCUT_DETAIL: Record<number, number> = { 1: 70, 2: 120, 3: 160, 4: 190 }
+// 고스트컷 디테일컷(클로즈업) — 1장당 120의 50% 할인 60크레딧, 장수와 무관하게 항상 동일(볼륨 할인 없음).
+// 다른 이미지 생성과 동일하게 생성 자체는 무료이고, "다운로드 시점"에 장당 차감된다.
+const CREDITS_PER_GHOSTCUT_DETAIL_IMAGE = 60
 
 // 영상 생성 실패(또는 15분 이상 응답 없음) 확인 시 크레딧을 환불하고 생성내역을
 // 'failed'로 전환한다. status='processing' → 'failed' 전환은 원자적 UPDATE로 수행해
@@ -4467,16 +4468,8 @@ app.post('/api/ghostcut/detail/start', async (c) => {
     const requestedCount = Math.max(1, Math.min(4, parseInt(body.count, 10) || 1))
     if (!imageUrl) return c.json({ error: 'imageUrl 필수' }, 400)
 
-    // 최악의 경우(요청 장수 전부 성공)를 기준으로 사전에 잔액을 확인한다.
-    const maxCost = CREDITS_PER_GHOSTCUT_DETAIL[requestedCount]
-    if (sess.credits < maxCost) {
-      return c.json({
-        error: `크레딧이 부족합니다. (보유: ${sess.credits}크레딧, 필요: ${maxCost}크레딧)`,
-        code: 'INSUFFICIENT_CREDITS',
-        available: sess.credits,
-        required: maxCost,
-      }, 402)
-    }
+    // 크레딧은 생성이 아닌 "다운로드 시점"에 장당 고정가로 차감된다(POST /api/credits/deduct).
+    // 생성 자체는 모델컷/고스트컷 이미지 생성과 동일하게 무료.
 
     const detailPrompt = (focusHint: string) => [
       `IMAGE CROP TASK — this is NOT a new photograph and NOT a creative reinterpretation. Take the EXACT SAME photograph shown in the source image and output a cropped, zoomed-in region of it — as if you digitally selected a rectangular region of the original photo file and enlarged it. Every pixel of color, texture, pattern, shading, stitching, and surface detail in your output must be identical to what already exists in that region of the source image.`,
@@ -4516,20 +4509,11 @@ app.post('/api/ghostcut/detail/start', async (c) => {
       return c.json({ success: false, message: firstErr?.msg || firstErr?.message || '디테일컷 생성 요청 실패' }, 502)
     }
 
-    // 실제로 접수에 성공한 장수만큼만 과금 (요청한 장수 전부가 접수됐을 때만 최대 요금)
     const actualCount = jobIds.length
-    const COST = CREDITS_PER_GHOSTCUT_DETAIL[actualCount]
     const combinedJobId = jobIds.join(',')
 
-    const newBalance = sess.credits - COST
-    await db.prepare(`UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`).bind(newBalance, sess.user_id).run()
-    await db.prepare(
-      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-       VALUES (?, 'deduct', ?, ?, 'ghostcut_detail_generation', ?)`
-    ).bind(sess.user_id, -COST, newBalance, combinedJobId).run()
-
     // 생성 내역 기록 — model_name에 '고스트컷디테일·' 접두어를 붙여, 다운로드 시
-    // /api/credits/deduct가 이미 생성 시점에 과금됐음을 인식하고 0크레딧으로 처리하도록 함
+    // /api/credits/deduct가 장당 고정가(CREDITS_PER_GHOSTCUT_DETAIL_IMAGE)로 과금하도록 함
     const lastSeq = await db.prepare(
       `SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`
     ).bind(sess.user_id).first() as any
@@ -4539,7 +4523,7 @@ app.post('/api/ghostcut/detail/start', async (c) => {
        VALUES (?, ?, ?, ?, ?, '1:1', ?, datetime('now', '+14 days'))`
     ).bind(sess.user_id, combinedJobId, actualCount, `고스트컷디테일·${categoryLabel || ''}`, '화이트 배경', nextSeq).run()
 
-    return c.json({ success: true, jobId: combinedJobId, imageCount: actualCount, creditsUsed: COST, creditsRemaining: newBalance })
+    return c.json({ success: true, jobId: combinedJobId, imageCount: actualCount })
   } catch (err: any) {
     console.error('ghostcut/detail/start error:', err)
     return c.json({ success: false, message: err.message }, 500)
@@ -5109,6 +5093,8 @@ app.get('/terms', (c) => {
   <h2>제7조 (면책조항)</h2>
   <p>① 서비스는 AI가 생성한 콘텐츠의 정확성, 완전성에 대해 보증하지 않습니다.</p>
   <p>② 서비스는 이용자의 귀책사유로 인한 손해에 대해 책임을 지지 않습니다.</p>
+  <p>③ 이용자가 서비스를 통해 생성한 이미지·영상 등 결과물을 상업적 용도(온라인/오프라인 판매, 광고, 마케팅 등)로 사용함에 따라 발생하는 저작권·상표권·초상권 등 제3자 권리 침해, 표시·광고 관련 법령 위반, 소비자 분쟁, 그 밖의 일체의 법적 책임 및 손해는 전적으로 이를 상업적으로 활용한 이용자 본인에게 있으며, 회사(벌거벗은호랑이)는 이에 대해 어떠한 법적 책임도 지지 않습니다.</p>
+  <p>④ 이용자는 결과물을 상업적으로 활용하기 전, 원본 이미지에 대한 정당한 권리(저작권, 상표권, 촬영 대상자의 초상권 동의 등)를 보유하고 있는지 스스로 확인할 책임이 있습니다.</p>
 
   <h2 id="refund">제8조 (청약철회 및 환불)</h2>
   <p>① 이용자는 크레딧 결제일로부터 7일 이내에는 「전자상거래 등에서의 소비자보호에 관한 법률」 제17조에 따라 청약철회를 요청할 수 있습니다. 단, 해당 크레딧을 일부라도 사용(이미지 생성)한 경우에는 사용분을 제외한 잔여 크레딧에 한해 환불이 가능합니다.</p>
@@ -7052,18 +7038,18 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           </div>
         </div>
         <div class="gslide-scroll" style="padding-top:12px;">
+          <!-- 디테일컷 결과 — 고스트컷 전용, 생성 완료 후에만 표시. 고스트컷 원본 이미지보다 위에 배치 -->
+          <div id="detailCutResultsSection" style="display:none;padding:0 16px 16px;">
+            <p style="font-size:12px;font-weight:700;color:#8b8ba0;margin:0 0 10px;">디테일컷</p>
+            <div id="detailCutResultsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
+          </div>
           <div class="results-grid" id="resultsGrid"></div>
-          <!-- 이미지 하단 ~ 버튼 상단 사이 안내 메시지 -->
-          <div style="padding:18px 16px 4px;text-align:center;">
+          <!-- 이미지 하단 ~ 버튼 상단 사이 안내 메시지 — 디테일컷 생성 완료 후에는 숨김(재생성은 원본 이미지 기준 안내라 혼동 방지) -->
+          <div id="resultInfoMsg" style="padding:18px 16px 4px;text-align:center;">
             <p style="font-size:13px;color:#8b8ba0;line-height:1.6;margin:0;">
               <span style="color:#9b7cff;font-weight:600;">이미지 생성은 크레딧이 차감되지 않습니다.</span><br/>
               오류가 있거나 마음에 들지 않으면 아래 <strong style="color:#e0e0f0;">🔄 재생성</strong> 버튼을 눌러보세요.
             </p>
-          </div>
-          <!-- 디테일컷 결과 — 고스트컷 전용, 생성 완료 후에만 표시 -->
-          <div id="detailCutResultsSection" style="display:none;padding:8px 16px 4px;">
-            <p style="font-size:12px;font-weight:700;color:#8b8ba0;margin:0 0 10px;">디테일컷</p>
-            <div id="detailCutResultsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
           </div>
         </div>
         <div class="gslide-nav" id="step4Nav">
@@ -7148,23 +7134,19 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
     <div class="modal-box" style="max-width:340px;">
       <button class="modal-close" onclick="closeModal('detailCutModal')">×</button>
       <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#fff;">디테일컷 추가</h3>
-      <p style="margin:0 0 18px;font-size:13px;color:#8b8ba0;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 추가로 만들어드려요. 생성 요청 시점에 크레딧이 차감돼요(다운로드는 무료).</p>
+      <p style="margin:0 0 18px;font-size:13px;color:#8b8ba0;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 추가로 만들어드려요. 생성은 무료이며, 다운로드 시 장당 <strong style="color:#e0e0f0;"><s style="opacity:0.55;">120</s> 60크레딧</strong>이 차감돼요.</p>
       <div style="display:flex;flex-direction:column;gap:10px;">
-        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:56px;">
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:48px;">
           <span class="rnb-main">1장 생성</span>
-          <span class="rnb-sub"><i class="fas fa-coins"></i> 70크레딧</span>
         </button>
-        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(2)" style="min-height:56px;">
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(2)" style="min-height:48px;">
           <span class="rnb-main">2장 생성</span>
-          <span class="rnb-sub"><i class="fas fa-coins"></i> 120크레딧</span>
         </button>
-        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(3)" style="min-height:56px;">
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(3)" style="min-height:48px;">
           <span class="rnb-main">3장 생성</span>
-          <span class="rnb-sub"><i class="fas fa-coins"></i> 160크레딧</span>
         </button>
-        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(4)" style="min-height:56px;">
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(4)" style="min-height:48px;">
           <span class="rnb-main">4장 생성</span>
-          <span class="rnb-sub"><i class="fas fa-coins"></i> 190크레딧</span>
         </button>
       </div>
     </div>

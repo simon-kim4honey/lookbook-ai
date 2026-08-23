@@ -3274,6 +3274,8 @@ function renderResults(images) {
   const detailGrid = document.getElementById('detailCutResultsGrid');
   if (detailSection) detailSection.style.display = 'none';
   if (detailGrid) detailGrid.innerHTML = '';
+  const infoMsg = document.getElementById('resultInfoMsg');
+  if (infoMsg) infoMsg.style.display = '';
 
   grid.innerHTML = '';
 
@@ -3507,16 +3509,6 @@ async function startDetailCutGeneration(count) {
       showToast(t('loginRequired'), 'error');
       return;
     }
-    if (res.status === 402) {
-      _hideDetailCutGeneratingView();
-      const errData = await res.json();
-      showToast(t('creditInsufficientDetail', errData.available ?? 0), 'error');
-      setTimeout(() => {
-        const userArea = document.getElementById('navUserArea');
-        if (userArea) userArea.click();
-      }, 1500);
-      return;
-    }
     if (!res.ok) {
       _hideDetailCutGeneratingView();
       const errData = await res.json().catch(() => ({}));
@@ -3525,13 +3517,6 @@ async function startDetailCutGeneration(count) {
     }
 
     const data = await res.json();
-    if (data.creditsRemaining !== undefined) {
-      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
-      if (cachedUser) { cachedUser.credits = data.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
-      if (AppState.user) AppState.user.credits = data.creditsRemaining;
-      updateUserUI({ credits: data.creditsRemaining });
-    }
-
     _startDetailCutFakeProgress();
     _pollDetailCutStatus(data.jobId);
   } catch (err) {
@@ -3670,14 +3655,19 @@ function _renderDetailCutResults(jobId, images) {
     card.style.cssText = 'border-radius:12px;overflow:hidden;background:rgba(255,255,255,0.04);';
     card.innerHTML = `
       <img src="${proxied}" class="no-save-media" alt="디테일컷" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block;" draggable="false" oncontextmenu="return false" />
-      <button class="result-nav-btn" style="width:100%;border-radius:0;" onclick="downloadDetailCutImage('${jobId}', ${idx}, '${proxied}')">
+      <button class="result-nav-btn primary" style="width:100%;border-radius:0;" onclick="downloadDetailCutImage('${jobId}', ${idx}, '${proxied}')">
+        <span class="rnb-badge">50%↓</span>
         <span class="rnb-main"><i class="fas fa-download"></i> 저장</span>
+        <span class="rnb-sub"><s class="rnb-strike">120</s> <i class="fas fa-coins"></i> 60</span>
       </button>
     `;
     grid.appendChild(card);
   });
 
   if (section) section.style.display = '';
+  // 디테일컷이 생성되면 재생성 안내 메시지는 숨김(원본 이미지 기준 안내라 혼동 방지)
+  const infoMsg = document.getElementById('resultInfoMsg');
+  if (infoMsg) infoMsg.style.display = 'none';
 }
 
 async function downloadDetailCutImage(jobId, idx, url) {
@@ -3696,12 +3686,28 @@ async function downloadDetailCutImage(jobId, idx, url) {
       showToast(t('loginRequired'), 'error');
       return;
     }
+    if (res.status === 402) {
+      const errData = await res.json();
+      showToast(t('creditInsufficientDetail', errData.available ?? 0), 'error');
+      setTimeout(() => {
+        const userArea = document.getElementById('navUserArea');
+        if (userArea) userArea.click();
+      }, 1500);
+      return;
+    }
     if (!res.ok) {
       showToast(t('creditError'), 'error');
       return;
     }
-    // 디테일컷은 생성 시점에 이미 차감되었으므로 다운로드는 항상 0크레딧으로 처리됨
+    const data = await res.json();
+    if (data.creditsRemaining !== undefined) {
+      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+      if (cachedUser) { cachedUser.credits = data.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+      if (AppState.user) AppState.user.credits = data.creditsRemaining;
+      updateUserUI({ credits: data.creditsRemaining });
+    }
     _doFileDownload(url, `detail_${idx + 1}`);
+    showToast(data.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', data.creditsRemaining), 'success');
   } catch (err) {
     console.error('Detail cut download error:', err);
     showToast(t('downloadErr'), 'error');
