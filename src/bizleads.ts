@@ -271,10 +271,20 @@ biz.post('/mail-batch/next', async (c) => {
   const batchId = batchRow?.n || 1
   const sentAt = new Date().toISOString()
   const ids = rows.map((r) => r.id)
-  const placeholders = ids.map(() => '?').join(',')
-  await db.prepare(
-    `UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${placeholders})`
-  ).bind(sentAt, batchId, ...ids).run()
+
+  // D1은 쿼리당 바인딩 파라미터 최대 100개 제한 — 200개 id를 한 UPDATE에 묶으면 초과되어 500 에러가 난다.
+  // 90개씩(+sentAt,batchId 2개=92개) 잘라서 batch()로 한 트랜잭션에 묶어 실행.
+  const CHUNK = 90
+  const stmts = []
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK)
+    const placeholders = chunk.map(() => '?').join(',')
+    stmts.push(
+      db.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${placeholders})`)
+        .bind(sentAt, batchId, ...chunk)
+    )
+  }
+  await db.batch(stmts)
 
   const xlsx = buildNameEmailXlsx(rows.map((r) => ({ name: r.name, email: r.email })))
   return new Response(xlsx, {
