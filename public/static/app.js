@@ -1963,6 +1963,10 @@ function initGhostCutUI() {
   const videoSub = document.getElementById('videoActionSub');
   if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
 
+  // 디테일컷 추가 버튼은 고스트컷 전용
+  const detailBtn = document.getElementById('detailCutBtn');
+  if (detailBtn) detailBtn.style.display = '';
+
   // 영상 생성 로딩화면 메시지 중 "포즈 동작 생성"은 모델(사람) 전용 문구라 옷 흔들림으로 교체
   const vmsg2 = document.querySelector('#vmsg2');
   if (vmsg2) {
@@ -3262,6 +3266,14 @@ function renderResults(images) {
   const downloadSub = document.getElementById('downloadActionSub');
   if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
 
+  // 새 결과가 렌더링되면 이전 상품의 디테일컷 결과도 초기화(고스트컷 전용)
+  const detailBtn = document.getElementById('detailCutBtn');
+  if (detailBtn) detailBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
+  const detailSection = document.getElementById('detailCutResultsSection');
+  const detailGrid = document.getElementById('detailCutResultsGrid');
+  if (detailSection) detailSection.style.display = 'none';
+  if (detailGrid) detailGrid.innerHTML = '';
+
   grid.innerHTML = '';
 
   // 결과 탭 텍스트 업데이트
@@ -3445,6 +3457,181 @@ async function downloadWithCreditCheck(idx) {
   } catch (err) {
     console.error('Download error:', err);
     closeActionProgress();
+    showToast(t('downloadErr'), 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// 디테일컷 추가 생성 (고스트컷 전용) — 생성 요청 시점에 크레딧 차감, 다운로드는 무료
+// ─────────────────────────────────────────────────────────
+function openDetailCutMenu() {
+  const img = AppState.generatedImages[0];
+  if (!img || !img.originalUrl) {
+    showToast('디테일컷을 생성할 이미지가 없습니다.', 'error');
+    return;
+  }
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast(t('loginRequired'), 'error');
+    return;
+  }
+  openModal('detailCutModal');
+}
+
+async function startDetailCutGeneration(count) {
+  closeModal('detailCutModal');
+
+  const img = AppState.generatedImages[0];
+  if (!img || !img.originalUrl) {
+    showToast('디테일컷을 생성할 이미지가 없습니다.', 'error');
+    return;
+  }
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast(t('loginRequired'), 'error');
+    return;
+  }
+
+  openActionProgress('디테일컷 생성 중...');
+
+  try {
+    const res = await fetch('/api/ghostcut/detail/start', {
+      method: 'POST',
+      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: img.originalUrl, count, categoryLabel: ghostCutUpload_.categoryLabel }),
+    });
+
+    if (res.status === 401) {
+      closeActionProgress();
+      showToast(t('loginRequired'), 'error');
+      return;
+    }
+    if (res.status === 402) {
+      closeActionProgress();
+      const errData = await res.json();
+      showToast(t('creditInsufficientDetail', errData.available ?? 0), 'error');
+      setTimeout(() => {
+        const userArea = document.getElementById('navUserArea');
+        if (userArea) userArea.click();
+      }, 1500);
+      return;
+    }
+    if (!res.ok) {
+      closeActionProgress();
+      const errData = await res.json().catch(() => ({}));
+      showToast(errData.message || '디테일컷 생성 요청에 실패했습니다.', 'error');
+      return;
+    }
+
+    const data = await res.json();
+    if (data.creditsRemaining !== undefined) {
+      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+      if (cachedUser) { cachedUser.credits = data.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+      if (AppState.user) AppState.user.credits = data.creditsRemaining;
+      updateUserUI({ credits: data.creditsRemaining });
+    }
+
+    _pollDetailCutStatus(data.jobId);
+  } catch (err) {
+    console.error('Detail cut start error:', err);
+    closeActionProgress();
+    showToast('디테일컷 생성 요청 중 네트워크 오류가 발생했습니다.', 'error');
+  }
+}
+
+async function _pollDetailCutStatus(jobId) {
+  let attempts = 0;
+  const maxAttempts = 60; // 60회×3초=3분
+
+  while (attempts < maxAttempts) {
+    await sleep(3000);
+    attempts++;
+    try {
+      const res = await fetch(`/api/generation/${jobId}/status`);
+      const data = await res.json();
+
+      if (data.status === 'completed') {
+        closeActionProgress();
+        const images = data.images || [];
+        _renderDetailCutResults(jobId, images);
+
+        // 생성된 이미지 URL을 서버에 저장 (범용 엔드포인트 재사용 — 히스토리 썸네일용)
+        const realUrls = images.filter(i => i.url && i.url.startsWith('http')).map(i => i.url);
+        if (realUrls.length > 0) {
+          const token = localStorage.getItem('lookbook_token') || '';
+          fetch('/api/generation/save-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Session-Token': token },
+            body: JSON.stringify({ job_id: jobId, image_urls: realUrls }),
+          }).catch(() => {});
+        }
+
+        showToast(`디테일컷 ${images.length}장 생성이 완료됐어요.`, 'success');
+        return;
+      } else if (data.status === 'failed') {
+        throw new Error(data.error || '생성 실패');
+      }
+    } catch (err) {
+      console.error('Detail cut poll error:', err);
+      if (attempts >= maxAttempts - 3) {
+        closeActionProgress();
+        showToast('디테일컷 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'error');
+        return;
+      }
+    }
+  }
+  closeActionProgress();
+  showToast('디테일컷 생성이 지연되고 있어요. 잠시 후 다시 확인해주세요.', 'error');
+}
+
+function _renderDetailCutResults(jobId, images) {
+  const section = document.getElementById('detailCutResultsSection');
+  const grid = document.getElementById('detailCutResultsGrid');
+  if (!grid) return;
+
+  images.forEach((img, i) => {
+    if (!img.url) return;
+    const proxied = img.url.startsWith('http') ? `/api/proxy/gen-image?url=${encodeURIComponent(img.url)}` : img.url;
+    const idx = grid.children.length; // 기존 디테일컷 결과 뒤에 이어서 추가(여러 번 생성 가능)
+
+    const card = document.createElement('div');
+    card.style.cssText = 'border-radius:12px;overflow:hidden;background:rgba(255,255,255,0.04);';
+    card.innerHTML = `
+      <img src="${proxied}" class="no-save-media" alt="디테일컷" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block;" draggable="false" oncontextmenu="return false" />
+      <button class="result-nav-btn" style="width:100%;border-radius:0;" onclick="downloadDetailCutImage('${jobId}', ${idx}, '${proxied}')">
+        <span class="rnb-main"><i class="fas fa-download"></i> 저장</span>
+      </button>
+    `;
+    grid.appendChild(card);
+  });
+
+  if (section) section.style.display = '';
+}
+
+async function downloadDetailCutImage(jobId, idx, url) {
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast(t('loginRequired'), 'error');
+    return;
+  }
+  try {
+    const res = await fetch('/api/credits/deduct', {
+      method: 'POST',
+      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jobId, idx }),
+    });
+    if (res.status === 401) {
+      showToast(t('loginRequired'), 'error');
+      return;
+    }
+    if (!res.ok) {
+      showToast(t('creditError'), 'error');
+      return;
+    }
+    // 디테일컷은 생성 시점에 이미 차감되었으므로 다운로드는 항상 0크레딧으로 처리됨
+    _doFileDownload(url, `detail_${idx + 1}`);
+  } catch (err) {
+    console.error('Detail cut download error:', err);
     showToast(t('downloadErr'), 'error');
   }
 }

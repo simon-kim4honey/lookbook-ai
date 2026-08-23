@@ -2660,8 +2660,10 @@ app.post('/api/credits/deduct', async (c) => {
     }
 
     // 고스트컷 결과 이미지는 model_name에 "고스트컷·" 접두어를 붙여 저장해뒀다 (별도 마이그레이션 없이 재사용)
+    // 디테일컷("고스트컷디테일·")은 생성 요청 시점에 이미 과금했으므로 다운로드는 무료(0크레딧)로 처리
+    const isGhostCutDetailDownload = !!(genLog?.model_name && String(genLog.model_name).startsWith('고스트컷디테일·'))
     const isGhostCutDownload = !!(genLog?.model_name && String(genLog.model_name).startsWith('고스트컷·'))
-    const COST = isGhostCutDownload ? CREDITS_PER_GHOSTCUT_IMAGE : CREDITS_PER_IMAGE
+    const COST = isGhostCutDetailDownload ? 0 : (isGhostCutDownload ? CREDITS_PER_GHOSTCUT_IMAGE : CREDITS_PER_IMAGE)
     if (sess.credits < COST) {
       return c.json({
         error: `크레딧이 부족합니다. (보유: ${sess.credits}크레딧, 필요: ${COST}크레딧)`,
@@ -2672,14 +2674,16 @@ app.post('/api/credits/deduct', async (c) => {
     }
 
     const newBalance = sess.credits - COST
-    await db.prepare(
-      `UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`
-    ).bind(newBalance, sess.user_id).run()
+    if (COST > 0) {
+      await db.prepare(
+        `UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`
+      ).bind(newBalance, sess.user_id).run()
 
-    await db.prepare(
-      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-       VALUES (?, 'deduct', ?, ?, 'image_download', ?)`
-    ).bind(sess.user_id, -COST, newBalance, `dl_${Date.now()}`).run()
+      await db.prepare(
+        `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+         VALUES (?, 'deduct', ?, ?, 'image_download', ?)`
+      ).bind(sess.user_id, -COST, newBalance, `dl_${Date.now()}`).run()
+    }
 
     if (genLog && imgIdx !== undefined) {
       downloadedIndices.push(imgIdx)
@@ -3593,6 +3597,10 @@ const CREDITS_PER_GHOSTCUT_IMAGE = 70  // 고스트컷 이미지 1장당 차감 
 const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
 const CREDITS_PER_GHOSTCUT_VIDEO = 250 // 고스트컷 영상(5초)당 차감 크레딧 — 모델컷과 별도 요금
 
+// 고스트컷 디테일컷(클로즈업) 추가 생성 — 장수별 고정가(볼륨 할인 구조).
+// 다운로드가 아닌 "생성 요청 시점"에 즉시 차감(영상과 동일한 방식) — 다운로드는 무료.
+const CREDITS_PER_GHOSTCUT_DETAIL: Record<number, number> = { 1: 70, 2: 120, 3: 160 }
+
 // 영상 생성 실패(또는 15분 이상 응답 없음) 확인 시 크레딧을 환불하고 생성내역을
 // 'failed'로 전환한다. status='processing' → 'failed' 전환은 원자적 UPDATE로 수행해
 // 동시에 여러 번 폴링이 들어와도 환불이 중복되지 않도록 한다.
@@ -4437,6 +4445,118 @@ app.post('/api/ghostcut/video/start', async (c) => {
     return c.json({ success: true, jobId, creditsRemaining: newBalance })
   } catch (err: any) {
     console.error('ghostcut/video/start error:', err)
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ════════════════════════════════════════════════════════════
+// POST /api/ghostcut/detail/start — 고스트컷 결과 이미지의 디자인/디테일이
+// 돋보이는 부위를 클로즈업한 "디테일컷" 1~3장을 추가 생성한다.
+// 다운로드가 아닌 "생성 요청 시점"에 크레딧을 즉시 차감(영상과 동일한 방식) —
+// 다운로드는 무료(POST /api/credits/deduct에서 model_name '고스트컷디테일·' 접두사로 인식해 0크레딧 처리).
+// 요청한 장수(count) 중 실제로 Atlas에 정상 접수된 장수만큼만 과금한다(부분 실패 시 과다 청구 방지).
+// 상태 폴링(GET /api/generation/:jobId/status)과 이미지 URL 저장(POST /api/generation/save-images)은
+// job_id 기반의 완전히 범용 로직이라 그대로 재사용.
+//
+// ⚠️ 아래 prompt 문자열도 실제 생성 품질에 직접 영향을 준다 — 함부로 문구를
+//   바꾸지 말 것. scripts/verify-critical-prompts.mjs GUARDS에도 등록되어 있다.
+// ════════════════════════════════════════════════════════════
+const GHOSTCUT_DETAIL_FOCUS_HINTS = [
+  `Choose the MOST visually distinctive design detail area of the garment for this close-up — such as a button, zipper, collar, pocket, stitching pattern, fabric texture, trim, or hardware — whichever best showcases the product's craftsmanship and quality.`,
+  `Choose a DIFFERENT design detail area than a typical front-view close-up — such as a cuff, hem, seam, side panel, or secondary hardware/trim — to show another distinctive feature of the garment not obvious from the main product photo.`,
+  `Choose YET ANOTHER distinctive design detail area, different from the two most obvious focal points — such as a back panel, shoulder seam, fabric weave close-up, or a unique construction detail — to give a third unique perspective on the product's quality.`,
+]
+
+app.post('/api/ghostcut/detail/start', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.', code: 'UNAUTHORIZED' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT s.user_id, u.credits, u.name FROM user_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token = ? AND s.expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.', code: 'UNAUTHORIZED' }, 401)
+
+    const body: any = await c.req.json()
+    const { imageUrl, categoryLabel } = body
+    const requestedCount = Math.max(1, Math.min(3, parseInt(body.count, 10) || 1))
+    if (!imageUrl) return c.json({ error: 'imageUrl 필수' }, 400)
+
+    // 최악의 경우(요청 장수 전부 성공)를 기준으로 사전에 잔액을 확인한다.
+    const maxCost = CREDITS_PER_GHOSTCUT_DETAIL[requestedCount]
+    if (sess.credits < maxCost) {
+      return c.json({
+        error: `크레딧이 부족합니다. (보유: ${sess.credits}크레딧, 필요: ${maxCost}크레딧)`,
+        code: 'INSUFFICIENT_CREDITS',
+        available: sess.credits,
+        required: maxCost,
+      }, 402)
+    }
+
+    const detailPrompt = (focusHint: string) => [
+      `PRODUCT DETAIL CLOSE-UP PHOTOGRAPHY — take the exact garment shown in the source image and create an extreme close-up macro shot of ONE specific design detail area of it.`,
+      `Source image = the ONLY reference for the garment's design, color, pattern, print, texture, fabric, stitching, and every visual detail. Do NOT redesign, alter, invent, or change ANY detail of the garment — this is a crop/zoom of the exact same real garment, not a new interpretation.`,
+      focusHint,
+      `Frame it as a tight macro/close-up product shot — fill most of the frame with the chosen detail area, sharp focus, professional e-commerce detail-shot style (the kind of close-up photo online stores use to show fabric texture, stitching quality, buttons, zippers, or prints up close).`,
+      `Background MUST remain pure solid white (#FFFFFF), completely flat and shadowless — NO drop shadow, NO contact shadow, NO reflection, NO gradient, NO vignette anywhere in the frame, exactly like the source image's background.`,
+      `ABSOLUTE RULES: DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image (unless an existing brand logo/print is already part of the garment's real design in the source image — reproduce that exactly, do not add new ones). NO visible human body, face, hands, mannequin form, or hanger anywhere in the output. DO NOT change the garment's color, pattern, print, texture, fabric, or any design element from the source image — this must look like a real macro photograph of the exact same product.`,
+      `Ultra-photorealistic, 8K quality, sharp macro focus, professional e-commerce product detail photography.`,
+    ].join(' ')
+
+    const jobRequests = Array.from({ length: requestedCount }, (_, i) =>
+      fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
+        method: 'POST',
+        headers: atlasHeaders(c.env.ATLAS_API_KEY),
+        body: JSON.stringify({
+          model: 'google/nano-banana-2/edit',
+          prompt: detailPrompt(GHOSTCUT_DETAIL_FOCUS_HINTS[i % GHOSTCUT_DETAIL_FOCUS_HINTS.length]),
+          aspect_ratio: '1:1',
+          resolution: '2k',
+          thinking_level: 'high',
+          output_format: 'jpeg',
+          images: [imageUrl],
+        }),
+      }).then(r => r.json())
+    )
+
+    const results: any[] = await Promise.all(jobRequests)
+    const jobIds: string[] = results.filter(r => r.code === 200 && r.data?.id).map(r => r.data.id)
+
+    if (jobIds.length === 0) {
+      const firstErr = results[0]
+      console.error('[GhostCut Detail] Atlas 요청 전체 실패:', firstErr)
+      return c.json({ success: false, message: firstErr?.msg || firstErr?.message || '디테일컷 생성 요청 실패' }, 502)
+    }
+
+    // 실제로 접수에 성공한 장수만큼만 과금 (요청한 장수 전부가 접수됐을 때만 최대 요금)
+    const actualCount = jobIds.length
+    const COST = CREDITS_PER_GHOSTCUT_DETAIL[actualCount]
+    const combinedJobId = jobIds.join(',')
+
+    const newBalance = sess.credits - COST
+    await db.prepare(`UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`).bind(newBalance, sess.user_id).run()
+    await db.prepare(
+      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       VALUES (?, 'deduct', ?, ?, 'ghostcut_detail_generation', ?)`
+    ).bind(sess.user_id, -COST, newBalance, combinedJobId).run()
+
+    // 생성 내역 기록 — model_name에 '고스트컷디테일·' 접두어를 붙여, 다운로드 시
+    // /api/credits/deduct가 이미 생성 시점에 과금됐음을 인식하고 0크레딧으로 처리하도록 함
+    const lastSeq = await db.prepare(
+      `SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`
+    ).bind(sess.user_id).first() as any
+    const nextSeq = (lastSeq?.last_seq || 0) + 1
+    await db.prepare(
+      `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, expires_at)
+       VALUES (?, ?, ?, ?, ?, '1:1', ?, datetime('now', '+14 days'))`
+    ).bind(sess.user_id, combinedJobId, actualCount, `고스트컷디테일·${categoryLabel || ''}`, '화이트 배경', nextSeq).run()
+
+    return c.json({ success: true, jobId: combinedJobId, imageCount: actualCount, creditsUsed: COST, creditsRemaining: newBalance })
+  } catch (err: any) {
+    console.error('ghostcut/detail/start error:', err)
     return c.json({ success: false, message: err.message }, 500)
   }
 })
@@ -6941,6 +7061,11 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               오류가 있거나 마음에 들지 않으면 아래 <strong style="color:#e0e0f0;">🔄 재생성</strong> 버튼을 눌러보세요.
             </p>
           </div>
+          <!-- 디테일컷 결과 — 고스트컷 전용, 생성 완료 후에만 표시 -->
+          <div id="detailCutResultsSection" style="display:none;padding:8px 16px 4px;">
+            <p style="font-size:12px;font-weight:700;color:#8b8ba0;margin:0 0 10px;">디테일컷</p>
+            <div id="detailCutResultsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
+          </div>
         </div>
         <div class="gslide-nav" id="step4Nav">
           <div class="result-nav-grid">
@@ -6959,6 +7084,11 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             </button>
             <button class="result-nav-btn" onclick="regenFromCard(0)">
               <span class="rnb-main"><i class="fas fa-rotate-right"></i> 재생성</span>
+            </button>
+            <!-- 고스트컷 전용 — initGhostCutUI()에서만 노출 -->
+            <button class="result-nav-btn primary" id="detailCutBtn" onclick="openDetailCutMenu()" style="display:none;grid-column:1 / -1;">
+              <span class="rnb-main"><i class="fas fa-magnifying-glass"></i> 디테일컷 추가</span>
+              <span class="rnb-sub">디자인이 돋보이는 부위를 클로즈업으로 추가 생성</span>
             </button>
           </div>
         </div>
@@ -7011,6 +7141,29 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
       </div>
       <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
       <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
+    </div>
+  </div>
+
+  <!-- 디테일컷 장수 선택 모달 (고스트컷 전용) -->
+  <div class="modal-overlay" id="detailCutModal" style="z-index:10500;">
+    <div class="modal-box" style="max-width:340px;">
+      <button class="modal-close" onclick="closeModal('detailCutModal')">×</button>
+      <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#fff;">디테일컷 추가</h3>
+      <p style="margin:0 0 18px;font-size:13px;color:#8b8ba0;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 추가로 만들어드려요. 생성 요청 시점에 크레딧이 차감돼요(다운로드는 무료).</p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:56px;">
+          <span class="rnb-main">1장 생성</span>
+          <span class="rnb-sub"><i class="fas fa-coins"></i> 70크레딧</span>
+        </button>
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(2)" style="min-height:56px;">
+          <span class="rnb-main">2장 생성</span>
+          <span class="rnb-sub"><i class="fas fa-coins"></i> 120크레딧</span>
+        </button>
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(3)" style="min-height:56px;">
+          <span class="rnb-main">3장 생성</span>
+          <span class="rnb-sub"><i class="fas fa-coins"></i> 160크레딧</span>
+        </button>
+      </div>
     </div>
   </div>
 

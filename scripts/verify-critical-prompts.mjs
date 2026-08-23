@@ -107,6 +107,16 @@ const GUARDS = [
     must: 'identical to the first frame from start to finish',
     why: '영상 중간에 배경이 변하거나 그림자가 생기지 않도록 첫 프레임과 끝까지 동일해야 함을 명시.',
   },
+  {
+    name: '고스트컷 디테일컷 — 크롭/줌일 뿐 새로운 디자인 해석 금지',
+    must: 'Do NOT redesign, alter, invent, or change ANY detail of the garment — this is a crop/zoom of the exact same real garment, not a new interpretation.',
+    why: '디테일컷은 생성된 고스트컷 이미지의 특정 부위를 클로즈업하는 것일 뿐, AI가 새로운 디자인으로 재해석하면 안 된다. 이 문구가 없으면 클로즈업 과정에서 디자인/색상이 미묘하게 바뀔 위험이 있음.',
+  },
+  {
+    name: '고스트컷 디테일컷 — 배경 화이트/무그림자 유지',
+    must: "Background MUST remain pure solid white (#FFFFFF), completely flat and shadowless",
+    why: '디테일컷도 원본 고스트컷 이미지와 동일하게 순백색·무그림자 배경을 유지해야 함을 명시.',
+  },
 ]
 
 let failed = false
