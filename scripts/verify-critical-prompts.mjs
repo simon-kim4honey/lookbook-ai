@@ -122,6 +122,16 @@ const GUARDS = [
     must: 'CRITICAL — DO NOT ADD ANY WEAR, AGING, OR DISTRESSING THAT IS NOT ALREADY IN THE SOURCE IMAGE',
     why: '2026-08-23 실제 발견된 회귀: 매끈한 청바지 밑단이 디테일컷 클로즈업에서 낡고 해진 빈티지 원단으로 바뀌어 나옴. "디자인 변경 금지" 문구가 색상/패턴만 포괄적으로 언급했을 뿐 가공/워싱/디스트레싱 추가를 구체적으로 금지하지 않아서 발생. 원본에 없는 워싱/해짐/낡은 질감을 임의로 추가하지 못하도록 구체적으로 명시.',
   },
+  {
+    name: '고스트컷 디테일컷 — 새 사진이 아닌 원본의 크롭/줌일 뿐임을 명시',
+    must: 'IMAGE CROP TASK — this is NOT a new photograph and NOT a creative reinterpretation.',
+    why: '2026-08-23 재발 사례: 워싱/디스트레싱 금지 문구를 추가한 뒤에도 사용자가 "일부 응용이 포함되어있다"고 재차 리포트함. "close-up macro shot을 만들어라(create)" 같은 표현 자체가 AI에게 "새로운 사진을 찍어라"는 창작 여지를 줘서 발생한 것으로 추정 — 이 작업이 원본 사진의 특정 영역을 그대로 잘라 확대하는 것일 뿐, 새로운 사진이나 창작적 재해석이 아님을 프롬프트 최상단에 명시.',
+  },
+  {
+    name: '고스트컷 디테일컷 — 창작적 변경 전면 금지(질감/구김/비율/조명 등)',
+    must: 'ABSOLUTE PROHIBITION ON CREATIVE CHANGES: Do NOT add, remove, invent, embellish, restyle, or reinterpret ANYTHING.',
+    why: '워싱/디스트레싱 외에도 질감·구김·비율·조명 등 다른 종류의 "응용"이 재발할 수 있으므로, 특정 케이스(워싱 등)에 한정하지 않고 모든 창작적 변경을 포괄적으로 금지하는 문구를 추가함. 특정 사례만 막으면 다른 형태의 변형이 계속 재발하는 패턴(2026-08-23 반복 확인)을 근본적으로 차단하기 위함.',
+  },
 ]
 
 let failed = false
