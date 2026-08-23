@@ -2022,7 +2022,7 @@ function ghostCutHandleFile(file) {
       }
 
       ghostCutUpload_ = { dataUrl, category: data.category, categoryLabel: data.label };
-      if (statusBox) { statusBox.style.color = '#22c55e'; statusBox.textContent = '✅ 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
+      if (statusBox) { statusBox.style.color = '#6C47FF'; statusBox.innerHTML = '<i class="fas fa-check-circle"></i> 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
       if (genBtn) genBtn.disabled = false;
     } catch (err) {
       console.error('ghostcut classify error:', err);
@@ -3492,7 +3492,7 @@ async function resumePendingVideoJob() {
     localStorage.removeItem('lookbook_pending_video');
     return;
   }
-  showToast('이전에 시작한 영상 생성을 이어서 확인합니다...', 'info');
+  showToast('진행 중인 영상 생성을 계속 확인하고 있어요. 완료되면 자동으로 저장돼요.', 'info');
   _pollVideoStatusBackground(pending.jobId);
 }
 

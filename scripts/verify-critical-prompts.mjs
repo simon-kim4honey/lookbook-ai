@@ -78,9 +78,19 @@ const GUARDS = [
     why: '2026-08-23 회귀(숏패딩→롱패딩) 재발 방지용 핵심 제약. 길이/실루엣은 반드시 사용자 원본(Image 1) 그대로 유지되어야 하고, 샘플(Image 2)의 형태를 따라가면 안 됨.',
   },
   {
+    name: '고스트컷 — 소재/컬러 절대 변경 금지(HARD_CONSTRAINTS)',
+    must: "Image 1's garment FABRIC MATERIAL and COLOR must be reproduced with ZERO deviation",
+    why: '2026-08-23 사용자 요청으로 추가된 이중 안전장치. 다른 문구들이 색상/패턴을 포괄적으로 언급하고 있었지만, 소재(재질)와 컬러를 별도의 절대 규칙으로 명시해 향후 리팩터링으로 흐려지지 않도록 함.',
+  },
+  {
     name: '고스트컷 영상 — 옷은 제자리에서 미풍에만 흔들림(사람 등장/이동 금지)',
     must: 'it does NOT walk, float away, spin, or change position',
     why: '고스트컷 영상은 사람이 포징하는 모델컷 영상과 달리 옷 자체가 제자리에서 살랑거리기만 해야 함. 이 문구가 없으면 모델컷 영상 프롬프트처럼 인물/이동이 섞여 들어갈 수 있음.',
+  },
+  {
+    name: '고스트컷 영상 — 옷이 안에서 공기가 들어차 부풀어 오르는(풍선 효과) 것 금지',
+    must: 'the garment must NEVER inflate, balloon, puff up, or expand in volume as if air were being blown INSIDE it from within',
+    why: '2026-08-23 실제 발견된 회귀: 미풍 표현을 지나치게 약하게("very subtle, minimal movement") 서술했더니 오히려 AI가 옷 안쪽에서 공기가 들어차 부풀어 오르는 부자연스러운 영상을 만들었다. 옷 표면이 자연스럽게 살랑거리는 것은 허용하되, 옷 전체 부피가 풍선처럼 팽창하는 것은 명시적으로 금지해야 함.',
   },
   {
     name: '고스트컷 영상 — 배경 화이트를 영상 끝까지 유지',
