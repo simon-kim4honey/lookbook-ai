@@ -543,6 +543,10 @@ const SAMPLE_PROJECTS = [
 // INITIALIZATION
 // ─────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // /ghostcut 화면 깜빡임 방지: initLocale()/verifySession()의 네트워크 왕복을
+  // 기다리면 그 사이 서버가 내려준 원본(모델컷 step-1) 화면이 잠깐 보였다 사라진다.
+  // DOM이 준비되자마자(네트워크 대기 없이) 즉시 UI를 바꿔 깜빡임을 없앤다.
+  if (window.location.pathname === '/ghostcut') initGhostCutUI();
   initLocale().then(() => initPage());
 });
 
@@ -551,6 +555,7 @@ function initPage() {
   initNavbar();
   // 모바일 OAuth 리다이렉트 콜백 결과 먼저 처리
   checkOAuthRedirectResult();
+  // /ghostcut의 UI 교체는 DOMContentLoaded 시점에 이미 실행됨(위 참고) — 여기서는 생략
   // 모든 페이지에서 세션 복원 (자동 로그인)
   verifySession().then(() => {
     if (path === '/' || path === '') {
@@ -565,7 +570,9 @@ function initPage() {
     } else if (path === '/generator') {
       initGenerator();
     } else if (path === '/ghostcut') {
-      initGhostCutPage();
+      // UI 교체는 위에서 이미 완료됨 — 로그인 상태 확인 후 필요한 이전 작업만 재개
+      resumePendingGeneration();
+      resumePendingVideoJob();
     }
   });
 }
@@ -1899,7 +1906,7 @@ function initGenerator() {
 // ─────────────────────────────────────────────────────────
 let ghostCutUpload_ = { dataUrl: null, category: null, categoryLabel: null };
 
-function initGhostCutPage() {
+function initGhostCutUI() {
   const body = document.querySelector('#step-1 .gslide-body');
   if (!body) return;
 
@@ -1948,9 +1955,6 @@ function initGhostCutPage() {
     if (onclickAttr === 'regenFromCard(0)') btn.style.display = 'none';
     if (onclickAttr === "window.location.href='/generator'") btn.setAttribute('onclick', "window.location.href='/ghostcut'");
   });
-
-  resumePendingGeneration();
-  resumePendingVideoJob();
 }
 
 function ghostCutHandleDrop(e) {
