@@ -7023,6 +7023,20 @@ app.get('/admin02', (c) => {
       </div>
 
       <div class="leads-card">
+        <div class="leads-row" style="justify-content:space-between;flex-wrap:wrap;">
+          <div class="leads-hint">
+            📧 DirectSend 메일 발송용 — 남은 대상 <b id="bizMailRemaining" style="color:#e0e0f0">-</b>건,
+            누적 발송 처리 <b id="bizMailSentTotal" style="color:#e0e0f0">-</b>건
+            <span id="bizMailLastInfo" style="color:#8b8ba0;"></span>
+          </div>
+          <button class="leads-btn small" onclick="bizMailBatchNext()">다음 200개 엑셀 발급 (발송대상 체크)</button>
+        </div>
+        <div class="leads-hint" style="margin-top:6px;font-size:12px;">
+          클릭 시 우선순위(유효 도메인 + 실이메일 우선) 상위 200건을 .xlsx로 내려받고, 즉시 "발송 처리"로 표시되어 다음 요청부터 제외됩니다.
+        </div>
+      </div>
+
+      <div class="leads-card">
         <div class="leads-row" style="justify-content:space-between;margin-bottom:6px;">
           <div class="leads-hint">결과: <b id="bizRCount" style="color:#e0e0f0">-</b>건 <span id="bizPInfo"></span></div>
         </div>
@@ -7171,6 +7185,7 @@ async function bizInit() {
     bizApi('/stats'),
     bizApi('/list?limit=100&page=1'),
   ])
+  bizMailBatchStatus()
   const banner = document.getElementById('bizErrorBanner')
   if (!st.success || !li.success) {
     banner.style.display = 'block'
@@ -7354,6 +7369,49 @@ function bizDownload() {
 }
 function bizDownloadKakao() { bizDownloadFile('/api/admin/bizleads/export/kakao.csv', 'fashion_biz_kakao.csv') }
 function bizDownloadInsta() { bizDownloadFile('/api/admin/bizleads/export/insta.csv', 'fashion_biz_instagram.csv') }
+
+async function bizMailBatchStatus() {
+  const s = await bizApi('/mail-batch/status')
+  if (!s.success) return
+  document.getElementById('bizMailRemaining').textContent = (s.remaining || 0).toLocaleString()
+  document.getElementById('bizMailSentTotal').textContent = (s.totalSent || 0).toLocaleString()
+  const info = document.getElementById('bizMailLastInfo')
+  if (s.lastBatch) {
+    info.textContent = ' (마지막 배치 #' + s.lastBatch.mail_batch + ', ' + s.lastBatch.n + '건, ' + (s.lastBatch.sent_at || '').slice(0, 16).replace('T', ' ') + ')'
+  } else {
+    info.textContent = ''
+  }
+}
+
+async function bizMailBatchNext() {
+  if (!confirm('다음 200개(우선순위 상위)를 발송 처리하고 엑셀을 내려받습니다. 한 번 발급하면 같은 리드는 다시 뽑히지 않습니다. 계속할까요?')) return
+  let res
+  try {
+    res = await fetch('/api/admin/bizleads/mail-batch/next?size=200', {
+      method: 'POST',
+      headers: { 'X-Admin-Password': adminPassword },
+    })
+  } catch (e) {
+    alert('네트워크 오류: ' + e.message)
+    return
+  }
+  if (!res.ok) {
+    let msg = 'HTTP ' + res.status
+    try { const j = await res.json(); msg = j.message || msg } catch (e) {}
+    alert(msg)
+    return
+  }
+  const batchId = res.headers.get('X-Batch-Id')
+  const count = res.headers.get('X-Batch-Count')
+  const blob = await res.blob()
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = 'bizleads_mail_batch_' + batchId + '.xlsx'
+  a.click()
+  URL.revokeObjectURL(a.href)
+  alert('배치 #' + batchId + ' — ' + count + '건 발급 완료. 발송 처리되어 다음 요청부터 제외됩니다.')
+  bizMailBatchStatus()
+}
 function bizDownloadFile(url, filename) {
   fetch(url, { headers: { 'X-Admin-Password': adminPassword } })
     .then(r => r.blob())

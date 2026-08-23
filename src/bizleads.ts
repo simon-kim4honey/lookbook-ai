@@ -4,6 +4,7 @@
 // 공정거래위원회 공공데이터 기반 — 조회 전용. 발송 기능 없음.
 // ────────────────────────────────────────────────────
 import { Hono } from 'hono'
+import { buildNameEmailXlsx } from './xlsx'
 
 type BizBindings = {
   LOOKBOOK_DB: D1Database
@@ -219,6 +220,103 @@ biz.get('/export/insta.csv', async (c) => {
   return c.text(csv, 200, {
     'Content-Type': 'text/csv; charset=utf-8',
     'Content-Disposition': 'attachment; filename="fashion_biz_instagram.csv"',
+  })
+})
+
+// ────────────────────────────────────────────────────
+// DirectSend 메일 발송용 엑셀(.xlsx) 배치 — 1회 200개
+// 우선순위: 도메인 유효 + 실제 이메일(마스킹 아님) 확보 리드 우선,
+//           그 다음 크롤링으로 확보한 이메일. 이미 뽑아준 건(mail_sent_at)은 제외.
+// ────────────────────────────────────────────────────
+const MAIL_BATCH_WHERE = `
+  is_valid = 1
+  AND mail_sent_at IS NULL
+  AND (
+    (email LIKE '%@%' AND email NOT LIKE '%**%')
+    OR (crawled_email IS NOT NULL AND crawled_email LIKE '%@%')
+  )
+`
+const MAIL_EMAIL_EXPR = `CASE WHEN email LIKE '%@%' AND email NOT LIKE '%**%' THEN email ELSE crawled_email END`
+const MAIL_NAME_EXPR = `COALESCE(NULLIF(bzmnNm, ''), NULLIF(domain_clean, ''), '거래처')`
+
+biz.get('/mail-batch/status', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const remaining = (await db.prepare(`SELECT COUNT(*) AS n FROM biz_leads WHERE ${MAIL_BATCH_WHERE}`).first<any>())?.n || 0
+  const last = await db.prepare(`
+    SELECT mail_batch, COUNT(*) AS n, MAX(mail_sent_at) AS sent_at
+    FROM biz_leads WHERE mail_batch IS NOT NULL
+    GROUP BY mail_batch ORDER BY mail_batch DESC LIMIT 1
+  `).first<any>()
+  const totalSent = (await db.prepare(`SELECT COUNT(*) AS n FROM biz_leads WHERE mail_sent_at IS NOT NULL`).first<any>())?.n || 0
+  return c.json({ success: true, remaining, totalSent, lastBatch: last || null })
+})
+
+biz.post('/mail-batch/next', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const size = Math.min(200, Math.max(1, parseInt(c.req.query('size') || '200')))
+
+  const { results: rows } = await db.prepare(`
+    SELECT id, ${MAIL_NAME_EXPR} AS name, ${MAIL_EMAIL_EXPR} AS email
+    FROM biz_leads
+    WHERE ${MAIL_BATCH_WHERE}
+    ORDER BY CASE WHEN email LIKE '%@%' AND email NOT LIKE '%**%' THEN 0 ELSE 1 END, id
+    LIMIT ?
+  `).bind(size).all<any>()
+
+  if (!rows.length) {
+    return c.json({ success: false, message: '더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).' }, 404)
+  }
+
+  const batchRow = await db.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first<any>()
+  const batchId = batchRow?.n || 1
+  const sentAt = new Date().toISOString()
+  const ids = rows.map((r) => r.id)
+
+  // D1은 쿼리당 바인딩 파라미터 최대 100개 제한 — 200개 id를 한 UPDATE에 묶으면 초과되어 500 에러가 난다.
+  // 90개씩(+sentAt,batchId 2개=92개) 잘라서 batch()로 한 트랜잭션에 묶어 실행.
+  const CHUNK = 90
+  const stmts = []
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const chunk = ids.slice(i, i + CHUNK)
+    const placeholders = chunk.map(() => '?').join(',')
+    stmts.push(
+      db.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${placeholders})`)
+        .bind(sentAt, batchId, ...chunk)
+    )
+  }
+  await db.batch(stmts)
+
+  const xlsx = buildNameEmailXlsx(rows.map((r) => ({ name: r.name, email: r.email })))
+  return new Response(xlsx, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="bizleads_mail_batch_${batchId}.xlsx"`,
+      'X-Batch-Id': String(batchId),
+      'X-Batch-Count': String(rows.length),
+    },
+  })
+})
+
+// 이미 발송 처리된 배치를 다시 다운로드(전송 실패 등으로 재발급이 필요한 경우) — DB 상태를 바꾸지 않음
+biz.get('/mail-batch/:batchId', async (c) => {
+  const batchId = parseInt(c.req.param('batchId'))
+  if (!batchId) return c.json({ success: false, message: '잘못된 배치 번호' }, 400)
+  const { results: rows } = await c.env.LOOKBOOK_DB.prepare(`
+    SELECT id, ${MAIL_NAME_EXPR} AS name, ${MAIL_EMAIL_EXPR} AS email
+    FROM biz_leads WHERE mail_batch = ? ORDER BY id
+  `).bind(batchId).all<any>()
+  if (!rows.length) return c.json({ success: false, message: '해당 배치를 찾을 수 없습니다.' }, 404)
+
+  const xlsx = buildNameEmailXlsx(rows.map((r) => ({ name: r.name, email: r.email })))
+  return new Response(xlsx, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="bizleads_mail_batch_${batchId}.xlsx"`,
+      'X-Batch-Id': String(batchId),
+      'X-Batch-Count': String(rows.length),
+    },
   })
 })
 
