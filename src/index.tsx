@@ -3588,6 +3588,7 @@ function buildClothingReplaceInstructions(
 // ── 크레딧 상수 ──
 const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
 const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
+const CREDITS_PER_GHOSTCUT_VIDEO = 250 // 고스트컷 영상(5초)당 차감 크레딧 — 모델컷과 별도 요금
 
 // 영상 생성 실패(또는 15분 이상 응답 없음) 확인 시 크레딧을 환불하고 생성내역을
 // 'failed'로 전환한다. status='processing' → 'failed' 전환은 원자적 UPDATE로 수행해
@@ -3604,12 +3605,20 @@ async function markVideoFailedAndRefund(db: D1Database, jobId: string): Promise<
   const upd = await db.prepare(`UPDATE generation_logs SET status = 'failed' WHERE job_id = ? AND status = 'processing'`).bind(jobId).run()
   if ((upd.meta?.changes ?? 0) === 0) return {} // 다른 요청이 먼저 처리함 — 중복 환불 방지
 
-  await db.prepare(`UPDATE users SET credits = credits + ?, updated_at = datetime('now') WHERE id = ?`).bind(CREDITS_PER_VIDEO, row.user_id).run()
+  // 이 작업에서 실제로 차감된 금액을 credit_logs에서 그대로 조회해 환불한다.
+  // 모델컷(600)과 고스트컷(250)은 차감액이 다르므로, 고정값으로 환불하면 고스트컷
+  // 실패 시 350크레딧을 더 얹어주는 과다 환불 버그가 생긴다.
+  const deductLog: any = await db.prepare(
+    `SELECT amount FROM credit_logs WHERE ref_id = ? AND reason = 'video_generation' ORDER BY id DESC LIMIT 1`
+  ).bind(jobId).first()
+  const refundAmount = deductLog?.amount ? Math.abs(deductLog.amount) : CREDITS_PER_VIDEO // 못 찾으면 기존 기본값으로 폴백
+
+  await db.prepare(`UPDATE users SET credits = credits + ?, updated_at = datetime('now') WHERE id = ?`).bind(refundAmount, row.user_id).run()
   const userRow: any = await db.prepare(`SELECT credits FROM users WHERE id = ?`).bind(row.user_id).first()
   const newBalance = userRow?.credits ?? null
   await db.prepare(
     `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id) VALUES (?, 'refund', ?, ?, 'video_generation_failed', ?)`
-  ).bind(row.user_id, CREDITS_PER_VIDEO, newBalance, jobId).run()
+  ).bind(row.user_id, refundAmount, newBalance, jobId).run()
 
   return { creditsRemaining: newBalance ?? undefined }
 }
@@ -4350,7 +4359,7 @@ app.post('/api/ghostcut/video/start', async (c) => {
     const { imageUrl, categoryLabel } = body
     if (!imageUrl) return c.json({ error: 'imageUrl 필수' }, 400)
 
-    const COST = CREDITS_PER_VIDEO
+    const COST = CREDITS_PER_GHOSTCUT_VIDEO
     if (sess.credits < COST) {
       return c.json({
         error: `크레딧이 부족합니다. (보유: ${sess.credits}크레딧, 필요: ${COST}크레딧)`,
@@ -4360,8 +4369,9 @@ app.post('/api/ghostcut/video/start', async (c) => {
       }, 402)
     }
 
-    // 사람이 아니라 옷 자체가 미풍에 살랑살랑 흔들리는 연출. 배경은 순백색·무그림자를 끝까지 유지.
-    const prompt = 'The garment shown in the image keeps the ghost-mannequin (invisible-body) effect and stays in the exact same position and framing throughout — it does NOT walk, float away, spin, or change position. The fabric gently sways and ripples as if moved by a soft, natural breeze: subtle, realistic movement in the sleeves, hem, and any loose or flowing fabric areas, with natural cloth physics — gentle, not exaggerated or stormy. The garment\'s color, pattern, print, texture, and design remain exactly as shown in the first frame, completely unchanged throughout the entire video. The background remains pure solid white (#FFFFFF), completely flat and even, with absolutely no shadow, no gradient, no vignette, and no change at any point — identical to the first frame from start to finish. Do NOT introduce any person, human body, face, hands, model, or visible mannequin form at any point in the video. The camera stays essentially static — no zoom, no dolly, no pan, no orbital movement — only the fabric itself moves. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Add soft, tasteful ambient background music suited for a clean e-commerce product showcase — no vocals, no jarring sound effects.'
+    // 사람이나 배경은 전혀 새로 만들어지지 않는다 — 고스트컷 결과 이미지 1장(imageUrl)만 입력으로
+    // 쓰고, 그 안의 옷 자체가 제자리에서 미풍에 살랑살랑 흔들리는 연출. 배경은 순백색·무그림자를 끝까지 유지.
+    const prompt = 'The garment shown in the image keeps the ghost-mannequin (invisible-body) effect and stays in the exact same position and framing throughout — it does NOT walk, float away, spin, or change position. The fabric gently sways and ripples as if moved by a soft, natural breeze: subtle, realistic movement in the sleeves, hem, and any loose or flowing fabric areas, with natural cloth physics — gentle, not exaggerated or stormy. The garment\'s color, pattern, print, texture, and design remain exactly as shown in the first frame, completely unchanged throughout the entire video. The background remains pure solid white (#FFFFFF), completely flat and even, with absolutely no shadow, no gradient, no vignette, and no change at any point — identical to the first frame from start to finish. Do NOT introduce any person, human body, face, hands, model, or visible mannequin form at any point in the video — nothing is added to the scene beyond what is already in the source image. The camera stays essentially static — no zoom, no dolly, no pan, no orbital movement — only the fabric itself moves. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Add soft, tasteful ambient background music suited for a clean e-commerce product showcase — no vocals, no jarring sound effects.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
@@ -4370,7 +4380,7 @@ app.post('/api/ghostcut/video/start', async (c) => {
         model: 'bytedance/seedance-2.5/image-to-video',
         prompt,
         image: imageUrl,
-        duration: 7,
+        duration: 5,
         resolution: '1080p-esr',
         ratio: 'adaptive',
         output_format: 'mp4',

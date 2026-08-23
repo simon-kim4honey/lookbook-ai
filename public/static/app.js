@@ -1955,6 +1955,19 @@ function initGhostCutUI() {
     if (onclickAttr === 'regenFromCard(0)') btn.style.display = 'none';
     if (onclickAttr === "window.location.href='/generator'") btn.setAttribute('onclick', "window.location.href='/ghostcut'");
   });
+
+  // 영상 생성 버튼 부제(길이·크레딧)를 고스트컷 요금(5초·250)으로 즉시 맞춤
+  const videoSub = document.getElementById('videoActionSub');
+  if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
+
+  // 영상 생성 로딩화면 메시지 중 "포즈 동작 생성"은 모델(사람) 전용 문구라 옷 흔들림으로 교체
+  const vmsg2 = document.querySelector('#vmsg2');
+  if (vmsg2) {
+    const dot = vmsg2.querySelector('.dot');
+    vmsg2.innerHTML = '';
+    if (dot) vmsg2.appendChild(dot);
+    vmsg2.appendChild(document.createTextNode(' 옷이 바람에 흔들리는 모션 생성 중...'));
+  }
 }
 
 function ghostCutHandleDrop(e) {
@@ -3242,7 +3255,7 @@ function renderResults(images) {
     if (main) main.innerHTML = '<i class="fas fa-film"></i> 2K 영상 생성';
   }
   const videoSub = document.getElementById('videoActionSub');
-  if (videoSub) videoSub.innerHTML = '7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600';
+  if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
 
   grid.innerHTML = '';
 
@@ -3436,12 +3449,22 @@ async function downloadWithCreditCheck(idx) {
 // ─────────────────────────────────────────────────────────
 let _videoState = { jobId: null, videoUrl: null, polling: false };
 
+// 모델컷(7초·600크레딧)과 고스트컷(5초·250크레딧)은 영상 길이/요금이 다르다
+function _videoSubHtml(withStrike) {
+  if (window.__EZLOOK_MODE__ === 'ghostcut') {
+    return '5초 · <i class="fas fa-coins"></i> 250';
+  }
+  return withStrike
+    ? '7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600'
+    : '7초 · <i class="fas fa-coins"></i> 600';
+}
+
 function _resetVideoBtn() {
   _videoState.polling = false;
   const btn = document.getElementById('videoActionBtn');
   const sub = document.getElementById('videoActionSub');
   if (btn) btn.disabled = false;
-  if (sub) sub.innerHTML = '7초 · <i class="fas fa-coins"></i> 600';
+  if (sub) sub.innerHTML = _videoSubHtml(false);
 }
 
 // 페이지 재진입 시 진행 중이던 영상 생성 작업을 백그라운드로 이어서 확인
