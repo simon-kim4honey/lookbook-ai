@@ -1832,8 +1832,12 @@ function initGhostCutPage() {
   const body = document.querySelector('#step-1 .gslide-body');
   if (!body) return;
 
+  // 원래 step-1의 이전/다음 단계 nav(.gslide-body와 형제 요소)는 모델컷 전용이라 숨김
+  const originalNav = document.querySelector('#step-1 > .gslide-nav');
+  if (originalNav) originalNav.style.display = 'none';
+
   body.innerHTML = `
-    <h2 class="gstep-title">고스트컷을 만들 상품 이미지를 업로드하세요</h2>
+    <h2 class="gstep-title">고스트컷을 만들 상품 이미지 1장을 업로드하세요</h2>
     <p class="gstep-sub">상품(옷) 사진 한 장만 올리면 AI가 종류를 자동으로 인식해요</p>
     <input type="file" id="gcUploadInput" accept="image/*" style="display:none;" onchange="ghostCutHandleFile(this.files[0])" />
     <label for="gcUploadInput" id="gcUploadDrop"
@@ -1845,8 +1849,7 @@ function initGhostCutPage() {
         <img id="gcUploadPreview" style="width:100%;border-radius:12px;display:block;" />
       </div>
       <div id="gcUploadEmpty" style="text-align:center;color:#8b8ba0;">
-        <div style="font-size:36px;margin-bottom:8px;">📷</div>
-        <div style="font-size:14px;font-weight:600;color:#e0e0f0;">탭하여 상품 사진 선택</div>
+        <div style="font-size:14px;font-weight:600;color:#e0e0f0;">탭하여 사진 선택</div>
         <div style="font-size:12px;margin-top:4px;">또는 파일을 여기로 드래그하세요</div>
       </div>
     </label>
@@ -1859,8 +1862,7 @@ function initGhostCutPage() {
     nav.id = 'gcStep1Nav';
     nav.innerHTML = `
       <div class="gslide-nav-inner">
-        <button class="step-nav-back" onclick="window.location.href='/generator'"><i class="fas fa-arrow-left"></i> 모델컷으로</button>
-        <button class="step-nav-next" id="gcGenBtn" onclick="startGhostCutGeneration()" disabled><i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작</button>
+        <button class="step-nav-next" id="gcGenBtn" onclick="startGhostCutGeneration()" disabled style="flex:1;"><i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작</button>
       </div>
     `;
     document.getElementById('step-1').appendChild(nav);
