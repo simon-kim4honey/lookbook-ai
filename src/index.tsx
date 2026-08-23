@@ -7384,7 +7384,7 @@ async function bizMailBatchStatus() {
 }
 
 async function bizMailBatchNext() {
-  if (!confirm('다음 200개(우선순위 상위)를 발송 처리하고 엑셀을 내려받습니다.\n한 번 발급하면 같은 리드는 다시 뽑히지 않습니다. 계속할까요?')) return
+  if (!confirm('다음 200개(우선순위 상위)를 발송 처리하고 엑셀을 내려받습니다. 한 번 발급하면 같은 리드는 다시 뽑히지 않습니다. 계속할까요?')) return
   let res
   try {
     res = await fetch('/api/admin/bizleads/mail-batch/next?size=200', {
