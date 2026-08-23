@@ -48,8 +48,13 @@ const GUARDS = [
     why: '영상 생성 시 슬로우모션 효과가 들어가지 않도록 막는 문구.',
   },
   {
-    name: '고스트컷 — 샘플 이미지는 실루엣/구도 참조 전용, 샘플의 실제 의류·배경·조명은 무시',
-    must: "IGNORE Image 2's own garment color, pattern, print, fabric, background, and lighting entirely",
+    name: '고스트컷 — 두 이미지는 서로 다른 무관한 상품이라는 명시',
+    must: 'TWO COMPLETELY DIFFERENT GARMENTS from two different products',
+    why: '실제 배포 후 확인된 회귀: AI가 이 문구가 약할 때 관리자 샘플(Image 2)의 실제 옷을 그대로 복사해버리는 현상이 발생함(2026-08-23). 두 이미지가 서로 무관한 별개 상품임을 강하게 못박는 문구.',
+  },
+  {
+    name: '고스트컷 — 샘플 이미지는 실루엣/구도 참조 전용, 샘플의 실제 의류·배경·조명은 무관함',
+    must: 'Image 2 = an UNRELATED product photo used SOLELY as an empty silhouette/shape template',
     why: '관리자가 등록한 카테고리 샘플 이미지의 실제 옷(색상/패턴)이나 배경/조명이 결과물에 섞이면 안 되고, 실루엣/구도만 참조해야 함.',
   },
   {
@@ -61,6 +66,11 @@ const GUARDS = [
     name: '고스트컷 — 배경 화이트 고정 + 그림자 제거',
     must: 'Background MUST be pure solid white (#FFFFFF), completely flat and shadowless',
     why: '샘플 이미지의 배경/그림자를 그대로 따라가지 않고, 항상 순백색·무그림자 배경으로 강제하기 위한 문구.',
+  },
+  {
+    name: '고스트컷 — 샘플 의류 복사 시 치명적 실패로 명시(HARD_CONSTRAINTS)',
+    must: 'if the output resembles Image 2\'s garment instead of Image 1\'s, this is a CRITICAL FAILURE',
+    why: '핵심 제약 목록에도 동일 규칙을 재차 명시 — 관리자 샘플 의류가 결과물에 그대로 나오는 회귀를 막기 위한 이중 안전장치.',
   },
 ]
 
