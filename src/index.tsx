@@ -4313,6 +4313,92 @@ app.post('/api/video/start', async (c) => {
   }
 })
 
+// ════════════════════════════════════════════════════════════
+// POST /api/ghostcut/video/start — 고스트컷 결과물을 미풍에 흔들리는 7초 영상으로 변환
+// 기존 /api/video/start(모델컷: 사람이 포징하는 프롬프트)와 완전히 분리된 별도 라우트.
+// 상태 폴링(GET /api/video/:jobId/status)은 job_id 기반으로 완전히 범용이라 그대로 재사용.
+//
+// ⚠️ 아래 prompt 문자열도 실제 생성 품질에 직접 영향을 준다 — 함부로 문구를
+//   바꾸지 말 것. scripts/verify-critical-prompts.mjs GUARDS에도 등록되어 있다.
+// ════════════════════════════════════════════════════════════
+app.post('/api/ghostcut/video/start', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.', code: 'UNAUTHORIZED' }, 401)
+
+    const sess = await db.prepare(
+      `SELECT s.user_id, u.credits, u.name FROM user_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token = ? AND s.expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ error: '세션이 만료되었습니다.', code: 'UNAUTHORIZED' }, 401)
+
+    const body: any = await c.req.json()
+    const { imageUrl, categoryLabel } = body
+    if (!imageUrl) return c.json({ error: 'imageUrl 필수' }, 400)
+
+    const COST = CREDITS_PER_VIDEO
+    if (sess.credits < COST) {
+      return c.json({
+        error: `크레딧이 부족합니다. (보유: ${sess.credits}크레딧, 필요: ${COST}크레딧)`,
+        code: 'INSUFFICIENT_CREDITS',
+        available: sess.credits,
+        required: COST,
+      }, 402)
+    }
+
+    // 사람이 아니라 옷 자체가 미풍에 살랑살랑 흔들리는 연출. 배경은 순백색·무그림자를 끝까지 유지.
+    const prompt = 'The garment shown in the image keeps the ghost-mannequin (invisible-body) effect and stays in the exact same position and framing throughout — it does NOT walk, float away, spin, or change position. The fabric gently sways and ripples as if moved by a soft, natural breeze: subtle, realistic movement in the sleeves, hem, and any loose or flowing fabric areas, with natural cloth physics — gentle, not exaggerated or stormy. The garment\'s color, pattern, print, texture, and design remain exactly as shown in the first frame, completely unchanged throughout the entire video. The background remains pure solid white (#FFFFFF), completely flat and even, with absolutely no shadow, no gradient, no vignette, and no change at any point — identical to the first frame from start to finish. Do NOT introduce any person, human body, face, hands, model, or visible mannequin form at any point in the video. The camera stays essentially static — no zoom, no dolly, no pan, no orbital movement — only the fabric itself moves. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Add soft, tasteful ambient background music suited for a clean e-commerce product showcase — no vocals, no jarring sound effects.'
+
+    const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
+      method: 'POST',
+      headers: atlasHeaders(c.env.ATLAS_API_KEY),
+      body: JSON.stringify({
+        model: 'bytedance/seedance-2.5/image-to-video',
+        prompt,
+        image: imageUrl,
+        duration: 7,
+        resolution: '1080p-esr',
+        ratio: 'adaptive',
+        output_format: 'mp4',
+        generate_audio: true,
+        watermark: false,
+      }),
+    })
+    const startData: any = await startRes.json()
+    const jobId = startData?.data?.id || startData?.id || null
+
+    if (!startRes.ok || !jobId) {
+      console.error('ghostcut/video/start Atlas 요청 실패:', startData)
+      return c.json({ success: false, message: startData?.msg || startData?.message || '영상 생성 요청 실패' }, 502)
+    }
+
+    // 생성 요청이 정상 접수된 뒤에만 크레딧 차감 (실패 시 차감 안 함)
+    const newBalance = sess.credits - COST
+    await db.prepare(`UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`).bind(newBalance, sess.user_id).run()
+    await db.prepare(
+      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       VALUES (?, 'deduct', ?, ?, 'video_generation', ?)`
+    ).bind(sess.user_id, -COST, newBalance, jobId).run()
+
+    const lastSeq = await db.prepare(
+      `SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`
+    ).bind(sess.user_id).first() as any
+    const nextSeq = (lastSeq?.last_seq || 0) + 1
+
+    await db.prepare(
+      `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, kind, expires_at, image_urls)
+       VALUES (?, ?, 1, ?, ?, '1:1', ?, 'video', datetime('now', '+14 days'), ?)`
+    ).bind(sess.user_id, jobId, `고스트컷·${categoryLabel || ''}`, '화이트 배경', nextSeq, JSON.stringify([imageUrl])).run()
+
+    return c.json({ success: true, jobId, creditsRemaining: newBalance })
+  } catch (err: any) {
+    console.error('ghostcut/video/start error:', err)
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 // GET /api/video/:jobId/status — 영상 생성 상태 폴링
 // 실패(또는 15분 이상 무응답 = 타임아웃)가 확인되면 크레딧을 자동 환불하고
 // 생성내역을 'failed'로 전환한다(markVideoFailedAndRefund, 중복 환불 방지 내장).

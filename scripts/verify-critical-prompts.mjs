@@ -72,6 +72,16 @@ const GUARDS = [
     must: 'if the output resembles Image 2\'s garment instead of Image 1\'s, this is a CRITICAL FAILURE',
     why: '핵심 제약 목록에도 동일 규칙을 재차 명시 — 관리자 샘플 의류가 결과물에 그대로 나오는 회귀를 막기 위한 이중 안전장치.',
   },
+  {
+    name: '고스트컷 영상 — 옷은 제자리에서 미풍에만 흔들림(사람 등장/이동 금지)',
+    must: 'it does NOT walk, float away, spin, or change position',
+    why: '고스트컷 영상은 사람이 포징하는 모델컷 영상과 달리 옷 자체가 제자리에서 살랑거리기만 해야 함. 이 문구가 없으면 모델컷 영상 프롬프트처럼 인물/이동이 섞여 들어갈 수 있음.',
+  },
+  {
+    name: '고스트컷 영상 — 배경 화이트를 영상 끝까지 유지',
+    must: 'identical to the first frame from start to finish',
+    why: '영상 중간에 배경이 변하거나 그림자가 생기지 않도록 첫 프레임과 끝까지 동일해야 함을 명시.',
+  },
 ]
 
 let failed = false

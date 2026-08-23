@@ -3548,15 +3548,21 @@ async function startVideoGeneration() {
 
   _showVideoGeneratingView();
 
+  // 고스트컷 결과는 사람이 없는 상품 영상이라 완전히 다른 프롬프트를 쓰는
+  // 별도 엔드포인트(/api/ghostcut/video/start)를 호출한다. 이후 폴링/완료
+  // 처리(_pollVideoStatus, _onVideoReady, downloadVideo 등)는 job_id 기반의
+  // 범용 로직이라 모델컷과 완전히 동일하게 재사용된다.
+  const isGhostCutMode = window.__EZLOOK_MODE__ === 'ghostcut';
+  const videoStartUrl = isGhostCutMode ? '/api/ghostcut/video/start' : '/api/video/start';
+  const videoStartBody = isGhostCutMode
+    ? { imageUrl: img.originalUrl, categoryLabel: ghostCutUpload_.categoryLabel }
+    : { imageUrl: img.originalUrl, modelName: AppState.lastGenParams?.modelName, bgName: AppState.lastGenParams?.bgName };
+
   try {
-    const startRes = await fetch('/api/video/start', {
+    const startRes = await fetch(videoStartUrl, {
       method: 'POST',
       headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageUrl: img.originalUrl,
-        modelName: AppState.lastGenParams?.modelName,
-        bgName: AppState.lastGenParams?.bgName,
-      }),
+      body: JSON.stringify(videoStartBody),
     });
 
     if (startRes.status === 401) {
