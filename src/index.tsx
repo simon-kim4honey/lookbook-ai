@@ -5971,9 +5971,36 @@ app.get('/dashboard', (c) => {
   <div id="historyPanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;overflow-y:auto;">
     <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
       <!-- 헤더 -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-        <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
-        <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">생성 내역</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+          <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+          <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">생성 내역</h2>
+        </div>
+        <!-- 사용자 메뉴 (다른 페이지와 동일한 아바타+드롭다운) -->
+        <div style="display:flex;align-items:center;gap:8px;position:relative;flex-shrink:0;">
+          <button id="navLoginBtn" onclick="openModal('loginModal')" style="display:none;font-size:12px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
+          <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
+            <span id="navUserCredits" style="display:none;"></span>
+            <span id="navUserName" style="display:none;"></span>
+            <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
+            <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:600;">
+              <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">
+                <div id="ddUserName" style="font-size:13px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
+                <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#6c47ff;"></div>
+                  <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
+                </div>
+              </a>
+              <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
+              <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">고스트컷 만들기</a>
+              <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
+              <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
+              <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+              <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
+            </div>
+          </div>
+        </div>
       </div>
       <!-- 14일 보관 안내 -->
       <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
