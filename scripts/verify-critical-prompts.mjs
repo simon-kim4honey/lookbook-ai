@@ -117,6 +117,11 @@ const GUARDS = [
     must: "Background MUST remain pure solid white (#FFFFFF), completely flat and shadowless",
     why: '디테일컷도 원본 고스트컷 이미지와 동일하게 순백색·무그림자 배경을 유지해야 함을 명시.',
   },
+  {
+    name: '고스트컷 디테일컷 — 원본에 없는 워싱/디스트레싱/에이징 임의 추가 금지',
+    must: 'CRITICAL — DO NOT ADD ANY WEAR, AGING, OR DISTRESSING THAT IS NOT ALREADY IN THE SOURCE IMAGE',
+    why: '2026-08-23 실제 발견된 회귀: 매끈한 청바지 밑단이 디테일컷 클로즈업에서 낡고 해진 빈티지 원단으로 바뀌어 나옴. "디자인 변경 금지" 문구가 색상/패턴만 포괄적으로 언급했을 뿐 가공/워싱/디스트레싱 추가를 구체적으로 금지하지 않아서 발생. 원본에 없는 워싱/해짐/낡은 질감을 임의로 추가하지 못하도록 구체적으로 명시.',
+  },
 ]
 
 let failed = false

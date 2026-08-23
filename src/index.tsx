@@ -1532,96 +1532,73 @@ app.delete('/api/admin/gen-loading-video/:slot', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
-// ── 고스트컷 로딩화면 하단 영상 슬롯 (모델컷 생성 로딩화면 영상과 완전히 별도 관리, 최대 5개) ──
-const GC_LOADING_VIDEO_SLOTS = [1, 2, 3, 4, 5]
-const GC_LOADING_VIDEO_MAX_BYTES = 22 * 1024 * 1024
+// ── 고스트컷 로딩화면 하단 이미지 슬롯 (모델컷 생성 로딩화면 영상과 완전히 별도 관리, 최대 5개) ──
+// ⚠️ 2026-08-23: 기존엔 영상 업로드였으나, 관리 편의를 위해 이미지 업로드로 전환됨
+// (KV 키 gc_loading_video_* → gc_loading_image_*, 기존 영상 데이터는 자동 이전되지 않음 — 재업로드 필요)
+const GC_LOADING_IMAGE_SLOTS = [1, 2, 3, 4, 5]
+const GC_LOADING_IMAGE_MAX_BYTES = 8 * 1024 * 1024
 
-// GET /api/gc-loading-videos — 공개 엔드포인트(고스트컷 로딩화면 + 관리자 목록 조회 공용)
-app.get('/api/gc-loading-videos', async (c) => {
+// GET /api/gc-loading-images — 공개 엔드포인트(고스트컷 로딩화면 + 관리자 목록 조회 공용)
+app.get('/api/gc-loading-images', async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
   const result: Record<string, string | null> = {}
   if (kv) {
-    for (const slot of GC_LOADING_VIDEO_SLOTS) {
-      const meta = await kv.getWithMetadata(`gc_loading_video_${slot}`)
-      result[slot] = meta.value != null ? `/api/gc-loading-video/${slot}` : null
+    for (const slot of GC_LOADING_IMAGE_SLOTS) {
+      const meta = await kv.getWithMetadata(`gc_loading_image_${slot}`)
+      result[slot] = meta.value != null ? `/api/gc-loading-image/${slot}` : null
     }
   } else {
-    GC_LOADING_VIDEO_SLOTS.forEach(slot => { result[slot] = null })
+    GC_LOADING_IMAGE_SLOTS.forEach(slot => { result[slot] = null })
   }
-  return c.json({ videos: result })
+  return c.json({ images: result })
 })
 
-// GET /api/gc-loading-video/:slot — 영상 바이너리 스트리밍 (Range 요청 지원)
-app.get('/api/gc-loading-video/:slot', async (c) => {
+// GET /api/gc-loading-image/:slot — 이미지 바이너리 스트리밍
+app.get('/api/gc-loading-image/:slot', async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
   if (!kv) return c.notFound()
   const slot = Number(c.req.param('slot'))
-  if (!GC_LOADING_VIDEO_SLOTS.includes(slot)) return c.notFound()
-  const { value, metadata } = await kv.getWithMetadata(`gc_loading_video_${slot}`, 'arrayBuffer')
+  if (!GC_LOADING_IMAGE_SLOTS.includes(slot)) return c.notFound()
+  const { value, metadata } = await kv.getWithMetadata(`gc_loading_image_${slot}`, 'arrayBuffer')
   if (!value) return c.notFound()
   const buf = value as ArrayBuffer
-  const contentType = (metadata as any)?.contentType || 'video/mp4'
-  const total = buf.byteLength
-
-  const range = c.req.header('range')
-  if (range) {
-    const m = range.match(/bytes=(\d*)-(\d*)/)
-    if (m) {
-      const start = m[1] ? parseInt(m[1], 10) : 0
-      const end = m[2] ? parseInt(m[2], 10) : total - 1
-      const safeStart = Math.max(0, Math.min(start, total - 1))
-      const safeEnd = Math.max(safeStart, Math.min(end, total - 1))
-      const chunk = buf.slice(safeStart, safeEnd + 1)
-      return new Response(chunk, {
-        status: 206,
-        headers: {
-          'Content-Type': contentType,
-          'Content-Range': `bytes ${safeStart}-${safeEnd}/${total}`,
-          'Accept-Ranges': 'bytes',
-          'Content-Length': String(chunk.byteLength),
-          'Cache-Control': 'public, max-age=3600',
-        },
-      })
-    }
-  }
-
+  const contentType = (metadata as any)?.contentType || 'image/jpeg'
   return new Response(buf, {
     headers: {
       'Content-Type': contentType,
-      'Accept-Ranges': 'bytes',
       'Cache-Control': 'public, max-age=3600',
-      'Content-Length': String(total),
+      'Content-Length': String(buf.byteLength),
     },
   })
 })
 
-// PUT /api/admin/gc-loading-video/:slot — 슬롯별 영상 등록/교체 (바이너리 바디)
-app.put('/api/admin/gc-loading-video/:slot', adminAuth, async (c) => {
+// PUT /api/admin/gc-loading-image/:slot — 슬롯별 이미지 등록/교체 (바이너리 바디)
+app.put('/api/admin/gc-loading-image/:slot', adminAuth, async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
   if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
   const slot = Number(c.req.param('slot'))
-  if (!GC_LOADING_VIDEO_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  if (!GC_LOADING_IMAGE_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
   try {
     const body = await c.req.arrayBuffer()
-    if (!body || body.byteLength === 0) return c.json({ success: false, message: '영상 파일이 필요합니다.' }, 400)
-    if (body.byteLength > GC_LOADING_VIDEO_MAX_BYTES) {
-      return c.json({ success: false, message: `영상 용량은 ${Math.floor(GC_LOADING_VIDEO_MAX_BYTES / 1024 / 1024)}MB 이하만 가능합니다.` }, 400)
+    if (!body || body.byteLength === 0) return c.json({ success: false, message: '이미지 파일이 필요합니다.' }, 400)
+    if (body.byteLength > GC_LOADING_IMAGE_MAX_BYTES) {
+      return c.json({ success: false, message: `이미지 용량은 ${Math.floor(GC_LOADING_IMAGE_MAX_BYTES / 1024 / 1024)}MB 이하만 가능합니다.` }, 400)
     }
-    const contentType = c.req.header('content-type') || 'video/mp4'
-    await kv.put(`gc_loading_video_${slot}`, body, { metadata: { contentType } })
+    const contentType = c.req.header('content-type') || 'image/jpeg'
+    await kv.put(`gc_loading_image_${slot}`, body, { metadata: { contentType } })
     return c.json({ success: true })
   } catch (e: any) {
     return c.json({ success: false, message: e.message }, 500)
   }
 })
 
-// DELETE /api/admin/gc-loading-video/:slot — 슬롯 영상 제거
-app.delete('/api/admin/gc-loading-video/:slot', adminAuth, async (c) => {
+// DELETE /api/admin/gc-loading-image/:slot — 슬롯 이미지 제거
+app.delete('/api/admin/gc-loading-image/:slot', adminAuth, async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
   if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
   const slot = Number(c.req.param('slot'))
-  if (!GC_LOADING_VIDEO_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
-  await kv.delete(`gc_loading_video_${slot}`)
+  if (!GC_LOADING_IMAGE_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  await kv.delete(`gc_loading_image_${slot}`)
   return c.json({ success: true })
 })
 
@@ -3599,7 +3576,7 @@ const CREDITS_PER_GHOSTCUT_VIDEO = 250 // 고스트컷 영상(5초)당 차감 �
 
 // 고스트컷 디테일컷(클로즈업) 추가 생성 — 장수별 고정가(볼륨 할인 구조).
 // 다운로드가 아닌 "생성 요청 시점"에 즉시 차감(영상과 동일한 방식) — 다운로드는 무료.
-const CREDITS_PER_GHOSTCUT_DETAIL: Record<number, number> = { 1: 70, 2: 120, 3: 160 }
+const CREDITS_PER_GHOSTCUT_DETAIL: Record<number, number> = { 1: 70, 2: 120, 3: 160, 4: 190 }
 
 // 영상 생성 실패(또는 15분 이상 응답 없음) 확인 시 크레딧을 환불하고 생성내역을
 // 'failed'로 전환한다. status='processing' → 'failed' 전환은 원자적 UPDATE로 수행해
@@ -4451,7 +4428,7 @@ app.post('/api/ghostcut/video/start', async (c) => {
 
 // ════════════════════════════════════════════════════════════
 // POST /api/ghostcut/detail/start — 고스트컷 결과 이미지의 디자인/디테일이
-// 돋보이는 부위를 클로즈업한 "디테일컷" 1~3장을 추가 생성한다.
+// 돋보이는 부위를 클로즈업한 "디테일컷" 1~4장을 추가 생성한다.
 // 다운로드가 아닌 "생성 요청 시점"에 크레딧을 즉시 차감(영상과 동일한 방식) —
 // 다운로드는 무료(POST /api/credits/deduct에서 model_name '고스트컷디테일·' 접두사로 인식해 0크레딧 처리).
 // 요청한 장수(count) 중 실제로 Atlas에 정상 접수된 장수만큼만 과금한다(부분 실패 시 과다 청구 방지).
@@ -4460,11 +4437,16 @@ app.post('/api/ghostcut/video/start', async (c) => {
 //
 // ⚠️ 아래 prompt 문자열도 실제 생성 품질에 직접 영향을 준다 — 함부로 문구를
 //   바꾸지 말 것. scripts/verify-critical-prompts.mjs GUARDS에도 등록되어 있다.
-// ════════════════════════════════════════════════════════════
+// ⚠️ 2026-08-23 실제 발견된 회귀: 매끈한(비 빈티지) 청바지 밑단이 디테일컷
+//   클로즈업에서 낡고 해진(빈티지) 원단으로 바뀌어 나왔다 — "새로운 디자인
+//   해석 금지" 문구가 색상/패턴만 언급할 뿐 "가공/워싱/디스트레싱 추가 금지"를
+//   명시하지 않아서 AI가 클로즈업을 "더 그럴듯하게" 만들려고 임의로 낡은 질감을
+//   더한 것으로 추정된다. 아래 프롬프트에 이 케이스를 구체적으로 명시해 금지.
 const GHOSTCUT_DETAIL_FOCUS_HINTS = [
   `Choose the MOST visually distinctive design detail area of the garment for this close-up — such as a button, zipper, collar, pocket, stitching pattern, fabric texture, trim, or hardware — whichever best showcases the product's craftsmanship and quality.`,
   `Choose a DIFFERENT design detail area than a typical front-view close-up — such as a cuff, hem, seam, side panel, or secondary hardware/trim — to show another distinctive feature of the garment not obvious from the main product photo.`,
   `Choose YET ANOTHER distinctive design detail area, different from the two most obvious focal points — such as a back panel, shoulder seam, fabric weave close-up, or a unique construction detail — to give a third unique perspective on the product's quality.`,
+  `Choose a FOURTH distinctive design detail area, different from the three focal points above — such as the waistband, closure/placket, inner lining edge, or another unique construction detail — to give a fourth unique perspective on the product's quality.`,
 ]
 
 app.post('/api/ghostcut/detail/start', async (c) => {
@@ -4482,7 +4464,7 @@ app.post('/api/ghostcut/detail/start', async (c) => {
 
     const body: any = await c.req.json()
     const { imageUrl, categoryLabel } = body
-    const requestedCount = Math.max(1, Math.min(3, parseInt(body.count, 10) || 1))
+    const requestedCount = Math.max(1, Math.min(4, parseInt(body.count, 10) || 1))
     if (!imageUrl) return c.json({ error: 'imageUrl 필수' }, 400)
 
     // 최악의 경우(요청 장수 전부 성공)를 기준으로 사전에 잔액을 확인한다.
@@ -4499,6 +4481,7 @@ app.post('/api/ghostcut/detail/start', async (c) => {
     const detailPrompt = (focusHint: string) => [
       `PRODUCT DETAIL CLOSE-UP PHOTOGRAPHY — take the exact garment shown in the source image and create an extreme close-up macro shot of ONE specific design detail area of it.`,
       `Source image = the ONLY reference for the garment's design, color, pattern, print, texture, fabric, stitching, and every visual detail. Do NOT redesign, alter, invent, or change ANY detail of the garment — this is a crop/zoom of the exact same real garment, not a new interpretation.`,
+      `CRITICAL — DO NOT ADD ANY WEAR, AGING, OR DISTRESSING THAT IS NOT ALREADY IN THE SOURCE IMAGE: if an edge, hem, seam, or surface is clean and smooth in the source image, it MUST remain exactly that clean and smooth in this close-up — do NOT add fraying, raw-edge unraveling, rips, tears, whiskering, faded/worn patches, scuffs, or any "distressed"/"vintage"/"aged" look that is not already present in the source. If the source already shows some existing wear or distressing, reproduce it EXACTLY as-is — do not add MORE fraying or tears beyond what the source shows, and do not invent new damage. This is a magnified crop of the real product photo, not a stylized reinterpretation — every stitch, seam, edge finish, and surface texture must match the source image, only zoomed in.`,
       focusHint,
       `Frame it as a tight macro/close-up product shot — fill most of the frame with the chosen detail area, sharp focus, professional e-commerce detail-shot style (the kind of close-up photo online stores use to show fabric texture, stitching quality, buttons, zippers, or prints up close).`,
       `Background MUST remain pure solid white (#FFFFFF), completely flat and shadowless — NO drop shadow, NO contact shadow, NO reflection, NO gradient, NO vignette anywhere in the frame, exactly like the source image's background.`,
@@ -7023,7 +7006,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <div class="gen-msg" id="msg5"><div class="dot"></div> 최종 렌더링 중...</div>
           </div>
           <div class="gen-video-promo-box">
-            <p class="gen-video-promo-text"><i class="fas fa-film"></i> 이미지가 생성되면 클릭한번으로 2K 고화질 영상 생성이 가능합니다.</p>
+            <p class="gen-video-promo-text" id="genVideoPromoText"><i class="fas fa-film"></i> 이미지가 생성되면 클릭한번으로 2K 고화질 영상 생성이 가능합니다.</p>
             <div class="gen-video-promo-player" id="genLoadingVideoPlayer" style="display:none;"></div>
           </div>
         </div>
@@ -7050,6 +7033,20 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <div class="gen-msg" id="vmsg3"><div class="dot"></div> 배경음악 합성 중...</div>
             <div class="gen-msg" id="vmsg4"><div class="dot"></div> 영상 렌더링 중...</div>
             <div class="gen-msg" id="vmsg5"><div class="dot"></div> 최종 인코딩 중...</div>
+          </div>
+        </div>
+        <!-- 디테일컷 생성 중 오버레이 (고스트컷 전용, 영상 생성 오버레이와 동일한 구조) -->
+        <div class="generating-view" id="detailCutGeneratingView">
+          <div class="gen-news-tag" id="detailCutGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
+          <div class="gen-news" id="detailCutGenViewNews" style="display:none;"></div>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 디테일컷을 생성 중입니다...</h2>
+          <div class="gen-progress-bar"><div class="gen-progress-fill" id="detailCutGenProgressFill" style="width:0%"></div></div>
+          <div class="gen-status-text" id="detailCutGenStatusText">시작 중...</div>
+          <div class="gen-status-msgs">
+            <div class="gen-msg current" id="dmsg1"><div class="dot"></div> 디테일컷 생성 요청 중...</div>
+            <div class="gen-msg" id="dmsg2"><div class="dot"></div> 디자인 디테일 부위 분석 중...</div>
+            <div class="gen-msg" id="dmsg3"><div class="dot"></div> 클로즈업 이미지 렌더링 중...</div>
+            <div class="gen-msg" id="dmsg4"><div class="dot"></div> 최종 마무리 중...</div>
           </div>
         </div>
         <div class="gslide-scroll" style="padding-top:12px;">
@@ -7079,16 +7076,16 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
               <span class="rnb-sub" id="videoActionSub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
             </button>
-            <button class="result-nav-btn" onclick="window.location.href='/generator'">
+            <button class="result-nav-btn" id="newProjectBtnCard" onclick="window.location.href='/generator'">
               <span class="rnb-main"><i class="fas fa-plus"></i> 새 프로젝트</span>
             </button>
-            <button class="result-nav-btn" onclick="regenFromCard(0)">
+            <button class="result-nav-btn" id="regenBtnCard" onclick="regenFromCard(0)">
               <span class="rnb-main"><i class="fas fa-rotate-right"></i> 재생성</span>
             </button>
-            <!-- 고스트컷 전용 — initGhostCutUI()에서만 노출 -->
-            <button class="result-nav-btn primary" id="detailCutBtn" onclick="openDetailCutMenu()" style="display:none;grid-column:1 / -1;">
+            <!-- 고스트컷 전용 — initGhostCutUI()에서 노출. "재생성" 버튼이 고스트컷에선 숨겨지므로
+                 (아래 initGhostCutUI 참고) 그리드 auto-flow로 자연스럽게 "새 프로젝트" 우측에 배치됨 -->
+            <button class="result-nav-btn primary" id="detailCutBtn" onclick="openDetailCutMenu()" style="display:none;">
               <span class="rnb-main"><i class="fas fa-magnifying-glass"></i> 디테일컷 추가</span>
-              <span class="rnb-sub">디자인이 돋보이는 부위를 클로즈업으로 추가 생성</span>
             </button>
           </div>
         </div>
@@ -7162,6 +7159,10 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         <button class="result-nav-btn primary" onclick="startDetailCutGeneration(3)" style="min-height:56px;">
           <span class="rnb-main">3장 생성</span>
           <span class="rnb-sub"><i class="fas fa-coins"></i> 160크레딧</span>
+        </button>
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(4)" style="min-height:56px;">
+          <span class="rnb-main">4장 생성</span>
+          <span class="rnb-sub"><i class="fas fa-coins"></i> 190크레딧</span>
         </button>
       </div>
     </div>
@@ -7643,10 +7644,10 @@ app.get('/admin02', (c) => {
         <div id="genLoadingVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
 
-      <!-- 고스트컷 로딩화면 하단 영상 슬롯 (모델컷과 완전히 별도) -->
+      <!-- 고스트컷 로딩화면 하단 이미지 슬롯 (모델컷과 완전히 별도) -->
       <div class="upload-form">
-        <h3><i class="fas fa-clapperboard" style="color:#00d4aa;"></i> 생성 로딩화면 영상 (고스트컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 반복 재생, 20MB 이하, 미등록 시 노출 안 함 — 모델컷 영상과 별도)</span></h3>
-        <div id="gcLoadingVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
+        <h3><i class="fas fa-image" style="color:#00d4aa;"></i> 생성 로딩화면 이미지 (고스트컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 슬라이드 전환, 8MB 이하, 미등록 시 노출 안 함 — 모델컷 영상과 별도)</span></h3>
+        <div id="gcLoadingImageGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
     </div>
   </div>
@@ -7877,7 +7878,7 @@ function switchTab(name) {
   document.getElementById('tabGhostCut').classList.toggle('active', name === 'ghostcut')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
-  if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos(); loadGcLoadingVideos() }
+  if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos(); loadGcLoadingImages() }
   if (name === 'users')  loadUsers()
   if (name === 'bizleads') bizInit()
   if (name === 'ghostcut') ghostCutInit()
@@ -9224,71 +9225,72 @@ async function deleteGenLoadingVideo(slot) {
 }
 
 // ══════════════════════════════════════════════
-//  고스트컷 로딩화면 영상 (최대 5슬롯, 모델컷 영상과 완전히 별도 관리)
+//  고스트컷 로딩화면 이미지 (최대 5슬롯, 모델컷 영상과 완전히 별도 관리)
+//  ⚠️ 2026-08-23: 기존 영상 업로드에서 이미지 업로드로 전환됨
 // ══════════════════════════════════════════════
-const GC_LOADING_VIDEO_LABELS = { 1: '영상 1', 2: '영상 2', 3: '영상 3', 4: '영상 4', 5: '영상 5' }
+const GC_LOADING_IMAGE_LABELS = { 1: '이미지 1', 2: '이미지 2', 3: '이미지 3', 4: '이미지 4', 5: '이미지 5' }
 
-async function loadGcLoadingVideos() {
-  const grid = document.getElementById('gcLoadingVideoGrid')
+async function loadGcLoadingImages() {
+  const grid = document.getElementById('gcLoadingImageGrid')
   try {
-    const res = await fetch('/api/gc-loading-videos')
+    const res = await fetch('/api/gc-loading-images')
     const data = await res.json()
-    const videos = data.videos || {}
-    grid.innerHTML = Object.keys(GC_LOADING_VIDEO_LABELS).map(slot => {
-      const src = videos[slot]
+    const images = data.images || {}
+    grid.innerHTML = Object.keys(GC_LOADING_IMAGE_LABELS).map(slot => {
+      const src = images[slot]
       return '<div style="border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden;">' +
         '<div style="position:relative;width:100%;aspect-ratio:9/16;background:#f2f2f5;display:flex;align-items:center;justify-content:center;">' +
-        (src ? '<video src="' + src + '" muted loop playsinline autoplay style="width:100%;height:100%;object-fit:cover;"></video>' : '<i class="fas fa-video" style="color:#ccc;font-size:24px;"></i>') +
+        (src ? '<img src="' + src + '" style="width:100%;height:100%;object-fit:cover;" />' : '<i class="fas fa-image" style="color:#ccc;font-size:24px;"></i>') +
         '</div>' +
         '<div style="padding:8px;">' +
-        '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + GC_LOADING_VIDEO_LABELS[slot] + '</div>' +
+        '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + GC_LOADING_IMAGE_LABELS[slot] + '</div>' +
         '<div style="display:flex;gap:6px;">' +
-        '<button onclick="pickGcLoadingVideo(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
-        (src ? '<button onclick="deleteGcLoadingVideo(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
+        '<button onclick="pickGcLoadingImage(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
+        (src ? '<button onclick="deleteGcLoadingImage(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
         '</div></div></div>'
     }).join('')
-  } catch(e) { console.error('loadGcLoadingVideos error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+  } catch(e) { console.error('loadGcLoadingImages error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
 }
 
-let _pendingGcLoadingVideoSlot = null
-function pickGcLoadingVideo(slot) {
-  _pendingGcLoadingVideoSlot = slot
-  let input = document.getElementById('gcLoadingVideoInput')
+let _pendingGcLoadingImageSlot = null
+function pickGcLoadingImage(slot) {
+  _pendingGcLoadingImageSlot = slot
+  let input = document.getElementById('gcLoadingImageInput')
   if (!input) {
     input = document.createElement('input')
     input.type = 'file'
-    input.accept = 'video/*'
-    input.id = 'gcLoadingVideoInput'
+    input.accept = 'image/*'
+    input.id = 'gcLoadingImageInput'
     input.style.display = 'none'
-    input.addEventListener('change', onGcLoadingVideoSelect)
+    input.addEventListener('change', onGcLoadingImageSelect)
     document.body.appendChild(input)
   }
   input.value = ''
   input.click()
 }
 
-async function onGcLoadingVideoSelect(e) {
+async function onGcLoadingImageSelect(e) {
   const file = e.target.files?.[0]
-  if (!file || !_pendingGcLoadingVideoSlot) return
-  if (file.size > 20 * 1024 * 1024) { alert('영상 용량이 너무 큽니다. 20MB 이하 파일을 사용해주세요.'); return }
+  if (!file || !_pendingGcLoadingImageSlot) return
+  if (file.size > 8 * 1024 * 1024) { alert('이미지 용량이 너무 큽니다. 8MB 이하 파일을 사용해주세요.'); return }
   try {
-    const res = await fetch('/api/admin/gc-loading-video/' + _pendingGcLoadingVideoSlot, {
+    const res = await fetch('/api/admin/gc-loading-image/' + _pendingGcLoadingImageSlot, {
       method: 'PUT',
-      headers: {'Content-Type': file.type || 'video/mp4', 'X-Admin-Password':adminPassword},
+      headers: {'Content-Type': file.type || 'image/jpeg', 'X-Admin-Password':adminPassword},
       body: file,
     })
     const data = await res.json()
     if (!data.success) { alert('업로드 실패: ' + (data.message || '알 수 없는 오류')); return }
-    await loadGcLoadingVideos()
+    await loadGcLoadingImages()
   } catch(err) { alert('오류: ' + err.message) }
 }
 
-async function deleteGcLoadingVideo(slot) {
-  if (!confirm('이 슬롯의 영상을 삭제하시겠습니까?')) return
-  const res = await fetch('/api/admin/gc-loading-video/' + slot, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+async function deleteGcLoadingImage(slot) {
+  if (!confirm('이 슬롯의 이미지를 삭제하시겠습니까?')) return
+  const res = await fetch('/api/admin/gc-loading-image/' + slot, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
   const data = await res.json()
   if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
-  await loadGcLoadingVideos()
+  await loadGcLoadingImages()
 }
 
 // ─── 배경 "생성용"(얼굴 마스킹) 이미지 등록/교체 ───

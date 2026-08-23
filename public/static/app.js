@@ -804,74 +804,71 @@ function stopGenLoadingVideoPlaylist() {
 }
 
 // ─────────────────────────────────────────────────────────
-// 고스트컷 로딩화면 하단 영상 슬롯 — 모델컷과 완전히 별도 관리되는 영상 풀
-// (같은 #genLoadingVideoPlayer DOM을 재사용하되, /api/gc-loading-videos에서
-//  받아온 별도 영상 목록으로 채운다 — 위 모델컷 함수들은 건드리지 않음)
+// 고스트컷 로딩화면 하단 이미지 슬롯 — 모델컷과 완전히 별도 관리되는 이미지 풀
+// (같은 #genLoadingVideoPlayer DOM을 재사용하되, /api/gc-loading-images에서
+//  받아온 이미지 목록으로 슬라이드 전환한다 — 위 모델컷 영상 함수들은 건드리지 않음)
+// ⚠️ 2026-08-23: 기존 영상 재생 방식에서 이미지 슬라이드쇼로 전환됨
 // ─────────────────────────────────────────────────────────
-let _gcLoadingVideoList = null;
-let _gcLoadingVideoEls = [];
-let _gcLoadingVideoIdx = 0;
+let _gcLoadingImageList = null;
+let _gcLoadingImageEls = [];
+let _gcLoadingImageIdx = 0;
+let _gcLoadingImageTimer = null;
+const GC_LOADING_IMAGE_INTERVAL_MS = 4000;
 
-async function _loadGcLoadingVideoList() {
-  if (_gcLoadingVideoList) return _gcLoadingVideoList;
+async function _loadGcLoadingImageList() {
+  if (_gcLoadingImageList) return _gcLoadingImageList;
   try {
-    const res = await fetch('/api/gc-loading-videos');
+    const res = await fetch('/api/gc-loading-images');
     const data = await res.json();
-    const videos = data.videos || {};
-    _gcLoadingVideoList = [1, 2, 3, 4, 5].map(s => videos[s]).filter(Boolean);
+    const images = data.images || {};
+    _gcLoadingImageList = [1, 2, 3, 4, 5].map(s => images[s]).filter(Boolean);
   } catch (e) {
-    console.warn('고스트컷 로딩화면 영상 로딩 실패:', e);
-    _gcLoadingVideoList = [];
+    console.warn('고스트컷 로딩화면 이미지 로딩 실패:', e);
+    _gcLoadingImageList = [];
   }
-  return _gcLoadingVideoList;
+  return _gcLoadingImageList;
 }
 
-async function startGcLoadingVideoPlaylist() {
+async function startGcLoadingImageSlideshow() {
   const player = document.getElementById('genLoadingVideoPlayer');
   if (!player) return;
-  const list = await _loadGcLoadingVideoList();
+  const list = await _loadGcLoadingImageList();
   if (!list.length) { player.style.display = 'none'; player.innerHTML = ''; return; }
 
   player.style.display = '';
   player.innerHTML = '';
-  _gcLoadingVideoIdx = 0;
-  _gcLoadingVideoEls = list.map((src, i) => {
-    const v = document.createElement('video');
-    v.src = src;
-    v.muted = true;
-    v.playsInline = true;
-    v.preload = 'auto';
-    v.loop = list.length === 1;
-    if (i === 0) v.classList.add('active');
-    player.appendChild(v);
-    return v;
+  _gcLoadingImageIdx = 0;
+  _gcLoadingImageEls = list.map((src, i) => {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = '';
+    if (i === 0) img.classList.add('active');
+    player.appendChild(img);
+    return img;
   });
-  if (list.length > 1) _gcLoadingVideoEls[0].onended = _advanceGcLoadingVideo;
-  _gcLoadingVideoEls[0].play().catch(() => {});
+  if (list.length > 1) {
+    if (_gcLoadingImageTimer) clearInterval(_gcLoadingImageTimer);
+    _gcLoadingImageTimer = setInterval(_advanceGcLoadingImage, GC_LOADING_IMAGE_INTERVAL_MS);
+  }
 }
 
-function _advanceGcLoadingVideo() {
-  const els = _gcLoadingVideoEls;
+function _advanceGcLoadingImage() {
+  const els = _gcLoadingImageEls;
   if (!els || els.length <= 1) return;
-  const current = els[_gcLoadingVideoIdx];
-  const nextIdx = (_gcLoadingVideoIdx + 1) % els.length;
+  const current = els[_gcLoadingImageIdx];
+  const nextIdx = (_gcLoadingImageIdx + 1) % els.length;
   const next = els[nextIdx];
-  current.onended = null;
   current.classList.remove('active');
-  next.currentTime = 0;
   next.classList.add('active');
-  next.onended = _advanceGcLoadingVideo;
-  next.play().catch(() => {});
-  _gcLoadingVideoIdx = nextIdx;
-  setTimeout(() => { current.pause(); }, 450);
+  _gcLoadingImageIdx = nextIdx;
 }
 
-function stopGcLoadingVideoPlaylist() {
+function stopGcLoadingImageSlideshow() {
   const player = document.getElementById('genLoadingVideoPlayer');
   if (player) { player.style.display = 'none'; player.innerHTML = ''; }
-  _gcLoadingVideoEls.forEach(v => { v.onended = null; v.pause(); });
-  _gcLoadingVideoEls = [];
-  _gcLoadingVideoIdx = 0;
+  if (_gcLoadingImageTimer) { clearInterval(_gcLoadingImageTimer); _gcLoadingImageTimer = null; }
+  _gcLoadingImageEls = [];
+  _gcLoadingImageIdx = 0;
 }
 
 // ─────────────────────────────────────────────────────────
@@ -1967,6 +1964,10 @@ function initGhostCutUI() {
   const detailBtn = document.getElementById('detailCutBtn');
   if (detailBtn) detailBtn.style.display = '';
 
+  // 이미지 생성 로딩화면 하단 홍보 문구 — 모델컷은 영상 생성을, 고스트컷은 디테일컷 생성을 안내
+  const promoText = document.getElementById('genVideoPromoText');
+  if (promoText) promoText.innerHTML = '<i class="fas fa-magnifying-glass"></i> 이미지가 생성되면 클릭한번으로 디테일컷 이미지 생성이 가능합니다.';
+
   // 영상 생성 로딩화면 메시지 중 "포즈 동작 생성"은 모델(사람) 전용 문구라 옷 흔들림으로 교체
   const vmsg2 = document.querySelector('#vmsg2');
   if (vmsg2) {
@@ -2062,7 +2063,7 @@ async function startGhostCutGeneration() {
 
   updateProgress(0, '시작 중...');
   setMsgState('msg1', 'current');
-  startGcLoadingVideoPlaylist();
+  startGcLoadingImageSlideshow();
 
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   const count = 1;
@@ -2122,7 +2123,7 @@ async function startGhostCutGeneration() {
     showToast('생성 중 오류가 발생했습니다: ' + err.message, 'error');
     AppState.isGenerating = false;
     stopNewsRotator();
-    stopGcLoadingVideoPlaylist();
+    stopGcLoadingImageSlideshow();
     localStorage.removeItem('lookbook_pending_gen');
     _ghostCutResetToStep1();
   }
@@ -3492,7 +3493,7 @@ async function startDetailCutGeneration(count) {
     return;
   }
 
-  openActionProgress('디테일컷 생성 중...');
+  _showDetailCutGeneratingView();
 
   try {
     const res = await fetch('/api/ghostcut/detail/start', {
@@ -3502,12 +3503,12 @@ async function startDetailCutGeneration(count) {
     });
 
     if (res.status === 401) {
-      closeActionProgress();
+      _hideDetailCutGeneratingView();
       showToast(t('loginRequired'), 'error');
       return;
     }
     if (res.status === 402) {
-      closeActionProgress();
+      _hideDetailCutGeneratingView();
       const errData = await res.json();
       showToast(t('creditInsufficientDetail', errData.available ?? 0), 'error');
       setTimeout(() => {
@@ -3517,7 +3518,7 @@ async function startDetailCutGeneration(count) {
       return;
     }
     if (!res.ok) {
-      closeActionProgress();
+      _hideDetailCutGeneratingView();
       const errData = await res.json().catch(() => ({}));
       showToast(errData.message || '디테일컷 생성 요청에 실패했습니다.', 'error');
       return;
@@ -3531,12 +3532,80 @@ async function startDetailCutGeneration(count) {
       updateUserUI({ credits: data.creditsRemaining });
     }
 
+    _startDetailCutFakeProgress();
     _pollDetailCutStatus(data.jobId);
   } catch (err) {
     console.error('Detail cut start error:', err);
-    closeActionProgress();
+    _hideDetailCutGeneratingView();
     showToast('디테일컷 생성 요청 중 네트워크 오류가 발생했습니다.', 'error');
   }
+}
+
+// 디테일컷 생성 로딩 화면 — 영상 생성 로딩 화면(.generating-view)과 동일한 구조를 재사용, 패션 뉴스도 함께 재생
+function _showDetailCutGeneratingView() {
+  const view = document.getElementById('detailCutGeneratingView');
+  if (view) view.classList.add('active');
+  const nav = document.getElementById('step4Nav');
+  if (nav) nav.style.display = 'none';
+  updateDetailCutProgress(0, '시작 중...');
+  setDetailCutMsgState('dmsg1', 'current');
+  startNewsRotator('detailCutGenViewNews');
+}
+
+function _hideDetailCutGeneratingView() {
+  const view = document.getElementById('detailCutGeneratingView');
+  if (view) view.classList.remove('active');
+  const nav = document.getElementById('step4Nav');
+  if (nav) nav.style.display = '';
+  stopNewsRotator();
+  _stopDetailCutFakeProgress();
+}
+
+function updateDetailCutProgress(percent, text) {
+  const fill = document.getElementById('detailCutGenProgressFill');
+  if (fill) fill.style.width = Math.min(percent, 100) + '%';
+  const statusText = document.getElementById('detailCutGenStatusText');
+  if (statusText) statusText.textContent = text;
+}
+
+function setDetailCutMsgState(msgId, state) {
+  const msg = document.getElementById(msgId);
+  if (!msg) return;
+  msg.classList.remove('current', 'done');
+  if (state === 'current') {
+    msg.classList.add('current');
+    const dot = msg.querySelector('.dot');
+    if (dot) dot.style.background = 'var(--primary)';
+  } else if (state === 'done') {
+    msg.classList.add('done');
+    const dot = msg.querySelector('.dot');
+    if (dot) dot.style.background = 'var(--success)';
+  }
+}
+
+let _detailCutFakeProgressTimer = null;
+function _startDetailCutFakeProgress() {
+  _stopDetailCutFakeProgress();
+  let percent = 15;
+  const stageMsgs = ['dmsg2', 'dmsg3', 'dmsg4'];
+  let stageIdx = 0;
+  setDetailCutMsgState('dmsg1', 'done');
+  setDetailCutMsgState('dmsg2', 'current');
+  updateDetailCutProgress(percent, 'AI가 디테일컷을 생성 중입니다... (최대 1~2분 소요)');
+  _detailCutFakeProgressTimer = setInterval(() => {
+    if (percent >= 90) return;
+    percent += 3;
+    const nextStage = Math.min(Math.floor((percent - 15) / 25), stageMsgs.length - 1);
+    if (nextStage > stageIdx) {
+      setDetailCutMsgState(stageMsgs[stageIdx], 'done');
+      setDetailCutMsgState(stageMsgs[nextStage], 'current');
+      stageIdx = nextStage;
+    }
+    updateDetailCutProgress(percent, 'AI가 디테일컷을 생성 중입니다... (최대 1~2분 소요)');
+  }, 2500);
+}
+function _stopDetailCutFakeProgress() {
+  if (_detailCutFakeProgressTimer) { clearInterval(_detailCutFakeProgressTimer); _detailCutFakeProgressTimer = null; }
 }
 
 async function _pollDetailCutStatus(jobId) {
@@ -3551,7 +3620,10 @@ async function _pollDetailCutStatus(jobId) {
       const data = await res.json();
 
       if (data.status === 'completed') {
-        closeActionProgress();
+        updateDetailCutProgress(100, '생성 완료!');
+        setDetailCutMsgState('dmsg4', 'done');
+        await sleep(500);
+        _hideDetailCutGeneratingView();
         const images = data.images || [];
         _renderDetailCutResults(jobId, images);
 
@@ -3574,13 +3646,13 @@ async function _pollDetailCutStatus(jobId) {
     } catch (err) {
       console.error('Detail cut poll error:', err);
       if (attempts >= maxAttempts - 3) {
-        closeActionProgress();
+        _hideDetailCutGeneratingView();
         showToast('디테일컷 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'error');
         return;
       }
     }
   }
-  closeActionProgress();
+  _hideDetailCutGeneratingView();
   showToast('디테일컷 생성이 지연되고 있어요. 잠시 후 다시 확인해주세요.', 'error');
 }
 
