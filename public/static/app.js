@@ -797,6 +797,77 @@ function stopGenLoadingVideoPlaylist() {
 }
 
 // ─────────────────────────────────────────────────────────
+// 고스트컷 로딩화면 하단 영상 슬롯 — 모델컷과 완전히 별도 관리되는 영상 풀
+// (같은 #genLoadingVideoPlayer DOM을 재사용하되, /api/gc-loading-videos에서
+//  받아온 별도 영상 목록으로 채운다 — 위 모델컷 함수들은 건드리지 않음)
+// ─────────────────────────────────────────────────────────
+let _gcLoadingVideoList = null;
+let _gcLoadingVideoEls = [];
+let _gcLoadingVideoIdx = 0;
+
+async function _loadGcLoadingVideoList() {
+  if (_gcLoadingVideoList) return _gcLoadingVideoList;
+  try {
+    const res = await fetch('/api/gc-loading-videos');
+    const data = await res.json();
+    const videos = data.videos || {};
+    _gcLoadingVideoList = [1, 2, 3, 4, 5].map(s => videos[s]).filter(Boolean);
+  } catch (e) {
+    console.warn('고스트컷 로딩화면 영상 로딩 실패:', e);
+    _gcLoadingVideoList = [];
+  }
+  return _gcLoadingVideoList;
+}
+
+async function startGcLoadingVideoPlaylist() {
+  const player = document.getElementById('genLoadingVideoPlayer');
+  if (!player) return;
+  const list = await _loadGcLoadingVideoList();
+  if (!list.length) { player.style.display = 'none'; player.innerHTML = ''; return; }
+
+  player.style.display = '';
+  player.innerHTML = '';
+  _gcLoadingVideoIdx = 0;
+  _gcLoadingVideoEls = list.map((src, i) => {
+    const v = document.createElement('video');
+    v.src = src;
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'auto';
+    v.loop = list.length === 1;
+    if (i === 0) v.classList.add('active');
+    player.appendChild(v);
+    return v;
+  });
+  if (list.length > 1) _gcLoadingVideoEls[0].onended = _advanceGcLoadingVideo;
+  _gcLoadingVideoEls[0].play().catch(() => {});
+}
+
+function _advanceGcLoadingVideo() {
+  const els = _gcLoadingVideoEls;
+  if (!els || els.length <= 1) return;
+  const current = els[_gcLoadingVideoIdx];
+  const nextIdx = (_gcLoadingVideoIdx + 1) % els.length;
+  const next = els[nextIdx];
+  current.onended = null;
+  current.classList.remove('active');
+  next.currentTime = 0;
+  next.classList.add('active');
+  next.onended = _advanceGcLoadingVideo;
+  next.play().catch(() => {});
+  _gcLoadingVideoIdx = nextIdx;
+  setTimeout(() => { current.pause(); }, 450);
+}
+
+function stopGcLoadingVideoPlaylist() {
+  const player = document.getElementById('genLoadingVideoPlayer');
+  if (player) { player.style.display = 'none'; player.innerHTML = ''; }
+  _gcLoadingVideoEls.forEach(v => { v.onended = null; v.pause(); });
+  _gcLoadingVideoEls = [];
+  _gcLoadingVideoIdx = 0;
+}
+
+// ─────────────────────────────────────────────────────────
 // TOAST NOTIFICATIONS
 // ─────────────────────────────────────────────────────────
 function showToast(message, type = 'info', duration = 4000) {
@@ -1967,7 +2038,7 @@ async function startGhostCutGeneration() {
 
   updateProgress(0, '시작 중...');
   setMsgState('msg1', 'current');
-  startGenLoadingVideoPlaylist();
+  startGcLoadingVideoPlaylist();
 
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   const count = 1;
@@ -2027,7 +2098,7 @@ async function startGhostCutGeneration() {
     showToast('생성 중 오류가 발생했습니다: ' + err.message, 'error');
     AppState.isGenerating = false;
     stopNewsRotator();
-    stopGenLoadingVideoPlaylist();
+    stopGcLoadingVideoPlaylist();
     localStorage.removeItem('lookbook_pending_gen');
     _ghostCutResetToStep1();
   }

@@ -1520,6 +1520,99 @@ app.delete('/api/admin/gen-loading-video/:slot', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// ── 고스트컷 로딩화면 하단 영상 슬롯 (모델컷 생성 로딩화면 영상과 완전히 별도 관리, 최대 5개) ──
+const GC_LOADING_VIDEO_SLOTS = [1, 2, 3, 4, 5]
+const GC_LOADING_VIDEO_MAX_BYTES = 22 * 1024 * 1024
+
+// GET /api/gc-loading-videos — 공개 엔드포인트(고스트컷 로딩화면 + 관리자 목록 조회 공용)
+app.get('/api/gc-loading-videos', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const result: Record<string, string | null> = {}
+  if (kv) {
+    for (const slot of GC_LOADING_VIDEO_SLOTS) {
+      const meta = await kv.getWithMetadata(`gc_loading_video_${slot}`)
+      result[slot] = meta.value != null ? `/api/gc-loading-video/${slot}` : null
+    }
+  } else {
+    GC_LOADING_VIDEO_SLOTS.forEach(slot => { result[slot] = null })
+  }
+  return c.json({ videos: result })
+})
+
+// GET /api/gc-loading-video/:slot — 영상 바이너리 스트리밍 (Range 요청 지원)
+app.get('/api/gc-loading-video/:slot', async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.notFound()
+  const slot = Number(c.req.param('slot'))
+  if (!GC_LOADING_VIDEO_SLOTS.includes(slot)) return c.notFound()
+  const { value, metadata } = await kv.getWithMetadata(`gc_loading_video_${slot}`, 'arrayBuffer')
+  if (!value) return c.notFound()
+  const buf = value as ArrayBuffer
+  const contentType = (metadata as any)?.contentType || 'video/mp4'
+  const total = buf.byteLength
+
+  const range = c.req.header('range')
+  if (range) {
+    const m = range.match(/bytes=(\d*)-(\d*)/)
+    if (m) {
+      const start = m[1] ? parseInt(m[1], 10) : 0
+      const end = m[2] ? parseInt(m[2], 10) : total - 1
+      const safeStart = Math.max(0, Math.min(start, total - 1))
+      const safeEnd = Math.max(safeStart, Math.min(end, total - 1))
+      const chunk = buf.slice(safeStart, safeEnd + 1)
+      return new Response(chunk, {
+        status: 206,
+        headers: {
+          'Content-Type': contentType,
+          'Content-Range': `bytes ${safeStart}-${safeEnd}/${total}`,
+          'Accept-Ranges': 'bytes',
+          'Content-Length': String(chunk.byteLength),
+          'Cache-Control': 'public, max-age=3600',
+        },
+      })
+    }
+  }
+
+  return new Response(buf, {
+    headers: {
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'public, max-age=3600',
+      'Content-Length': String(total),
+    },
+  })
+})
+
+// PUT /api/admin/gc-loading-video/:slot — 슬롯별 영상 등록/교체 (바이너리 바디)
+app.put('/api/admin/gc-loading-video/:slot', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const slot = Number(c.req.param('slot'))
+  if (!GC_LOADING_VIDEO_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  try {
+    const body = await c.req.arrayBuffer()
+    if (!body || body.byteLength === 0) return c.json({ success: false, message: '영상 파일이 필요합니다.' }, 400)
+    if (body.byteLength > GC_LOADING_VIDEO_MAX_BYTES) {
+      return c.json({ success: false, message: `영상 용량은 ${Math.floor(GC_LOADING_VIDEO_MAX_BYTES / 1024 / 1024)}MB 이하만 가능합니다.` }, 400)
+    }
+    const contentType = c.req.header('content-type') || 'video/mp4'
+    await kv.put(`gc_loading_video_${slot}`, body, { metadata: { contentType } })
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
+// DELETE /api/admin/gc-loading-video/:slot — 슬롯 영상 제거
+app.delete('/api/admin/gc-loading-video/:slot', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  if (!kv) return c.json({ success: false, message: 'KV 미설정' }, 500)
+  const slot = Number(c.req.param('slot'))
+  if (!GC_LOADING_VIDEO_SLOTS.includes(slot)) return c.json({ success: false, message: '잘못된 슬롯' }, 400)
+  await kv.delete(`gc_loading_video_${slot}`)
+  return c.json({ success: true })
+})
+
 // ────────────────────────────────────────────────────
 // 패션 뉴스 (생성 대기 화면 로테이터용) — 구글 뉴스 RSS 파싱 + KV 캐시
 // ────────────────────────────────────────────────────
@@ -7230,8 +7323,14 @@ app.get('/admin02', (c) => {
 
       <!-- 이미지 생성 로딩화면 하단 영상 슬롯 -->
       <div class="upload-form">
-        <h3><i class="fas fa-clapperboard" style="color:#9b7cff;"></i> 생성 로딩화면 영상 <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 반복 재생, 20MB 이하, 미등록 시 노출 안 함)</span></h3>
+        <h3><i class="fas fa-clapperboard" style="color:#9b7cff;"></i> 생성 로딩화면 영상 (모델컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 반복 재생, 20MB 이하, 미등록 시 노출 안 함)</span></h3>
         <div id="genLoadingVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
+      </div>
+
+      <!-- 고스트컷 로딩화면 하단 영상 슬롯 (모델컷과 완전히 별도) -->
+      <div class="upload-form">
+        <h3><i class="fas fa-clapperboard" style="color:#00d4aa;"></i> 생성 로딩화면 영상 (고스트컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 반복 재생, 20MB 이하, 미등록 시 노출 안 함 — 모델컷 영상과 별도)</span></h3>
+        <div id="gcLoadingVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
     </div>
   </div>
@@ -7462,7 +7561,7 @@ function switchTab(name) {
   document.getElementById('tabGhostCut').classList.toggle('active', name === 'ghostcut')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
-  if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos() }
+  if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos(); loadGcLoadingVideos() }
   if (name === 'users')  loadUsers()
   if (name === 'bizleads') bizInit()
   if (name === 'ghostcut') ghostCutInit()
@@ -8806,6 +8905,74 @@ async function deleteGenLoadingVideo(slot) {
   const data = await res.json()
   if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
   await loadGenLoadingVideos()
+}
+
+// ══════════════════════════════════════════════
+//  고스트컷 로딩화면 영상 (최대 5슬롯, 모델컷 영상과 완전히 별도 관리)
+// ══════════════════════════════════════════════
+const GC_LOADING_VIDEO_LABELS = { 1: '영상 1', 2: '영상 2', 3: '영상 3', 4: '영상 4', 5: '영상 5' }
+
+async function loadGcLoadingVideos() {
+  const grid = document.getElementById('gcLoadingVideoGrid')
+  try {
+    const res = await fetch('/api/gc-loading-videos')
+    const data = await res.json()
+    const videos = data.videos || {}
+    grid.innerHTML = Object.keys(GC_LOADING_VIDEO_LABELS).map(slot => {
+      const src = videos[slot]
+      return '<div style="border:1.5px solid #e0e0e0;border-radius:10px;overflow:hidden;">' +
+        '<div style="position:relative;width:100%;aspect-ratio:9/16;background:#f2f2f5;display:flex;align-items:center;justify-content:center;">' +
+        (src ? '<video src="' + src + '" muted loop playsinline autoplay style="width:100%;height:100%;object-fit:cover;"></video>' : '<i class="fas fa-video" style="color:#ccc;font-size:24px;"></i>') +
+        '</div>' +
+        '<div style="padding:8px;">' +
+        '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + GC_LOADING_VIDEO_LABELS[slot] + '</div>' +
+        '<div style="display:flex;gap:6px;">' +
+        '<button onclick="pickGcLoadingVideo(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
+        (src ? '<button onclick="deleteGcLoadingVideo(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
+        '</div></div></div>'
+    }).join('')
+  } catch(e) { console.error('loadGcLoadingVideos error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+let _pendingGcLoadingVideoSlot = null
+function pickGcLoadingVideo(slot) {
+  _pendingGcLoadingVideoSlot = slot
+  let input = document.getElementById('gcLoadingVideoInput')
+  if (!input) {
+    input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'video/*'
+    input.id = 'gcLoadingVideoInput'
+    input.style.display = 'none'
+    input.addEventListener('change', onGcLoadingVideoSelect)
+    document.body.appendChild(input)
+  }
+  input.value = ''
+  input.click()
+}
+
+async function onGcLoadingVideoSelect(e) {
+  const file = e.target.files?.[0]
+  if (!file || !_pendingGcLoadingVideoSlot) return
+  if (file.size > 20 * 1024 * 1024) { alert('영상 용량이 너무 큽니다. 20MB 이하 파일을 사용해주세요.'); return }
+  try {
+    const res = await fetch('/api/admin/gc-loading-video/' + _pendingGcLoadingVideoSlot, {
+      method: 'PUT',
+      headers: {'Content-Type': file.type || 'video/mp4', 'X-Admin-Password':adminPassword},
+      body: file,
+    })
+    const data = await res.json()
+    if (!data.success) { alert('업로드 실패: ' + (data.message || '알 수 없는 오류')); return }
+    await loadGcLoadingVideos()
+  } catch(err) { alert('오류: ' + err.message) }
+}
+
+async function deleteGcLoadingVideo(slot) {
+  if (!confirm('이 슬롯의 영상을 삭제하시겠습니까?')) return
+  const res = await fetch('/api/admin/gc-loading-video/' + slot, {method:'DELETE', headers:{'X-Admin-Password':adminPassword}})
+  const data = await res.json()
+  if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
+  await loadGcLoadingVideos()
 }
 
 // ─── 배경 "생성용"(얼굴 마스킹) 이미지 등록/교체 ───
