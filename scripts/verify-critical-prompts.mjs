@@ -53,9 +53,9 @@ const GUARDS = [
     why: '실제 배포 후 확인된 회귀: AI가 이 문구가 약할 때 관리자 샘플(Image 2)의 실제 옷을 그대로 복사해버리는 현상이 발생함(2026-08-23). 두 이미지가 서로 무관한 별개 상품임을 강하게 못박는 문구.',
   },
   {
-    name: '고스트컷 — 샘플 이미지는 실루엣/구도 참조 전용, 샘플의 실제 의류·배경·조명은 무관함',
-    must: 'Image 2 = an UNRELATED product photo used SOLELY as an empty silhouette/shape template',
-    why: '관리자가 등록한 카테고리 샘플 이미지의 실제 옷(색상/패턴)이나 배경/조명이 결과물에 섞이면 안 되고, 실루엣/구도만 참조해야 함.',
+    name: '고스트컷 — 샘플 이미지는 렌더링 기법/구도 참조 전용, 형태(길이·컷·실루엣)는 절대 참조 안 함',
+    must: 'Image 2 = an UNRELATED product photo used SOLELY for the RENDERING TECHNIQUE and camera framing — NEVER for shape.',
+    why: '2026-08-23 실제 발견된 회귀: 이전 문구("empty silhouette/shape template")가 샘플의 전체적인 길이/실루엣까지 따라하라는 뜻으로 읽혀, 숏패딩을 업로드했는데 롱패딩으로 바뀌어 나온 사고가 있었음. 샘플은 오직 "고스트 마네킹 렌더링 기법"과 "카메라 구도"만 참고하고, 의류의 형태(길이/컷/실루엣)는 무조건 사용자 원본을 따라야 함.',
   },
   {
     name: '고스트컷 — 상품 이미지 디테일 정확 재현',
@@ -71,6 +71,11 @@ const GUARDS = [
     name: '고스트컷 — 샘플 의류 복사 시 치명적 실패로 명시(HARD_CONSTRAINTS)',
     must: 'if the output resembles Image 2\'s garment instead of Image 1\'s, this is a CRITICAL FAILURE',
     why: '핵심 제약 목록에도 동일 규칙을 재차 명시 — 관리자 샘플 의류가 결과물에 그대로 나오는 회귀를 막기 위한 이중 안전장치.',
+  },
+  {
+    name: '고스트컷 — 의류 길이/실루엣을 샘플에 맞춰 바꾸지 말 것(HARD_CONSTRAINTS)',
+    must: "Image 1's garment LENGTH and SILHOUETTE (e.g., a cropped/short jacket must stay cropped/short, a long coat must stay long) must be preserved EXACTLY",
+    why: '2026-08-23 회귀(숏패딩→롱패딩) 재발 방지용 핵심 제약. 길이/실루엣은 반드시 사용자 원본(Image 1) 그대로 유지되어야 하고, 샘플(Image 2)의 형태를 따라가면 안 됨.',
   },
   {
     name: '고스트컷 영상 — 옷은 제자리에서 미풍에만 흔들림(사람 등장/이동 금지)',

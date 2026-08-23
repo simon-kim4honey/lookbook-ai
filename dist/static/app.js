@@ -1956,7 +1956,9 @@ function initGhostCutUI() {
     if (onclickAttr === "window.location.href='/generator'") btn.setAttribute('onclick', "window.location.href='/ghostcut'");
   });
 
-  // 영상 생성 버튼 부제(길이·크레딧)를 고스트컷 요금(5초·250)으로 즉시 맞춤
+  // 다운로드/영상 버튼 부제(요금)를 고스트컷 요금(140→70 / 500→250)으로 즉시 맞춤
+  const downloadSub = document.getElementById('downloadActionSub');
+  if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
   const videoSub = document.getElementById('videoActionSub');
   if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
 
@@ -2015,12 +2017,12 @@ function ghostCutHandleFile(file) {
         return;
       }
       if (!data.sampleReady) {
-        if (statusBox) { statusBox.style.color = '#f59e0b'; statusBox.textContent = '⚠️ "' + (data.displayLabel || data.label) + '" 카테고리는 아직 준비 중이에요. 다른 상품으로 시도해주세요.'; }
+        if (statusBox) { statusBox.style.color = '#f59e0b'; statusBox.textContent = '⚠️ 이 상품은 아직 준비 중이에요. 다른 상품으로 시도해주세요.'; }
         return;
       }
 
       ghostCutUpload_ = { dataUrl, category: data.category, categoryLabel: data.label };
-      if (statusBox) { statusBox.style.color = '#22c55e'; statusBox.textContent = '✅ "' + (data.displayLabel || data.label) + '"로 인식했어요. 아래 버튼을 눌러 생성을 시작하세요.'; }
+      if (statusBox) { statusBox.style.color = '#22c55e'; statusBox.textContent = '✅ 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
       if (genBtn) genBtn.disabled = false;
     } catch (err) {
       console.error('ghostcut classify error:', err);
@@ -3256,6 +3258,8 @@ function renderResults(images) {
   }
   const videoSub = document.getElementById('videoActionSub');
   if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
+  const downloadSub = document.getElementById('downloadActionSub');
+  if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
 
   grid.innerHTML = '';
 
@@ -3449,14 +3453,24 @@ async function downloadWithCreditCheck(idx) {
 // ─────────────────────────────────────────────────────────
 let _videoState = { jobId: null, videoUrl: null, polling: false };
 
-// 모델컷(7초·600크레딧)과 고스트컷(5초·250크레딧)은 영상 길이/요금이 다르다
+// 모델컷(7초·1200→600)과 고스트컷(5초·500→250)은 영상 길이/요금이 다르다
 function _videoSubHtml(withStrike) {
   if (window.__EZLOOK_MODE__ === 'ghostcut') {
-    return '5초 · <i class="fas fa-coins"></i> 250';
+    return withStrike
+      ? '5초 · <s class="rnb-strike">500</s> <i class="fas fa-coins"></i> 250'
+      : '5초 · <i class="fas fa-coins"></i> 250';
   }
   return withStrike
     ? '7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600'
     : '7초 · <i class="fas fa-coins"></i> 600';
+}
+
+// 모델컷(180→90)과 고스트컷(140→70) 이미지 다운로드 요금 표기
+function _downloadSubHtml() {
+  if (window.__EZLOOK_MODE__ === 'ghostcut') {
+    return '<s class="rnb-strike">140</s> <i class="fas fa-coins"></i> 70';
+  }
+  return '<s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90';
 }
 
 function _resetVideoBtn() {

@@ -2649,7 +2649,7 @@ app.post('/api/credits/deduct', async (c) => {
     let downloadedIndices: number[] = []
     if (jobId) {
       genLog = await db.prepare(
-        `SELECT id, downloaded_indices FROM generation_logs WHERE job_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1`
+        `SELECT id, downloaded_indices, model_name FROM generation_logs WHERE job_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1`
       ).bind(jobId, sess.user_id).first() as any
       if (genLog?.downloaded_indices) {
         try { downloadedIndices = JSON.parse(genLog.downloaded_indices) } catch {}
@@ -2659,7 +2659,9 @@ app.post('/api/credits/deduct', async (c) => {
       }
     }
 
-    const COST = CREDITS_PER_IMAGE  // 90크레딧
+    // 고스트컷 결과 이미지는 model_name에 "고스트컷·" 접두어를 붙여 저장해뒀다 (별도 마이그레이션 없이 재사용)
+    const isGhostCutDownload = !!(genLog?.model_name && String(genLog.model_name).startsWith('고스트컷·'))
+    const COST = isGhostCutDownload ? CREDITS_PER_GHOSTCUT_IMAGE : CREDITS_PER_IMAGE
     if (sess.credits < COST) {
       return c.json({
         error: `크레딧이 부족합니다. (보유: ${sess.credits}크레딧, 필요: ${COST}크레딧)`,
@@ -3587,6 +3589,7 @@ function buildClothingReplaceInstructions(
 
 // ── 크레딧 상수 ──
 const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
+const CREDITS_PER_GHOSTCUT_IMAGE = 70  // 고스트컷 이미지 1장당 차감 크레딧(140의 50% 할인) — 모델컷과 별도 요금
 const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
 const CREDITS_PER_GHOSTCUT_VIDEO = 250 // 고스트컷 영상(5초)당 차감 크레딧 — 모델컷과 별도 요금
 
@@ -4155,25 +4158,30 @@ app.post('/api/ghostcut/generate', async (c) => {
     }
 
     // ── 프롬프트 구성 (신규 전용 모드 — 기존 5개 분기와 무관) ──
+    // ⚠️ 2026-08-23 발견된 회귀: "reshaped to Image 2's silhouette" 같은 표현이 있으면
+    //   AI가 Image 1 의류의 길이/디자인 자체를 Image 2 샘플에 맞춰 바꿔버렸다(숏패딩→롱패딩
+    //   사례). Image 2는 "고스트 마네킹 렌더링 기법·카메라 구도"만 참고하고, 의류의 길이/컷/
+    //   실루엣/비율은 반드시 Image 1 그대로 유지해야 한다 — 이 구분을 절대 흐리지 말 것.
     const GHOSTCUT_HARD_CONSTRAINTS = [
       `ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,
       `1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,
-      `2. DO NOT change, redesign, or substitute ANY detail of the garment from Image 1: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown in Image 1.`,
-      `3. NO visible human body, face, hands, mannequin form, hanger, or flat-lay surface anywhere in the output — only the invisible-mannequin (ghost) silhouette effect.`,
+      `2. DO NOT change, redesign, or substitute ANY detail of the garment from Image 1: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, stitching, OVERALL LENGTH, CUT, and SILHOUETTE must be reproduced EXACTLY as shown in Image 1.`,
+      `3. NO visible human body, face, hands, mannequin form, hanger, or flat-lay surface anywhere in the output — only the invisible-mannequin (ghost) effect.`,
       `4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,
       `5. Background MUST be pure solid white (#FFFFFF), completely flat and shadowless — NO drop shadow, NO contact shadow, NO reflection, NO gradient, NO vignette anywhere in the frame.`,
       `6. The output garment's color, pattern, print, fabric, and overall design MUST come exclusively from Image 1. Image 1 and Image 2 show two different, unrelated products — if the output resembles Image 2's garment instead of Image 1's, this is a CRITICAL FAILURE.`,
+      `7. Image 1's garment LENGTH and SILHOUETTE (e.g., a cropped/short jacket must stay cropped/short, a long coat must stay long) must be preserved EXACTLY — do NOT lengthen, shorten, widen, or otherwise reshape it to match Image 2's proportions. Image 2 contributes ONLY the rendering technique and camera framing, never the garment's shape.`,
       `Ultra-photorealistic, 8K quality, professional e-commerce product photography.`,
     ].join(' ')
 
     const prompt = [
-      `GHOST MANNEQUIN PRODUCT PHOTOGRAPHY — combine an actual garment photo with a silhouette reference from a DIFFERENT, UNRELATED product photo.`,
+      `GHOST MANNEQUIN PRODUCT PHOTOGRAPHY — combine an actual garment photo with a rendering-style reference from a DIFFERENT, UNRELATED product photo.`,
       `Image 1 and Image 2 show TWO COMPLETELY DIFFERENT GARMENTS from two different products. They are NOT the same item and must NEVER be blended, merged, mixed, or averaged together.`,
-      `Image 1 = THE PRODUCT BEING SOLD — the ONLY source of what the garment looks like. Every visual detail (color, pattern, print, texture, fabric weave, stitching, buttons, zippers, collar, cuffs, hem, logo placement, print scale) must be reproduced EXACTLY as shown in Image 1, with zero alteration.`,
-      `Image 2 = an UNRELATED product photo used SOLELY as an empty silhouette/shape template. Imagine Image 2's actual garment has been made invisible, leaving only its 3D outline: the invisible-mannequin fit shape (garment naturally filled/worn by an invisible body, realistic volume and drape — no visible mannequin, no visible model, no human body or hands, no headless-torso form) and its camera framing/crop/angle. Image 2's own garment color, pattern, print, fabric, cut, style, background, and lighting belong to a DIFFERENT product and are COMPLETELY IRRELEVANT — they must have ZERO influence on the output. Do not let Image 2's colors or patterns bleed, blend, or partially show through anywhere in the result.`,
+      `Image 1 = THE PRODUCT BEING SOLD — the ONLY source of what the garment looks like AND its exact shape. Every visual detail (color, pattern, print, texture, fabric weave, stitching, buttons, zippers, collar, cuffs, hem, logo placement, print scale) AND every structural detail (overall length, cut, silhouette, fit, proportions — e.g. a cropped jacket stays cropped, it must NOT become a long coat) must be reproduced EXACTLY as shown in Image 1, with zero alteration.`,
+      `Image 2 = an UNRELATED product photo used SOLELY for the RENDERING TECHNIQUE and camera framing — NEVER for shape. Take from Image 2 ONLY: how a garment is rendered with the invisible-mannequin (ghost) effect (naturally filled/worn by an invisible body, realistic volumetric fill and fabric drape — no visible mannequin, no visible model, no human body or hands, no headless-torso form) and the camera framing/crop/angle. Do NOT take Image 2's garment length, cut, silhouette, proportions, design, color, pattern, print, fabric, background, or lighting — none of that belongs to this product and must have ZERO influence on the output. Image 1's garment keeps its own exact length and shape unchanged; only the rendering method is borrowed from Image 2.`,
       `BACKGROUND & LIGHTING — MANDATORY, OVERRIDES Image 2 entirely: Pure solid white (#FFFFFF) seamless studio background, completely flat and even, no gradient, no vignette, no visible floor line or horizon. Even, shadowless studio lighting on the garment — DO NOT render any drop shadow, contact shadow, cast shadow, or reflection anywhere on or around the garment. The garment must appear to float cleanly on pure white with ZERO shadow, regardless of what background or lighting Image 2 shows.`,
-      `REMINDER before finalizing: the garment's actual appearance (color, pattern, fabric, design) in your output must be Image 1's garment, reshaped to Image 2's silhouette. If your output resembles Image 2's garment more than Image 1's, that is WRONG — Image 1 and Image 2 are different products, and only Image 1's product is being photographed here.`,
-      `FINAL OUTPUT: A single professional e-commerce ghost-mannequin product photograph on a pure white, completely shadowless background — Image 1's exact garment (color, pattern, fabric, design), reshaped into Image 2's invisible-mannequin silhouette and framing only. The garment must look naturally filled with realistic fabric drape and natural wrinkles at shoulders/sleeves/hem, as if worn by an invisible body — NOT flat-lay, NOT laid on a table, NOT on a visible mannequin or hanger.`,
+      `REMINDER before finalizing: the garment's appearance AND shape (length, cut, silhouette, proportions) in your output must both come from Image 1 unchanged — resize nothing, reshape nothing, only render it using the invisible-mannequin technique and framing shown in Image 2. If your output's garment is longer, shorter, or differently proportioned than Image 1, or resembles Image 2's garment in any way, that is WRONG.`,
+      `FINAL OUTPUT: A single professional e-commerce ghost-mannequin product photograph on a pure white, completely shadowless background — Image 1's exact garment (color, pattern, fabric, design, length, cut, silhouette, all unchanged), rendered using Image 2's invisible-mannequin technique and camera framing only. The garment must look naturally filled with realistic fabric drape and natural wrinkles at shoulders/sleeves/hem, as if worn by an invisible body — NOT flat-lay, NOT laid on a table, NOT on a visible mannequin or hanger.`,
       GHOSTCUT_HARD_CONSTRAINTS,
     ].join(' ')
 
@@ -4371,7 +4379,7 @@ app.post('/api/ghostcut/video/start', async (c) => {
 
     // 사람이나 배경은 전혀 새로 만들어지지 않는다 — 고스트컷 결과 이미지 1장(imageUrl)만 입력으로
     // 쓰고, 그 안의 옷 자체가 제자리에서 미풍에 살랑살랑 흔들리는 연출. 배경은 순백색·무그림자를 끝까지 유지.
-    const prompt = 'The garment shown in the image keeps the ghost-mannequin (invisible-body) effect and stays in the exact same position and framing throughout — it does NOT walk, float away, spin, or change position. The fabric gently sways and ripples as if moved by a soft, natural breeze: subtle, realistic movement in the sleeves, hem, and any loose or flowing fabric areas, with natural cloth physics — gentle, not exaggerated or stormy. The garment\'s color, pattern, print, texture, and design remain exactly as shown in the first frame, completely unchanged throughout the entire video. The background remains pure solid white (#FFFFFF), completely flat and even, with absolutely no shadow, no gradient, no vignette, and no change at any point — identical to the first frame from start to finish. Do NOT introduce any person, human body, face, hands, model, or visible mannequin form at any point in the video — nothing is added to the scene beyond what is already in the source image. The camera stays essentially static — no zoom, no dolly, no pan, no orbital movement — only the fabric itself moves. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Add soft, tasteful ambient background music suited for a clean e-commerce product showcase — no vocals, no jarring sound effects.'
+    const prompt = 'The garment shown in the image keeps the ghost-mannequin (invisible-body) effect and stays in the exact same position and framing throughout — it does NOT walk, float away, spin, or change position. The fabric shows only very subtle, minimal movement — as if a faint indoor air current is passing over it: barely-visible ripples at the hem, cuffs, collar, or any loose, flowing parts of the fabric, with realistic, restrained cloth physics. This must look like a professional e-commerce product video — NOT a strong wind effect, NOT dramatic flapping, billowing, or swaying. When in doubt, less movement is more natural; the garment should read as almost still, with just enough motion to show it is real fabric, not a static photo. The garment\'s color, pattern, print, texture, and design remain exactly as shown in the first frame, completely unchanged throughout the entire video. The background remains pure solid white (#FFFFFF), completely flat and even, with absolutely no shadow, no gradient, no vignette, and no change at any point — identical to the first frame from start to finish. Do NOT introduce any person, human body, face, hands, model, or visible mannequin form at any point in the video — nothing is added to the scene beyond what is already in the source image. The camera stays essentially static — no zoom, no dolly, no pan, no orbital movement — only the fabric itself moves, and only slightly. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Add soft, tasteful ambient background music suited for a clean e-commerce product showcase — no vocals, no jarring sound effects.'
 
     const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
       method: 'POST',
@@ -6922,7 +6930,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <button class="result-nav-btn primary" onclick="downloadWithCreditCheck(0)">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운</span>
-              <span class="rnb-sub"><s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90</span>
+              <span class="rnb-sub" id="downloadActionSub"><s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90</span>
             </button>
             <button class="result-nav-btn primary" id="videoActionBtn" onclick="startVideoGeneration()">
               <span class="rnb-badge">50%↓</span>
