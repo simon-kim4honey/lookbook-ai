@@ -2002,12 +2002,12 @@ function ghostCutHandleFile(file) {
         return;
       }
       if (!data.sampleReady) {
-        if (statusBox) { statusBox.style.color = '#f59e0b'; statusBox.textContent = '⚠️ "' + data.label + '" 카테고리는 아직 준비 중이에요. 다른 상품으로 시도해주세요.'; }
+        if (statusBox) { statusBox.style.color = '#f59e0b'; statusBox.textContent = '⚠️ "' + (data.displayLabel || data.label) + '" 카테고리는 아직 준비 중이에요. 다른 상품으로 시도해주세요.'; }
         return;
       }
 
       ghostCutUpload_ = { dataUrl, category: data.category, categoryLabel: data.label };
-      if (statusBox) { statusBox.style.color = '#22c55e'; statusBox.textContent = '✅ "' + data.label + '"로 인식했어요. 아래 버튼을 눌러 생성을 시작하세요.'; }
+      if (statusBox) { statusBox.style.color = '#22c55e'; statusBox.textContent = '✅ "' + (data.displayLabel || data.label) + '"로 인식했어요. 아래 버튼을 눌러 생성을 시작하세요.'; }
       if (genBtn) genBtn.disabled = false;
     } catch (err) {
       console.error('ghostcut classify error:', err);

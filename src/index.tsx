@@ -365,6 +365,18 @@ const GHOSTCUT_CATEGORIES: GhostCutCategory[] = [
 ]
 const GHOSTCUT_CODE_SET = new Set(GHOSTCUT_CATEGORIES.map(g => g.code))
 
+// 사용자에게 보여줄 분류 결과 라벨 — 29종 세부 카테고리(관리자 샘플 관리용)를 그대로
+// 노출하지 않고 상의/하의/아우터/원피스/점프수트/세트 6종으로 단순화해서 보여준다.
+const GHOSTCUT_DISPLAY_LABEL: Record<string, string> = {}
+GHOSTCUT_CATEGORIES.forEach(g => {
+  if (g.group === '상의' || g.group === '하의' || g.group === '아우터') GHOSTCUT_DISPLAY_LABEL[g.code] = g.group
+})
+GHOSTCUT_DISPLAY_LABEL['DRESS_DRESS'] = '원피스'
+GHOSTCUT_DISPLAY_LABEL['DRESS_JUMPSUIT'] = '점프수트'
+GHOSTCUT_DISPLAY_LABEL['DRESS_OVERALL'] = '세트'
+GHOSTCUT_DISPLAY_LABEL['DRESS_TRACKSUIT'] = '세트'
+GHOSTCUT_DISPLAY_LABEL['DRESS_SUITSET'] = '세트'
+
 async function kvGetGhostCutSample(kv: KVNamespace, code: string): Promise<string | null> {
   return await kv.get(`ghostcut_img:${code}`)
 }
@@ -529,7 +541,7 @@ app.post('/api/ghostcut/classify', async (c) => {
     else if (db) sampleReady = !!(await d1GetGhostCutSample(db, code))
     else sampleReady = !!_memGhostCut[code]
 
-    return c.json({ success: true, isClothing: true, category: code, group: cat.group, label: cat.label, sampleReady })
+    return c.json({ success: true, isClothing: true, category: code, group: cat.group, label: cat.label, displayLabel: GHOSTCUT_DISPLAY_LABEL[code] || cat.group, sampleReady })
   } catch (e: any) {
     console.error('ghostcut/classify error:', e)
     return c.json({ success: false, message: '이미지 분석 중 오류가 발생했습니다.' })
