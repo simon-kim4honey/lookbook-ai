@@ -327,6 +327,82 @@ let _memModels: (CustomModel & { imageBase64?: string })[] = []
 let _memBgs: (CustomBg & { imageBase64?: string })[] = []
 let _memIdCounter = 1000
 
+// ────────────────────────────────────────────────────
+// 고스트컷(Ghost Mannequin) — 카테고리 고정 29종 + 관리자 샘플 이미지
+// (모델/배경과 달리 카테고리가 코드에 고정되어 있어 id 채번 없이 category를 그대로 키로 사용)
+// ────────────────────────────────────────────────────
+interface GhostCutCategory { code: string; group: string; label: string }
+const GHOSTCUT_CATEGORIES: GhostCutCategory[] = [
+  { code: 'TOP_TSHIRT',      group: '상의', label: '티셔츠' },
+  { code: 'TOP_SLEEVELESS',  group: '상의', label: '민소매' },
+  { code: 'TOP_SHIRT',       group: '상의', label: '셔츠' },
+  { code: 'TOP_BLOUSE',      group: '상의', label: '블라우스' },
+  { code: 'TOP_SWEATSHIRT',  group: '상의', label: '맨투맨' },
+  { code: 'TOP_HOODIE',      group: '상의', label: '후드티' },
+  { code: 'TOP_KNIT',        group: '상의', label: '니트' },
+  { code: 'TOP_SWEATER',     group: '상의', label: '스웨터' },
+  { code: 'BOTTOM_DENIM',    group: '하의', label: '데님(청바지)' },
+  { code: 'BOTTOM_SLACKS',   group: '하의', label: '슬랙스' },
+  { code: 'BOTTOM_CHINO',    group: '하의', label: '면바지(치노)' },
+  { code: 'BOTTOM_SHORTS',   group: '하의', label: '반바지' },
+  { code: 'BOTTOM_JOGGER',   group: '하의', label: '조거팬츠' },
+  { code: 'BOTTOM_LEGGINGS', group: '하의', label: '레깅스' },
+  { code: 'BOTTOM_SKIRT',    group: '하의', label: '스커트(치마)' },
+  { code: 'OUTER_COAT',        group: '아우터', label: '코트' },
+  { code: 'OUTER_TRENCHCOAT',  group: '아우터', label: '트렌치코트' },
+  { code: 'OUTER_JACKET',      group: '아우터', label: '자켓' },
+  { code: 'OUTER_BLAZER',      group: '아우터', label: '블레이저' },
+  { code: 'OUTER_CARDIGAN',    group: '아우터', label: '가디건' },
+  { code: 'OUTER_PADDING',     group: '아우터', label: '패딩' },
+  { code: 'OUTER_JUMPER',      group: '아우터', label: '점퍼' },
+  { code: 'OUTER_BLOUSON',     group: '아우터', label: '블루종' },
+  { code: 'OUTER_MUSTANG',     group: '아우터', label: '무스탕' },
+  { code: 'DRESS_DRESS',      group: '원피스및기타', label: '원피스(미니/롱)' },
+  { code: 'DRESS_JUMPSUIT',   group: '원피스및기타', label: '점프수트' },
+  { code: 'DRESS_OVERALL',    group: '원피스및기타', label: '멜빵바지(오버롤)' },
+  { code: 'DRESS_TRACKSUIT',  group: '원피스및기타', label: '트레이닝 세트' },
+  { code: 'DRESS_SUITSET',    group: '원피스및기타', label: '정장 세트(셋업)' },
+]
+const GHOSTCUT_CODE_SET = new Set(GHOSTCUT_CATEGORIES.map(g => g.code))
+
+async function kvGetGhostCutSample(kv: KVNamespace, code: string): Promise<string | null> {
+  return await kv.get(`ghostcut_img:${code}`)
+}
+async function kvSetGhostCutSample(kv: KVNamespace, code: string, imageBase64: string) {
+  await kv.put(`ghostcut_img:${code}`, imageBase64)
+}
+async function kvDeleteGhostCutSample(kv: KVNamespace, code: string) {
+  await kv.delete(`ghostcut_img:${code}`)
+}
+async function kvListGhostCutSamples(kv: KVNamespace): Promise<Record<string, boolean>> {
+  const entries = await Promise.all(GHOSTCUT_CATEGORIES.map(async (g) => [g.code, !!(await kv.get(`ghostcut_img:${g.code}`))] as const))
+  return Object.fromEntries(entries)
+}
+
+async function d1GetGhostCutSample(db: D1Database, code: string): Promise<string | null> {
+  const row: any = await db.prepare(`SELECT image_b64 FROM ghost_cut_samples WHERE category = ?`).bind(code).first()
+  return row?.image_b64 ?? null
+}
+async function d1SetGhostCutSample(db: D1Database, code: string, group: string, label: string, imageBase64: string) {
+  await db.prepare(
+    `INSERT INTO ghost_cut_samples (category, group_name, label_ko, image_b64, updated_at) VALUES (?,?,?,?,datetime('now'))
+     ON CONFLICT(category) DO UPDATE SET image_b64 = excluded.image_b64, updated_at = excluded.updated_at`
+  ).bind(code, group, label, imageBase64).run()
+}
+async function d1DeleteGhostCutSample(db: D1Database, code: string): Promise<boolean> {
+  const r = await db.prepare(`DELETE FROM ghost_cut_samples WHERE category = ?`).bind(code).run()
+  return (r.meta?.changes ?? 0) > 0
+}
+async function d1ListGhostCutSamples(db: D1Database): Promise<Record<string, boolean>> {
+  const { results } = await db.prepare(`SELECT category FROM ghost_cut_samples WHERE image_b64 IS NOT NULL AND image_b64 != ''`).all()
+  const present = new Set((results as any[]).map(r => r.category))
+  const out: Record<string, boolean> = {}
+  GHOSTCUT_CATEGORIES.forEach(g => { out[g.code] = present.has(g.code) })
+  return out
+}
+
+const _memGhostCut: Record<string, string> = {}
+
 // ── 커스텀 모델 API ──
 // POST /api/admin/models — 모델 업로드 (단일 or 배열 일괄)
 app.post('/api/admin/models', adminAuth, async (c) => {
@@ -405,6 +481,58 @@ app.post('/api/validate/clothing', async (c) => {
   } catch (e: any) {
     console.error('validate/clothing error:', e)
     return c.json({ success: true, isClothing: true })
+  }
+})
+
+// POST /api/ghostcut/classify — 고스트컷용 상품 이미지의 세부 카테고리(29종) 자동 판별
+// validate/clothing과 달리 여기서는 판별이 실패하면 사용자에게 재시도를 요청해야 하므로 fail-open하지 않음
+const GHOSTCUT_CLASSIFY_PROMPT = (() => {
+  const lines = GHOSTCUT_CATEGORIES.map(g => `${g.code} (${g.group} - ${g.label})`)
+  return [
+    `You are a clothing product classifier for a "ghost mannequin" e-commerce photography app.`,
+    `Look at the uploaded image. First decide: is this clearly a photo of a SINGLE clothing/fashion product (worn, laid flat, on a hanger, or on a mannequin)? It does not need to be a professional product shot.`,
+    `If it is NOT a clothing product at all (e.g. a person's portrait unrelated to showing a garment, an animal, food, scenery, a random object, or an image with no identifiable single garment), respond with exactly: NOT_CLOTHING`,
+    `If it IS a clothing product, respond with EXACTLY ONE of these category codes (the single best match, nothing else):`,
+    lines.join(', '),
+    `Respond with ONLY the code (e.g. "TOP_HOODIE") or "NOT_CLOTHING" — no explanation, no punctuation, no extra words.`,
+  ].join('\n')
+})()
+
+app.post('/api/ghostcut/classify', async (c) => {
+  try {
+    const body: any = await c.req.json()
+    const imageBase64: string = body?.imageBase64 || ''
+    if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
+
+    const openaiKey = (c.env as any)?.OPENAI_API_KEY || ''
+    if (!openaiKey) return c.json({ success: false, message: '서버 설정 오류: OPENAI_API_KEY 미설정' }, 500)
+
+    const content = await openaiChatVision(openaiKey, imageBase64, GHOSTCUT_CLASSIFY_PROMPT)
+    if (content === null) {
+      return c.json({ success: false, message: '이미지 분석에 실패했습니다. 잠시 후 다시 시도해주세요.' })
+    }
+
+    const code = content.trim().toUpperCase().replace(/[^A-Z_]/g, '')
+    if (code === 'NOT_CLOTHING') {
+      return c.json({ success: true, isClothing: false })
+    }
+    const cat = GHOSTCUT_CATEGORIES.find(g => g.code === code)
+    if (!cat) {
+      console.warn('ghostcut/classify: 알 수 없는 분류 응답:', content)
+      return c.json({ success: false, message: '이미지 분류에 실패했습니다. 다른 사진으로 다시 시도해주세요.' })
+    }
+
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+    let sampleReady = false
+    if (kv) sampleReady = !!(await kvGetGhostCutSample(kv, code))
+    else if (db) sampleReady = !!(await d1GetGhostCutSample(db, code))
+    else sampleReady = !!_memGhostCut[code]
+
+    return c.json({ success: true, isClothing: true, category: code, group: cat.group, label: cat.label, sampleReady })
+  } catch (e: any) {
+    console.error('ghostcut/classify error:', e)
+    return c.json({ success: false, message: '이미지 분석 중 오류가 발생했습니다.' })
   }
 })
 
@@ -733,6 +861,72 @@ app.get('/api/proxy/custom-bg/:id', async (c) => {
   return new Response(bytes.buffer, {
     headers: { 'Content-Type': mime, 'Cache-Control': 'public, max-age=3600' },
   })
+})
+
+// ── 고스트컷 관리자 샘플 API ──
+// GET /api/admin/ghostcut-samples — 29개 카테고리 전체 목록 (등록 여부 + 이미지)
+app.get('/api/admin/ghostcut-samples', adminAuth, async (c) => {
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+
+  let presence: Record<string, boolean> = {}
+  if (kv) presence = await kvListGhostCutSamples(kv)
+  else if (db) presence = await d1ListGhostCutSamples(db)
+  else GHOSTCUT_CATEGORIES.forEach(g => { presence[g.code] = !!_memGhostCut[g.code] })
+
+  const categories = GHOSTCUT_CATEGORIES.map(g => ({ ...g, hasSample: !!presence[g.code] }))
+  return c.json({ success: true, categories })
+})
+
+// GET /api/admin/ghostcut-samples/:category/image — 특정 카테고리 샘플 이미지 원본(base64) 조회
+app.get('/api/admin/ghostcut-samples/:category/image', adminAuth, async (c) => {
+  const code = c.req.param('category')
+  if (!GHOSTCUT_CODE_SET.has(code)) return c.json({ success: false, message: '알 수 없는 카테고리' }, 400)
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+
+  let imageBase64: string | null = null
+  if (kv) imageBase64 = await kvGetGhostCutSample(kv, code)
+  else if (db) imageBase64 = await d1GetGhostCutSample(db, code)
+  else imageBase64 = _memGhostCut[code] || null
+
+  return c.json({ success: true, imageBase64 })
+})
+
+// POST /api/admin/ghostcut-samples/:category — 샘플 이미지 업로드/교체
+app.post('/api/admin/ghostcut-samples/:category', adminAuth, async (c) => {
+  const code = c.req.param('category')
+  const cat = GHOSTCUT_CATEGORIES.find(g => g.code === code)
+  if (!cat) return c.json({ success: false, message: '알 수 없는 카테고리' }, 400)
+  try {
+    const body: any = await c.req.json()
+    const imageBase64: string = body?.imageBase64 || ''
+    if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
+
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+    if (kv) await kvSetGhostCutSample(kv, code, imageBase64)
+    else if (db) await d1SetGhostCutSample(db, code, cat.group, cat.label, imageBase64)
+    else _memGhostCut[code] = imageBase64
+
+    return c.json({ success: true })
+  } catch (e: any) {
+    return c.json({ success: false, message: e.message }, 500)
+  }
+})
+
+// DELETE /api/admin/ghostcut-samples/:category — 샘플 이미지 제거
+app.delete('/api/admin/ghostcut-samples/:category', adminAuth, async (c) => {
+  const code = c.req.param('category')
+  if (!GHOSTCUT_CODE_SET.has(code)) return c.json({ success: false, message: '알 수 없는 카테고리' }, 400)
+  const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+  const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+
+  if (kv) { await kvDeleteGhostCutSample(kv, code); return c.json({ success: true }) }
+  if (db) { const ok = await d1DeleteGhostCutSample(db, code); return c.json({ success: ok }) }
+  const had = !!_memGhostCut[code]
+  delete _memGhostCut[code]
+  return c.json({ success: had })
 })
 
 // GET /api/proxy/clothing/:jobId/:idx — 공유 페이지용 원본 의상 이미지 서빙 (14일 KV 보관)
@@ -3793,6 +3987,128 @@ app.get('/api/generation/:jobId/status', async (c) => {
   }
 })
 
+// ════════════════════════════════════════════════════════════
+// POST /api/ghostcut/generate — 고스트컷(Ghost Mannequin) 상품컷 생성
+// 기존 /api/generation/start(모델컷)와 완전히 분리된 별도 라우트.
+// 상품 이미지 1장 + 관리자가 등록한 해당 카테고리 샘플 이미지 1장만 사용하며,
+// 사람 얼굴/배경 합성 로직(위 5개 분기, CLAUDE.md 경고 대상)은 전혀 건드리지 않는다.
+// jobId 응답 형식은 /api/generation/start와 동일하므로 클라이언트는 기존
+// pollGenerationStatus()/completeGeneration() 등을 그대로 재사용한다.
+//
+// ⚠️ 아래 prompt 문자열도 실제 생성 품질에 직접 영향을 준다 — 함부로 문구를
+//   바꾸지 말 것. scripts/verify-critical-prompts.mjs GUARDS에도 등록되어 있다.
+// ════════════════════════════════════════════════════════════
+app.post('/api/ghostcut/generate', async (c) => {
+  try {
+    const body: any = await c.req.json()
+    const { productImageUrl, category } = body
+
+    if (!productImageUrl || !String(productImageUrl).startsWith('data:')) {
+      return c.json({ error: '상품 이미지가 필요합니다.', code: 'MISSING_IMAGE' }, 400)
+    }
+    const cat = GHOSTCUT_CATEGORIES.find(g => g.code === category)
+    if (!cat) {
+      return c.json({ error: '알 수 없는 카테고리입니다.', code: 'INVALID_CATEGORY' }, 400)
+    }
+
+    // ── 세션 인증 (모델컷과 동일한 방식) ──
+    const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
+    let sessionUser: any = null
+    if (db) {
+      const sessionToken = c.req.header('X-Session-Token') || ''
+      if (sessionToken) {
+        const sess = await db.prepare(
+          `SELECT s.user_id, u.name, u.credits FROM user_sessions s
+           JOIN users u ON u.id = s.user_id
+           WHERE s.token = ? AND s.expires_at > datetime('now')`
+        ).bind(sessionToken).first() as any
+        if (sess) sessionUser = sess
+      }
+      if (!sessionUser) {
+        return c.json({ error: '로그인이 필요합니다.', code: 'UNAUTHORIZED' }, 401)
+      }
+    }
+
+    // ── 관리자 등록 샘플 이미지 조회 ──
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    let sampleImageBase64: string | null = null
+    if (kv) sampleImageBase64 = await kvGetGhostCutSample(kv, category)
+    else if (db) sampleImageBase64 = await d1GetGhostCutSample(db, category)
+    else sampleImageBase64 = _memGhostCut[category] || null
+
+    if (!sampleImageBase64) {
+      return c.json({ error: `"${cat.label}" 카테고리는 아직 준비되지 않았습니다.`, code: 'SAMPLE_NOT_READY' }, 400)
+    }
+
+    // ── 프롬프트 구성 (신규 전용 모드 — 기존 5개 분기와 무관) ──
+    const GHOSTCUT_HARD_CONSTRAINTS = [
+      `ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,
+      `1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,
+      `2. DO NOT change, redesign, or substitute ANY detail of the garment from Image 1: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, or stitching must be reproduced EXACTLY as shown in Image 1.`,
+      `3. NO visible human body, face, hands, mannequin form, hanger, or flat-lay surface anywhere in the output — only the invisible-mannequin (ghost) silhouette effect.`,
+      `4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,
+      `Ultra-photorealistic, 8K quality, professional e-commerce product photography.`,
+    ].join(' ')
+
+    const prompt = [
+      `GHOST MANNEQUIN PRODUCT PHOTOGRAPHY — combine an actual garment photo with a styling reference photo.`,
+      `Image 1 = THE ACTUAL GARMENT. This is the exact product to render — every detail (color, pattern, print, texture, fabric weave, stitching, buttons, zippers, collar, cuffs, hem, logo placement, print scale) must be reproduced EXACTLY as shown in Image 1. Do not alter, redesign, recolor, or substitute any part of this garment.`,
+      `Image 2 = GHOST MANNEQUIN STYLING REFERENCE ONLY. Use Image 2 exclusively for: the invisible-mannequin silhouette and fit (garment appears naturally filled/worn by an invisible body, with realistic 3D volume and drape — no visible mannequin, no visible model, no human body or hands, no headless-torso form), the camera framing/crop/angle, the studio lighting setup, and the background color/style. IGNORE Image 2's own garment color, pattern, print, and fabric entirely — that belongs to a different product and must NOT appear in the output. Only Image 2's STYLING (silhouette shape, framing, lighting, background) transfers to the result.`,
+      `FINAL OUTPUT: A single professional e-commerce ghost-mannequin product photograph — Image 1's exact garment, rendered with Image 2's invisible-mannequin silhouette, framing, lighting, and background style. The garment must look naturally filled with realistic fabric drape and natural wrinkles at shoulders/sleeves/hem, as if worn by an invisible body — NOT flat-lay, NOT laid on a table, NOT on a visible mannequin or hanger.`,
+      GHOSTCUT_HARD_CONSTRAINTS,
+    ].join(' ')
+
+    console.log('[GhostCut] category:', category, '| prompt(first 200):', prompt.substring(0, 200))
+
+    // ── Atlas Cloud 호출 (모델컷과 동일 모델/엔드포인트, images는 [상품, 샘플] 2장 고정) ──
+    const requestBody: any = {
+      model: 'google/nano-banana-2/edit',
+      prompt,
+      aspect_ratio: '1:1',
+      resolution: '2k',
+      thinking_level: 'high',
+      output_format: 'jpeg',
+      images: [productImageUrl, sampleImageBase64],
+    }
+
+    const atlasRes: any = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateImage`, {
+      method: 'POST',
+      headers: atlasHeaders(c.env.ATLAS_API_KEY),
+      body: JSON.stringify(requestBody),
+    }).then(r => r.json())
+
+    if (atlasRes.code !== 200 || !atlasRes.data?.id) {
+      console.error('[GhostCut] Atlas request failed:', atlasRes)
+      const fallbackJobId = 'fallback_' + Math.random().toString(36).substr(2, 9)
+      return c.json({ jobId: fallbackJobId, estimatedSeconds: 5, status: 'queued', isFallback: true, error: atlasRes?.msg || atlasRes?.message || 'Atlas API error' })
+    }
+
+    const jobId = atlasRes.data.id
+
+    if (db && sessionUser) {
+      try {
+        const lastSeq = await db.prepare(
+          `SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`
+        ).bind(sessionUser.user_id).first() as any
+        const nextSeq = (lastSeq?.last_seq || 0) + 1
+        await db.prepare(
+          `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, model_id, bg_id, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, datetime('now', '+14 days'))`
+        ).bind(sessionUser.user_id, jobId, 1, `고스트컷·${cat.label}`, cat.group, '1:1', nextSeq).run()
+      } catch (logErr) {
+        console.warn('[GhostCut] 생성 내역 기록 실패 (무시):', logErr)
+      }
+    }
+
+    return c.json({ jobId, estimatedSeconds: 30, status: 'queued', isFallback: false })
+
+  } catch (err: any) {
+    console.error('GhostCut generate error:', err)
+    const fallbackJobId = 'fallback_' + Math.random().toString(36).substr(2, 9)
+    return c.json({ jobId: fallbackJobId, estimatedSeconds: 5, status: 'queued', isFallback: true, error: err.message })
+  }
+})
+
 // 플레이스홀더 이미지 생성 헬퍼 (Atlas API 실패 시)
 function generatePlaceholderImages(count: number) {
   const colors = [
@@ -4785,6 +5101,8 @@ app.get('/', (c) => {
                 <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
+            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">고스트컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
@@ -5411,6 +5729,18 @@ app.get('/dashboard', (c) => {
         </div>
         <button class="db-charge-btn" onclick="openChargePanel()" data-i18n="nav-charge">충전</button>
       </div>
+
+      <!-- 모델컷 만들기 -->
+      <a href="/generator" class="db-menu-item">
+        <span class="db-menu-label">모델컷 만들기</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
+      <!-- 고스트컷 만들기 -->
+      <a href="/ghostcut" class="db-menu-item">
+        <span class="db-menu-label">고스트컷 만들기</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
 
       <!-- 생성 내역 -->
       <a href="/dashboard#history" class="db-menu-item" id="menuHistory">
@@ -6109,9 +6439,16 @@ app.get('/credits', (c) => {
 
 
 // ─── Generator Page ───
-app.get('/generator', (c) => {
-  const generatorDescription = '옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.'
-  return c.html(htmlShell('무료 AI 룩북 생성기', `
+// /ghostcut은 동일한 셸(모달/스텝-4/결과화면/로딩화면 등)을 그대로 재사용하고,
+// window.__EZLOOK_MODE__ 값을 읽어 클라이언트 JS(app.js)가 step-1 UI만 교체한다.
+// (서버 템플릿은 100% 동일 — 모델컷 플로우에 영향 없음)
+const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
+  const generatorDescription = mode === 'ghostcut'
+    ? '상품(옷) 이미지 한 장만 업로드하면 AI가 카테고리를 자동 인식해 고스트 마네킹(투명 마네킹) 스타일의 상품컷으로 변환해드립니다.'
+    : '옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.'
+  const pageTitle = mode === 'ghostcut' ? '무료 AI 고스트컷 생성기' : '무료 AI 룩북 생성기'
+  const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};</script>`
+  return c.html(htmlShell(pageTitle, `
   <div class="toast-container" id="toastContainer"></div>
   <h1 class="sr-only">AI 룩북 생성기 — 옷 사진 한 장으로 온모델 피팅컷 무료 제작</h1>
 
@@ -6144,6 +6481,8 @@ app.get('/generator', (c) => {
                 <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
+            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">고스트컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
@@ -6491,8 +6830,10 @@ app.get('/generator', (c) => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 이용약관 및 개인정보처리방침에 동의합니다.</p>
     </div>
   </div>
-  `, '', generatorDescription, c.env.GA4_MEASUREMENT_ID))
-})
+  `, modeScript, generatorDescription, c.env.GA4_MEASUREMENT_ID))
+}
+app.get('/generator', (c) => generatorPageHandler(c, 'model'))
+app.get('/ghostcut', (c) => generatorPageHandler(c, 'ghostcut'))
 
 // ────────────────────────────────────────────────────
 // Admin Page  GET /admin
@@ -6690,6 +7031,7 @@ app.get('/admin02', (c) => {
     <button class="tab-btn" onclick="switchTab('home')"><i class="fas fa-home"></i> 홈페이지 관리</button>
     <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
     <button class="tab-btn" onclick="switchTab('bizleads')"><i class="fas fa-building"></i> 사업자 리드</button>
+    <button class="tab-btn" onclick="switchTab('ghostcut')"><i class="fas fa-tshirt"></i> 고스트컷 샘플</button>
   </div>
 
   <!-- ▼ 탭: 프롬프트 -->
@@ -7060,6 +7402,15 @@ app.get('/admin02', (c) => {
     </div>
   </div>
 
+  <!-- ▼ 탭: 고스트컷 샘플 -->
+  <div class="tab-panel" id="tabGhostCut">
+    <div class="admin-body">
+      <div class="page-title">👻 고스트컷 샘플 관리</div>
+      <div class="page-sub">카테고리별로 고스트 마네킹(투명 마네킹) 스타일링 샘플 이미지를 1장씩 등록하세요. 사용자가 상품 이미지를 업로드하면 AI가 카테고리를 자동 판별하고, 여기 등록된 샘플의 실루엣·구도·조명 스타일로 합성합니다. (샘플 자체의 옷 색상/무늬는 결과물에 반영되지 않습니다 — 스타일링 참조 전용)</div>
+      <div id="ghostCutGroups"></div>
+    </div>
+  </div>
+
   <div class="biz-modal-overlay" id="bizModal" onclick="bizCloseModal(event)">
     <div class="biz-modal-box" onclick="event.stopPropagation()">
       <div class="biz-modal-head">
@@ -7097,7 +7448,7 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs','home','users','bizleads']
+    const names = ['prompt','models','bgs','home','users','bizleads','ghostcut']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
@@ -7106,11 +7457,13 @@ function switchTab(name) {
   document.getElementById('tabHome').classList.toggle('active', name === 'home')
   document.getElementById('tabUsers').classList.toggle('active', name === 'users')
   document.getElementById('tabBizLeads').classList.toggle('active', name === 'bizleads')
+  document.getElementById('tabGhostCut').classList.toggle('active', name === 'ghostcut')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos() }
   if (name === 'users')  loadUsers()
   if (name === 'bizleads') bizInit()
+  if (name === 'ghostcut') ghostCutInit()
 }
 
 // ══════════════════════════════════════════════
@@ -7800,6 +8153,81 @@ function readFileAsBase64(file) {
     }
     r.readAsDataURL(file)
   })
+}
+
+// ══════════════════════════════════════════════
+//  고스트컷 샘플 관리 — 카테고리 고정 29종
+// ══════════════════════════════════════════════
+let ghostCutCategories = []
+
+async function ghostCutInit() {
+  const r = await fetch('/api/admin/ghostcut-samples', { headers: { 'X-Admin-Password': adminPassword } })
+  const d = await r.json()
+  if (!d.success) return
+  ghostCutCategories = d.categories
+
+  const groups = {}
+  ghostCutCategories.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c) })
+  const groupOrder = ['상의', '하의', '아우터', '원피스및기타']
+  const readyCount = ghostCutCategories.filter(c => c.hasSample).length
+
+  document.getElementById('ghostCutGroups').innerHTML =
+    '<div class="leads-hint" style="margin-bottom:16px;">등록 현황: <b style="color:#e0e0f0">' + readyCount + '</b> / ' + ghostCutCategories.length + '개 카테고리</div>' +
+    groupOrder.filter(g => groups[g]).map(g => (
+      '<div style="margin-bottom:24px;">' +
+        '<div style="font-weight:700;color:#fff;margin-bottom:10px;font-size:15px;">' + g + '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">' +
+          groups[g].map(ghostCutCardHtml).join('') +
+        '</div>' +
+      '</div>'
+    )).join('')
+
+  ghostCutCategories.filter(c => c.hasSample).forEach(c => ghostCutLoadThumb(c.code))
+}
+
+function ghostCutCardHtml(c) {
+  return '<div style="background:#1e1e35;border:1px solid #3a3a60;border-radius:12px;padding:10px;text-align:center;">' +
+    '<div id="gcThumb_' + c.code + '" style="width:100%;aspect-ratio:1;border-radius:8px;background:#141428;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px;color:#54546e;font-size:12px;">' +
+      (c.hasSample ? '로딩중...' : '미등록') +
+    '</div>' +
+    '<div style="font-size:13px;color:#e0e0f0;font-weight:600;margin-bottom:8px;">' + c.label + '</div>' +
+    '<input type="file" accept="image/*" style="display:none" id="gcFile_' + c.code + '" onchange="ghostCutUpload(\\'' + c.code + '\\', this.files[0])" />' +
+    '<div style="display:flex;gap:6px;justify-content:center;">' +
+      '<button class="leads-btn small" style="padding:5px 10px;font-size:11px;" onclick="document.getElementById(\\'gcFile_' + c.code + '\\').click()">업로드</button>' +
+      (c.hasSample ? '<button class="leads-btn secondary small" style="padding:5px 10px;font-size:11px;" onclick="ghostCutDelete(\\'' + c.code + '\\')">삭제</button>' : '') +
+    '</div>' +
+  '</div>'
+}
+
+async function ghostCutLoadThumb(code) {
+  const r = await fetch('/api/admin/ghostcut-samples/' + code + '/image', { headers: { 'X-Admin-Password': adminPassword } })
+  const d = await r.json()
+  const el = document.getElementById('gcThumb_' + code)
+  if (el && d.success && d.imageBase64) el.innerHTML = '<img src="' + d.imageBase64 + '" style="width:100%;height:100%;object-fit:cover;" />'
+}
+
+async function ghostCutUpload(code, file) {
+  if (!file) return
+  const base64 = await readFileAsBase64(file)
+  const r = await fetch('/api/admin/ghostcut-samples/' + code, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+    body: JSON.stringify({ imageBase64: base64 }),
+  })
+  const d = await r.json()
+  if (!d.success) { alert(d.message || '업로드 실패'); return }
+  ghostCutInit()
+}
+
+async function ghostCutDelete(code) {
+  if (!confirm('이 카테고리의 샘플 이미지를 삭제할까요?')) return
+  const r = await fetch('/api/admin/ghostcut-samples/' + code, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Password': adminPassword },
+  })
+  const d = await r.json()
+  if (!d.success) { alert('삭제 실패'); return }
+  ghostCutInit()
 }
 
 // ══════════════════════════════════════════════
