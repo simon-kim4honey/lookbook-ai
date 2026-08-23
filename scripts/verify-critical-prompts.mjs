@@ -48,14 +48,19 @@ const GUARDS = [
     why: '영상 생성 시 슬로우모션 효과가 들어가지 않도록 막는 문구.',
   },
   {
-    name: '고스트컷 — 샘플 이미지는 스타일링 참조 전용, 샘플의 실제 의류는 무시',
-    must: "IGNORE Image 2's own garment color, pattern, print, and fabric entirely",
-    why: '관리자가 등록한 카테고리 샘플 이미지의 실제 옷(색상/패턴)이 결과물에 섞이면 안 되고, 실루엣/조명/구도만 참조해야 함.',
+    name: '고스트컷 — 샘플 이미지는 실루엣/구도 참조 전용, 샘플의 실제 의류·배경·조명은 무시',
+    must: "IGNORE Image 2's own garment color, pattern, print, fabric, background, and lighting entirely",
+    why: '관리자가 등록한 카테고리 샘플 이미지의 실제 옷(색상/패턴)이나 배경/조명이 결과물에 섞이면 안 되고, 실루엣/구도만 참조해야 함.',
   },
   {
     name: '고스트컷 — 상품 이미지 디테일 정확 재현',
     must: 'DO NOT change, redesign, or substitute ANY detail of the garment from Image 1',
     why: '사용자가 업로드한 실제 상품의 색상/패턴/디테일이 왜곡되지 않도록 하는 문구.',
+  },
+  {
+    name: '고스트컷 — 배경 화이트 고정 + 그림자 제거',
+    must: 'Background MUST be pure solid white (#FFFFFF), completely flat and shadowless',
+    why: '샘플 이미지의 배경/그림자를 그대로 따라가지 않고, 항상 순백색·무그림자 배경으로 강제하기 위한 문구.',
   },
 ]
 
