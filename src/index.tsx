@@ -328,7 +328,7 @@ let _memBgs: (CustomBg & { imageBase64?: string })[] = []
 let _memIdCounter = 1000
 
 // ────────────────────────────────────────────────────
-// 고스트컷(Ghost Mannequin) — 카테고리 고정 6종 + 관리자 샘플 이미지
+// 누끼컷(Ghost Mannequin) — 카테고리 고정 6종 + 관리자 샘플 이미지
 // (모델/배경과 달리 카테고리가 코드에 고정되어 있어 id 채번 없이 category를 그대로 키로 사용)
 // ⚠️ 2026-08-24: 기존 29종 세부 카테고리(예: TOP_HOODIE, BOTTOM_DENIM 등)에서
 //   상의/하의/아우터/원피스/점프수트/세트 6종으로 통합됨. 분류(classify)와 관리자
@@ -465,7 +465,7 @@ app.post('/api/validate/clothing', async (c) => {
   }
 })
 
-// POST /api/ghostcut/classify — 고스트컷용 상품 이미지의 카테고리(6종) 자동 판별
+// POST /api/ghostcut/classify — 누끼컷용 상품 이미지의 카테고리(6종) 자동 판별
 // validate/clothing과 달리 여기서는 판별이 실패하면 사용자에게 재시도를 요청해야 하므로 fail-open하지 않음
 const GHOSTCUT_CLASSIFY_PROMPT = (() => {
   const lines = GHOSTCUT_CATEGORIES.map(g => `${g.code} (${g.group} - ${g.label})`)
@@ -844,7 +844,7 @@ app.get('/api/proxy/custom-bg/:id', async (c) => {
   })
 })
 
-// ── 고스트컷 관리자 샘플 API ──
+// ── 누끼컷 관리자 샘플 API ──
 // GET /api/admin/ghostcut-samples — 6개 카테고리 전체 목록 (등록 여부 + 이미지)
 app.get('/api/admin/ghostcut-samples', adminAuth, async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
@@ -1501,13 +1501,13 @@ app.delete('/api/admin/gen-loading-video/:slot', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
-// ── 고스트컷 로딩화면 하단 이미지 슬롯 (모델컷 생성 로딩화면 영상과 완전히 별도 관리, 최대 5개) ──
+// ── 누끼컷 로딩화면 하단 이미지 슬롯 (모델컷 생성 로딩화면 영상과 완전히 별도 관리, 최대 5개) ──
 // ⚠️ 2026-08-23: 기존엔 영상 업로드였으나, 관리 편의를 위해 이미지 업로드로 전환됨
 // (KV 키 gc_loading_video_* → gc_loading_image_*, 기존 영상 데이터는 자동 이전되지 않음 — 재업로드 필요)
 const GC_LOADING_IMAGE_SLOTS = [1, 2, 3, 4, 5]
 const GC_LOADING_IMAGE_MAX_BYTES = 8 * 1024 * 1024
 
-// GET /api/gc-loading-images — 공개 엔드포인트(고스트컷 로딩화면 + 관리자 목록 조회 공용)
+// GET /api/gc-loading-images — 공개 엔드포인트(누끼컷 로딩화면 + 관리자 목록 조회 공용)
 app.get('/api/gc-loading-images', async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
   const result: Record<string, string | null> = {}
@@ -2605,7 +2605,7 @@ app.post('/api/credits/deduct', async (c) => {
       }
     }
 
-    // 고스트컷 결과 이미지는 model_name에 "고스트컷·" 접두어를 붙여 저장해뒀다 (별도 마이그레이션 없이 재사용)
+    // 누끼컷 결과 이미지는 model_name에 "고스트컷·" 접두어를 붙여 저장해뒀다 (별도 마이그레이션 없이 재사용)
     // 디테일컷("고스트컷디테일·")은 다른 이미지와 동일하게 다운로드 시점에 차감되며, 장당 고정가(60)로
     // 장수와 무관하게 항상 동일하다(볼륨 할인 없음).
     const isGhostCutDetailDownload = !!(genLog?.model_name && String(genLog.model_name).startsWith('고스트컷디테일·'))
@@ -3540,10 +3540,10 @@ function buildClothingReplaceInstructions(
 
 // ── 크레딧 상수 ──
 const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
-const CREDITS_PER_GHOSTCUT_IMAGE = 70  // 고스트컷 이미지 1장당 차감 크레딧(140의 50% 할인) — 모델컷과 별도 요금
+const CREDITS_PER_GHOSTCUT_IMAGE = 70  // 누끼컷 이미지 1장당 차감 크레딧(140의 50% 할인) — 모델컷과 별도 요금
 const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
 
-// 고스트컷 디테일컷(클로즈업) — 1장당 120의 50% 할인 60크레딧, 장수와 무관하게 항상 동일(볼륨 할인 없음).
+// 누끼컷 디테일컷(클로즈업) — 1장당 120의 50% 할인 60크레딧, 장수와 무관하게 항상 동일(볼륨 할인 없음).
 // 다른 이미지 생성과 동일하게 생성 자체는 무료이고, "다운로드 시점"에 장당 차감된다.
 const CREDITS_PER_GHOSTCUT_DETAIL_IMAGE = 60
 
@@ -3563,7 +3563,7 @@ async function markVideoFailedAndRefund(db: D1Database, jobId: string): Promise<
   if ((upd.meta?.changes ?? 0) === 0) return {} // 다른 요청이 먼저 처리함 — 중복 환불 방지
 
   // 이 작업에서 실제로 차감된 금액을 credit_logs에서 그대로 조회해 환불한다.
-  // 모델컷(600)과 고스트컷(250)은 차감액이 다르므로, 고정값으로 환불하면 고스트컷
+  // 모델컷(600)과 누끼컷(250)은 차감액이 다르므로, 고정값으로 환불하면 누끼컷
   // 실패 시 350크레딧을 더 얹어주는 과다 환불 버그가 생긴다.
   const deductLog: any = await db.prepare(
     `SELECT amount FROM credit_logs WHERE ref_id = ? AND reason = 'video_generation' ORDER BY id DESC LIMIT 1`
@@ -4059,7 +4059,7 @@ app.get('/api/generation/:jobId/status', async (c) => {
 })
 
 // ════════════════════════════════════════════════════════════
-// POST /api/ghostcut/generate — 고스트컷(Ghost Mannequin) 상품컷 생성
+// POST /api/ghostcut/generate — 누끼컷(Ghost Mannequin) 상품컷 생성
 // 기존 /api/generation/start(모델컷)와 완전히 분리된 별도 라우트.
 // 상품 이미지 1장 + 관리자가 등록한 해당 카테고리 샘플 이미지 1장만 사용하며,
 // 사람 얼굴/배경 합성 로직(위 5개 분기, CLAUDE.md 경고 대상)은 전혀 건드리지 않는다.
@@ -4298,7 +4298,7 @@ app.post('/api/video/start', async (c) => {
 })
 
 // ════════════════════════════════════════════════════════════
-// POST /api/ghostcut/detail/start — 고스트컷 결과 이미지의 디자인/디테일이
+// POST /api/ghostcut/detail/start — 누끼컷 결과 이미지의 디자인/디테일이
 // 돋보이는 부위를 클로즈업한 "디테일컷" 1~4장을 추가 생성한다.
 // 다운로드가 아닌 "생성 요청 시점"에 크레딧을 즉시 차감(영상과 동일한 방식) —
 // 다운로드는 무료(POST /api/credits/deduct에서 model_name '고스트컷디테일·' 접두사로 인식해 0크레딧 처리).
@@ -4340,8 +4340,8 @@ app.post('/api/ghostcut/detail/start', async (c) => {
     if (!jobId) return c.json({ error: 'jobId 필수', code: 'MISSING_JOB_ID' }, 400)
 
     // 크레딧은 생성이 아닌 "다운로드 시점"에 장당 고정가로 차감된다(POST /api/credits/deduct).
-    // 생성 자체는 모델컷/고스트컷 이미지 생성과 동일하게 무료 — 단, 크레딧 차감 없이 무한정
-    // 생성 요청이 쌓이는 것을 막기 위해 "고스트컷 원본 이미지를 최소 1회 다운로드(=결제)한
+    // 생성 자체는 모델컷/누끼컷 이미지 생성과 동일하게 무료 — 단, 크레딧 차감 없이 무한정
+    // 생성 요청이 쌓이는 것을 막기 위해 "누끼컷 원본 이미지를 최소 1회 다운로드(=결제)한
     // 이력"이 있어야만 디테일컷 생성을 허용한다.
     const gcLog: any = await db.prepare(
       `SELECT downloaded_indices FROM generation_logs WHERE job_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1`
@@ -4351,7 +4351,7 @@ app.post('/api/ghostcut/detail/start', async (c) => {
       try { downloadedIndices = JSON.parse(gcLog.downloaded_indices) } catch {}
     }
     if (downloadedIndices.length === 0) {
-      return c.json({ error: '먼저 고스트컷 이미지를 다운로드한 후 디테일컷을 생성할 수 있습니다.', code: 'DOWNLOAD_REQUIRED' }, 403)
+      return c.json({ error: '먼저 누끼컷 이미지를 다운로드한 후 디테일컷을 생성할 수 있습니다.', code: 'DOWNLOAD_REQUIRED' }, 403)
     }
 
     const detailPrompt = (focusHint: string) => [
@@ -4761,8 +4761,8 @@ app.get('/share/:jobId/:idx', async (c) => {
   const renderSharePage = (opts: { state: 'ok' | 'expired' | 'notfound'; imageUrl?: string; isVideo?: boolean; sourceTabs?: { label: string; url: string }[]; resultTab?: { label: string; url: string }; isGhostCut?: boolean }) => {
     const origin = getOrigin(c)
     const pageUrl = `${origin}/share/${jobId}/${idx}`
-    const shareTitle = opts.isGhostCut ? '상품 이미지로 고스트컷 만들기' : '상품 이미지로 모델컷 만들기'
-    const shareDesc = opts.isGhostCut ? '클릭1번으로 AI고스트컷이 무료로 만들어 진다고?' : '클릭4번으로 AI모델컷이 무료로 만들어 진다고?'
+    const shareTitle = opts.isGhostCut ? '상품 이미지로 누끼컷 만들기' : '상품 이미지로 모델컷 만들기'
+    const shareDesc = opts.isGhostCut ? '클릭1번으로 AI누끼컷이 무료로 만들어 진다고?' : '클릭4번으로 AI모델컷이 무료로 만들어 진다고?'
     const shareCtaHref = opts.isGhostCut ? '/ghostcut' : '/generator'
     let body = ''
     if (opts.state === 'ok') {
@@ -5307,7 +5307,7 @@ app.get('/', (c) => {
               </div>
             </a>
             <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">고스트컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
@@ -5941,9 +5941,9 @@ app.get('/dashboard', (c) => {
         <span class="db-menu-arrow">›</span>
       </a>
 
-      <!-- 고스트컷 만들기 -->
+      <!-- 누끼컷 만들기 -->
       <a href="/ghostcut" class="db-menu-item">
-        <span class="db-menu-label">고스트컷 만들기</span>
+        <span class="db-menu-label">누끼컷 만들기</span>
         <span class="db-menu-arrow">›</span>
       </a>
 
@@ -6014,7 +6014,7 @@ app.get('/dashboard', (c) => {
                 </div>
               </a>
               <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-              <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">고스트컷 만들기</a>
+              <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
               <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
               <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
@@ -6474,8 +6474,10 @@ app.get('/dashboard', (c) => {
           return;
         }
 
-        // 고스트컷/디테일컷 내역은 model_name이 "고스트컷"으로 시작한다 — 이 항목은
-        // 모델을 입힌 영상 생성 대상이 아니므로 "다시보기"에서 2K 영상 생성 버튼을 노출하지 않는다.
+        // 누끼컷/디테일컷 내역은 model_name이 내부적으로 여전히 "고스트컷"으로 시작한다
+        // (표시명은 누끼컷으로 변경됐지만, DB에 이미 저장된 값과의 하위 호환을 위해 내부
+        // 접두어는 그대로 유지). 이 항목은 모델을 입힌 영상 생성 대상이 아니므로
+        // "다시보기"에서 2K 영상 생성 버튼을 노출하지 않는다.
         const isGhostCutRow = /^고스트컷/.test(log.model_name || '');
 
         urls.forEach((u, ui) => {
@@ -6716,7 +6718,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
   const generatorDescription = mode === 'ghostcut'
     ? '상품(옷) 이미지 한 장만 업로드하면 AI가 카테고리를 자동 인식해 고스트 마네킹(투명 마네킹) 스타일의 상품컷으로 변환해드립니다.'
     : '옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.'
-  const pageTitle = mode === 'ghostcut' ? '무료 AI 고스트컷 생성기' : '무료 AI 룩북 생성기'
+  const pageTitle = mode === 'ghostcut' ? '무료 AI 누끼컷 생성기' : '무료 AI 룩북 생성기'
   const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};</script>`
   return c.html(htmlShell(pageTitle, `
   <div class="toast-container" id="toastContainer"></div>
@@ -6752,7 +6754,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               </div>
             </a>
             <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">고스트컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
@@ -6944,7 +6946,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <div class="gen-msg" id="vmsg5"><div class="dot"></div> 최종 인코딩 중...</div>
           </div>
         </div>
-        <!-- 디테일컷 생성 중 오버레이 (고스트컷 전용, 영상 생성 오버레이와 동일한 구조) -->
+        <!-- 디테일컷 생성 중 오버레이 (누끼컷 전용, 영상 생성 오버레이와 동일한 구조) -->
         <div class="generating-view" id="detailCutGeneratingView">
           <div class="gen-news-tag" id="detailCutGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
           <div class="gen-news" id="detailCutGenViewNews" style="display:none;"></div>
@@ -6959,7 +6961,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           </div>
         </div>
         <div class="gslide-scroll" style="padding-top:12px;">
-          <!-- 디테일컷 결과 — 고스트컷 전용, 생성 완료 후에만 표시. 고스트컷 원본 이미지보다 위에 배치 -->
+          <!-- 디테일컷 결과 — 누끼컷 전용, 생성 완료 후에만 표시. 누끼컷 원본 이미지보다 위에 배치 -->
           <div id="detailCutResultsSection" style="display:none;padding:0 16px 16px;">
             <p style="font-size:12px;font-weight:700;color:#8b8ba0;margin:0 0 10px;">디테일컷</p>
             <div id="detailCutResultsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
@@ -6991,13 +6993,13 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <button class="result-nav-btn" id="regenBtnCard" onclick="regenFromCard(0)">
               <span class="rnb-main"><i class="fas fa-rotate-right"></i> 재생성</span>
             </button>
-            <!-- 고스트컷 전용 — initGhostCutUI()에서 노출. "재생성" 버튼이 고스트컷에선 숨겨지므로
+            <!-- 누끼컷 전용 — initGhostCutUI()에서 노출. "재생성" 버튼이 누끼컷에선 숨겨지므로
                  (아래 initGhostCutUI 참고) 그리드 auto-flow로 자연스럽게 "새 프로젝트" 우측에 배치됨 -->
             <button class="result-nav-btn primary" id="detailCutBtn" onclick="openDetailCutMenu()" style="display:none;">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-magnifying-glass"></i> 디테일컷 추가</span>
             </button>
-            <!-- 고스트컷 전용 재생성 — 같은 업로드 이미지로 다시 생성(페이지 새로고침 없음).
+            <!-- 누끼컷 전용 재생성 — 같은 업로드 이미지로 다시 생성(페이지 새로고침 없음).
                  "디테일컷 추가" 바로 다음 DOM 순서라 grid auto-flow로 그 우측에 배치됨 -->
             <button class="result-nav-btn" id="gcRegenBtn" onclick="startGhostCutGeneration()" style="display:none;">
               <span class="rnb-main"><i class="fas fa-rotate-right"></i> 재생성</span>
@@ -7051,7 +7053,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <i class="fas fa-comment"></i> 카카오톡 공유
         </button>
       </div>
-      <!-- 고스트컷 원본 이미지 다운로드 완료 시에만 노출 — 카카오톡 공유 버튼 아래 -->
+      <!-- 누끼컷 원본 이미지 다운로드 완료 시에만 노출 — 카카오톡 공유 버튼 아래 -->
       <button id="actionProgressDetailCutBtn" class="action-progress-share-btn" style="display:none;width:100%;margin-top:8px;" onclick="goToDetailCutFromShare()">
         <i class="fas fa-magnifying-glass"></i> 디테일컷 생성하기
       </button>
@@ -7060,11 +7062,11 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
     </div>
   </div>
 
-  <!-- 디테일컷 장수 선택 모달 (고스트컷 전용) -->
+  <!-- 디테일컷 장수 선택 모달 (누끼컷 전용) -->
   <div class="modal-overlay" id="detailCutModal" style="z-index:10500;">
     <div class="modal-box" style="max-width:340px;">
       <button class="modal-close" onclick="closeModal('detailCutModal')">×</button>
-      <!-- 고스트컷 원본 이미지를 아직 다운로드하지 않았을 때만 노출 — openDetailCutMenu()에서 토글 -->
+      <!-- 누끼컷 원본 이미지를 아직 다운로드하지 않았을 때만 노출 — openDetailCutMenu()에서 토글 -->
       <div id="detailCutDownloadFirstCta" style="display:none;margin-bottom:16px;">
         <button class="result-nav-btn primary" style="width:100%;min-height:52px;" onclick="downloadThenPromptDetailCut()">
           <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운로드</span>
@@ -7364,7 +7366,7 @@ app.get('/admin02', (c) => {
     <button class="tab-btn" onclick="switchTab('home')"><i class="fas fa-home"></i> 홈페이지 관리</button>
     <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
     <button class="tab-btn" onclick="switchTab('bizleads')"><i class="fas fa-building"></i> 사업자 리드</button>
-    <button class="tab-btn" onclick="switchTab('ghostcut')"><i class="fas fa-tshirt"></i> 고스트컷 샘플</button>
+    <button class="tab-btn" onclick="switchTab('ghostcut')"><i class="fas fa-tshirt"></i> 누끼컷 샘플</button>
   </div>
 
   <!-- ▼ 탭: 프롬프트 -->
@@ -7565,9 +7567,9 @@ app.get('/admin02', (c) => {
         <div id="genLoadingVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
 
-      <!-- 고스트컷 로딩화면 하단 이미지 슬롯 (모델컷과 완전히 별도) -->
+      <!-- 누끼컷 로딩화면 하단 이미지 슬롯 (모델컷과 완전히 별도) -->
       <div class="upload-form">
-        <h3><i class="fas fa-image" style="color:#00d4aa;"></i> 생성 로딩화면 이미지 (고스트컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 슬라이드 전환, 8MB 이하, 미등록 시 노출 안 함 — 모델컷 영상과 별도)</span></h3>
+        <h3><i class="fas fa-image" style="color:#00d4aa;"></i> 생성 로딩화면 이미지 (누끼컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 슬라이드 전환, 8MB 이하, 미등록 시 노출 안 함 — 모델컷 영상과 별도)</span></h3>
         <div id="gcLoadingImageGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
     </div>
@@ -7741,10 +7743,10 @@ app.get('/admin02', (c) => {
     </div>
   </div>
 
-  <!-- ▼ 탭: 고스트컷 샘플 -->
+  <!-- ▼ 탭: 누끼컷 샘플 -->
   <div class="tab-panel" id="tabGhostCut">
     <div class="admin-body">
-      <div class="page-title">👻 고스트컷 샘플 관리</div>
+      <div class="page-title">👻 누끼컷 샘플 관리</div>
       <div class="page-sub">카테고리별로 고스트 마네킹(투명 마네킹) 스타일링 샘플 이미지를 1장씩 등록하세요. 사용자가 상품 이미지를 업로드하면 AI가 카테고리를 자동 판별하고, 여기 등록된 샘플의 실루엣·구도·조명 스타일로 합성합니다. (샘플 자체의 옷 색상/무늬는 결과물에 반영되지 않습니다 — 스타일링 참조 전용)</div>
       <div id="ghostCutGroups"></div>
     </div>
@@ -8495,7 +8497,7 @@ function readFileAsBase64(file) {
 }
 
 // ══════════════════════════════════════════════
-//  고스트컷 샘플 관리 — 카테고리 고정 6종
+//  누끼컷 샘플 관리 — 카테고리 고정 6종
 // ══════════════════════════════════════════════
 let ghostCutCategories = []
 
@@ -9140,7 +9142,7 @@ async function deleteGenLoadingVideo(slot) {
 }
 
 // ══════════════════════════════════════════════
-//  고스트컷 로딩화면 이미지 (최대 5슬롯, 모델컷 영상과 완전히 별도 관리)
+//  누끼컷 로딩화면 이미지 (최대 5슬롯, 모델컷 영상과 완전히 별도 관리)
 //  ⚠️ 2026-08-23: 기존 영상 업로드에서 이미지 업로드로 전환됨
 // ══════════════════════════════════════════════
 const GC_LOADING_IMAGE_LABELS = { 1: '이미지 1', 2: '이미지 2', 3: '이미지 3', 4: '이미지 4', 5: '이미지 5' }
