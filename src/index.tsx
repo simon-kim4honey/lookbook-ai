@@ -6959,8 +6959,9 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-magnifying-glass"></i> 디테일컷 추가</span>
             </button>
-            <!-- 고스트컷 전용 재생성 — 같은 업로드 이미지로 다시 생성(페이지 새로고침 없음) -->
-            <button class="result-nav-btn" id="gcRegenBtn" onclick="startGhostCutGeneration()" style="display:none;grid-column:1 / -1;">
+            <!-- 고스트컷 전용 재생성 — 같은 업로드 이미지로 다시 생성(페이지 새로고침 없음).
+                 "디테일컷 추가" 바로 다음 DOM 순서라 grid auto-flow로 그 우측에 배치됨 -->
+            <button class="result-nav-btn" id="gcRegenBtn" onclick="startGhostCutGeneration()" style="display:none;">
               <span class="rnb-main"><i class="fas fa-rotate-right"></i> 재생성</span>
             </button>
           </div>
@@ -7031,9 +7032,9 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운로드</span>
         </button>
       </div>
-      <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#fff;">디테일컷 추가</h3>
-      <p style="margin:0 0 18px;font-size:13px;color:#8b8ba0;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 자동으로 만들어드려요. 생성은 무료 입니다.</p>
-      <div style="display:flex;flex-direction:column;gap:10px;">
+      <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:var(--text-primary);">디테일컷 추가</h3>
+      <p style="margin:0 0 18px;font-size:13px;color:#5c5c70;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 자동으로 만들어드려요. 생성은 무료 입니다.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:48px;">
           <span class="rnb-main">1장 생성</span>
         </button>
