@@ -2280,7 +2280,8 @@ footer {
    비율이 정확히 맞으면 object-fit: cover가 크롭 없이 박스를 꽉 채운다.
    (혹시 비율이 살짝 다른 영상이 올라와도 여백 없이 채워지도록 cover는 유지하되,
    위/아래 어느 한쪽으로 치우쳐 자르지 않도록 object-position은 기본값(중앙)을 사용) */
-.gen-video-promo-player video {
+.gen-video-promo-player video,
+.gen-video-promo-player img {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2289,7 +2290,8 @@ footer {
   opacity: 0;
   transition: opacity 0.4s ease;
 }
-.gen-video-promo-player video.active { opacity: 1; }
+.gen-video-promo-player video.active,
+.gen-video-promo-player img.active { opacity: 1; }
 
 /* 로딩 중 패션 뉴스 로테이터 (영상 생성 로딩화면에서만 사용) */
 .gen-news {
@@ -2305,15 +2307,15 @@ footer {
   animation: gen-news-fade 0.4s ease;
 }
 @keyframes gen-news-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-#videoGenViewNews { margin-top: 0; margin-bottom: 40px; }
+#videoGenViewNews, #detailCutGenViewNews { margin-top: 0; margin-bottom: 40px; }
 .gen-news-tag { font-size: 12px; font-weight: 700; color: #a78bfa; margin-bottom: 6px; letter-spacing: 0.02em; }
 .gen-news-headline {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 39px; /* 13px * 1.5줄간격 * 2줄 — 헤드라인이 1줄이어도 박스 높이가 줄어들지 않도록 고정 */
-  font-size: 13px;
+  min-height: 42px; /* 14px * 1.5줄간격 * 2줄 — 헤드라인이 1줄이어도 박스 높이가 줄어들지 않도록 고정 */
+  font-size: 14px;
   font-weight: 600;
   color: #fff;
   text-decoration: none;
