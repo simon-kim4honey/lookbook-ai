@@ -7025,14 +7025,14 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
   <div class="modal-overlay" id="detailCutModal" style="z-index:10500;">
     <div class="modal-box" style="max-width:340px;">
       <button class="modal-close" onclick="closeModal('detailCutModal')">×</button>
-      <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#fff;">디테일컷 추가</h3>
-      <p style="margin:0 0 18px;font-size:13px;color:#8b8ba0;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 추가로 만들어드려요. 생성은 무료이며, 다운로드 시 장당 <strong style="color:#e0e0f0;"><s style="opacity:0.55;">120</s> 60크레딧</strong>이 차감돼요.</p>
       <!-- 고스트컷 원본 이미지를 아직 다운로드하지 않았을 때만 노출 — openDetailCutMenu()에서 토글 -->
-      <div id="detailCutDownloadFirstCta" style="display:none;margin-bottom:14px;">
+      <div id="detailCutDownloadFirstCta" style="display:none;margin-bottom:16px;">
         <button class="result-nav-btn primary" style="width:100%;min-height:52px;" onclick="downloadThenPromptDetailCut()">
-          <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운로드 후 디테일컷 생성하기</span>
+          <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운로드</span>
         </button>
       </div>
+      <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#fff;">디테일컷 추가</h3>
+      <p style="margin:0 0 18px;font-size:13px;color:#8b8ba0;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 자동으로 만들어드려요. 생성은 무료 입니다.</p>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:48px;">
           <span class="rnb-main">1장 생성</span>
