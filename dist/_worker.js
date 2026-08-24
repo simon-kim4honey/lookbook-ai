@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mt6mbsnp`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mt6um5aj`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1909,6 +1909,10 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           return;
         }
 
+        // 고스트컷/디테일컷 내역은 model_name이 "고스트컷"으로 시작한다 — 이 항목은
+        // 모델을 입힌 영상 생성 대상이 아니므로 "다시보기"에서 2K 영상 생성 버튼을 노출하지 않는다.
+        const isGhostCutRow = /^고스트컷/.test(log.model_name || '');
+
         urls.forEach((u, ui) => {
           const rowSeq = urls.length > 1 ? \`\${seqLabel}-\${ui+1}\` : seqLabel;
           const proxyUrl = u.startsWith('/api/proxy') ? u : \`/api/proxy/gen-image?url=\${encodeURIComponent(u)}\`;
@@ -1917,6 +1921,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           const jobIdEsc = (log.job_id || '').replace(/'/g,"\\\\'");
           const modelEsc = (log.model_name || '패션 모델').replace(/'/g,"\\\\'");
           const bgEsc = (log.bg_name || '스튜디오').replace(/'/g,"\\\\'");
+          const histModalArgs = isGhostCutRow
+            ? \`'\${urlEsc}','\${expEsc}',false\`
+            : \`'\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}'\`;
 
           if (expired) {
             rows.push(\`<div class="hist-row hist-row--expired">
@@ -1934,13 +1941,13 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           const dlLabel = downloadedIdx.includes(ui) ? '재다운로드' : '다운로드';
 
           rows.push(\`<div class="hist-row">
-            <div class="hist-thumb" onclick="openHistModal('\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}')">
+            <div class="hist-thumb" onclick="openHistModal(\${histModalArgs})">
               <img src="\${proxyUrl}" alt="생성 이미지" onerror="this.parentNode.innerHTML='<i class=&quot;fas fa-image&quot;></i>'" />
             </div>
             <div class="hist-body">
               <div class="hist-meta">#\${rowSeq} · \${dateStr} · \${expLabel || ''}</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal('\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}')"><i class="fas fa-eye"></i> 다시보기</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
                 <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)"><i class="fas fa-download"></i> \${dlLabel}</button>
                 <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
               </div>
