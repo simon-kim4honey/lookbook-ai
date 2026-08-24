@@ -804,7 +804,7 @@ function stopGenLoadingVideoPlaylist() {
 }
 
 // ─────────────────────────────────────────────────────────
-// 고스트컷 로딩화면 하단 이미지 슬롯 — 모델컷과 완전히 별도 관리되는 이미지 풀
+// 누끼컷 로딩화면 하단 이미지 슬롯 — 모델컷과 완전히 별도 관리되는 이미지 풀
 // (같은 #genLoadingVideoPlayer DOM을 재사용하되, /api/gc-loading-images에서
 //  받아온 이미지 목록으로 슬라이드 전환한다 — 위 모델컷 영상 함수들은 건드리지 않음)
 // ⚠️ 2026-08-23: 기존 영상 재생 방식에서 이미지 슬라이드쇼로 전환됨
@@ -823,7 +823,7 @@ async function _loadGcLoadingImageList() {
     const images = data.images || {};
     _gcLoadingImageList = [1, 2, 3, 4, 5].map(s => images[s]).filter(Boolean);
   } catch (e) {
-    console.warn('고스트컷 로딩화면 이미지 로딩 실패:', e);
+    console.warn('누끼컷 로딩화면 이미지 로딩 실패:', e);
     _gcLoadingImageList = [];
   }
   return _gcLoadingImageList;
@@ -957,7 +957,7 @@ function setActionComplete(text, opts) {
     _shareCtx = { jobId: opts.jobId, idx: opts.idx, imageUrl: opts.imageUrl || '' };
     if (share) share.style.display = 'flex';
     if (kakaoBtn) kakaoBtn.style.display = _kakaoJsKey ? '' : 'none';
-    // 고스트컷 원본 이미지 다운로드 완료 화면에서만 "디테일컷 생성하기" 바로가기 노출
+    // 누끼컷 원본 이미지 다운로드 완료 화면에서만 "디테일컷 생성하기" 바로가기 노출
     if (detailCutBtn) detailCutBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
   } else if (share) {
     share.style.display = 'none';
@@ -1047,8 +1047,8 @@ function shareToKakao() {
   Kakao.Share.sendDefault({
     objectType: 'feed',
     content: {
-      title: isGc ? '상품 이미지로 고스트컷 만들기' : '상품 이미지로 모델컷 만들기',
-      description: isGc ? '클릭1번으로 AI고스트컷이 무료로 만들어 진다고?' : '클릭4번으로 AI모델컷이 무료로 만들어 진다고?',
+      title: isGc ? '상품 이미지로 누끼컷 만들기' : '상품 이미지로 모델컷 만들기',
+      description: isGc ? '클릭1번으로 AI누끼컷이 무료로 만들어 진다고?' : '클릭4번으로 AI모델컷이 무료로 만들어 진다고?',
       imageUrl: _shareCtx.imageUrl,
       link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
     },
@@ -1903,7 +1903,7 @@ function initGenerator() {
 }
 
 // ─────────────────────────────────────────────────────────
-// 고스트컷 모드 (window.__EZLOOK_MODE__ === 'ghostcut', /ghostcut 라우트)
+// 누끼컷 모드 (window.__EZLOOK_MODE__ === 'ghostcut', /ghostcut 라우트)
 // /ghostcut은 /generator와 완전히 동일한 셸(모달·step-3·step-4·로딩화면 등)을
 // 그대로 서빙하고, 여기서 step-1의 내용만 교체해 재사용한다. 생성은
 // /api/generation/start가 아니라 /api/ghostcut/generate를 호출하지만, 완료 후
@@ -1922,7 +1922,7 @@ function initGhostCutUI() {
   if (originalNav) originalNav.style.display = 'none';
 
   body.innerHTML = `
-    <h2 class="gstep-title">고스트컷을 만들 상품 이미지 1장을 업로드하세요</h2>
+    <h2 class="gstep-title">누끼컷을 만들 상품 이미지 1장을 업로드하세요</h2>
     <p class="gstep-sub">상품(옷) 사진 한 장만 올리면 AI가 종류를 자동으로 인식해요</p>
     <input type="file" id="gcUploadInput" accept="image/*" style="display:none;" onchange="ghostCutHandleFile(this.files[0])" />
     <label for="gcUploadInput" id="gcUploadDrop"
@@ -1956,9 +1956,9 @@ function initGhostCutUI() {
     document.getElementById('step-1').appendChild(nav);
   }
 
-  // 재생성 버튼은 모델컷 전용(/api/generation/start 재호출) — 고스트컷에선 숨기고,
+  // 재생성 버튼은 모델컷 전용(/api/generation/start 재호출) — 누끼컷에선 숨기고,
   // "새 프로젝트" 버튼은 /ghostcut으로 돌아가도록 재배선.
-  // "2K 영상 생성" 버튼도 고스트컷에서는 완전히 숨김(사업성이 약해 기능 자체를 삭제, 2026-08-24).
+  // "2K 영상 생성" 버튼도 누끼컷에서는 완전히 숨김(사업성이 약해 기능 자체를 삭제, 2026-08-24).
   const regenBtn = document.getElementById('regenBtn');
   if (regenBtn) regenBtn.style.display = 'none';
   document.querySelectorAll('#step-4 .result-nav-grid .result-nav-btn').forEach(btn => {
@@ -1968,18 +1968,18 @@ function initGhostCutUI() {
     if (onclickAttr === "window.location.href='/generator'") btn.setAttribute('onclick', "window.location.href='/ghostcut'");
   });
 
-  // 다운로드 버튼 부제(요금)를 고스트컷 요금(140→70)으로 즉시 맞춤
+  // 다운로드 버튼 부제(요금)를 누끼컷 요금(140→70)으로 즉시 맞춤
   const downloadSub = document.getElementById('downloadActionSub');
   if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
 
-  // 디테일컷 추가 / 재생성 버튼은 고스트컷 전용
+  // 디테일컷 추가 / 재생성 버튼은 누끼컷 전용
   const detailBtn = document.getElementById('detailCutBtn');
   if (detailBtn) detailBtn.style.display = '';
   _gcImageDownloaded = false;
   const gcRegenBtn = document.getElementById('gcRegenBtn');
   if (gcRegenBtn) gcRegenBtn.style.display = '';
 
-  // 이미지 생성 로딩화면 하단 홍보 문구 — 모델컷은 영상 생성을, 고스트컷은 디테일컷 생성을 안내
+  // 이미지 생성 로딩화면 하단 홍보 문구 — 모델컷은 영상 생성을, 누끼컷은 디테일컷 생성을 안내
   const promoText = document.getElementById('genVideoPromoText');
   if (promoText) promoText.innerHTML = '<i class="fas fa-magnifying-glass"></i> 이미지가 생성되면 클릭한번으로 디테일컷 이미지 생성이 가능합니다.';
 }
@@ -2116,7 +2116,7 @@ async function startGhostCutGeneration() {
 
     AppState.currentJobId = startData.jobId;
     AppState.lastJobId = startData.jobId;
-    AppState.lastGenParams = null; // 고스트컷 결과는 모델컷 재생성(regenImage) 대상이 아님
+    AppState.lastGenParams = null; // 누끼컷 결과는 모델컷 재생성(regenImage) 대상이 아님
 
     if (startData.isFallback) {
       console.warn('[GhostCut] Atlas Cloud 요청 실패 — 데모 이미지로 대체:', startData.error);
@@ -3278,7 +3278,7 @@ function renderResults(images) {
   if (!grid) return;
 
   // 새 결과가 렌더링되면 이전 영상 생성 상태/버튼을 초기화 — 영상 생성은 모델컷 전용
-  // 기능이라 고스트컷에서는 버튼 자체를 계속 숨김 상태로 유지(2026-08-24 기능 삭제)
+  // 기능이라 누끼컷에서는 버튼 자체를 계속 숨김 상태로 유지(2026-08-24 기능 삭제)
   _videoState = { jobId: null, videoUrl: null, polling: false };
   const videoBtn = document.getElementById('videoActionBtn');
   if (videoBtn) {
@@ -3295,7 +3295,7 @@ function renderResults(images) {
   const downloadSub = document.getElementById('downloadActionSub');
   if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
 
-  // 새 결과가 렌더링되면 이전 상품의 디테일컷 결과/다운로드 상태도 초기화(고스트컷 전용)
+  // 새 결과가 렌더링되면 이전 상품의 디테일컷 결과/다운로드 상태도 초기화(누끼컷 전용)
   const detailBtn = document.getElementById('detailCutBtn');
   if (detailBtn) detailBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
   if (window.__EZLOOK_MODE__ === 'ghostcut') _gcImageDownloaded = false;
@@ -3481,7 +3481,7 @@ async function downloadWithCreditCheck(idx) {
     }
     // 파일 다운로드
     _doFileDownload(img.url, idx + 1);
-    _gcImageDownloaded = true; // 고스트컷 원본 이미지를 1회 이상 다운로드하면 디테일컷 생성이 가능해짐
+    _gcImageDownloaded = true; // 누끼컷 원본 이미지를 1회 이상 다운로드하면 디테일컷 생성이 가능해짐
     const completeMsg = deductData.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', deductData.creditsRemaining);
     setActionComplete(completeMsg, {
       showShare: true,
@@ -3497,9 +3497,9 @@ async function downloadWithCreditCheck(idx) {
 }
 
 // ─────────────────────────────────────────────────────────
-// 디테일컷 추가 생성 (고스트컷 전용) — 생성 요청 시점에 크레딧 차감, 다운로드는 무료
+// 디테일컷 추가 생성 (누끼컷 전용) — 생성 요청 시점에 크레딧 차감, 다운로드는 무료
 // ─────────────────────────────────────────────────────────
-// 디테일컷은 고스트컷 원본 이미지를 1회 이상 다운로드(=결제)하기 전까지 실제로는
+// 디테일컷은 누끼컷 원본 이미지를 1회 이상 다운로드(=결제)하기 전까지 실제로는
 // 생성할 수 없다(서버에서 403으로 거부, 크레딧 차감 없이 생성 요청만 무한정 쌓이는
 // 것을 방지). 다만 "디테일컷 추가" 버튼 자체는 항상 눌러볼 수 있게 열어두고, 아직
 // 다운로드 전이면 장수 선택 모달 상단에 "이미지 다운로드 후 디테일컷 생성하기"
@@ -3565,7 +3565,7 @@ async function startDetailCutGeneration(count) {
       _hideDetailCutGeneratingView();
       _gcImageDownloaded = false; // 서버가 다운로드 이력을 못 찾음 — 클라이언트 상태를 동기화
       const errData = await res.json().catch(() => ({}));
-      showToast(errData.error || '먼저 고스트컷 이미지를 다운로드한 후 이용할 수 있어요.', 'error');
+      showToast(errData.error || '먼저 누끼컷 이미지를 다운로드한 후 이용할 수 있어요.', 'error');
       return;
     }
     if (!res.ok) {
@@ -3778,7 +3778,7 @@ async function downloadDetailCutImage(jobId, idx, url) {
 // ─────────────────────────────────────────────────────────
 let _videoState = { jobId: null, videoUrl: null, polling: false };
 
-// 모델컷(7초·1200→600)과 고스트컷(5초·500→250)은 영상 길이/요금이 다르다
+// 모델컷(7초·1200→600)과 누끼컷(5초·500→250)은 영상 길이/요금이 다르다
 function _videoSubHtml(withStrike) {
   if (window.__EZLOOK_MODE__ === 'ghostcut') {
     return withStrike
@@ -3790,7 +3790,7 @@ function _videoSubHtml(withStrike) {
     : '7초 · <i class="fas fa-coins"></i> 600';
 }
 
-// 모델컷(180→90)과 고스트컷(140→70) 이미지 다운로드 요금 표기
+// 모델컷(180→90)과 누끼컷(140→70) 이미지 다운로드 요금 표기
 function _downloadSubHtml() {
   if (window.__EZLOOK_MODE__ === 'ghostcut') {
     return '<s class="rnb-strike">140</s> <i class="fas fa-coins"></i> 70';
@@ -3910,8 +3910,8 @@ async function startVideoGeneration() {
 
   _showVideoGeneratingView();
 
-  // 영상 생성은 모델컷 전용 기능 — 고스트컷은 "2K 영상 생성" 버튼 자체가 숨겨져 있어
-  // 이 함수가 호출되지 않는다(사업성이 약해 고스트컷 영상 생성 기능은 삭제됨, 2026-08-24).
+  // 영상 생성은 모델컷 전용 기능 — 누끼컷은 "2K 영상 생성" 버튼 자체가 숨겨져 있어
+  // 이 함수가 호출되지 않는다(사업성이 약해 누끼컷 영상 생성 기능은 삭제됨, 2026-08-24).
   try {
     const startRes = await fetch('/api/video/start', {
       method: 'POST',
