@@ -328,54 +328,23 @@ let _memBgs: (CustomBg & { imageBase64?: string })[] = []
 let _memIdCounter = 1000
 
 // ────────────────────────────────────────────────────
-// 고스트컷(Ghost Mannequin) — 카테고리 고정 29종 + 관리자 샘플 이미지
+// 고스트컷(Ghost Mannequin) — 카테고리 고정 6종 + 관리자 샘플 이미지
 // (모델/배경과 달리 카테고리가 코드에 고정되어 있어 id 채번 없이 category를 그대로 키로 사용)
-// ────────────────────────────────────────────────────
+// ⚠️ 2026-08-24: 기존 29종 세부 카테고리(예: TOP_HOODIE, BOTTOM_DENIM 등)에서
+//   상의/하의/아우터/원피스/점프수트/세트 6종으로 통합됨. 분류(classify)와 관리자
+//   샘플 매칭 모두 이 6종 기준으로 동작한다. 기존 29종 코드로 등록된 관리자 샘플은
+//   자동 이전되지 않으므로(D1의 ghost_cut_samples 테이블에 고아 행으로 남음) 6종
+//   기준으로 재업로드가 필요하다.
 interface GhostCutCategory { code: string; group: string; label: string }
 const GHOSTCUT_CATEGORIES: GhostCutCategory[] = [
-  { code: 'TOP_TSHIRT',      group: '상의', label: '티셔츠' },
-  { code: 'TOP_SLEEVELESS',  group: '상의', label: '민소매' },
-  { code: 'TOP_SHIRT',       group: '상의', label: '셔츠' },
-  { code: 'TOP_BLOUSE',      group: '상의', label: '블라우스' },
-  { code: 'TOP_SWEATSHIRT',  group: '상의', label: '맨투맨' },
-  { code: 'TOP_HOODIE',      group: '상의', label: '후드티' },
-  { code: 'TOP_KNIT',        group: '상의', label: '니트' },
-  { code: 'TOP_SWEATER',     group: '상의', label: '스웨터' },
-  { code: 'BOTTOM_DENIM',    group: '하의', label: '데님(청바지)' },
-  { code: 'BOTTOM_SLACKS',   group: '하의', label: '슬랙스' },
-  { code: 'BOTTOM_CHINO',    group: '하의', label: '면바지(치노)' },
-  { code: 'BOTTOM_SHORTS',   group: '하의', label: '반바지' },
-  { code: 'BOTTOM_JOGGER',   group: '하의', label: '조거팬츠' },
-  { code: 'BOTTOM_LEGGINGS', group: '하의', label: '레깅스' },
-  { code: 'BOTTOM_SKIRT',    group: '하의', label: '스커트(치마)' },
-  { code: 'OUTER_COAT',        group: '아우터', label: '코트' },
-  { code: 'OUTER_TRENCHCOAT',  group: '아우터', label: '트렌치코트' },
-  { code: 'OUTER_JACKET',      group: '아우터', label: '자켓' },
-  { code: 'OUTER_BLAZER',      group: '아우터', label: '블레이저' },
-  { code: 'OUTER_CARDIGAN',    group: '아우터', label: '가디건' },
-  { code: 'OUTER_PADDING',     group: '아우터', label: '패딩' },
-  { code: 'OUTER_JUMPER',      group: '아우터', label: '점퍼' },
-  { code: 'OUTER_BLOUSON',     group: '아우터', label: '블루종' },
-  { code: 'OUTER_MUSTANG',     group: '아우터', label: '무스탕' },
-  { code: 'DRESS_DRESS',      group: '원피스및기타', label: '원피스(미니/롱)' },
-  { code: 'DRESS_JUMPSUIT',   group: '원피스및기타', label: '점프수트' },
-  { code: 'DRESS_OVERALL',    group: '원피스및기타', label: '멜빵바지(오버롤)' },
-  { code: 'DRESS_TRACKSUIT',  group: '원피스및기타', label: '트레이닝 세트' },
-  { code: 'DRESS_SUITSET',    group: '원피스및기타', label: '정장 세트(셋업)' },
+  { code: 'TOP',      group: '상의',   label: '상의' },
+  { code: 'BOTTOM',   group: '하의',   label: '하의' },
+  { code: 'OUTER',    group: '아우터', label: '아우터' },
+  { code: 'DRESS',    group: '원피스', label: '원피스' },
+  { code: 'JUMPSUIT', group: '점프수트', label: '점프수트' },
+  { code: 'SET',      group: '세트',   label: '세트' },
 ]
 const GHOSTCUT_CODE_SET = new Set(GHOSTCUT_CATEGORIES.map(g => g.code))
-
-// 사용자에게 보여줄 분류 결과 라벨 — 29종 세부 카테고리(관리자 샘플 관리용)를 그대로
-// 노출하지 않고 상의/하의/아우터/원피스/점프수트/세트 6종으로 단순화해서 보여준다.
-const GHOSTCUT_DISPLAY_LABEL: Record<string, string> = {}
-GHOSTCUT_CATEGORIES.forEach(g => {
-  if (g.group === '상의' || g.group === '하의' || g.group === '아우터') GHOSTCUT_DISPLAY_LABEL[g.code] = g.group
-})
-GHOSTCUT_DISPLAY_LABEL['DRESS_DRESS'] = '원피스'
-GHOSTCUT_DISPLAY_LABEL['DRESS_JUMPSUIT'] = '점프수트'
-GHOSTCUT_DISPLAY_LABEL['DRESS_OVERALL'] = '세트'
-GHOSTCUT_DISPLAY_LABEL['DRESS_TRACKSUIT'] = '세트'
-GHOSTCUT_DISPLAY_LABEL['DRESS_SUITSET'] = '세트'
 
 async function kvGetGhostCutSample(kv: KVNamespace, code: string): Promise<string | null> {
   return await kv.get(`ghostcut_img:${code}`)
@@ -496,7 +465,7 @@ app.post('/api/validate/clothing', async (c) => {
   }
 })
 
-// POST /api/ghostcut/classify — 고스트컷용 상품 이미지의 세부 카테고리(29종) 자동 판별
+// POST /api/ghostcut/classify — 고스트컷용 상품 이미지의 카테고리(6종) 자동 판별
 // validate/clothing과 달리 여기서는 판별이 실패하면 사용자에게 재시도를 요청해야 하므로 fail-open하지 않음
 const GHOSTCUT_CLASSIFY_PROMPT = (() => {
   const lines = GHOSTCUT_CATEGORIES.map(g => `${g.code} (${g.group} - ${g.label})`)
@@ -506,7 +475,7 @@ const GHOSTCUT_CLASSIFY_PROMPT = (() => {
     `If it is NOT a clothing product at all (e.g. a person's portrait unrelated to showing a garment, an animal, food, scenery, a random object, or an image with no identifiable single garment), respond with exactly: NOT_CLOTHING`,
     `If it IS a clothing product, respond with EXACTLY ONE of these category codes (the single best match, nothing else):`,
     lines.join(', '),
-    `Respond with ONLY the code (e.g. "TOP_HOODIE") or "NOT_CLOTHING" — no explanation, no punctuation, no extra words.`,
+    `Respond with ONLY the code (e.g. "TOP") or "NOT_CLOTHING" — no explanation, no punctuation, no extra words.`,
   ].join('\n')
 })()
 
@@ -541,7 +510,7 @@ app.post('/api/ghostcut/classify', async (c) => {
     else if (db) sampleReady = !!(await d1GetGhostCutSample(db, code))
     else sampleReady = !!_memGhostCut[code]
 
-    return c.json({ success: true, isClothing: true, category: code, group: cat.group, label: cat.label, displayLabel: GHOSTCUT_DISPLAY_LABEL[code] || cat.group, sampleReady })
+    return c.json({ success: true, isClothing: true, category: code, group: cat.group, label: cat.label, displayLabel: cat.label, sampleReady })
   } catch (e: any) {
     console.error('ghostcut/classify error:', e)
     return c.json({ success: false, message: '이미지 분석 중 오류가 발생했습니다.' })
@@ -876,7 +845,7 @@ app.get('/api/proxy/custom-bg/:id', async (c) => {
 })
 
 // ── 고스트컷 관리자 샘플 API ──
-// GET /api/admin/ghostcut-samples — 29개 카테고리 전체 목록 (등록 여부 + 이미지)
+// GET /api/admin/ghostcut-samples — 6개 카테고리 전체 목록 (등록 여부 + 이미지)
 app.get('/api/admin/ghostcut-samples', adminAuth, async (c) => {
   const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
   const db: D1Database | undefined = (c.env as any)?.LOOKBOOK_DB
@@ -4464,12 +4433,25 @@ app.post('/api/ghostcut/detail/start', async (c) => {
     if (!sess) return c.json({ error: '세션이 만료되었습니다.', code: 'UNAUTHORIZED' }, 401)
 
     const body: any = await c.req.json()
-    const { imageUrl, categoryLabel } = body
+    const { imageUrl, categoryLabel, jobId } = body
     const requestedCount = Math.max(1, Math.min(4, parseInt(body.count, 10) || 1))
     if (!imageUrl) return c.json({ error: 'imageUrl 필수' }, 400)
+    if (!jobId) return c.json({ error: 'jobId 필수', code: 'MISSING_JOB_ID' }, 400)
 
     // 크레딧은 생성이 아닌 "다운로드 시점"에 장당 고정가로 차감된다(POST /api/credits/deduct).
-    // 생성 자체는 모델컷/고스트컷 이미지 생성과 동일하게 무료.
+    // 생성 자체는 모델컷/고스트컷 이미지 생성과 동일하게 무료 — 단, 크레딧 차감 없이 무한정
+    // 생성 요청이 쌓이는 것을 막기 위해 "고스트컷 원본 이미지를 최소 1회 다운로드(=결제)한
+    // 이력"이 있어야만 디테일컷 생성을 허용한다.
+    const gcLog: any = await db.prepare(
+      `SELECT downloaded_indices FROM generation_logs WHERE job_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1`
+    ).bind(jobId, sess.user_id).first()
+    let downloadedIndices: number[] = []
+    if (gcLog?.downloaded_indices) {
+      try { downloadedIndices = JSON.parse(gcLog.downloaded_indices) } catch {}
+    }
+    if (downloadedIndices.length === 0) {
+      return c.json({ error: '먼저 고스트컷 이미지를 다운로드한 후 디테일컷을 생성할 수 있습니다.', code: 'DOWNLOAD_REQUIRED' }, 403)
+    }
 
     const detailPrompt = (focusHint: string) => [
       `IMAGE CROP TASK — this is NOT a new photograph and NOT a creative reinterpretation. Take the EXACT SAME photograph shown in the source image and output a cropped, zoomed-in region of it — as if you digitally selected a rectangular region of the original photo file and enlarged it. Every pixel of color, texture, pattern, shading, stitching, and surface detail in your output must be identical to what already exists in that region of the source image.`,
@@ -8558,7 +8540,7 @@ function readFileAsBase64(file) {
 }
 
 // ══════════════════════════════════════════════
-//  고스트컷 샘플 관리 — 카테고리 고정 29종
+//  고스트컷 샘플 관리 — 카테고리 고정 6종
 // ══════════════════════════════════════════════
 let ghostCutCategories = []
 
@@ -8568,21 +8550,15 @@ async function ghostCutInit() {
   if (!d.success) return
   ghostCutCategories = d.categories
 
-  const groups = {}
-  ghostCutCategories.forEach(c => { (groups[c.group] = groups[c.group] || []).push(c) })
-  const groupOrder = ['상의', '하의', '아우터', '원피스및기타']
+  // 6종 카테고리는 각각 group === label(1:1)이라 더 이상 그룹 헤더로 묶을 필요가 없어
+  // 단순 플랫 그리드로 표시(API 응답이 이미 GHOSTCUT_CATEGORIES 정의 순서 그대로임)
   const readyCount = ghostCutCategories.filter(c => c.hasSample).length
 
   document.getElementById('ghostCutGroups').innerHTML =
     '<div class="leads-hint" style="margin-bottom:16px;">등록 현황: <b style="color:#e0e0f0">' + readyCount + '</b> / ' + ghostCutCategories.length + '개 카테고리</div>' +
-    groupOrder.filter(g => groups[g]).map(g => (
-      '<div style="margin-bottom:24px;">' +
-        '<div style="font-weight:700;color:#fff;margin-bottom:10px;font-size:15px;">' + g + '</div>' +
-        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">' +
-          groups[g].map(ghostCutCardHtml).join('') +
-        '</div>' +
-      '</div>'
-    )).join('')
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;">' +
+      ghostCutCategories.map(ghostCutCardHtml).join('') +
+    '</div>'
 
   ghostCutCategories.filter(c => c.hasSample).forEach(c => ghostCutLoadThumb(c.code))
 }

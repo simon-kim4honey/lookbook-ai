@@ -1960,9 +1960,11 @@ function initGhostCutUI() {
   const videoSub = document.getElementById('videoActionSub');
   if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
 
-  // 디테일컷 추가 버튼은 고스트컷 전용
+  // 디테일컷 추가 버튼은 고스트컷 전용 — 원본 이미지를 1회 이상 다운로드하기 전까지는 잠김
+  // (크레딧 차감 없이 생성 요청만 무한정 쌓이는 것을 방지)
   const detailBtn = document.getElementById('detailCutBtn');
   if (detailBtn) detailBtn.style.display = '';
+  _lockDetailCutBtn();
 
   // 이미지 생성 로딩화면 하단 홍보 문구 — 모델컷은 영상 생성을, 고스트컷은 디테일컷 생성을 안내
   const promoText = document.getElementById('genVideoPromoText');
@@ -3267,9 +3269,10 @@ function renderResults(images) {
   const downloadSub = document.getElementById('downloadActionSub');
   if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
 
-  // 새 결과가 렌더링되면 이전 상품의 디테일컷 결과도 초기화(고스트컷 전용)
+  // 새 결과가 렌더링되면 이전 상품의 디테일컷 결과/잠금 상태도 초기화(고스트컷 전용)
   const detailBtn = document.getElementById('detailCutBtn');
   if (detailBtn) detailBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
+  if (window.__EZLOOK_MODE__ === 'ghostcut') _lockDetailCutBtn();
   const detailSection = document.getElementById('detailCutResultsSection');
   const detailGrid = document.getElementById('detailCutResultsGrid');
   if (detailSection) detailSection.style.display = 'none';
@@ -3450,6 +3453,7 @@ async function downloadWithCreditCheck(idx) {
     }
     // 파일 다운로드
     _doFileDownload(img.url, idx + 1);
+    _unlockDetailCutBtn(); // 고스트컷 원본 이미지를 1회 이상 다운로드하면 디테일컷 버튼 활성화
     const completeMsg = deductData.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', deductData.creditsRemaining);
     setActionComplete(completeMsg, {
       showShare: true,
@@ -3467,10 +3471,39 @@ async function downloadWithCreditCheck(idx) {
 // ─────────────────────────────────────────────────────────
 // 디테일컷 추가 생성 (고스트컷 전용) — 생성 요청 시점에 크레딧 차감, 다운로드는 무료
 // ─────────────────────────────────────────────────────────
+// 디테일컷은 고스트컷 원본 이미지를 1회 이상 다운로드(=결제)하기 전까지 잠겨있다
+// (크레딧 차감 없이 생성 요청만 무한정 쌓이는 것을 방지) — 버튼 disabled로 클릭 자체가
+// 막히지만, 방어적으로 함수 진입 시점에도 한 번 더 확인한다.
+function _lockDetailCutBtn() {
+  const btn = document.getElementById('detailCutBtn');
+  if (!btn) return;
+  btn.disabled = true;
+  let sub = btn.querySelector('.rnb-sub');
+  if (!sub) {
+    sub = document.createElement('span');
+    sub.className = 'rnb-sub';
+    btn.appendChild(sub);
+  }
+  sub.textContent = '이미지 다운로드 후 이용 가능';
+}
+
+function _unlockDetailCutBtn() {
+  const btn = document.getElementById('detailCutBtn');
+  if (!btn) return;
+  btn.disabled = false;
+  const sub = btn.querySelector('.rnb-sub');
+  if (sub) sub.remove();
+}
+
 function openDetailCutMenu() {
   const img = AppState.generatedImages[0];
   if (!img || !img.originalUrl) {
     showToast('디테일컷을 생성할 이미지가 없습니다.', 'error');
+    return;
+  }
+  const detailBtn = document.getElementById('detailCutBtn');
+  if (detailBtn && detailBtn.disabled) {
+    showToast('먼저 고스트컷 이미지를 다운로드한 후 이용할 수 있어요.', 'error');
     return;
   }
   const sessionToken = localStorage.getItem('lookbook_token') || '';
@@ -3501,12 +3534,19 @@ async function startDetailCutGeneration(count) {
     const res = await fetch('/api/ghostcut/detail/start', {
       method: 'POST',
       headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageUrl: img.originalUrl, count, categoryLabel: ghostCutUpload_.categoryLabel }),
+      body: JSON.stringify({ imageUrl: img.originalUrl, count, categoryLabel: ghostCutUpload_.categoryLabel, jobId: AppState.lastJobId }),
     });
 
     if (res.status === 401) {
       _hideDetailCutGeneratingView();
       showToast(t('loginRequired'), 'error');
+      return;
+    }
+    if (res.status === 403) {
+      _hideDetailCutGeneratingView();
+      _lockDetailCutBtn();
+      const errData = await res.json().catch(() => ({}));
+      showToast(errData.error || '먼저 고스트컷 이미지를 다운로드한 후 이용할 수 있어요.', 'error');
       return;
     }
     if (!res.ok) {
