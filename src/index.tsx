@@ -6443,6 +6443,10 @@ app.get('/dashboard', (c) => {
           return;
         }
 
+        // 고스트컷/디테일컷 내역은 model_name이 "고스트컷"으로 시작한다 — 이 항목은
+        // 모델을 입힌 영상 생성 대상이 아니므로 "다시보기"에서 2K 영상 생성 버튼을 노출하지 않는다.
+        const isGhostCutRow = /^고스트컷/.test(log.model_name || '');
+
         urls.forEach((u, ui) => {
           const rowSeq = urls.length > 1 ? \`\${seqLabel}-\${ui+1}\` : seqLabel;
           const proxyUrl = u.startsWith('/api/proxy') ? u : \`/api/proxy/gen-image?url=\${encodeURIComponent(u)}\`;
@@ -6451,6 +6455,9 @@ app.get('/dashboard', (c) => {
           const jobIdEsc = (log.job_id || '').replace(/'/g,"\\\\'");
           const modelEsc = (log.model_name || '패션 모델').replace(/'/g,"\\\\'");
           const bgEsc = (log.bg_name || '스튜디오').replace(/'/g,"\\\\'");
+          const histModalArgs = isGhostCutRow
+            ? \`'\${urlEsc}','\${expEsc}',false\`
+            : \`'\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}'\`;
 
           if (expired) {
             rows.push(\`<div class="hist-row hist-row--expired">
@@ -6468,13 +6475,13 @@ app.get('/dashboard', (c) => {
           const dlLabel = downloadedIdx.includes(ui) ? '재다운로드' : '다운로드';
 
           rows.push(\`<div class="hist-row">
-            <div class="hist-thumb" onclick="openHistModal('\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}')">
+            <div class="hist-thumb" onclick="openHistModal(\${histModalArgs})">
               <img src="\${proxyUrl}" alt="생성 이미지" onerror="this.parentNode.innerHTML='<i class=&quot;fas fa-image&quot;></i>'" />
             </div>
             <div class="hist-body">
               <div class="hist-meta">#\${rowSeq} · \${dateStr} · \${expLabel || ''}</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal('\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}')"><i class="fas fa-eye"></i> 다시보기</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
                 <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)"><i class="fas fa-download"></i> \${dlLabel}</button>
                 <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
               </div>
