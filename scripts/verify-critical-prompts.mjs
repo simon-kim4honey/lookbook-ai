@@ -83,31 +83,6 @@ const GUARDS = [
     why: '2026-08-23 사용자 요청으로 추가된 이중 안전장치. 다른 문구들이 색상/패턴을 포괄적으로 언급하고 있었지만, 소재(재질)와 컬러를 별도의 절대 규칙으로 명시해 향후 리팩터링으로 흐려지지 않도록 함.',
   },
   {
-    name: '고스트컷 영상 — 옷은 제자리에서 미풍에만 흔들림(사람 등장/이동 금지)',
-    must: 'it does NOT walk, float away, spin, fall, or change position',
-    why: '고스트컷 영상은 사람이 포징하는 모델컷 영상과 달리 옷 자체가 제자리에서 살랑거리기만 해야 함. 이 문구가 없으면 모델컷 영상 프롬프트처럼 인물/이동이 섞여 들어갈 수 있음.',
-  },
-  {
-    name: '고스트컷 영상 — 옷이 안에서 공기가 들어차 부풀어 오르는(풍선 효과) 것 금지',
-    must: 'it must NOT inflate, balloon, puff up, expand, grow rounder, or look like it is filling with air from within',
-    why: '2026-08-23 실제 발견된 회귀: 미풍 표현을 지나치게 약하게("very subtle, minimal movement") 서술했더니 오히려 AI가 옷 안쪽에서 공기가 들어차 부풀어 오르는 부자연스러운 영상을 만들었다. 옷 표면이 자연스럽게 살랑거리는 것은 허용하되, 옷 전체 부피가 풍선처럼 팽창하는 것은 명시적으로 금지해야 함.',
-  },
-  {
-    name: '고스트컷 영상 — 패딩/퀄팅류는 볼륨이 첫 프레임 그대로 고정(재발 방지)',
-    must: 'This applies especially to padded, quilted, or puffer-style garments (e.g. a padded jumper/jacket) — their padding and loft must look exactly as filled and rigid as in the first frame from start to finish, with zero growth in volume',
-    why: '2026-08-23 재발 사례: 위 풍선 효과 금지 문구를 추가한 뒤에도 패딩 점퍼 상품에서는 옷 전체가 다시 부풀어 오르는 현상이 재발함. 패딩류는 원래 형태 자체가 통통해서 AI가 "더 부풀리는" 쪽으로 해석하기 쉬우므로, 패딩/퀄팅류를 별도로 콕 집어 볼륨 고정을 강조하는 문구를 추가함.',
-  },
-  {
-    name: '고스트컷 영상 — 바닥/표면 없이 공중에 떠 있는 상태 유지(재발 방지)',
-    must: 'There is NO ground, floor, surface, table, clothesline, hanger, or any support of any kind visible or implied anywhere in the scene at any point',
-    why: '2026-08-23 재발 사례: "빨랫줄에 걸린 옷" 비유가 오히려 옷이 바닥/바닥 근처에 놓인 채 바람에 날리는 것처럼 보이는 결과를 유발함. 고스트 마네킹 효과대로 옷이 공중에 완전히 떠 있는 상태여야 하며, 바닥/표면/지지대가 화면에 전혀 암시되어서도 안 됨을 명시.',
-  },
-  {
-    name: '고스트컷 영상 — 배경 화이트를 영상 끝까지 유지',
-    must: 'identical to the first frame from start to finish',
-    why: '영상 중간에 배경이 변하거나 그림자가 생기지 않도록 첫 프레임과 끝까지 동일해야 함을 명시.',
-  },
-  {
     name: '고스트컷 디테일컷 — 크롭/줌일 뿐 새로운 디자인 해석 금지',
     must: 'Do NOT redesign, alter, invent, or change ANY detail of the garment — this is a crop/zoom of the exact same real garment, not a new interpretation.',
     why: '디테일컷은 생성된 고스트컷 이미지의 특정 부위를 클로즈업하는 것일 뿐, AI가 새로운 디자인으로 재해석하면 안 된다. 이 문구가 없으면 클로즈업 과정에서 디자인/색상이 미묘하게 바뀔 위험이 있음.',

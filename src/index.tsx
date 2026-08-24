@@ -3542,7 +3542,6 @@ function buildClothingReplaceInstructions(
 const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
 const CREDITS_PER_GHOSTCUT_IMAGE = 70  // 고스트컷 이미지 1장당 차감 크레딧(140의 50% 할인) — 모델컷과 별도 요금
 const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
-const CREDITS_PER_GHOSTCUT_VIDEO = 250 // 고스트컷 영상(5초)당 차감 크레딧 — 모델컷과 별도 요금
 
 // 고스트컷 디테일컷(클로즈업) — 1장당 120의 50% 할인 60크레딧, 장수와 무관하게 항상 동일(볼륨 할인 없음).
 // 다른 이미지 생성과 동일하게 생성 자체는 무료이고, "다운로드 시점"에 장당 차감된다.
@@ -4294,104 +4293,6 @@ app.post('/api/video/start', async (c) => {
     return c.json({ success: true, jobId, creditsRemaining: newBalance })
   } catch (err: any) {
     console.error('video/start error:', err)
-    return c.json({ success: false, message: err.message }, 500)
-  }
-})
-
-// ════════════════════════════════════════════════════════════
-// POST /api/ghostcut/video/start — 고스트컷 결과물을 미풍에 흔들리는 7초 영상으로 변환
-// 기존 /api/video/start(모델컷: 사람이 포징하는 프롬프트)와 완전히 분리된 별도 라우트.
-// 상태 폴링(GET /api/video/:jobId/status)은 job_id 기반으로 완전히 범용이라 그대로 재사용.
-//
-// ⚠️ 아래 prompt 문자열도 실제 생성 품질에 직접 영향을 준다 — 함부로 문구를
-//   바꾸지 말 것. scripts/verify-critical-prompts.mjs GUARDS에도 등록되어 있다.
-// ════════════════════════════════════════════════════════════
-app.post('/api/ghostcut/video/start', async (c) => {
-  try {
-    const db: D1Database = c.env.LOOKBOOK_DB
-    const sessionToken = c.req.header('X-Session-Token') || ''
-    if (!sessionToken) return c.json({ error: '로그인이 필요합니다.', code: 'UNAUTHORIZED' }, 401)
-
-    const sess = await db.prepare(
-      `SELECT s.user_id, u.credits, u.name FROM user_sessions s
-       JOIN users u ON u.id = s.user_id
-       WHERE s.token = ? AND s.expires_at > datetime('now')`
-    ).bind(sessionToken).first() as any
-    if (!sess) return c.json({ error: '세션이 만료되었습니다.', code: 'UNAUTHORIZED' }, 401)
-
-    const body: any = await c.req.json()
-    const { imageUrl, categoryLabel } = body
-    if (!imageUrl) return c.json({ error: 'imageUrl 필수' }, 400)
-
-    const COST = CREDITS_PER_GHOSTCUT_VIDEO
-    if (sess.credits < COST) {
-      return c.json({
-        error: `크레딧이 부족합니다. (보유: ${sess.credits}크레딧, 필요: ${COST}크레딧)`,
-        code: 'INSUFFICIENT_CREDITS',
-        available: sess.credits,
-        required: COST,
-      }, 402)
-    }
-
-    // 사람이나 배경은 전혀 새로 만들어지지 않는다 — 고스트컷 결과 이미지 1장(imageUrl)만 입력으로
-    // 쓰고, 그 안의 옷 자체가 제자리에서 미풍에 살랑살랑 흔들리는 연출. 배경은 순백색·무그림자를 끝까지 유지.
-    // ⚠️ 2026-08-23 회귀 이력:
-    //   1차) "매우 미세한 움직임만" 표현이 오히려 옷 안쪽에서 공기가 들어차 부풀어 오르는
-    //        (풍선처럼 팽창) 영상을 유발함 → "미풍에 자연스럽게 살랑" + "부풀어 오르는 것 금지"로 수정.
-    //   2차) 위 수정 후에도 패딩 점퍼(퀄팅/패딩류) 상품에서는 여전히 옷 전체가 부풀어 오르는
-    //        현상이 재발함(패딩류는 원래도 통통한 형태라 AI가 "더 부풀리는" 쪽으로 해석하기 쉬움).
-    //        → "외부 바람에 흩날리는 실제 물리 현상"에 빗대어 더 구체적으로 지시하고, 패딩/퀄팅류는
-    //        볼륨이 첫 프레임 그대로 고정임을 별도 명시.
-    //   3차) "빨랫줄에 걸린 옷" 비유가 오히려 옷이 바닥/바닥 근처에 놓여 바람에 날리는 것처럼
-    //        보이는 결과를 유발함(공중에 떠 있는 고스트 마네킹 효과가 아니라 바닥에 눕혀진 느낌).
-    //        → 바닥/표면/지지대가 전혀 없이 공중에 떠 있는 상태임을 명시적으로 강조하고, 옷 전체가
-    //        (끝단뿐 아니라) 하나로 연결되어 함께 살랑거리는 느낌으로 수정.
-    const prompt = 'The garment shown in the image keeps the ghost-mannequin (invisible-body) effect and remains floating in mid-air, worn by the exact same invisible body exactly as filled in the first frame, anchored in the same overall position and framing throughout — it does NOT walk, float away, spin, fall, or change position. There is NO ground, floor, surface, table, clothesline, hanger, or any support of any kind visible or implied anywhere in the scene at any point — the garment is entirely suspended in open air, exactly like the first frame. While anchored in place, the entire garment gently sways and drifts together as one connected whole (the body, sleeves, collar, and hem all move together, not just isolated edges) — as if a light, natural outdoor breeze is flowing around the invisible body wearing it while it floats in open air, with soft, rhythmic, realistic cloth physics. CRITICAL: the garment\'s internal volume, loft, and thickness are 100% FIXED exactly as shown in the first frame and must NEVER change — it must NOT inflate, balloon, puff up, expand, grow rounder, or look like it is filling with air from within, at any point in the video. This applies especially to padded, quilted, or puffer-style garments (e.g. a padded jumper/jacket) — their padding and loft must look exactly as filled and rigid as in the first frame from start to finish, with zero growth in volume. This must look like a professional e-commerce product video with natural, believable, whole-garment fabric motion — NOT a static photo, NOT laundry lying on or pinned to the ground, NOT a strong gust with dramatic flapping, and absolutely NOT any inflating, expanding, or ballooning motion. The garment\'s color, pattern, print, texture, and design remain exactly as shown in the first frame, completely unchanged throughout the entire video. The background remains pure solid white (#FFFFFF), completely flat and even, with absolutely no shadow, no gradient, no vignette, and no change at any point — identical to the first frame from start to finish. Do NOT introduce any person, human body, face, hands, model, or visible mannequin form at any point in the video — nothing is added to the scene beyond what is already in the source image. The camera stays essentially static — no zoom, no dolly, no pan, no orbital movement — only the garment itself moves. Smooth, realistic motion at regular playback speed — absolutely no slow motion, no slow-mo effect, no frame-rate ramping. Add soft, tasteful ambient background music suited for a clean e-commerce product showcase — no vocals, no jarring sound effects.'
-
-    const startRes = await fetch(`${ATLAS_API_BASE}/api/v1/model/generateVideo`, {
-      method: 'POST',
-      headers: atlasHeaders(c.env.ATLAS_API_KEY),
-      body: JSON.stringify({
-        model: 'bytedance/seedance-2.5/image-to-video',
-        prompt,
-        image: imageUrl,
-        duration: 5,
-        resolution: '1080p-esr',
-        ratio: 'adaptive',
-        output_format: 'mp4',
-        generate_audio: true,
-        watermark: false,
-      }),
-    })
-    const startData: any = await startRes.json()
-    const jobId = startData?.data?.id || startData?.id || null
-
-    if (!startRes.ok || !jobId) {
-      console.error('ghostcut/video/start Atlas 요청 실패:', startData)
-      return c.json({ success: false, message: startData?.msg || startData?.message || '영상 생성 요청 실패' }, 502)
-    }
-
-    // 생성 요청이 정상 접수된 뒤에만 크레딧 차감 (실패 시 차감 안 함)
-    const newBalance = sess.credits - COST
-    await db.prepare(`UPDATE users SET credits = ?, updated_at = datetime('now') WHERE id = ?`).bind(newBalance, sess.user_id).run()
-    await db.prepare(
-      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-       VALUES (?, 'deduct', ?, ?, 'video_generation', ?)`
-    ).bind(sess.user_id, -COST, newBalance, jobId).run()
-
-    const lastSeq = await db.prepare(
-      `SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`
-    ).bind(sess.user_id).first() as any
-    const nextSeq = (lastSeq?.last_seq || 0) + 1
-
-    await db.prepare(
-      `INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, kind, expires_at, image_urls)
-       VALUES (?, ?, 1, ?, ?, '1:1', ?, 'video', datetime('now', '+14 days'), ?)`
-    ).bind(sess.user_id, jobId, `고스트컷·${categoryLabel || ''}`, '화이트 배경', nextSeq, JSON.stringify([imageUrl])).run()
-
-    return c.json({ success: true, jobId, creditsRemaining: newBalance })
-  } catch (err: any) {
-    console.error('ghostcut/video/start error:', err)
     return c.json({ success: false, message: err.message }, 500)
   }
 })
@@ -7055,6 +6956,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <!-- 고스트컷 전용 — initGhostCutUI()에서 노출. "재생성" 버튼이 고스트컷에선 숨겨지므로
                  (아래 initGhostCutUI 참고) 그리드 auto-flow로 자연스럽게 "새 프로젝트" 우측에 배치됨 -->
             <button class="result-nav-btn primary" id="detailCutBtn" onclick="openDetailCutMenu()" style="display:none;">
+              <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-magnifying-glass"></i> 디테일컷 추가</span>
             </button>
           </div>
@@ -7106,6 +7008,10 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <i class="fas fa-comment"></i> 카카오톡 공유
         </button>
       </div>
+      <!-- 고스트컷 원본 이미지 다운로드 완료 시에만 노출 — 카카오톡 공유 버튼 아래 -->
+      <button id="actionProgressDetailCutBtn" class="action-progress-share-btn" style="display:none;width:100%;margin-top:8px;" onclick="goToDetailCutFromShare()">
+        <i class="fas fa-magnifying-glass"></i> 디테일컷 생성하기
+      </button>
       <div class="gen-news" id="actionProgressNews" style="display:none;"></div>
       <button id="actionProgressCloseBtn" class="action-progress-close" onclick="closeActionProgress()" style="display:none;">닫기</button>
     </div>
@@ -7117,6 +7023,12 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
       <button class="modal-close" onclick="closeModal('detailCutModal')">×</button>
       <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#fff;">디테일컷 추가</h3>
       <p style="margin:0 0 18px;font-size:13px;color:#8b8ba0;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 추가로 만들어드려요. 생성은 무료이며, 다운로드 시 장당 <strong style="color:#e0e0f0;"><s style="opacity:0.55;">120</s> 60크레딧</strong>이 차감돼요.</p>
+      <!-- 고스트컷 원본 이미지를 아직 다운로드하지 않았을 때만 노출 — openDetailCutMenu()에서 토글 -->
+      <div id="detailCutDownloadFirstCta" style="display:none;margin-bottom:14px;">
+        <button class="result-nav-btn primary" style="width:100%;min-height:52px;" onclick="downloadThenPromptDetailCut()">
+          <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운로드 후 디테일컷 생성하기</span>
+        </button>
+      </div>
       <div style="display:flex;flex-direction:column;gap:10px;">
         <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:48px;">
           <span class="rnb-main">1장 생성</span>

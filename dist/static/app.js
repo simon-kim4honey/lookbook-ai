@@ -948,6 +948,7 @@ function setActionComplete(text, opts) {
   const share = document.getElementById('actionProgressShare');
   const closeBtn = document.getElementById('actionProgressCloseBtn');
   const kakaoBtn = document.getElementById('actionProgressKakaoBtn');
+  const detailCutBtn = document.getElementById('actionProgressDetailCutBtn');
   if (spinner) spinner.style.display = 'none';
   if (check) check.style.display = 'flex';
   if (textEl) textEl.textContent = text;
@@ -956,9 +957,17 @@ function setActionComplete(text, opts) {
     _shareCtx = { jobId: opts.jobId, idx: opts.idx, imageUrl: opts.imageUrl || '' };
     if (share) share.style.display = 'flex';
     if (kakaoBtn) kakaoBtn.style.display = _kakaoJsKey ? '' : 'none';
+    // 고스트컷 원본 이미지 다운로드 완료 화면에서만 "디테일컷 생성하기" 바로가기 노출
+    if (detailCutBtn) detailCutBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
   } else if (share) {
     share.style.display = 'none';
+    if (detailCutBtn) detailCutBtn.style.display = 'none';
   }
+}
+
+function goToDetailCutFromShare() {
+  closeActionProgress();
+  openDetailCutMenu();
 }
 
 function closeActionProgress() {
@@ -1945,39 +1954,29 @@ function initGhostCutUI() {
   }
 
   // 재생성 버튼은 모델컷 전용(/api/generation/start 재호출) — 고스트컷에선 숨기고,
-  // "새 프로젝트" 버튼은 /ghostcut으로 돌아가도록 재배선
+  // "새 프로젝트" 버튼은 /ghostcut으로 돌아가도록 재배선.
+  // "2K 영상 생성" 버튼도 고스트컷에서는 완전히 숨김(사업성이 약해 기능 자체를 삭제, 2026-08-24).
   const regenBtn = document.getElementById('regenBtn');
   if (regenBtn) regenBtn.style.display = 'none';
   document.querySelectorAll('#step-4 .result-nav-grid .result-nav-btn').forEach(btn => {
     const onclickAttr = btn.getAttribute('onclick');
     if (onclickAttr === 'regenFromCard(0)') btn.style.display = 'none';
+    if (onclickAttr === 'startVideoGeneration()') btn.style.display = 'none';
     if (onclickAttr === "window.location.href='/generator'") btn.setAttribute('onclick', "window.location.href='/ghostcut'");
   });
 
-  // 다운로드/영상 버튼 부제(요금)를 고스트컷 요금(140→70 / 500→250)으로 즉시 맞춤
+  // 다운로드 버튼 부제(요금)를 고스트컷 요금(140→70)으로 즉시 맞춤
   const downloadSub = document.getElementById('downloadActionSub');
   if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
-  const videoSub = document.getElementById('videoActionSub');
-  if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
 
-  // 디테일컷 추가 버튼은 고스트컷 전용 — 원본 이미지를 1회 이상 다운로드하기 전까지는 잠김
-  // (크레딧 차감 없이 생성 요청만 무한정 쌓이는 것을 방지)
+  // 디테일컷 추가 버튼은 고스트컷 전용
   const detailBtn = document.getElementById('detailCutBtn');
   if (detailBtn) detailBtn.style.display = '';
-  _lockDetailCutBtn();
+  _gcImageDownloaded = false;
 
   // 이미지 생성 로딩화면 하단 홍보 문구 — 모델컷은 영상 생성을, 고스트컷은 디테일컷 생성을 안내
   const promoText = document.getElementById('genVideoPromoText');
   if (promoText) promoText.innerHTML = '<i class="fas fa-magnifying-glass"></i> 이미지가 생성되면 클릭한번으로 디테일컷 이미지 생성이 가능합니다.';
-
-  // 영상 생성 로딩화면 메시지 중 "포즈 동작 생성"은 모델(사람) 전용 문구라 옷 흔들림으로 교체
-  const vmsg2 = document.querySelector('#vmsg2');
-  if (vmsg2) {
-    const dot = vmsg2.querySelector('.dot');
-    vmsg2.innerHTML = '';
-    if (dot) vmsg2.appendChild(dot);
-    vmsg2.appendChild(document.createTextNode(' 옷이 바람에 흔들리는 모션 생성 중...'));
-  }
 }
 
 function ghostCutHandleDrop(e) {
@@ -3256,23 +3255,28 @@ function renderResults(images) {
   const grid = document.getElementById('resultsGrid');
   if (!grid) return;
 
-  // 새 결과가 렌더링되면 이전 영상 생성 상태/버튼을 초기화
+  // 새 결과가 렌더링되면 이전 영상 생성 상태/버튼을 초기화 — 영상 생성은 모델컷 전용
+  // 기능이라 고스트컷에서는 버튼 자체를 계속 숨김 상태로 유지(2026-08-24 기능 삭제)
   _videoState = { jobId: null, videoUrl: null, polling: false };
   const videoBtn = document.getElementById('videoActionBtn');
   if (videoBtn) {
-    videoBtn.disabled = false;
-    const main = videoBtn.querySelector('.rnb-main');
-    if (main) main.innerHTML = '<i class="fas fa-film"></i> 2K 영상 생성';
+    if (window.__EZLOOK_MODE__ === 'ghostcut') {
+      videoBtn.style.display = 'none';
+    } else {
+      videoBtn.disabled = false;
+      const main = videoBtn.querySelector('.rnb-main');
+      if (main) main.innerHTML = '<i class="fas fa-film"></i> 2K 영상 생성';
+      const videoSub = document.getElementById('videoActionSub');
+      if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
+    }
   }
-  const videoSub = document.getElementById('videoActionSub');
-  if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
   const downloadSub = document.getElementById('downloadActionSub');
   if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
 
-  // 새 결과가 렌더링되면 이전 상품의 디테일컷 결과/잠금 상태도 초기화(고스트컷 전용)
+  // 새 결과가 렌더링되면 이전 상품의 디테일컷 결과/다운로드 상태도 초기화(고스트컷 전용)
   const detailBtn = document.getElementById('detailCutBtn');
   if (detailBtn) detailBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
-  if (window.__EZLOOK_MODE__ === 'ghostcut') _lockDetailCutBtn();
+  if (window.__EZLOOK_MODE__ === 'ghostcut') _gcImageDownloaded = false;
   const detailSection = document.getElementById('detailCutResultsSection');
   const detailGrid = document.getElementById('detailCutResultsGrid');
   if (detailSection) detailSection.style.display = 'none';
@@ -3453,7 +3457,7 @@ async function downloadWithCreditCheck(idx) {
     }
     // 파일 다운로드
     _doFileDownload(img.url, idx + 1);
-    _unlockDetailCutBtn(); // 고스트컷 원본 이미지를 1회 이상 다운로드하면 디테일컷 버튼 활성화
+    _gcImageDownloaded = true; // 고스트컷 원본 이미지를 1회 이상 다운로드하면 디테일컷 생성이 가능해짐
     const completeMsg = deductData.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', deductData.creditsRemaining);
     setActionComplete(completeMsg, {
       showShare: true,
@@ -3471,28 +3475,23 @@ async function downloadWithCreditCheck(idx) {
 // ─────────────────────────────────────────────────────────
 // 디테일컷 추가 생성 (고스트컷 전용) — 생성 요청 시점에 크레딧 차감, 다운로드는 무료
 // ─────────────────────────────────────────────────────────
-// 디테일컷은 고스트컷 원본 이미지를 1회 이상 다운로드(=결제)하기 전까지 잠겨있다
-// (크레딧 차감 없이 생성 요청만 무한정 쌓이는 것을 방지) — 버튼 disabled로 클릭 자체가
-// 막히지만, 방어적으로 함수 진입 시점에도 한 번 더 확인한다.
-function _lockDetailCutBtn() {
-  const btn = document.getElementById('detailCutBtn');
-  if (!btn) return;
-  btn.disabled = true;
-  let sub = btn.querySelector('.rnb-sub');
-  if (!sub) {
-    sub = document.createElement('span');
-    sub.className = 'rnb-sub';
-    btn.appendChild(sub);
-  }
-  sub.textContent = '이미지 다운로드 후 이용 가능';
+// 디테일컷은 고스트컷 원본 이미지를 1회 이상 다운로드(=결제)하기 전까지 실제로는
+// 생성할 수 없다(서버에서 403으로 거부, 크레딧 차감 없이 생성 요청만 무한정 쌓이는
+// 것을 방지). 다만 "디테일컷 추가" 버튼 자체는 항상 눌러볼 수 있게 열어두고, 아직
+// 다운로드 전이면 장수 선택 모달 상단에 "이미지 다운로드 후 디테일컷 생성하기"
+// CTA를 보여줘서 자연스럽게 다운로드로 유도한다.
+let _gcImageDownloaded = false;
+
+function _updateDetailCutModalCta() {
+  const cta = document.getElementById('detailCutDownloadFirstCta');
+  if (cta) cta.style.display = _gcImageDownloaded ? 'none' : '';
 }
 
-function _unlockDetailCutBtn() {
-  const btn = document.getElementById('detailCutBtn');
-  if (!btn) return;
-  btn.disabled = false;
-  const sub = btn.querySelector('.rnb-sub');
-  if (sub) sub.remove();
+// "이미지 다운로드 후 디테일컷 생성하기" CTA — 클릭 시 다운로드를 먼저 진행하고,
+// 완료되면(_gcImageDownloaded=true) "디테일컷 생성하기" 바로가기로 이어서 열 수 있다.
+function downloadThenPromptDetailCut() {
+  closeModal('detailCutModal');
+  downloadWithCreditCheck(0);
 }
 
 function openDetailCutMenu() {
@@ -3501,16 +3500,12 @@ function openDetailCutMenu() {
     showToast('디테일컷을 생성할 이미지가 없습니다.', 'error');
     return;
   }
-  const detailBtn = document.getElementById('detailCutBtn');
-  if (detailBtn && detailBtn.disabled) {
-    showToast('먼저 고스트컷 이미지를 다운로드한 후 이용할 수 있어요.', 'error');
-    return;
-  }
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   if (!sessionToken) {
     showToast(t('loginRequired'), 'error');
     return;
   }
+  _updateDetailCutModalCta();
   openModal('detailCutModal');
 }
 
@@ -3544,7 +3539,7 @@ async function startDetailCutGeneration(count) {
     }
     if (res.status === 403) {
       _hideDetailCutGeneratingView();
-      _lockDetailCutBtn();
+      _gcImageDownloaded = false; // 서버가 다운로드 이력을 못 찾음 — 클라이언트 상태를 동기화
       const errData = await res.json().catch(() => ({}));
       showToast(errData.error || '먼저 고스트컷 이미지를 다운로드한 후 이용할 수 있어요.', 'error');
       return;
@@ -3891,21 +3886,13 @@ async function startVideoGeneration() {
 
   _showVideoGeneratingView();
 
-  // 고스트컷 결과는 사람이 없는 상품 영상이라 완전히 다른 프롬프트를 쓰는
-  // 별도 엔드포인트(/api/ghostcut/video/start)를 호출한다. 이후 폴링/완료
-  // 처리(_pollVideoStatus, _onVideoReady, downloadVideo 등)는 job_id 기반의
-  // 범용 로직이라 모델컷과 완전히 동일하게 재사용된다.
-  const isGhostCutMode = window.__EZLOOK_MODE__ === 'ghostcut';
-  const videoStartUrl = isGhostCutMode ? '/api/ghostcut/video/start' : '/api/video/start';
-  const videoStartBody = isGhostCutMode
-    ? { imageUrl: img.originalUrl, categoryLabel: ghostCutUpload_.categoryLabel }
-    : { imageUrl: img.originalUrl, modelName: AppState.lastGenParams?.modelName, bgName: AppState.lastGenParams?.bgName };
-
+  // 영상 생성은 모델컷 전용 기능 — 고스트컷은 "2K 영상 생성" 버튼 자체가 숨겨져 있어
+  // 이 함수가 호출되지 않는다(사업성이 약해 고스트컷 영상 생성 기능은 삭제됨, 2026-08-24).
   try {
-    const startRes = await fetch(videoStartUrl, {
+    const startRes = await fetch('/api/video/start', {
       method: 'POST',
       headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify(videoStartBody),
+      body: JSON.stringify({ imageUrl: img.originalUrl, modelName: AppState.lastGenParams?.modelName, bgName: AppState.lastGenParams?.bgName }),
     });
 
     if (startRes.status === 401) {
