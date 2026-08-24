@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mt6unau1`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mt6uuayp`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1511,7 +1511,10 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     <video id="histModalVideo" src="" autoplay loop muted playsinline controls controlsList="nodownload" disablePictureInPicture
       style="max-width:min(420px,90vw);max-height:calc(100dvh - 140px);object-fit:contain;border-radius:14px;display:none;"></video>
     <div id="histModalExpiry" style="font-size:11px;color:#f87171;margin-top:8px;text-align:center;"></div>
-    <button id="histModalVideoBtn" class="result-nav-btn primary" onclick="startHistVideoGeneration()" style="display:none;width:100%;max-width:220px;margin:14px auto 0;">
+    <button id="histModalDownloadBtn" class="result-nav-btn primary" onclick="histModalDownloadClick(this)" style="display:none;width:100%;max-width:220px;margin:14px auto 0;">
+      <i class="fas fa-download"></i> 다운로드
+    </button>
+    <button id="histModalVideoBtn" class="result-nav-btn primary" onclick="startHistVideoGeneration()" style="display:none;width:100%;max-width:220px;margin:10px auto 0;">
       <span class="rnb-badge">50%↓</span>
       <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
       <span class="rnb-sub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
@@ -1612,13 +1615,15 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
   // ── 히스토리 이미지 모달 상태 ──
   let _histModalUrl = null;
   let _histModalVideoGenCtx = null; // { imageUrl, modelName, bgName } — "다시보기"에서 영상 생성 시 사용
+  let _histModalDownloadCtx = null; // { isVideo, jobId, url, imgIdx, thumbUrl } — "다시보기"에서 다운로드 시 사용
 
-  function openHistModal(imgUrl, expiresAt, isVideo, originalUrl, modelName, bgName) {
+  function openHistModal(imgUrl, expiresAt, isVideo, originalUrl, modelName, bgName, jobId, imgIdx, dlLabel, thumbUrl) {
     _histModalUrl = imgUrl;
     const modal = document.getElementById('histImgModal');
     const imgEl = document.getElementById('histModalImg');
     const vidEl = document.getElementById('histModalVideo');
     const videoBtn = document.getElementById('histModalVideoBtn');
+    const dlBtn = document.getElementById('histModalDownloadBtn');
     if (isVideo) {
       imgEl.style.display = 'none';
       vidEl.style.display = 'block';
@@ -1644,6 +1649,18 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         if (videoBtn) videoBtn.style.display = 'none';
       }
     }
+    // 다운로드(재다운로드) 버튼 — jobId가 있을 때만 노출. 다운로드를 누르면
+    // 기존 목록의 다운로드 버튼과 동일하게(histRowDownload/downloadHistVideo) 처리되며,
+    // 완료 시 공유(링크복사/카카오톡) 버튼이 자동으로 함께 노출된다.
+    if (jobId && dlBtn) {
+      _histModalDownloadCtx = { isVideo: !!isVideo, jobId, url: (isVideo ? imgUrl : (originalUrl || imgUrl)), imgIdx: imgIdx || 0, thumbUrl: thumbUrl || originalUrl || imgUrl };
+      dlBtn.style.display = '';
+      dlBtn.disabled = false;
+      dlBtn.innerHTML = '<i class="fas fa-download"></i> ' + (dlLabel || '다운로드');
+    } else {
+      _histModalDownloadCtx = null;
+      if (dlBtn) dlBtn.style.display = 'none';
+    }
     const expLabel = expiresAt ? expiryLabel(expiresAt) : null;
     document.getElementById('histModalExpiry').textContent = expLabel ? \`만료: \${expLabel}\` : '';
     modal.style.display = 'flex';
@@ -1656,6 +1673,19 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     vidEl.load();
     _histModalUrl = null;
     _histModalVideoGenCtx = null;
+    _histModalDownloadCtx = null;
+  }
+
+  // "다시보기" 모달의 다운로드 버튼 — 이미지/영상 여부에 따라 기존 목록의
+  // histRowDownload/downloadHistVideo를 그대로 재사용한다(크레딧 차감, 공유 버튼 노출 등 동일 동작).
+  function histModalDownloadClick(btn) {
+    const ctx = _histModalDownloadCtx;
+    if (!ctx) return;
+    if (ctx.isVideo) {
+      downloadHistVideo(ctx.url, ctx.jobId, btn, ctx.thumbUrl);
+    } else {
+      histRowDownload(ctx.jobId, ctx.url, ctx.imgIdx, btn);
+    }
   }
 
   // "다시보기" 모달에서 영상 생성 — /api/video/start를 직접 호출 (generator 페이지의
@@ -1871,15 +1901,16 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           try { vThumbUrls = log.image_urls ? JSON.parse(log.image_urls) : []; } catch(e) { vThumbUrls = []; }
           const vThumbProxy = vThumbUrls[0] ? \`/api/proxy/gen-image?url=\${encodeURIComponent(vThumbUrls[0])}\` : vProxyUrl;
           const vThumbEsc = vThumbProxy.replace(/'/g,"\\\\'");
+          const vHistModalArgs = \`'\${vUrlEsc}','\${expEsc}',true,null,null,null,'\${vJobIdEsc}',0,'다운로드','\${vThumbEsc}'\`;
           rows.push(\`<div class="hist-row">
-            <div class="hist-thumb hist-thumb--video" onclick="openHistModal('\${vUrlEsc}','\${expEsc}',true)">
+            <div class="hist-thumb hist-thumb--video" onclick="openHistModal(\${vHistModalArgs})">
               <video src="\${vProxyUrl}" muted preload="metadata" onerror="this.parentNode.innerHTML='<i class=&quot;fas fa-film&quot;></i>'"></video>
               <i class="fas fa-play hist-thumb-play"></i>
             </div>
             <div class="hist-body">
               <div class="hist-meta">#\${seqLabel} · \${dateStr} · \${expLabel || ''} · 영상</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal('\${vUrlEsc}','\${expEsc}',true)"><i class="fas fa-eye"></i> 다시보기</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${vHistModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
                 <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')"><i class="fas fa-download"></i> 다운로드</button>
                 <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
               </div>
@@ -1921,9 +1952,6 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           const jobIdEsc = (log.job_id || '').replace(/'/g,"\\\\'");
           const modelEsc = (log.model_name || '패션 모델').replace(/'/g,"\\\\'");
           const bgEsc = (log.bg_name || '스튜디오').replace(/'/g,"\\\\'");
-          const histModalArgs = isGhostCutRow
-            ? \`'\${urlEsc}','\${expEsc}',false\`
-            : \`'\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}'\`;
 
           if (expired) {
             rows.push(\`<div class="hist-row hist-row--expired">
@@ -1939,6 +1967,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           }
 
           const dlLabel = downloadedIdx.includes(ui) ? '재다운로드' : '다운로드';
+          const histModalArgs = isGhostCutRow
+            ? \`'\${urlEsc}','\${expEsc}',false,null,null,null,'\${jobIdEsc}',\${ui},'\${dlLabel}','\${origEsc}'\`
+            : \`'\${urlEsc}','\${expEsc}',false,'\${origEsc}','\${modelEsc}','\${bgEsc}','\${jobIdEsc}',\${ui},'\${dlLabel}','\${origEsc}'\`;
 
           rows.push(\`<div class="hist-row">
             <div class="hist-thumb" onclick="openHistModal(\${histModalArgs})">
