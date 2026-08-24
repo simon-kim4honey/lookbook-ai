@@ -6959,6 +6959,10 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-magnifying-glass"></i> 디테일컷 추가</span>
             </button>
+            <!-- 고스트컷 전용 재생성 — 같은 업로드 이미지로 다시 생성(페이지 새로고침 없음) -->
+            <button class="result-nav-btn" id="gcRegenBtn" onclick="startGhostCutGeneration()" style="display:none;grid-column:1 / -1;">
+              <span class="rnb-main"><i class="fas fa-rotate-right"></i> 재생성</span>
+            </button>
           </div>
         </div>
       </div>

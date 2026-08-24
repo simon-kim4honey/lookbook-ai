@@ -1930,8 +1930,11 @@ function initGhostCutUI() {
       ondragleave="event.currentTarget.classList.remove('drag')"
       ondrop="ghostCutHandleDrop(event)"
       style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px dashed rgba(255,255,255,0.25);border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;background:rgba(255,255,255,0.03);margin-top:16px;">
-      <div id="gcUploadPreviewWrap" style="display:none;width:100%;max-width:220px;">
+      <div id="gcUploadPreviewWrap" style="display:none;width:100%;max-width:220px;position:relative;">
         <img id="gcUploadPreview" style="width:100%;border-radius:12px;display:block;" />
+        <button type="button" id="gcUploadRemoveBtn" onclick="event.preventDefault();event.stopPropagation();ghostCutRemoveImage();" style="position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+          <i class="fas fa-times"></i>
+        </button>
       </div>
       <div id="gcUploadEmpty" style="text-align:center;color:#8b8ba0;">
         <div style="font-size:14px;font-weight:600;color:#e0e0f0;">탭하여 사진 선택</div>
@@ -1969,10 +1972,12 @@ function initGhostCutUI() {
   const downloadSub = document.getElementById('downloadActionSub');
   if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
 
-  // 디테일컷 추가 버튼은 고스트컷 전용
+  // 디테일컷 추가 / 재생성 버튼은 고스트컷 전용
   const detailBtn = document.getElementById('detailCutBtn');
   if (detailBtn) detailBtn.style.display = '';
   _gcImageDownloaded = false;
+  const gcRegenBtn = document.getElementById('gcRegenBtn');
+  if (gcRegenBtn) gcRegenBtn.style.display = '';
 
   // 이미지 생성 로딩화면 하단 홍보 문구 — 모델컷은 영상 생성을, 고스트컷은 디테일컷 생성을 안내
   const promoText = document.getElementById('genVideoPromoText');
@@ -1984,6 +1989,23 @@ function ghostCutHandleDrop(e) {
   e.currentTarget.classList.remove('drag');
   const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
   if (file) ghostCutHandleFile(file);
+}
+
+// 업로드 슬롯 우측 상단 × 버튼 — 업로드한 이미지를 지우고 빈 업로드 상태로 되돌림
+function ghostCutRemoveImage() {
+  ghostCutUpload_ = { dataUrl: null, category: null, categoryLabel: null };
+  const previewWrap = document.getElementById('gcUploadPreviewWrap');
+  const previewImg  = document.getElementById('gcUploadPreview');
+  const emptyBox    = document.getElementById('gcUploadEmpty');
+  const statusBox   = document.getElementById('gcStatusBox');
+  const genBtn      = document.getElementById('gcGenBtn');
+  const input       = document.getElementById('gcUploadInput');
+  if (previewWrap) previewWrap.style.display = 'none';
+  if (previewImg) previewImg.src = '';
+  if (emptyBox) emptyBox.style.display = '';
+  if (statusBox) { statusBox.style.display = 'none'; statusBox.textContent = ''; }
+  if (genBtn) genBtn.disabled = true;
+  if (input) input.value = '';
 }
 
 function ghostCutHandleFile(file) {
@@ -3277,6 +3299,8 @@ function renderResults(images) {
   const detailBtn = document.getElementById('detailCutBtn');
   if (detailBtn) detailBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
   if (window.__EZLOOK_MODE__ === 'ghostcut') _gcImageDownloaded = false;
+  const gcRegenBtn = document.getElementById('gcRegenBtn');
+  if (gcRegenBtn) gcRegenBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
   const detailSection = document.getElementById('detailCutResultsSection');
   const detailGrid = document.getElementById('detailCutResultsGrid');
   if (detailSection) detailSection.style.display = 'none';
