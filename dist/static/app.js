@@ -543,6 +543,10 @@ const SAMPLE_PROJECTS = [
 // INITIALIZATION
 // ─────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // /ghostcut 화면 깜빡임 방지: initLocale()/verifySession()의 네트워크 왕복을
+  // 기다리면 그 사이 서버가 내려준 원본(모델컷 step-1) 화면이 잠깐 보였다 사라진다.
+  // DOM이 준비되자마자(네트워크 대기 없이) 즉시 UI를 바꿔 깜빡임을 없앤다.
+  if (window.location.pathname === '/ghostcut') initGhostCutUI();
   initLocale().then(() => initPage());
 });
 
@@ -551,6 +555,7 @@ function initPage() {
   initNavbar();
   // 모바일 OAuth 리다이렉트 콜백 결과 먼저 처리
   checkOAuthRedirectResult();
+  // /ghostcut의 UI 교체는 DOMContentLoaded 시점에 이미 실행됨(위 참고) — 여기서는 생략
   // 모든 페이지에서 세션 복원 (자동 로그인)
   verifySession().then(() => {
     if (path === '/' || path === '') {
@@ -564,6 +569,10 @@ function initPage() {
       initDashboard();
     } else if (path === '/generator') {
       initGenerator();
+    } else if (path === '/ghostcut') {
+      // UI 교체는 위에서 이미 완료됨 — 로그인 상태 확인 후 필요한 이전 작업만 재개
+      resumePendingGeneration();
+      resumePendingVideoJob();
     }
   });
 }
@@ -795,6 +804,74 @@ function stopGenLoadingVideoPlaylist() {
 }
 
 // ─────────────────────────────────────────────────────────
+// 고스트컷 로딩화면 하단 이미지 슬롯 — 모델컷과 완전히 별도 관리되는 이미지 풀
+// (같은 #genLoadingVideoPlayer DOM을 재사용하되, /api/gc-loading-images에서
+//  받아온 이미지 목록으로 슬라이드 전환한다 — 위 모델컷 영상 함수들은 건드리지 않음)
+// ⚠️ 2026-08-23: 기존 영상 재생 방식에서 이미지 슬라이드쇼로 전환됨
+// ─────────────────────────────────────────────────────────
+let _gcLoadingImageList = null;
+let _gcLoadingImageEls = [];
+let _gcLoadingImageIdx = 0;
+let _gcLoadingImageTimer = null;
+const GC_LOADING_IMAGE_INTERVAL_MS = 4000;
+
+async function _loadGcLoadingImageList() {
+  if (_gcLoadingImageList) return _gcLoadingImageList;
+  try {
+    const res = await fetch('/api/gc-loading-images');
+    const data = await res.json();
+    const images = data.images || {};
+    _gcLoadingImageList = [1, 2, 3, 4, 5].map(s => images[s]).filter(Boolean);
+  } catch (e) {
+    console.warn('고스트컷 로딩화면 이미지 로딩 실패:', e);
+    _gcLoadingImageList = [];
+  }
+  return _gcLoadingImageList;
+}
+
+async function startGcLoadingImageSlideshow() {
+  const player = document.getElementById('genLoadingVideoPlayer');
+  if (!player) return;
+  const list = await _loadGcLoadingImageList();
+  if (!list.length) { player.style.display = 'none'; player.innerHTML = ''; return; }
+
+  player.style.display = '';
+  player.innerHTML = '';
+  _gcLoadingImageIdx = 0;
+  _gcLoadingImageEls = list.map((src, i) => {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = '';
+    if (i === 0) img.classList.add('active');
+    player.appendChild(img);
+    return img;
+  });
+  if (list.length > 1) {
+    if (_gcLoadingImageTimer) clearInterval(_gcLoadingImageTimer);
+    _gcLoadingImageTimer = setInterval(_advanceGcLoadingImage, GC_LOADING_IMAGE_INTERVAL_MS);
+  }
+}
+
+function _advanceGcLoadingImage() {
+  const els = _gcLoadingImageEls;
+  if (!els || els.length <= 1) return;
+  const current = els[_gcLoadingImageIdx];
+  const nextIdx = (_gcLoadingImageIdx + 1) % els.length;
+  const next = els[nextIdx];
+  current.classList.remove('active');
+  next.classList.add('active');
+  _gcLoadingImageIdx = nextIdx;
+}
+
+function stopGcLoadingImageSlideshow() {
+  const player = document.getElementById('genLoadingVideoPlayer');
+  if (player) { player.style.display = 'none'; player.innerHTML = ''; }
+  if (_gcLoadingImageTimer) { clearInterval(_gcLoadingImageTimer); _gcLoadingImageTimer = null; }
+  _gcLoadingImageEls = [];
+  _gcLoadingImageIdx = 0;
+}
+
+// ─────────────────────────────────────────────────────────
 // TOAST NOTIFICATIONS
 // ─────────────────────────────────────────────────────────
 function showToast(message, type = 'info', duration = 4000) {
@@ -871,6 +948,7 @@ function setActionComplete(text, opts) {
   const share = document.getElementById('actionProgressShare');
   const closeBtn = document.getElementById('actionProgressCloseBtn');
   const kakaoBtn = document.getElementById('actionProgressKakaoBtn');
+  const detailCutBtn = document.getElementById('actionProgressDetailCutBtn');
   if (spinner) spinner.style.display = 'none';
   if (check) check.style.display = 'flex';
   if (textEl) textEl.textContent = text;
@@ -879,9 +957,17 @@ function setActionComplete(text, opts) {
     _shareCtx = { jobId: opts.jobId, idx: opts.idx, imageUrl: opts.imageUrl || '' };
     if (share) share.style.display = 'flex';
     if (kakaoBtn) kakaoBtn.style.display = _kakaoJsKey ? '' : 'none';
+    // 고스트컷 원본 이미지 다운로드 완료 화면에서만 "디테일컷 생성하기" 바로가기 노출
+    if (detailCutBtn) detailCutBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
   } else if (share) {
     share.style.display = 'none';
+    if (detailCutBtn) detailCutBtn.style.display = 'none';
   }
+}
+
+function goToDetailCutFromShare() {
+  closeActionProgress();
+  openDetailCutMenu();
 }
 
 function closeActionProgress() {
@@ -956,12 +1042,13 @@ function shareToKakao() {
     return;
   }
   const shareUrl = _shareUrlFor(_shareCtx.jobId, _shareCtx.idx);
+  const isGc = window.__EZLOOK_MODE__ === 'ghostcut';
   try { if (typeof gtag === 'function') gtag('event', 'share', { method: 'kakao', content_type: 'lookbook_image' }); } catch (e) {}
   Kakao.Share.sendDefault({
     objectType: 'feed',
     content: {
-      title: '상품 이미지로 모델컷 만들기',
-      description: '클릭4번으로 AI모델컷이 무료로 만들어 진다고?',
+      title: isGc ? '상품 이미지로 고스트컷 만들기' : '상품 이미지로 모델컷 만들기',
+      description: isGc ? '클릭1번으로 AI고스트컷이 무료로 만들어 진다고?' : '클릭4번으로 AI모델컷이 무료로 만들어 진다고?',
       imageUrl: _shareCtx.imageUrl,
       link: { mobileWebUrl: shareUrl, webUrl: shareUrl },
     },
@@ -1813,6 +1900,266 @@ function initGenerator() {
   // 이전에 시작된 생성/영상 작업이 있으면 이어서 확인
   resumePendingGeneration();
   resumePendingVideoJob();
+}
+
+// ─────────────────────────────────────────────────────────
+// 고스트컷 모드 (window.__EZLOOK_MODE__ === 'ghostcut', /ghostcut 라우트)
+// /ghostcut은 /generator와 완전히 동일한 셸(모달·step-3·step-4·로딩화면 등)을
+// 그대로 서빙하고, 여기서 step-1의 내용만 교체해 재사용한다. 생성은
+// /api/generation/start가 아니라 /api/ghostcut/generate를 호출하지만, 완료 후
+// 폴링/결과화면/다운로드/공유는 기존 pollGenerationStatus()/completeGeneration()/
+// renderResults()/downloadWithCreditCheck()를 그대로 재사용한다 — 모델컷과 동일한
+// 크레딧 차감/공유 로직을 별도로 다시 구현하지 않는다.
+// ─────────────────────────────────────────────────────────
+let ghostCutUpload_ = { dataUrl: null, category: null, categoryLabel: null };
+
+function initGhostCutUI() {
+  const body = document.querySelector('#step-1 .gslide-body');
+  if (!body) return;
+
+  // 원래 step-1의 이전/다음 단계 nav(.gslide-body와 형제 요소)는 모델컷 전용이라 숨김
+  const originalNav = document.querySelector('#step-1 > .gslide-nav');
+  if (originalNav) originalNav.style.display = 'none';
+
+  body.innerHTML = `
+    <h2 class="gstep-title">고스트컷을 만들 상품 이미지 1장을 업로드하세요</h2>
+    <p class="gstep-sub">상품(옷) 사진 한 장만 올리면 AI가 종류를 자동으로 인식해요</p>
+    <input type="file" id="gcUploadInput" accept="image/*" style="display:none;" onchange="ghostCutHandleFile(this.files[0])" />
+    <label for="gcUploadInput" id="gcUploadDrop"
+      ondragover="event.preventDefault(); event.currentTarget.classList.add('drag')"
+      ondragleave="event.currentTarget.classList.remove('drag')"
+      ondrop="ghostCutHandleDrop(event)"
+      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px dashed rgba(255,255,255,0.25);border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;background:rgba(255,255,255,0.03);margin-top:16px;">
+      <div id="gcUploadPreviewWrap" style="display:none;width:100%;max-width:220px;position:relative;">
+        <img id="gcUploadPreview" style="width:100%;border-radius:12px;display:block;" />
+        <button type="button" id="gcUploadRemoveBtn" onclick="event.preventDefault();event.stopPropagation();ghostCutRemoveImage();" style="position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div id="gcUploadEmpty" style="text-align:center;color:#8b8ba0;">
+        <div style="font-size:14px;font-weight:600;color:#e0e0f0;">탭하여 사진 선택</div>
+        <div style="font-size:12px;margin-top:4px;">또는 파일을 여기로 드래그하세요</div>
+      </div>
+    </label>
+    <div id="gcStatusBox" style="display:none;margin-top:16px;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,0.04);font-size:13px;line-height:1.6;"></div>
+  `;
+
+  if (!document.getElementById('gcStep1Nav')) {
+    const nav = document.createElement('div');
+    nav.className = 'gslide-nav';
+    nav.id = 'gcStep1Nav';
+    nav.innerHTML = `
+      <div class="gslide-nav-inner">
+        <button class="step-nav-next" id="gcGenBtn" onclick="startGhostCutGeneration()" disabled style="flex:1;"><i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작</button>
+      </div>
+    `;
+    document.getElementById('step-1').appendChild(nav);
+  }
+
+  // 재생성 버튼은 모델컷 전용(/api/generation/start 재호출) — 고스트컷에선 숨기고,
+  // "새 프로젝트" 버튼은 /ghostcut으로 돌아가도록 재배선.
+  // "2K 영상 생성" 버튼도 고스트컷에서는 완전히 숨김(사업성이 약해 기능 자체를 삭제, 2026-08-24).
+  const regenBtn = document.getElementById('regenBtn');
+  if (regenBtn) regenBtn.style.display = 'none';
+  document.querySelectorAll('#step-4 .result-nav-grid .result-nav-btn').forEach(btn => {
+    const onclickAttr = btn.getAttribute('onclick');
+    if (onclickAttr === 'regenFromCard(0)') btn.style.display = 'none';
+    if (onclickAttr === 'startVideoGeneration()') btn.style.display = 'none';
+    if (onclickAttr === "window.location.href='/generator'") btn.setAttribute('onclick', "window.location.href='/ghostcut'");
+  });
+
+  // 다운로드 버튼 부제(요금)를 고스트컷 요금(140→70)으로 즉시 맞춤
+  const downloadSub = document.getElementById('downloadActionSub');
+  if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
+
+  // 디테일컷 추가 / 재생성 버튼은 고스트컷 전용
+  const detailBtn = document.getElementById('detailCutBtn');
+  if (detailBtn) detailBtn.style.display = '';
+  _gcImageDownloaded = false;
+  const gcRegenBtn = document.getElementById('gcRegenBtn');
+  if (gcRegenBtn) gcRegenBtn.style.display = '';
+
+  // 이미지 생성 로딩화면 하단 홍보 문구 — 모델컷은 영상 생성을, 고스트컷은 디테일컷 생성을 안내
+  const promoText = document.getElementById('genVideoPromoText');
+  if (promoText) promoText.innerHTML = '<i class="fas fa-magnifying-glass"></i> 이미지가 생성되면 클릭한번으로 디테일컷 이미지 생성이 가능합니다.';
+}
+
+function ghostCutHandleDrop(e) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag');
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (file) ghostCutHandleFile(file);
+}
+
+// 업로드 슬롯 우측 상단 × 버튼 — 업로드한 이미지를 지우고 빈 업로드 상태로 되돌림
+function ghostCutRemoveImage() {
+  ghostCutUpload_ = { dataUrl: null, category: null, categoryLabel: null };
+  const previewWrap = document.getElementById('gcUploadPreviewWrap');
+  const previewImg  = document.getElementById('gcUploadPreview');
+  const emptyBox    = document.getElementById('gcUploadEmpty');
+  const statusBox   = document.getElementById('gcStatusBox');
+  const genBtn      = document.getElementById('gcGenBtn');
+  const input       = document.getElementById('gcUploadInput');
+  if (previewWrap) previewWrap.style.display = 'none';
+  if (previewImg) previewImg.src = '';
+  if (emptyBox) emptyBox.style.display = '';
+  if (statusBox) { statusBox.style.display = 'none'; statusBox.textContent = ''; }
+  if (genBtn) genBtn.disabled = true;
+  if (input) input.value = '';
+}
+
+function ghostCutHandleFile(file) {
+  if (!file) return;
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!validTypes.includes(file.type)) { showToast(t('uploadFormatErr'), 'error'); return; }
+  if (file.size > 10 * 1024 * 1024) { showToast(t('uploadSizeErr'), 'error'); return; }
+
+  const statusBox = document.getElementById('gcStatusBox');
+  const genBtn = document.getElementById('gcGenBtn');
+  ghostCutUpload_ = { dataUrl: null, category: null, categoryLabel: null };
+  if (genBtn) genBtn.disabled = true;
+
+  _resizeImageFile(file, 1600, 0.85).then(async (dataUrl) => {
+    const previewWrap = document.getElementById('gcUploadPreviewWrap');
+    const previewImg  = document.getElementById('gcUploadPreview');
+    const emptyBox    = document.getElementById('gcUploadEmpty');
+    if (previewImg) previewImg.src = dataUrl;
+    if (previewWrap) previewWrap.style.display = '';
+    if (emptyBox) emptyBox.style.display = 'none';
+
+    if (statusBox) { statusBox.style.display = ''; statusBox.style.color = '#8b8ba0'; statusBox.textContent = '🔍 상품 종류를 분석하는 중...'; }
+
+    try {
+      const res = await fetch('/api/ghostcut/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: dataUrl }),
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        if (statusBox) { statusBox.style.color = '#ef4444'; statusBox.textContent = '❌ ' + (data.message || '분석에 실패했습니다. 다시 시도해주세요.'); }
+        return;
+      }
+      if (!data.isClothing) {
+        if (statusBox) { statusBox.style.color = '#ef4444'; statusBox.textContent = '❌ 옷(의류) 사진이 아닌 것 같아요. 상품 사진을 다시 업로드해주세요.'; }
+        return;
+      }
+      if (!data.sampleReady) {
+        if (statusBox) { statusBox.style.color = '#f59e0b'; statusBox.textContent = '⚠️ 이 상품은 아직 준비 중이에요. 다른 상품으로 시도해주세요.'; }
+        return;
+      }
+
+      ghostCutUpload_ = { dataUrl, category: data.category, categoryLabel: data.label };
+      if (statusBox) { statusBox.style.color = '#6C47FF'; statusBox.innerHTML = '<i class="fas fa-check-circle"></i> 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
+      if (genBtn) genBtn.disabled = false;
+    } catch (err) {
+      console.error('ghostcut classify error:', err);
+      if (statusBox) { statusBox.style.color = '#ef4444'; statusBox.textContent = '❌ 네트워크 오류가 발생했습니다. 다시 시도해주세요.'; }
+    }
+  });
+}
+
+async function startGhostCutGeneration() {
+  if (AppState.isGenerating) return;
+  if (!ghostCutUpload_.dataUrl || !ghostCutUpload_.category) {
+    showToast('상품 이미지를 먼저 업로드해주세요.', 'warning');
+    return;
+  }
+
+  const genBtn = document.getElementById('gcGenBtn');
+  if (genBtn) { genBtn.innerHTML = '<span class="btn-spinner"></span> 생성 중...'; genBtn.disabled = true; }
+
+  if (!AppState.user) {
+    AppState.pendingGeneration = true;
+    if (genBtn) { genBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; genBtn.disabled = false; }
+    openModal('loginModal');
+    return;
+  }
+
+  AppState.isGenerating = true;
+  changeStep(3);
+  const step3Nav = document.getElementById('step3Nav');
+  if (step3Nav) step3Nav.style.display = 'none';
+  const genView = document.getElementById('generatingView');
+  if (genView) { genView.style.display = ''; genView.classList.add('active'); }
+
+  updateProgress(0, '시작 중...');
+  setMsgState('msg1', 'current');
+  startGcLoadingImageSlideshow();
+
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  const count = 1;
+
+  try {
+    updateProgress(10, '상품 이미지 분석 중...');
+    const startRes = await fetch('/api/ghostcut/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Token': sessionToken },
+      body: JSON.stringify({ productImageUrl: ghostCutUpload_.dataUrl, category: ghostCutUpload_.category }),
+    });
+
+    if (startRes.status === 401) {
+      showToast(t('loginRequired'), 'error');
+      _ghostCutResetToStep1();
+      return;
+    }
+    if (!startRes.ok) {
+      const errData = await startRes.json().catch(() => ({}));
+      showToast(errData.error || '생성 요청이 실패했습니다.', 'error');
+      _ghostCutResetToStep1();
+      return;
+    }
+
+    const startData = await startRes.json();
+    if (!startData.jobId) throw new Error('생성 요청 실패: Job ID 없음');
+
+    AppState.currentJobId = startData.jobId;
+    AppState.lastJobId = startData.jobId;
+    AppState.lastGenParams = null; // 고스트컷 결과는 모델컷 재생성(regenImage) 대상이 아님
+
+    if (startData.isFallback) {
+      console.warn('[GhostCut] Atlas Cloud 요청 실패 — 데모 이미지로 대체:', startData.error);
+      updateProgress(50, '이미지 합성 중...');
+      setMsgState('msg1', 'done'); setMsgState('msg2', 'current');
+      await sleep(1200);
+      updateProgress(100, '완료!');
+      setMsgState('msg2', 'done'); setMsgState('msg5', 'current');
+      completeGeneration(generateFallbackImages(count), true);
+      return;
+    }
+
+    updateProgress(20, '고스트 마네킹 스타일로 합성 중...');
+    setMsgState('msg1', 'done');
+    setMsgState('msg2', 'current');
+
+    try {
+      localStorage.setItem('lookbook_pending_gen', JSON.stringify({
+        jobId: startData.jobId, count, lastGenParams: null, startedAt: Date.now(),
+      }));
+    } catch (e) { /* 저장 공간 부족 등은 무시 */ }
+
+    await pollGenerationStatus(startData.jobId, count);
+
+  } catch (err) {
+    console.error('GhostCut generation error:', err);
+    showToast('생성 중 오류가 발생했습니다: ' + err.message, 'error');
+    AppState.isGenerating = false;
+    stopNewsRotator();
+    stopGcLoadingImageSlideshow();
+    localStorage.removeItem('lookbook_pending_gen');
+    _ghostCutResetToStep1();
+  }
+}
+
+function _ghostCutResetToStep1() {
+  changeStep(1);
+  const step3Nav = document.getElementById('step3Nav');
+  if (step3Nav) step3Nav.style.display = '';
+  const genView = document.getElementById('generatingView');
+  if (genView) genView.classList.remove('active');
+  const genBtn = document.getElementById('gcGenBtn');
+  if (genBtn) { genBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> AI 생성 시작'; genBtn.disabled = false; }
 }
 
 function shuffleArray(arr) {
@@ -2930,16 +3277,36 @@ function renderResults(images) {
   const grid = document.getElementById('resultsGrid');
   if (!grid) return;
 
-  // 새 결과가 렌더링되면 이전 영상 생성 상태/버튼을 초기화
+  // 새 결과가 렌더링되면 이전 영상 생성 상태/버튼을 초기화 — 영상 생성은 모델컷 전용
+  // 기능이라 고스트컷에서는 버튼 자체를 계속 숨김 상태로 유지(2026-08-24 기능 삭제)
   _videoState = { jobId: null, videoUrl: null, polling: false };
   const videoBtn = document.getElementById('videoActionBtn');
   if (videoBtn) {
-    videoBtn.disabled = false;
-    const main = videoBtn.querySelector('.rnb-main');
-    if (main) main.innerHTML = '<i class="fas fa-film"></i> 2K 영상 생성';
+    if (window.__EZLOOK_MODE__ === 'ghostcut') {
+      videoBtn.style.display = 'none';
+    } else {
+      videoBtn.disabled = false;
+      const main = videoBtn.querySelector('.rnb-main');
+      if (main) main.innerHTML = '<i class="fas fa-film"></i> 2K 영상 생성';
+      const videoSub = document.getElementById('videoActionSub');
+      if (videoSub) videoSub.innerHTML = _videoSubHtml(true);
+    }
   }
-  const videoSub = document.getElementById('videoActionSub');
-  if (videoSub) videoSub.innerHTML = '7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600';
+  const downloadSub = document.getElementById('downloadActionSub');
+  if (downloadSub) downloadSub.innerHTML = _downloadSubHtml();
+
+  // 새 결과가 렌더링되면 이전 상품의 디테일컷 결과/다운로드 상태도 초기화(고스트컷 전용)
+  const detailBtn = document.getElementById('detailCutBtn');
+  if (detailBtn) detailBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
+  if (window.__EZLOOK_MODE__ === 'ghostcut') _gcImageDownloaded = false;
+  const gcRegenBtn = document.getElementById('gcRegenBtn');
+  if (gcRegenBtn) gcRegenBtn.style.display = window.__EZLOOK_MODE__ === 'ghostcut' ? '' : 'none';
+  const detailSection = document.getElementById('detailCutResultsSection');
+  const detailGrid = document.getElementById('detailCutResultsGrid');
+  if (detailSection) detailSection.style.display = 'none';
+  if (detailGrid) detailGrid.innerHTML = '';
+  const infoMsg = document.getElementById('resultInfoMsg');
+  if (infoMsg) infoMsg.style.display = '';
 
   grid.innerHTML = '';
 
@@ -3114,6 +3481,7 @@ async function downloadWithCreditCheck(idx) {
     }
     // 파일 다운로드
     _doFileDownload(img.url, idx + 1);
+    _gcImageDownloaded = true; // 고스트컷 원본 이미지를 1회 이상 다운로드하면 디테일컷 생성이 가능해짐
     const completeMsg = deductData.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', deductData.creditsRemaining);
     setActionComplete(completeMsg, {
       showShare: true,
@@ -3129,16 +3497,313 @@ async function downloadWithCreditCheck(idx) {
 }
 
 // ─────────────────────────────────────────────────────────
+// 디테일컷 추가 생성 (고스트컷 전용) — 생성 요청 시점에 크레딧 차감, 다운로드는 무료
+// ─────────────────────────────────────────────────────────
+// 디테일컷은 고스트컷 원본 이미지를 1회 이상 다운로드(=결제)하기 전까지 실제로는
+// 생성할 수 없다(서버에서 403으로 거부, 크레딧 차감 없이 생성 요청만 무한정 쌓이는
+// 것을 방지). 다만 "디테일컷 추가" 버튼 자체는 항상 눌러볼 수 있게 열어두고, 아직
+// 다운로드 전이면 장수 선택 모달 상단에 "이미지 다운로드 후 디테일컷 생성하기"
+// CTA를 보여줘서 자연스럽게 다운로드로 유도한다.
+let _gcImageDownloaded = false;
+
+function _updateDetailCutModalCta() {
+  const cta = document.getElementById('detailCutDownloadFirstCta');
+  if (cta) cta.style.display = _gcImageDownloaded ? 'none' : '';
+}
+
+// "이미지 다운로드 후 디테일컷 생성하기" CTA — 클릭 시 다운로드를 먼저 진행하고,
+// 완료되면(_gcImageDownloaded=true) "디테일컷 생성하기" 바로가기로 이어서 열 수 있다.
+function downloadThenPromptDetailCut() {
+  closeModal('detailCutModal');
+  downloadWithCreditCheck(0);
+}
+
+function openDetailCutMenu() {
+  const img = AppState.generatedImages[0];
+  if (!img || !img.originalUrl) {
+    showToast('디테일컷을 생성할 이미지가 없습니다.', 'error');
+    return;
+  }
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast(t('loginRequired'), 'error');
+    return;
+  }
+  _updateDetailCutModalCta();
+  openModal('detailCutModal');
+}
+
+async function startDetailCutGeneration(count) {
+  closeModal('detailCutModal');
+
+  const img = AppState.generatedImages[0];
+  if (!img || !img.originalUrl) {
+    showToast('디테일컷을 생성할 이미지가 없습니다.', 'error');
+    return;
+  }
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast(t('loginRequired'), 'error');
+    return;
+  }
+
+  _showDetailCutGeneratingView();
+
+  try {
+    const res = await fetch('/api/ghostcut/detail/start', {
+      method: 'POST',
+      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: img.originalUrl, count, categoryLabel: ghostCutUpload_.categoryLabel, jobId: AppState.lastJobId }),
+    });
+
+    if (res.status === 401) {
+      _hideDetailCutGeneratingView();
+      showToast(t('loginRequired'), 'error');
+      return;
+    }
+    if (res.status === 403) {
+      _hideDetailCutGeneratingView();
+      _gcImageDownloaded = false; // 서버가 다운로드 이력을 못 찾음 — 클라이언트 상태를 동기화
+      const errData = await res.json().catch(() => ({}));
+      showToast(errData.error || '먼저 고스트컷 이미지를 다운로드한 후 이용할 수 있어요.', 'error');
+      return;
+    }
+    if (!res.ok) {
+      _hideDetailCutGeneratingView();
+      const errData = await res.json().catch(() => ({}));
+      showToast(errData.message || '디테일컷 생성 요청에 실패했습니다.', 'error');
+      return;
+    }
+
+    const data = await res.json();
+    _startDetailCutFakeProgress();
+    _pollDetailCutStatus(data.jobId);
+  } catch (err) {
+    console.error('Detail cut start error:', err);
+    _hideDetailCutGeneratingView();
+    showToast('디테일컷 생성 요청 중 네트워크 오류가 발생했습니다.', 'error');
+  }
+}
+
+// 디테일컷 생성 로딩 화면 — 영상 생성 로딩 화면(.generating-view)과 동일한 구조를 재사용, 패션 뉴스도 함께 재생
+function _showDetailCutGeneratingView() {
+  const view = document.getElementById('detailCutGeneratingView');
+  if (view) view.classList.add('active');
+  const nav = document.getElementById('step4Nav');
+  if (nav) nav.style.display = 'none';
+  updateDetailCutProgress(0, '시작 중...');
+  setDetailCutMsgState('dmsg1', 'current');
+  startNewsRotator('detailCutGenViewNews');
+}
+
+function _hideDetailCutGeneratingView() {
+  const view = document.getElementById('detailCutGeneratingView');
+  if (view) view.classList.remove('active');
+  const nav = document.getElementById('step4Nav');
+  if (nav) nav.style.display = '';
+  stopNewsRotator();
+  _stopDetailCutFakeProgress();
+}
+
+function updateDetailCutProgress(percent, text) {
+  const fill = document.getElementById('detailCutGenProgressFill');
+  if (fill) fill.style.width = Math.min(percent, 100) + '%';
+  const statusText = document.getElementById('detailCutGenStatusText');
+  if (statusText) statusText.textContent = text;
+}
+
+function setDetailCutMsgState(msgId, state) {
+  const msg = document.getElementById(msgId);
+  if (!msg) return;
+  msg.classList.remove('current', 'done');
+  if (state === 'current') {
+    msg.classList.add('current');
+    const dot = msg.querySelector('.dot');
+    if (dot) dot.style.background = 'var(--primary)';
+  } else if (state === 'done') {
+    msg.classList.add('done');
+    const dot = msg.querySelector('.dot');
+    if (dot) dot.style.background = 'var(--success)';
+  }
+}
+
+let _detailCutFakeProgressTimer = null;
+function _startDetailCutFakeProgress() {
+  _stopDetailCutFakeProgress();
+  let percent = 15;
+  const stageMsgs = ['dmsg2', 'dmsg3', 'dmsg4'];
+  let stageIdx = 0;
+  setDetailCutMsgState('dmsg1', 'done');
+  setDetailCutMsgState('dmsg2', 'current');
+  updateDetailCutProgress(percent, 'AI가 디테일컷을 생성 중입니다... (최대 1~2분 소요)');
+  _detailCutFakeProgressTimer = setInterval(() => {
+    if (percent >= 90) return;
+    percent += 3;
+    const nextStage = Math.min(Math.floor((percent - 15) / 25), stageMsgs.length - 1);
+    if (nextStage > stageIdx) {
+      setDetailCutMsgState(stageMsgs[stageIdx], 'done');
+      setDetailCutMsgState(stageMsgs[nextStage], 'current');
+      stageIdx = nextStage;
+    }
+    updateDetailCutProgress(percent, 'AI가 디테일컷을 생성 중입니다... (최대 1~2분 소요)');
+  }, 2500);
+}
+function _stopDetailCutFakeProgress() {
+  if (_detailCutFakeProgressTimer) { clearInterval(_detailCutFakeProgressTimer); _detailCutFakeProgressTimer = null; }
+}
+
+async function _pollDetailCutStatus(jobId) {
+  let attempts = 0;
+  const maxAttempts = 60; // 60회×3초=3분
+
+  while (attempts < maxAttempts) {
+    await sleep(3000);
+    attempts++;
+    try {
+      const res = await fetch(`/api/generation/${jobId}/status`);
+      const data = await res.json();
+
+      if (data.status === 'completed') {
+        updateDetailCutProgress(100, '생성 완료!');
+        setDetailCutMsgState('dmsg4', 'done');
+        await sleep(500);
+        _hideDetailCutGeneratingView();
+        const images = data.images || [];
+        _renderDetailCutResults(jobId, images);
+
+        // 생성된 이미지 URL을 서버에 저장 (범용 엔드포인트 재사용 — 히스토리 썸네일용)
+        const realUrls = images.filter(i => i.url && i.url.startsWith('http')).map(i => i.url);
+        if (realUrls.length > 0) {
+          const token = localStorage.getItem('lookbook_token') || '';
+          fetch('/api/generation/save-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Session-Token': token },
+            body: JSON.stringify({ job_id: jobId, image_urls: realUrls }),
+          }).catch(() => {});
+        }
+
+        showToast(`디테일컷 ${images.length}장 생성이 완료됐어요.`, 'success');
+        return;
+      } else if (data.status === 'failed') {
+        throw new Error(data.error || '생성 실패');
+      }
+    } catch (err) {
+      console.error('Detail cut poll error:', err);
+      if (attempts >= maxAttempts - 3) {
+        _hideDetailCutGeneratingView();
+        showToast('디테일컷 생성 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'error');
+        return;
+      }
+    }
+  }
+  _hideDetailCutGeneratingView();
+  showToast('디테일컷 생성이 지연되고 있어요. 잠시 후 다시 확인해주세요.', 'error');
+}
+
+function _renderDetailCutResults(jobId, images) {
+  const section = document.getElementById('detailCutResultsSection');
+  const grid = document.getElementById('detailCutResultsGrid');
+  if (!grid) return;
+
+  images.forEach((img, i) => {
+    if (!img.url) return;
+    const proxied = img.url.startsWith('http') ? `/api/proxy/gen-image?url=${encodeURIComponent(img.url)}` : img.url;
+    const idx = grid.children.length; // 기존 디테일컷 결과 뒤에 이어서 추가(여러 번 생성 가능)
+
+    const card = document.createElement('div');
+    card.style.cssText = 'border-radius:12px;overflow:hidden;background:rgba(255,255,255,0.04);';
+    card.innerHTML = `
+      <img src="${proxied}" class="no-save-media" alt="디테일컷" style="width:100%;aspect-ratio:1/1;object-fit:cover;display:block;" draggable="false" oncontextmenu="return false" />
+      <button class="result-nav-btn primary" style="width:100%;border-radius:0;" onclick="downloadDetailCutImage('${jobId}', ${idx}, '${proxied}')">
+        <span class="rnb-badge">50%↓</span>
+        <span class="rnb-main"><i class="fas fa-download"></i> 저장</span>
+        <span class="rnb-sub"><s class="rnb-strike">120</s> <i class="fas fa-coins"></i> 60</span>
+      </button>
+    `;
+    grid.appendChild(card);
+  });
+
+  if (section) section.style.display = '';
+  // 디테일컷이 생성되면 재생성 안내 메시지는 숨김(원본 이미지 기준 안내라 혼동 방지)
+  const infoMsg = document.getElementById('resultInfoMsg');
+  if (infoMsg) infoMsg.style.display = 'none';
+}
+
+async function downloadDetailCutImage(jobId, idx, url) {
+  const sessionToken = localStorage.getItem('lookbook_token') || '';
+  if (!sessionToken) {
+    showToast(t('loginRequired'), 'error');
+    return;
+  }
+  try {
+    const res = await fetch('/api/credits/deduct', {
+      method: 'POST',
+      headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jobId, idx }),
+    });
+    if (res.status === 401) {
+      showToast(t('loginRequired'), 'error');
+      return;
+    }
+    if (res.status === 402) {
+      const errData = await res.json();
+      showToast(t('creditInsufficientDetail', errData.available ?? 0), 'error');
+      setTimeout(() => {
+        const userArea = document.getElementById('navUserArea');
+        if (userArea) userArea.click();
+      }, 1500);
+      return;
+    }
+    if (!res.ok) {
+      showToast(t('creditError'), 'error');
+      return;
+    }
+    const data = await res.json();
+    if (data.creditsRemaining !== undefined) {
+      const cachedUser = JSON.parse(localStorage.getItem('lookbook_user') || 'null');
+      if (cachedUser) { cachedUser.credits = data.creditsRemaining; localStorage.setItem('lookbook_user', JSON.stringify(cachedUser)); }
+      if (AppState.user) AppState.user.credits = data.creditsRemaining;
+      updateUserUI({ credits: data.creditsRemaining });
+    }
+    _doFileDownload(url, `detail_${idx + 1}`);
+    showToast(data.alreadyDownloaded ? t('creditRedownloadDone') : t('creditDeductDone', data.creditsRemaining), 'success');
+  } catch (err) {
+    console.error('Detail cut download error:', err);
+    showToast(t('downloadErr'), 'error');
+  }
+}
+
+// ─────────────────────────────────────────────────────────
 // 영상 생성 (AtlasCloud seedance-2.5/reference-to-video)
 // ─────────────────────────────────────────────────────────
 let _videoState = { jobId: null, videoUrl: null, polling: false };
+
+// 모델컷(7초·1200→600)과 고스트컷(5초·500→250)은 영상 길이/요금이 다르다
+function _videoSubHtml(withStrike) {
+  if (window.__EZLOOK_MODE__ === 'ghostcut') {
+    return withStrike
+      ? '5초 · <s class="rnb-strike">500</s> <i class="fas fa-coins"></i> 250'
+      : '5초 · <i class="fas fa-coins"></i> 250';
+  }
+  return withStrike
+    ? '7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600'
+    : '7초 · <i class="fas fa-coins"></i> 600';
+}
+
+// 모델컷(180→90)과 고스트컷(140→70) 이미지 다운로드 요금 표기
+function _downloadSubHtml() {
+  if (window.__EZLOOK_MODE__ === 'ghostcut') {
+    return '<s class="rnb-strike">140</s> <i class="fas fa-coins"></i> 70';
+  }
+  return '<s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90';
+}
 
 function _resetVideoBtn() {
   _videoState.polling = false;
   const btn = document.getElementById('videoActionBtn');
   const sub = document.getElementById('videoActionSub');
   if (btn) btn.disabled = false;
-  if (sub) sub.innerHTML = '7초 · <i class="fas fa-coins"></i> 600';
+  if (sub) sub.innerHTML = _videoSubHtml(false);
 }
 
 // 페이지 재진입 시 진행 중이던 영상 생성 작업을 백그라운드로 이어서 확인
@@ -3152,7 +3817,7 @@ async function resumePendingVideoJob() {
     localStorage.removeItem('lookbook_pending_video');
     return;
   }
-  showToast('이전에 시작한 영상 생성을 이어서 확인합니다...', 'info');
+  showToast('진행 중인 영상 생성을 계속 확인하고 있어요. 완료되면 자동으로 저장돼요.', 'info');
   _pollVideoStatusBackground(pending.jobId);
 }
 
@@ -3245,15 +3910,13 @@ async function startVideoGeneration() {
 
   _showVideoGeneratingView();
 
+  // 영상 생성은 모델컷 전용 기능 — 고스트컷은 "2K 영상 생성" 버튼 자체가 숨겨져 있어
+  // 이 함수가 호출되지 않는다(사업성이 약해 고스트컷 영상 생성 기능은 삭제됨, 2026-08-24).
   try {
     const startRes = await fetch('/api/video/start', {
       method: 'POST',
       headers: { 'X-Session-Token': sessionToken, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imageUrl: img.originalUrl,
-        modelName: AppState.lastGenParams?.modelName,
-        bgName: AppState.lastGenParams?.bgName,
-      }),
+      body: JSON.stringify({ imageUrl: img.originalUrl, modelName: AppState.lastGenParams?.modelName, bgName: AppState.lastGenParams?.bgName }),
     });
 
     if (startRes.status === 401) {
