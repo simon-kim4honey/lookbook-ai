@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mt6utklo`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mt6xgjjp`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -312,7 +312,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
        VALUES (?, 'deduct', ?, ?, 'video_generation', ?)`).bind(r.user_id,-600,f,d).run();let p=((await t.prepare(`SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`).bind(r.user_id).first())?.last_seq||0)+1;return await t.prepare(`INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, kind, expires_at, image_urls)
        VALUES (?, ?, 1, ?, ?, '9:16', ?, 'video', datetime('now', '+14 days'), ?)`).bind(r.user_id,d,a||`패션 모델`,o||`스튜디오`,p,JSON.stringify([i])).run(),e.json({success:!0,jobId:d,creditsRemaining:f})}catch(t){return console.error(`video/start error:`,t),e.json({success:!1,message:t.message},500)}});var In=[`Choose the MOST visually distinctive design detail area of the garment for this close-up — such as a button, zipper, collar, pocket, stitching pattern, fabric texture, trim, or hardware — whichever best showcases the product's craftsmanship and quality.`,`Choose a DIFFERENT design detail area than a typical front-view close-up — such as a cuff, hem, seam, side panel, or secondary hardware/trim — to show another distinctive feature of the garment not obvious from the main product photo.`,`Choose YET ANOTHER distinctive design detail area, different from the two most obvious focal points — such as a back panel, shoulder seam, fabric weave close-up, or a unique construction detail — to give a third unique perspective on the product's quality.`,`Choose a FOURTH distinctive design detail area, different from the three focal points above — such as the waistband, closure/placket, inner lining edge, or another unique construction detail — to give a fourth unique perspective on the product's quality.`];V.post(`/api/ghostcut/detail/start`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`,code:`UNAUTHORIZED`},401);let r=await t.prepare(`SELECT s.user_id, u.credits, u.name FROM user_sessions s
        JOIN users u ON u.id = s.user_id
-       WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`,code:`UNAUTHORIZED`},401);let i=await e.req.json(),{imageUrl:a,categoryLabel:o,jobId:s}=i,l=Math.max(1,Math.min(4,parseInt(i.count,10)||1));if(!a)return e.json({error:`imageUrl 필수`},400);if(!s)return e.json({error:`jobId 필수`,code:`MISSING_JOB_ID`},400);let u=await t.prepare(`SELECT downloaded_indices FROM generation_logs WHERE job_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1`).bind(s,r.user_id).first(),d=[];if(u?.downloaded_indices)try{d=JSON.parse(u.downloaded_indices)}catch{}if(d.length===0)return e.json({error:`먼저 고스트컷 이미지를 다운로드한 후 디테일컷을 생성할 수 있습니다.`,code:`DOWNLOAD_REQUIRED`},403);let f=e=>[`IMAGE CROP TASK — this is NOT a new photograph and NOT a creative reinterpretation. Take the EXACT SAME photograph shown in the source image and output a cropped, zoomed-in region of it — as if you digitally selected a rectangular region of the original photo file and enlarged it. Every pixel of color, texture, pattern, shading, stitching, and surface detail in your output must be identical to what already exists in that region of the source image.`,`Source image = the ONLY reference for the garment's design, color, pattern, print, texture, fabric, stitching, and every visual detail. Do NOT redesign, alter, invent, or change ANY detail of the garment — this is a crop/zoom of the exact same real garment, not a new interpretation.`,`ABSOLUTE PROHIBITION ON CREATIVE CHANGES: Do NOT add, remove, invent, embellish, restyle, or reinterpret ANYTHING. No new textures, no new wrinkles or creases beyond what the source already shows, no new stitching patterns, no changed proportions, no artistic enhancement, no different fabric sheen or lighting mood, no camera/lens look different from the source. If you are unsure whether a fine detail is present in the source, do NOT invent it — leave that area exactly as plain/ambiguous as the source shows it. Act as a lossless digital zoom, not as a photographer or illustrator creating a new image.`,`CRITICAL — DO NOT ADD ANY WEAR, AGING, OR DISTRESSING THAT IS NOT ALREADY IN THE SOURCE IMAGE: if an edge, hem, seam, or surface is clean and smooth in the source image, it MUST remain exactly that clean and smooth in this close-up — do NOT add fraying, raw-edge unraveling, rips, tears, whiskering, faded/worn patches, scuffs, or any "distressed"/"vintage"/"aged" look that is not already present in the source. If the source already shows some existing wear or distressing, reproduce it EXACTLY as-is — do not add MORE fraying or tears beyond what the source shows, and do not invent new damage.`,e,`Output framing: crop tightly so the chosen detail area fills most of the frame. This is purely a crop/zoom operation on the source photo — not a new photoshoot, not a restyled product shot.`,`Background MUST remain pure solid white (#FFFFFF), completely flat and shadowless — NO drop shadow, NO contact shadow, NO reflection, NO gradient, NO vignette anywhere in the frame, exactly like the source image's background.`,`ABSOLUTE RULES: DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image (unless an existing brand logo/print is already part of the garment's real design in the source image — reproduce that exactly, do not add new ones). NO visible human body, face, hands, mannequin form, or hanger anywhere in the output. DO NOT change the garment's color, pattern, print, texture, fabric, or any design element from the source image — this must look like a real macro photograph of the exact same product.`,`REMINDER before finalizing: if your output looks like a new photograph rather than a cropped/zoomed region of the EXACT source image — different texture, different wear, different stitching, different proportions, any detail added, removed, or reinterpreted — that is WRONG. This must be pixel-faithful to the source image, only cropped and enlarged.`,`Ultra-high-resolution, 8K, sharp macro focus — the same photographic characteristics as the source image, with zero artistic reinterpretation.`].join(` `),p=Array.from({length:l},(t,n)=>fetch(`${H}/api/v1/model/generateImage`,{method:`POST`,headers:Q(e.env.ATLAS_API_KEY),body:JSON.stringify({model:`google/nano-banana-2/edit`,prompt:f(In[n%In.length]),aspect_ratio:`1:1`,resolution:`2k`,thinking_level:`high`,output_format:`jpeg`,images:[a]})}).then(e=>e.json())),m=await Promise.all(p),h=m.filter(e=>e.code===200&&e.data?.id).map(e=>e.data.id);if(h.length===0){let t=m[0];return console.error(`[GhostCut Detail] Atlas 요청 전체 실패:`,t),e.json({success:!1,message:t?.msg||t?.message||`디테일컷 생성 요청 실패`},502)}let g=h.length,_=h.join(`,`),v=((await t.prepare(`SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`).bind(r.user_id).first())?.last_seq||0)+1;return await t.prepare(`INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, expires_at)
+       WHERE s.token = ? AND s.expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({error:`세션이 만료되었습니다.`,code:`UNAUTHORIZED`},401);let i=await e.req.json(),{imageUrl:a,categoryLabel:o,jobId:s}=i,l=Math.max(1,Math.min(4,parseInt(i.count,10)||1));if(!a)return e.json({error:`imageUrl 필수`},400);if(!s)return e.json({error:`jobId 필수`,code:`MISSING_JOB_ID`},400);let u=await t.prepare(`SELECT downloaded_indices FROM generation_logs WHERE job_id = ? AND user_id = ? ORDER BY id DESC LIMIT 1`).bind(s,r.user_id).first(),d=[];if(u?.downloaded_indices)try{d=JSON.parse(u.downloaded_indices)}catch{}if(d.length===0)return e.json({error:`먼저 누끼컷 이미지를 다운로드한 후 디테일컷을 생성할 수 있습니다.`,code:`DOWNLOAD_REQUIRED`},403);let f=e=>[`IMAGE CROP TASK — this is NOT a new photograph and NOT a creative reinterpretation. Take the EXACT SAME photograph shown in the source image and output a cropped, zoomed-in region of it — as if you digitally selected a rectangular region of the original photo file and enlarged it. Every pixel of color, texture, pattern, shading, stitching, and surface detail in your output must be identical to what already exists in that region of the source image.`,`Source image = the ONLY reference for the garment's design, color, pattern, print, texture, fabric, stitching, and every visual detail. Do NOT redesign, alter, invent, or change ANY detail of the garment — this is a crop/zoom of the exact same real garment, not a new interpretation.`,`ABSOLUTE PROHIBITION ON CREATIVE CHANGES: Do NOT add, remove, invent, embellish, restyle, or reinterpret ANYTHING. No new textures, no new wrinkles or creases beyond what the source already shows, no new stitching patterns, no changed proportions, no artistic enhancement, no different fabric sheen or lighting mood, no camera/lens look different from the source. If you are unsure whether a fine detail is present in the source, do NOT invent it — leave that area exactly as plain/ambiguous as the source shows it. Act as a lossless digital zoom, not as a photographer or illustrator creating a new image.`,`CRITICAL — DO NOT ADD ANY WEAR, AGING, OR DISTRESSING THAT IS NOT ALREADY IN THE SOURCE IMAGE: if an edge, hem, seam, or surface is clean and smooth in the source image, it MUST remain exactly that clean and smooth in this close-up — do NOT add fraying, raw-edge unraveling, rips, tears, whiskering, faded/worn patches, scuffs, or any "distressed"/"vintage"/"aged" look that is not already present in the source. If the source already shows some existing wear or distressing, reproduce it EXACTLY as-is — do not add MORE fraying or tears beyond what the source shows, and do not invent new damage.`,e,`Output framing: crop tightly so the chosen detail area fills most of the frame. This is purely a crop/zoom operation on the source photo — not a new photoshoot, not a restyled product shot.`,`Background MUST remain pure solid white (#FFFFFF), completely flat and shadowless — NO drop shadow, NO contact shadow, NO reflection, NO gradient, NO vignette anywhere in the frame, exactly like the source image's background.`,`ABSOLUTE RULES: DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image (unless an existing brand logo/print is already part of the garment's real design in the source image — reproduce that exactly, do not add new ones). NO visible human body, face, hands, mannequin form, or hanger anywhere in the output. DO NOT change the garment's color, pattern, print, texture, fabric, or any design element from the source image — this must look like a real macro photograph of the exact same product.`,`REMINDER before finalizing: if your output looks like a new photograph rather than a cropped/zoomed region of the EXACT source image — different texture, different wear, different stitching, different proportions, any detail added, removed, or reinterpreted — that is WRONG. This must be pixel-faithful to the source image, only cropped and enlarged.`,`Ultra-high-resolution, 8K, sharp macro focus — the same photographic characteristics as the source image, with zero artistic reinterpretation.`].join(` `),p=Array.from({length:l},(t,n)=>fetch(`${H}/api/v1/model/generateImage`,{method:`POST`,headers:Q(e.env.ATLAS_API_KEY),body:JSON.stringify({model:`google/nano-banana-2/edit`,prompt:f(In[n%In.length]),aspect_ratio:`1:1`,resolution:`2k`,thinking_level:`high`,output_format:`jpeg`,images:[a]})}).then(e=>e.json())),m=await Promise.all(p),h=m.filter(e=>e.code===200&&e.data?.id).map(e=>e.data.id);if(h.length===0){let t=m[0];return console.error(`[GhostCut Detail] Atlas 요청 전체 실패:`,t),e.json({success:!1,message:t?.msg||t?.message||`디테일컷 생성 요청 실패`},502)}let g=h.length,_=h.join(`,`),v=((await t.prepare(`SELECT COALESCE(MAX(seq_no), 0) AS last_seq FROM generation_logs WHERE user_id = ?`).bind(r.user_id).first())?.last_seq||0)+1;return await t.prepare(`INSERT INTO generation_logs (user_id, job_id, image_count, model_name, bg_name, ratio, seq_no, expires_at)
        VALUES (?, ?, ?, ?, ?, '1:1', ?, datetime('now', '+14 days'))`).bind(r.user_id,_,g,`고스트컷디테일·${o||``}`,`화이트 배경`,v).run(),e.json({success:!0,jobId:_,imageCount:g})}catch(t){return console.error(`ghostcut/detail/start error:`,t),e.json({success:!1,message:t.message},500)}}),V.get(`/api/video/:jobId/status`,async e=>{let t=e.req.param(`jobId`),n=e.env.LOOKBOOK_DB;try{let r=null;try{r=await n.prepare(`SELECT status, video_url, created_at FROM generation_logs WHERE job_id = ?`).bind(t).first()}catch{r=null}if(r?.status===`completed`&&r.video_url)return e.json({status:`completed`,progress:100,videoUrl:r.video_url});if(r?.status===`failed`)return e.json({status:`failed`,progress:100,error:`영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)`});let i=r?.created_at?Date.now()-new Date(r.created_at.replace(` `,`T`)+`Z`).getTime()>900*1e3:!1,a=async(r,a)=>{if(i){let r=await Pn(n,t);return e.json({status:`failed`,progress:100,error:a,...r})}return e.json({status:`processing`,progress:r})},o;try{o=await fetch(`${H}/api/v1/model/prediction/${t}`,{headers:{Authorization:`Bearer ${e.env.ATLAS_API_KEY}`}}).then(e=>e.json())}catch(e){return console.error(`Atlas 상태 조회 일시 실패:`,e),await a(50,`영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)`)}let s=String(o.data?.status??o.status??``).toLowerCase();if(!new Set([`completed`,`succeeded`,`success`,`failed`,`failure`,`timeout`,`canceled`,`cancelled`,`error`]).has(s))return await a(50,`영상 생성 응답 시간이 초과되었습니다. (크레딧은 차감되지 않았습니다)`);if(s!==`completed`&&s!==`succeeded`&&s!==`success`){console.error(`video status 실패:`,s,o);let r=await Pn(n,t);return e.json({status:`failed`,progress:100,error:`영상 생성에 실패했습니다. (크레딧은 차감되지 않았습니다)`,...r})}let l=o.data?.outputs??o.data?.output??o.data?.video??o.data?.videos??o.output??null,u=Array.isArray(l)?l.find(e=>typeof e==`string`&&e.startsWith(`http`))||null:typeof l==`string`&&l.startsWith(`http`)?l:null;return u?(await n.prepare(`UPDATE generation_logs SET video_url = ?, status = 'completed' WHERE job_id = ?`).bind(u,t).run(),e.json({status:`completed`,progress:100,videoUrl:u})):(console.error(`video 완료 응답이지만 URL 파싱 실패:`,JSON.stringify(o).slice(0,500)),await a(90,`영상 URL을 찾을 수 없습니다. (크레딧은 차감되지 않았습니다)`))}catch(t){return console.error(`video status poll error (재시도 예정):`,t),e.json({status:`processing`,progress:50})}}),V.get(`/api/admin/debug/stuck-videos`,W,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=await t.prepare(`SELECT id, user_id, job_id, status, video_url, created_at,
               CAST((julianday('now') - julianday(created_at)) * 24 * 60 AS INTEGER) AS minutes_elapsed
        FROM generation_logs
@@ -429,7 +429,7 @@ ${t}
 </div>
 
 </body>
-</html>`;V.get(`/share/:jobId/:idx`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`jobId`),r=parseInt(e.req.param(`idx`)||`0`,10),i=t=>{let i=`${$(e)}/share/${n}/${r}`,a=t.isGhostCut?`상품 이미지로 고스트컷 만들기`:`상품 이미지로 모델컷 만들기`,o=t.isGhostCut?`클릭1번으로 AI고스트컷이 무료로 만들어 진다고?`:`클릭4번으로 AI모델컷이 무료로 만들어 진다고?`,s=t.isGhostCut?`/ghostcut`:`/generator`,l=``;if(t.state===`ok`){let e=t.sourceTabs||[];l=`
+</html>`;V.get(`/share/:jobId/:idx`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`jobId`),r=parseInt(e.req.param(`idx`)||`0`,10),i=t=>{let i=`${$(e)}/share/${n}/${r}`,a=t.isGhostCut?`상품 이미지로 누끼컷 만들기`:`상품 이미지로 모델컷 만들기`,o=t.isGhostCut?`클릭1번으로 AI누끼컷이 무료로 만들어 진다고?`:`클릭4번으로 AI모델컷이 무료로 만들어 진다고?`,s=t.isGhostCut?`/ghostcut`:`/generator`,l=``;if(t.state===`ok`){let e=t.sourceTabs||[];l=`
         <div class="share-card">
           ${e.length>0?`
           <div class="share-tabs">
@@ -778,7 +778,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               </div>
             </a>
             <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">고스트컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
@@ -1407,9 +1407,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <span class="db-menu-arrow">›</span>
       </a>
 
-      <!-- 고스트컷 만들기 -->
+      <!-- 누끼컷 만들기 -->
       <a href="/ghostcut" class="db-menu-item">
-        <span class="db-menu-label">고스트컷 만들기</span>
+        <span class="db-menu-label">누끼컷 만들기</span>
         <span class="db-menu-arrow">›</span>
       </a>
 
@@ -1480,7 +1480,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
                 </div>
               </a>
               <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-              <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">고스트컷 만들기</a>
+              <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
               <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
               <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
@@ -1940,8 +1940,10 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           return;
         }
 
-        // 고스트컷/디테일컷 내역은 model_name이 "고스트컷"으로 시작한다 — 이 항목은
-        // 모델을 입힌 영상 생성 대상이 아니므로 "다시보기"에서 2K 영상 생성 버튼을 노출하지 않는다.
+        // 누끼컷/디테일컷 내역은 model_name이 내부적으로 여전히 "고스트컷"으로 시작한다
+        // (표시명은 누끼컷으로 변경됐지만, DB에 이미 저장된 값과의 하위 호환을 위해 내부
+        // 접두어는 그대로 유지). 이 항목은 모델을 입힌 영상 생성 대상이 아니므로
+        // "다시보기"에서 2K 영상 생성 버튼을 노출하지 않는다.
         const isGhostCutRow = /^고스트컷/.test(log.model_name || '');
 
         urls.forEach((u, ui) => {
@@ -2164,7 +2166,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       loadCreditHistory();
     });
   <\/script>
-  `,``,`내 크레딧 충전/사용 내역과 잔여 크레딧을 확인하세요.`,e.env.GA4_MEASUREMENT_ID)));var Un=(e,t=`model`)=>{let n=t===`ghostcut`?`상품(옷) 이미지 한 장만 업로드하면 AI가 카테고리를 자동 인식해 고스트 마네킹(투명 마네킹) 스타일의 상품컷으로 변환해드립니다.`:`옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.`,r=t===`ghostcut`?`무료 AI 고스트컷 생성기`:`무료 AI 룩북 생성기`,i=`<script>window.__EZLOOK_MODE__=${JSON.stringify(t)};<\/script>`;return e.html(Bn(r,`
+  `,``,`내 크레딧 충전/사용 내역과 잔여 크레딧을 확인하세요.`,e.env.GA4_MEASUREMENT_ID)));var Un=(e,t=`model`)=>{let n=t===`ghostcut`?`상품(옷) 이미지 한 장만 업로드하면 AI가 카테고리를 자동 인식해 고스트 마네킹(투명 마네킹) 스타일의 상품컷으로 변환해드립니다.`:`옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.`,r=t===`ghostcut`?`무료 AI 누끼컷 생성기`:`무료 AI 룩북 생성기`,i=`<script>window.__EZLOOK_MODE__=${JSON.stringify(t)};<\/script>`;return e.html(Bn(r,`
   <div class="toast-container" id="toastContainer"></div>
   <h1 class="sr-only">AI 룩북 생성기 — 옷 사진 한 장으로 온모델 피팅컷 무료 제작</h1>
 
@@ -2198,7 +2200,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               </div>
             </a>
             <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">고스트컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
@@ -2390,7 +2392,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             <div class="gen-msg" id="vmsg5"><div class="dot"></div> 최종 인코딩 중...</div>
           </div>
         </div>
-        <!-- 디테일컷 생성 중 오버레이 (고스트컷 전용, 영상 생성 오버레이와 동일한 구조) -->
+        <!-- 디테일컷 생성 중 오버레이 (누끼컷 전용, 영상 생성 오버레이와 동일한 구조) -->
         <div class="generating-view" id="detailCutGeneratingView">
           <div class="gen-news-tag" id="detailCutGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
           <div class="gen-news" id="detailCutGenViewNews" style="display:none;"></div>
@@ -2405,7 +2407,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           </div>
         </div>
         <div class="gslide-scroll" style="padding-top:12px;">
-          <!-- 디테일컷 결과 — 고스트컷 전용, 생성 완료 후에만 표시. 고스트컷 원본 이미지보다 위에 배치 -->
+          <!-- 디테일컷 결과 — 누끼컷 전용, 생성 완료 후에만 표시. 누끼컷 원본 이미지보다 위에 배치 -->
           <div id="detailCutResultsSection" style="display:none;padding:0 16px 16px;">
             <p style="font-size:12px;font-weight:700;color:#8b8ba0;margin:0 0 10px;">디테일컷</p>
             <div id="detailCutResultsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
@@ -2437,13 +2439,13 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             <button class="result-nav-btn" id="regenBtnCard" onclick="regenFromCard(0)">
               <span class="rnb-main"><i class="fas fa-rotate-right"></i> 재생성</span>
             </button>
-            <!-- 고스트컷 전용 — initGhostCutUI()에서 노출. "재생성" 버튼이 고스트컷에선 숨겨지므로
+            <!-- 누끼컷 전용 — initGhostCutUI()에서 노출. "재생성" 버튼이 누끼컷에선 숨겨지므로
                  (아래 initGhostCutUI 참고) 그리드 auto-flow로 자연스럽게 "새 프로젝트" 우측에 배치됨 -->
             <button class="result-nav-btn primary" id="detailCutBtn" onclick="openDetailCutMenu()" style="display:none;">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-magnifying-glass"></i> 디테일컷 추가</span>
             </button>
-            <!-- 고스트컷 전용 재생성 — 같은 업로드 이미지로 다시 생성(페이지 새로고침 없음).
+            <!-- 누끼컷 전용 재생성 — 같은 업로드 이미지로 다시 생성(페이지 새로고침 없음).
                  "디테일컷 추가" 바로 다음 DOM 순서라 grid auto-flow로 그 우측에 배치됨 -->
             <button class="result-nav-btn" id="gcRegenBtn" onclick="startGhostCutGeneration()" style="display:none;">
               <span class="rnb-main"><i class="fas fa-rotate-right"></i> 재생성</span>
@@ -2497,7 +2499,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           <i class="fas fa-comment"></i> 카카오톡 공유
         </button>
       </div>
-      <!-- 고스트컷 원본 이미지 다운로드 완료 시에만 노출 — 카카오톡 공유 버튼 아래 -->
+      <!-- 누끼컷 원본 이미지 다운로드 완료 시에만 노출 — 카카오톡 공유 버튼 아래 -->
       <button id="actionProgressDetailCutBtn" class="action-progress-share-btn" style="display:none;width:100%;margin-top:8px;" onclick="goToDetailCutFromShare()">
         <i class="fas fa-magnifying-glass"></i> 디테일컷 생성하기
       </button>
@@ -2506,11 +2508,11 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     </div>
   </div>
 
-  <!-- 디테일컷 장수 선택 모달 (고스트컷 전용) -->
+  <!-- 디테일컷 장수 선택 모달 (누끼컷 전용) -->
   <div class="modal-overlay" id="detailCutModal" style="z-index:10500;">
     <div class="modal-box" style="max-width:340px;">
       <button class="modal-close" onclick="closeModal('detailCutModal')">×</button>
-      <!-- 고스트컷 원본 이미지를 아직 다운로드하지 않았을 때만 노출 — openDetailCutMenu()에서 토글 -->
+      <!-- 누끼컷 원본 이미지를 아직 다운로드하지 않았을 때만 노출 — openDetailCutMenu()에서 토글 -->
       <div id="detailCutDownloadFirstCta" style="display:none;margin-bottom:16px;">
         <button class="result-nav-btn primary" style="width:100%;min-height:52px;" onclick="downloadThenPromptDetailCut()">
           <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운로드</span>
@@ -2800,7 +2802,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     <button class="tab-btn" onclick="switchTab('home')"><i class="fas fa-home"></i> 홈페이지 관리</button>
     <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
     <button class="tab-btn" onclick="switchTab('bizleads')"><i class="fas fa-building"></i> 사업자 리드</button>
-    <button class="tab-btn" onclick="switchTab('ghostcut')"><i class="fas fa-tshirt"></i> 고스트컷 샘플</button>
+    <button class="tab-btn" onclick="switchTab('ghostcut')"><i class="fas fa-tshirt"></i> 누끼컷 샘플</button>
   </div>
 
   <!-- ▼ 탭: 프롬프트 -->
@@ -3001,9 +3003,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <div id="genLoadingVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
 
-      <!-- 고스트컷 로딩화면 하단 이미지 슬롯 (모델컷과 완전히 별도) -->
+      <!-- 누끼컷 로딩화면 하단 이미지 슬롯 (모델컷과 완전히 별도) -->
       <div class="upload-form">
-        <h3><i class="fas fa-image" style="color:#00d4aa;"></i> 생성 로딩화면 이미지 (고스트컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 슬라이드 전환, 8MB 이하, 미등록 시 노출 안 함 — 모델컷 영상과 별도)</span></h3>
+        <h3><i class="fas fa-image" style="color:#00d4aa;"></i> 생성 로딩화면 이미지 (누끼컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 슬라이드 전환, 8MB 이하, 미등록 시 노출 안 함 — 모델컷 영상과 별도)</span></h3>
         <div id="gcLoadingImageGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
     </div>
@@ -3177,10 +3179,10 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     </div>
   </div>
 
-  <!-- ▼ 탭: 고스트컷 샘플 -->
+  <!-- ▼ 탭: 누끼컷 샘플 -->
   <div class="tab-panel" id="tabGhostCut">
     <div class="admin-body">
-      <div class="page-title">👻 고스트컷 샘플 관리</div>
+      <div class="page-title">👻 누끼컷 샘플 관리</div>
       <div class="page-sub">카테고리별로 고스트 마네킹(투명 마네킹) 스타일링 샘플 이미지를 1장씩 등록하세요. 사용자가 상품 이미지를 업로드하면 AI가 카테고리를 자동 판별하고, 여기 등록된 샘플의 실루엣·구도·조명 스타일로 합성합니다. (샘플 자체의 옷 색상/무늬는 결과물에 반영되지 않습니다 — 스타일링 참조 전용)</div>
       <div id="ghostCutGroups"></div>
     </div>
@@ -3931,7 +3933,7 @@ function readFileAsBase64(file) {
 }
 
 // ══════════════════════════════════════════════
-//  고스트컷 샘플 관리 — 카테고리 고정 6종
+//  누끼컷 샘플 관리 — 카테고리 고정 6종
 // ══════════════════════════════════════════════
 let ghostCutCategories = []
 
@@ -4576,7 +4578,7 @@ async function deleteGenLoadingVideo(slot) {
 }
 
 // ══════════════════════════════════════════════
-//  고스트컷 로딩화면 이미지 (최대 5슬롯, 모델컷 영상과 완전히 별도 관리)
+//  누끼컷 로딩화면 이미지 (최대 5슬롯, 모델컷 영상과 완전히 별도 관리)
 //  ⚠️ 2026-08-23: 기존 영상 업로드에서 이미지 업로드로 전환됨
 // ══════════════════════════════════════════════
 const GC_LOADING_IMAGE_LABELS = { 1: '이미지 1', 2: '이미지 2', 3: '이미지 3', 4: '이미지 4', 5: '이미지 5' }
