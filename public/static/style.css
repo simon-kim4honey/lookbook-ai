@@ -95,7 +95,7 @@ img { max-width: 100%; height: auto; }
   gap: 8px;
   padding: 12px 24px;
   border-radius: var(--radius-full);
-  font-size: 15px;
+  font-size: 22.5px;
   font-weight: 600;
   transition: var(--transition);
   white-space: nowrap;
@@ -176,8 +176,8 @@ img { max-width: 100%; height: auto; }
   pointer-events: none;
 }
 
-.btn-lg { padding: 16px 32px; font-size: 17px; }
-.btn-sm { padding: 8px 16px; font-size: 13px; }
+.btn-lg { padding: 16px 32px; font-size: 25.5px; }
+.btn-sm { padding: 8px 16px; font-size: 19.5px; }
 .btn-icon { padding: 10px; border-radius: var(--radius-md); }
 
 .badge {
@@ -294,7 +294,7 @@ img { max-width: 100%; height: auto; }
   border: none;
   background: transparent;
   color: var(--text-primary);
-  font-size: 18px;
+  font-size: 27px;
   cursor: pointer;
   border-radius: var(--radius-md);
   flex-shrink: 0;
@@ -312,13 +312,13 @@ img { max-width: 100%; height: auto; }
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 19.5px;
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
 }
 .locale-switcher-trigger:hover { border-color: var(--primary); color: var(--primary); }
-.locale-switcher-trigger i { font-size: 12px; }
+.locale-switcher-trigger i { font-size: 18px; }
 
 .locale-switcher-menu {
   display: none;
@@ -726,7 +726,7 @@ img { max-width: 100%; height: auto; }
   background: var(--gray-1);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 700;
   color: var(--text-primary);
   cursor: pointer;
@@ -902,9 +902,9 @@ footer {
 .modal-box {
   background: var(--white);
   border-radius: var(--radius-xl);
-  padding: 48px 40px;
+  padding: 72px 60px;
   width: 100%;
-  max-width: 440px;
+  max-width: 660px;
   max-height: 90dvh;
   overflow-y: auto;
   position: relative;
@@ -930,7 +930,7 @@ footer {
   justify-content: center;
   color: var(--text-muted);
   transition: var(--transition);
-  font-size: 18px;
+  font-size: 27px;
 }
 .modal-close:hover { background: var(--gray-3); color: var(--text-primary); }
 .modal-title { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
@@ -965,7 +965,7 @@ footer {
   border-radius: var(--radius-md);
   background: var(--white);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -1121,7 +1121,7 @@ footer {
   border: 2px solid var(--border);
   border-radius: var(--radius-full);
   background: var(--white);
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
@@ -1192,7 +1192,7 @@ footer {
   flex: 1;
   padding: 7px 12px;
   border-radius: var(--radius-md);
-  font-size: 12px;
+  font-size: 18px;
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
@@ -1469,7 +1469,7 @@ footer {
   right: -6px;
   background: #ef4444;
   color: #fff;
-  font-size: 9px;
+  font-size: 13.5px;
   font-weight: 800;
   padding: 2px 6px;
   border-radius: 8px;
@@ -1479,7 +1479,7 @@ footer {
 .result-nav-btn .rnb-strike {
   opacity: 0.55;
   text-decoration: line-through;
-  font-size: 10px;
+  font-size: 15px;
 }
 .result-nav-btn:hover {
   background: rgba(255,255,255,0.12);
@@ -1489,20 +1489,20 @@ footer {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 600;
 }
 .result-nav-btn .rnb-sub {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 16.5px;
   opacity: 0.75;
   font-weight: 500;
 }
 .result-nav-btn .rnb-sub i {
   color: #fbbf24;
-  font-size: 10px;
+  font-size: 15px;
 }
 .result-nav-btn.primary {
   background: linear-gradient(135deg, #7c3aed, #a78bfa);
@@ -1594,7 +1594,7 @@ footer {
   background: rgba(255,255,255,0.06) !important;
   border-color: rgba(255,255,255,0.1) !important;
   color: rgba(255,255,255,0.55) !important;
-  font-size: 12px !important;
+  font-size: 18px !important;
   padding: 6px 14px !important;
   border-radius: 20px !important;
   white-space: nowrap;
@@ -1798,7 +1798,7 @@ footer {
   background: rgba(0,0,0,0.65);
   border: none;
   color: rgba(255,255,255,0.85);
-  font-size: 11px;
+  font-size: 16.5px;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   backdrop-filter: blur(4px);
@@ -1968,7 +1968,7 @@ footer {
   padding: 7px 16px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-full);
-  font-size: 13px;
+  font-size: 19.5px;
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
@@ -2418,7 +2418,7 @@ footer {
   padding: 10px 8px;
   border-radius: var(--radius-md);
   border: none;
-  font-size: 13px;
+  font-size: 19.5px;
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
@@ -2444,8 +2444,8 @@ footer {
 .action-progress-box {
   background: #17172b;
   border-radius: 22px;
-  padding: 40px 34px 32px;
-  width: 360px;
+  padding: 60px 51px 48px;
+  width: 540px;
   max-width: 92vw;
   text-align: center;
   box-shadow: 0 20px 60px rgba(0,0,0,0.4);
@@ -2494,7 +2494,7 @@ footer {
   padding: 15px 10px;
   border-radius: 14px;
   border: none;
-  font-size: 15px;
+  font-size: 22.5px;
   font-weight: 700;
   cursor: pointer;
   transition: var(--transition);
@@ -2508,14 +2508,14 @@ footer {
   background: none;
   border: none;
   color: #8b8ba0;
-  font-size: 13px;
+  font-size: 19.5px;
   cursor: pointer;
   padding: 4px;
 }
 
 /* Image Modal — 확대 화면이 뷰포트를 넘지 않도록 */
 .image-modal .modal-box {
-  max-width: min(700px, 95vw);
+  max-width: min(1050px, 95vw);
   width: 95vw;
   padding: 0;
   overflow: hidden;
@@ -2583,7 +2583,7 @@ footer {
   border-radius: var(--radius-full);
   background: var(--white);
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 22.5px;
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
@@ -2599,7 +2599,7 @@ footer {
   border: none;
   border-radius: var(--radius-full);
   color: white;
-  font-size: 15px;
+  font-size: 22.5px;
   font-weight: 600;
   cursor: pointer;
   transition: var(--transition);
@@ -2732,7 +2732,7 @@ footer {
   .navbar-nav a { padding: 14px 8px; border-radius: 0; border-bottom: 1px solid var(--border); }
   .navbar-nav a:last-child { border-bottom: none; }
   .navbar-actions { gap: 8px; }
-  .navbar-actions .btn { padding: 9px 16px; font-size: 13px; }
+  .navbar-actions .btn { padding: 9px 16px; font-size: 19.5px; }
   .features-grid { grid-template-columns: 1fr; }
   .steps-grid { grid-template-columns: repeat(2, 1fr); }
   .direction-grid { grid-template-columns: 1fr; }
@@ -2775,7 +2775,7 @@ button, a { touch-action: manipulation; }
   .navbar-logo span { font-size: 15px; }
   .logo-icon { width: 28px; height: 28px; font-size: 14px; }
   .navbar-actions { gap: 6px; }
-  .navbar-actions .btn { padding: 7px 12px; font-size: 12px; }
+  .navbar-actions .btn { padding: 7px 12px; font-size: 18px; }
 }
 
 /* Step 헤더 모바일 */
@@ -2798,13 +2798,13 @@ button, a { touch-action: manipulation; }
 /* 필터 태그 모바일 */
 @media (max-width: 480px) {
   .model-filters, .bg-categories { padding: 8px 12px; gap: 6px; }
-  .filter-tag, .bg-cat { font-size: 12px; padding: 5px 12px; }
+  .filter-tag, .bg-cat { font-size: 18px; padding: 5px 12px; }
 }
 
 /* Step Nav 버튼 모바일 */
 @media (max-width: 480px) {
   .step-nav { padding: 10px 16px; gap: 10px; }
-  .step-nav-back, .step-nav-next { padding: 12px 16px; font-size: 13px; }
+  .step-nav-back, .step-nav-next { padding: 12px 16px; font-size: 19.5px; }
 }
 
 /* 업로드 영역 모바일 */
@@ -3196,7 +3196,7 @@ button, a { touch-action: manipulation; }
   background: rgba(255,255,255,0.92);
   border: 1.5px solid rgba(108,71,255,0.25);
   color: var(--primary);
-  font-size: 16px;
+  font-size: 24px;
   cursor: pointer;
   align-items: center;
   justify-content: center;
@@ -3308,7 +3308,7 @@ button, a { touch-action: manipulation; }
   border: none;
   background: #2a2a45;
   color: #c4c4d8;
-  font-size: 11px;
+  font-size: 16.5px;
   font-weight: 700;
   cursor: pointer;
   font-family: inherit;
