@@ -4676,7 +4676,7 @@ ${bodyContent}
 <div id="chargePanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:9000;overflow-y:auto;">
   <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-      <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+      <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:27px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
       <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;margin:0;" data-i18n="charge-title">크레딧 충전</h2>
     </div>
     <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
@@ -4735,7 +4735,7 @@ ${bodyContent}
       </div>
     </div>
     <button id="chargeCta" onclick="startPayment()"
-            style="width:100%;padding:16px;background:linear-gradient(135deg,#6c47ff,#a855f7);border:none;border-radius:16px;color:white;font-size:16px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.5;pointer-events:none;transition:all 0.2s;">
+            style="width:100%;padding:16px;background:linear-gradient(135deg,#6c47ff,#a855f7);border:none;border-radius:16px;color:white;font-size:24px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.5;pointer-events:none;transition:all 0.2s;">
       <i class="fas fa-credit-card"></i>
       <span id="ctaLabel" data-i18n="pkg-btn">패키지를 선택하세요</span>
     </button>
@@ -4836,7 +4836,7 @@ app.get('/share/:jobId/:idx', async (c) => {
     .share-card { width: 100%; max-width: 420px; height: 100%; max-height: 760px; background: #17172b; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.4); display: flex; flex-direction: column; }
     .share-tabs { flex: 0 0 auto; display: flex; gap: 6px; padding: 10px 10px 0; flex-wrap: wrap; }
     .share-tabs-bottom { padding: 8px 10px 0; }
-    .share-tab { flex: 1; min-width: 60px; background: #23233d; color: #a0a0c0; border: none; border-radius: 10px; padding: 8px 4px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; }
+    .share-tab { flex: 1; min-width: 60px; background: #23233d; color: #a0a0c0; border: none; border-radius: 10px; padding: 8px 4px; font-size: 16.5px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; }
     .share-tab.active { background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; }
     .share-img-wrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-top: 8px; background: #000; }
     .share-img {
@@ -5303,7 +5303,7 @@ app.get('/', (c) => {
               <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:16.5px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
             <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
@@ -5312,7 +5312,7 @@ app.get('/', (c) => {
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:21px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
         </div>
       </div>
@@ -5618,22 +5618,22 @@ app.get('/', (c) => {
 
   <!-- Login / Signup Modal (통합) -->
   <div class="modal-overlay" id="loginModal">
-    <div class="modal-box" style="max-width:420px;">
+    <div class="modal-box" style="max-width:630px;">
       <button class="modal-close" onclick="closeModal('loginModal')">×</button>
 
       <!-- 탭 전환 -->
       <div style="display:flex;gap:0;margin-bottom:24px;border-bottom:2px solid var(--border);">
-        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;" data-i18n="nav-login">로그인</button>
-        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:600;color:var(--text-muted);cursor:pointer;" data-i18n="nav-signup2">회원가입</button>
+        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:22.5px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;" data-i18n="nav-login">로그인</button>
+        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:22.5px;font-weight:600;color:var(--text-muted);cursor:pointer;" data-i18n="nav-signup2">회원가입</button>
       </div>
 
       <!-- 소셜 로그인 버튼 -->
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
-        <button onclick="oauthLogin('kakao', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#FEE500;border:none;border-radius:10px;font-size:15px;font-weight:700;color:#3C1E1E;cursor:pointer;">
+        <button onclick="oauthLogin('kakao', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#FEE500;border:none;border-radius:10px;font-size:22.5px;font-weight:700;color:#3C1E1E;cursor:pointer;">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="#3C1E1E"><path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.7 1.628 5.073 4.09 6.51L4.993 21l4.457-2.387A11.3 11.3 0 0 0 12 18.6c5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/></svg>
           카카오로 시작하기
         </button>
-        <button onclick="oauthLogin('google', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#fff;border:1px solid #dadce0;border-radius:10px;font-size:15px;font-weight:600;color:#3c4043;cursor:pointer;">
+        <button onclick="oauthLogin('google', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#fff;border:1px solid #dadce0;border-radius:10px;font-size:22.5px;font-weight:600;color:#3c4043;cursor:pointer;">
           <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
           Google로 시작하기
         </button>
@@ -5800,7 +5800,7 @@ app.get('/dashboard', (c) => {
       color: white;
       border: none;
       border-radius: 24px;
-      font-size: 13px;
+      font-size: 19.5px;
       font-weight: 700;
       cursor: pointer;
       transition: background 0.15s;
@@ -5853,7 +5853,7 @@ app.get('/dashboard', (c) => {
     }
     .db-logout-btn:hover { background: #1e1e35; }
     .db-logout-label {
-      font-size: 15px;
+      font-size: 22.5px;
       font-weight: 600;
       color: #ef4444;
     }
@@ -5994,12 +5994,12 @@ app.get('/dashboard', (c) => {
       <!-- 헤더 -->
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-          <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+          <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:27px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
           <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">생성 내역</h2>
         </div>
         <!-- 사용자 메뉴 (다른 페이지와 동일한 아바타+드롭다운) -->
         <div style="display:flex;align-items:center;gap:8px;position:relative;flex-shrink:0;">
-          <button id="navLoginBtn" onclick="openModal('loginModal')" style="display:none;font-size:12px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
+          <button id="navLoginBtn" onclick="openModal('loginModal')" style="display:none;font-size:18px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
           <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
             <span id="navUserCredits" style="display:none;"></span>
             <span id="navUserName" style="display:none;"></span>
@@ -6010,7 +6010,7 @@ app.get('/dashboard', (c) => {
                 <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                   <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#6c47ff;"></div>
-                  <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
+                  <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:16.5px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
                 </div>
               </a>
               <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
@@ -6018,7 +6018,7 @@ app.get('/dashboard', (c) => {
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
               <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
               <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
-              <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
+              <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:19.5px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
             </div>
           </div>
         </div>
@@ -6039,7 +6039,7 @@ app.get('/dashboard', (c) => {
 
   <!-- 이미지 확대 보기 모달 (히스토리 전용 — 다시보기) -->
   <div id="histImgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1000;align-items:center;justify-content:center;flex-direction:column;padding:20px;">
-    <button onclick="closeHistModal()" style="position:absolute;top:16px;right:16px;width:36px;height:36px;border:none;background:rgba(255,255,255,0.1);border-radius:50%;color:#fff;font-size:20px;cursor:pointer;">×</button>
+    <button onclick="closeHistModal()" style="position:absolute;top:16px;right:16px;width:36px;height:36px;border:none;background:rgba(255,255,255,0.1);border-radius:50%;color:#fff;font-size:30px;cursor:pointer;">×</button>
     <img id="histModalImg" src="" alt="생성 이미지" draggable="false"
       style="max-width:min(420px,90vw);max-height:calc(100dvh - 140px);object-fit:contain;border-radius:14px;display:block;" />
     <video id="histModalVideo" src="" autoplay loop muted playsinline controls controlsList="nodownload" disablePictureInPicture
@@ -6679,7 +6679,7 @@ app.get('/credits', (c) => {
           <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">잔여 크레딧</div>
           <div id="creditsPanelBalance" style="font-size:28px;font-weight:800;color:#a78bfa;">-</div>
         </div>
-        <button class="db-charge-btn" onclick="openChargePanel()" style="padding:9px 20px;background:#6c47ff;color:white;border:none;border-radius:24px;font-size:13px;font-weight:700;cursor:pointer;">충전</button>
+        <button class="db-charge-btn" onclick="openChargePanel()" style="padding:9px 20px;background:#6c47ff;color:white;border:none;border-radius:24px;font-size:19.5px;font-weight:700;cursor:pointer;">충전</button>
       </div>
 
       <!-- 유효기간/환불 안내 -->
@@ -6739,7 +6739,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
       <a href="/generator" class="gapp-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
       <!-- 로그인 상태 표시 -->
       <div style="display:flex;align-items:center;gap:8px;position:relative;">
-        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:12px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
+        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:18px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
         <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
           <span id="navUserCredits" style="display:none;"></span>
           <span id="navUserName" style="display:none;"></span>
@@ -6750,7 +6750,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:11px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:16.5px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
             <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
@@ -6759,7 +6759,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
-            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:19.5px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
         </div>
       </div>
@@ -7021,13 +7021,13 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         <!-- 버튼 영역: 재생성 + 다운로드 -->
         <div id="modalButtonArea" style="position:absolute;bottom:16px;right:16px;z-index:20;display:flex;align-items:center;gap:8px;">
           <!-- 재생성 버튼 -->
-          <button id="regenBtn" onclick="regenImage()" style="display:flex;align-items:center;gap:6px;padding:10px 16px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.85)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">
+          <button id="regenBtn" onclick="regenImage()" style="display:flex;align-items:center;gap:6px;padding:10px 16px;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:21px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.85)'" onmouseout="this.style.background='rgba(0,0,0,0.6)'">
             <i class="fas fa-redo-alt"></i>
             <span id="regenBtnText">재생성</span>
             <span id="regenCounter" style="font-size:12px;opacity:0.8;"></span>
           </button>
           <!-- 다운로드 버튼 -->
-          <button id="downloadBtn" onclick="downloadImage()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:rgba(99,102,241,0.85);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,1)'" onmouseout="this.style.background='rgba(99,102,241,0.85)'">
+          <button id="downloadBtn" onclick="downloadImage()" style="display:flex;align-items:center;gap:8px;padding:10px 20px;background:rgba(99,102,241,0.85);backdrop-filter:blur(8px);color:white;border:1px solid rgba(255,255,255,0.25);border-radius:8px;font-size:21px;font-weight:600;cursor:pointer;transition:background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,1)'" onmouseout="this.style.background='rgba(99,102,241,0.85)'">
             <i class="fas fa-download"></i> 다운로드
           </button>
         </div>
@@ -7064,27 +7064,27 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 
   <!-- 디테일컷 장수 선택 모달 (누끼컷 전용) -->
   <div class="modal-overlay" id="detailCutModal" style="z-index:10500;">
-    <div class="modal-box" style="max-width:340px;">
+    <div class="modal-box" style="max-width:510px;">
       <button class="modal-close" onclick="closeModal('detailCutModal')">×</button>
       <!-- 누끼컷 원본 이미지를 아직 다운로드하지 않았을 때만 노출 — openDetailCutMenu()에서 토글 -->
       <div id="detailCutDownloadFirstCta" style="display:none;margin-bottom:16px;">
-        <button class="result-nav-btn primary" style="width:100%;min-height:52px;" onclick="downloadThenPromptDetailCut()">
+        <button class="result-nav-btn primary" style="width:100%;min-height:78px;" onclick="downloadThenPromptDetailCut()">
           <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운로드</span>
         </button>
       </div>
       <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:var(--text-primary);">디테일컷 추가</h3>
       <p style="margin:0 0 18px;font-size:13px;color:#5c5c70;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 자동으로 만들어드려요. 생성은 무료 입니다.</p>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:48px;">
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:72px;">
           <span class="rnb-main">1장 생성</span>
         </button>
-        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(2)" style="min-height:48px;">
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(2)" style="min-height:72px;">
           <span class="rnb-main">2장 생성</span>
         </button>
-        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(3)" style="min-height:48px;">
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(3)" style="min-height:72px;">
           <span class="rnb-main">3장 생성</span>
         </button>
-        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(4)" style="min-height:48px;">
+        <button class="result-nav-btn primary" onclick="startDetailCutGeneration(4)" style="min-height:72px;">
           <span class="rnb-main">4장 생성</span>
         </button>
       </div>
@@ -7093,7 +7093,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 
   <!-- Auth Modal (Generator 내부) -->
   <div class="modal-overlay" id="loginModal" style="z-index:10000;">
-    <div class="modal-box" style="max-width:420px;">
+    <div class="modal-box" style="max-width:630px;">
       <button class="modal-close" onclick="closeModal('loginModal')">×</button>
       <div style="text-align:center;margin-bottom:20px;">
         <div style="font-size:28px;margin-bottom:8px;">✨</div>
@@ -7101,15 +7101,15 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         <p style="font-size:13px;color:var(--text-muted);">가입 즉시 무료 크레딧을 드려요!</p>
       </div>
       <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
-        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;" data-i18n="nav-login">로그인</button>
-        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:15px;font-weight:600;color:var(--text-muted);cursor:pointer;" data-i18n="nav-signup2">회원가입</button>
+        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:22.5px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;" data-i18n="nav-login">로그인</button>
+        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:22.5px;font-weight:600;color:var(--text-muted);cursor:pointer;" data-i18n="nav-signup2">회원가입</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
-        <button onclick="oauthLogin('kakao', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#FEE500;border:none;border-radius:10px;font-size:15px;font-weight:700;color:#3C1E1E;cursor:pointer;">
+        <button onclick="oauthLogin('kakao', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#FEE500;border:none;border-radius:10px;font-size:22.5px;font-weight:700;color:#3C1E1E;cursor:pointer;">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="#3C1E1E"><path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.7 1.628 5.073 4.09 6.51L4.993 21l4.457-2.387A11.3 11.3 0 0 0 12 18.6c5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/></svg>
           카카오로 시작하기
         </button>
-        <button onclick="oauthLogin('google', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#fff;border:1px solid #dadce0;border-radius:10px;font-size:15px;font-weight:600;color:#3c4043;cursor:pointer;">
+        <button onclick="oauthLogin('google', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#fff;border:1px solid #dadce0;border-radius:10px;font-size:22.5px;font-weight:600;color:#3c4043;cursor:pointer;">
           <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
           Google로 시작하기
         </button>
@@ -7204,7 +7204,7 @@ app.get('/admin02', (c) => {
     .admin-header .logout:hover{border-color:#6c47ff;color:#9b7cff;}
     /* 탭 */
     .tab-bar{display:flex;gap:4px;background:#1a1a2e;border-bottom:1px solid #2e2e50;padding:0 28px;}
-    .tab-btn{padding:14px 20px;font-size:14px;font-weight:500;cursor:pointer;border:none;background:none;color:#8b8ba0;border-bottom:2px solid transparent;transition:all .2s;}
+    .tab-btn{padding:14px 20px;font-size: 21px;font-weight:500;cursor:pointer;border:none;background:none;color:#8b8ba0;border-bottom:2px solid transparent;transition:all .2s;}
     .tab-btn.active{color:#9b7cff;border-bottom-color:#6c47ff;}
     .tab-btn:hover{color:#e0e0f0;}
     .tab-panel{display:none;}
@@ -7232,14 +7232,14 @@ app.get('/admin02', (c) => {
     .section-card textarea:focus{border-color:#6c47ff;}
     .char-count{font-size:12px;color:#8b8ba0;text-align:right;margin-top:5px;}
     .preset-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
-    .preset-btn{font-size:12px;padding:4px 11px;border:1px solid #3a3a60;border-radius:20px;background:none;color:#a0a0c0;cursor:pointer;transition:all .2s;white-space:nowrap;}
+    .preset-btn{font-size: 18px;padding:4px 11px;border:1px solid #3a3a60;border-radius:20px;background:none;color:#a0a0c0;cursor:pointer;transition:all .2s;white-space:nowrap;}
     .preset-btn:hover{border-color:#6c47ff;color:#9b7cff;background:#6c47ff11;}
     /* 저장바 */
     .save-bar{position:sticky;bottom:0;background:#0f0f1a;border-top:1px solid #2e2e50;padding:14px 0;display:flex;align-items:center;gap:14px;margin-top:6px;}
-    .btn-save{padding:11px 28px;background:#6c47ff;color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
+    .btn-save{padding:11px 28px;background:#6c47ff;color:white;border:none;border-radius:10px;font-size: 21px;font-weight:600;cursor:pointer;transition:all .2s;}
     .btn-save:hover{background:#7c5bff;}
     .btn-save:disabled{background:#3a3a60;color:#8b8ba0;cursor:not-allowed;}
-    .btn-cancel{padding:11px 20px;background:transparent;color:#8b8ba0;border:1.5px solid #3a3a60;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;}
+    .btn-cancel{padding:11px 20px;background:transparent;color:#8b8ba0;border:1.5px solid #3a3a60;border-radius:10px;font-size: 21px;font-weight:600;cursor:pointer;transition:all .2s;}
     .btn-cancel:hover{border-color:#6c47ff;color:#9b7cff;}
     .save-status{font-size:13px;color:#8b8ba0;}
     .save-status.ok{color:#22c55e;}
@@ -7266,7 +7266,7 @@ app.get('/admin02', (c) => {
     .media-card .meta{padding:10px 12px;}
     .media-card .meta .name{font-size:13px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .media-card .meta .desc{font-size:11px;color:#8b8ba0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .media-card .del-btn{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:#ef44449e;border:none;color:white;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:background .2s;}
+    .media-card .del-btn{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:#ef44449e;border:none;color:white;cursor:pointer;font-size: 18px;display:flex;align-items:center;justify-content:center;transition:background .2s;}
     .media-card .del-btn:hover{background:#ef4444;}
     .media-card .custom-badge{position:absolute;top:6px;left:6px;font-size:10px;background:#6c47ffcc;color:white;padding:2px 8px;border-radius:10px;}
     /* 업로드 폼 */
@@ -7291,10 +7291,10 @@ app.get('/admin02', (c) => {
     .leads-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
     .leads-tabroot input,.leads-tabroot select,.leads-tabroot textarea{background:#0f0f1a;border:1px solid #3a3a60;border-radius:8px;color:#e0e0f0;font-size:13px;padding:9px 12px;outline:none;font-family:inherit;}
     .leads-tabroot textarea{width:100%;min-height:90px;resize:vertical;line-height:1.6;}
-    .leads-btn{background:#6c47ff;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;}
+    .leads-btn{background:#6c47ff;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size: 19.5px;font-weight:600;cursor:pointer;}
     .leads-btn:hover{background:#5a38e0;}
     .leads-btn.secondary{background:#252540;border:1px solid #3a3a60;color:#e0e0f0;}
-    .leads-btn.small{padding:5px 10px;font-size:12px;}
+    .leads-btn.small{padding:5px 10px;font-size: 18px;}
     .leads-tabroot table{width:100%;border-collapse:collapse;font-size:12.5px;}
     .leads-tabroot th{text-align:left;color:#8b8ba0;font-weight:600;padding:8px;border-bottom:1px solid #2e2e50;}
     .leads-tabroot td{padding:8px;border-bottom:1px solid #22223a;vertical-align:top;}
@@ -7308,7 +7308,7 @@ app.get('/admin02', (c) => {
     .biz-stat-box-highlight{border-color:#3a2e6e;background:#161129;}
     .biz-stat-box-highlight .num{color:#4ade80;}
     .leads-notice-err{background:#3a1414;border:1px solid #6c1a1a;color:#fca5a5;border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;}
-    .biz-filter-btn{cursor:pointer;border:1px solid #3a3a60;border-radius:9px;padding:7px 13px;font-size:12px;color:#8b8ba0;background:#15152a;transition:.15s;}
+    .biz-filter-btn{cursor:pointer;border:1px solid #3a3a60;border-radius:9px;padding:7px 13px;font-size: 18px;color:#8b8ba0;background:#15152a;transition:.15s;}
     .biz-filter-btn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
     .biz-pill{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap;}
     .biz-pill-green{background:#1a4a3a;color:#4ade80;}
@@ -7316,12 +7316,12 @@ app.get('/admin02', (c) => {
     .biz-pill-yellow{background:#4a3a1a;color:#facc15;}
     .biz-pill-gray{background:#2e2e50;color:#c0c0e0;}
     .biz-masked{color:#f87171;font-size:11px;font-style:italic;}
-    .biz-copy-btn{cursor:pointer;opacity:.5;font-size:11px;border:none;background:none;color:#9b7cff;padding:0 0 0 5px;}
+    .biz-copy-btn{cursor:pointer;opacity:.5;font-size: 16.5px;border:none;background:none;color:#9b7cff;padding:0 0 0 5px;}
     .biz-copy-btn:hover{opacity:1;}
     .biz-tablewrap{overflow:auto;max-height:calc(100vh - 420px);}
     .biz-tablewrap th{position:sticky;top:0;background:#1a1a2e;z-index:2;}
     .biz-tablewrap tr{cursor:pointer;}
-    .biz-pagebtn{min-width:30px;height:28px;border-radius:7px;border:1px solid #3a3a60;background:#15152a;color:#8b8ba0;font-size:11.5px;cursor:pointer;padding:0 6px;}
+    .biz-pagebtn{min-width:30px;height:28px;border-radius:7px;border:1px solid #3a3a60;background:#15152a;color:#8b8ba0;font-size: 17.2px;cursor:pointer;padding:0 6px;}
     .biz-pagebtn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
     .biz-pagebtn:disabled{opacity:.35;cursor:default;}
     .biz-modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);align-items:center;justify-content:center;padding:20px;z-index:2100;}
@@ -7656,7 +7656,7 @@ app.get('/admin02', (c) => {
     <div class="modal-box" style="max-width:640px;max-height:80vh;overflow-y:auto;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
         <h3 style="margin:0;font-size:17px;" id="userDetailName">회원 상세</h3>
-        <button onclick="closeModal('userDetailModal')" style="background:none;border:none;color:#8b8ba0;font-size:20px;cursor:pointer;">×</button>
+        <button onclick="closeModal('userDetailModal')" style="background:none;border:none;color:#8b8ba0;font-size:30px;cursor:pointer;">×</button>
       </div>
       <div id="userDetailSummary" style="font-size:13px;color:#c8c8dc;margin-bottom:20px;line-height:1.8;"></div>
 
@@ -8194,11 +8194,11 @@ function renderUserTable(users) {
     var uid = String(u.id)
     var statusBtn = ''
     if (u.status === 'active') {
-      statusBtn = '<button data-uid="' + uid + '" data-action="suspend" class="btn-sm btn-danger-sm" style="font-size:11px;padding:4px 10px;">정지</button>'
+      statusBtn = '<button data-uid="' + uid + '" data-action="suspend" class="btn-sm btn-danger-sm" style="font-size:16.5px;padding:4px 10px;">정지</button>'
     } else if (u.status === 'suspended') {
-      statusBtn = '<button data-uid="' + uid + '" data-action="activate" class="btn-sm btn-primary-sm" style="font-size:11px;padding:4px 10px;">활성화</button>'
+      statusBtn = '<button data-uid="' + uid + '" data-action="activate" class="btn-sm btn-primary-sm" style="font-size:16.5px;padding:4px 10px;">활성화</button>'
     }
-    var deleteBtn = !isAdmin ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||'') + '" data-email="' + escHtml(u.email||'') + '" data-action="delete" class="btn-sm btn-danger-sm" style="font-size:11px;padding:4px 10px;">삭제</button>' : ''
+    var deleteBtn = !isAdmin ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||'') + '" data-email="' + escHtml(u.email||'') + '" data-action="delete" class="btn-sm btn-danger-sm" style="font-size:16.5px;padding:4px 10px;">삭제</button>' : ''
     var credits = (u.credits != null) ? u.credits : 0
     return '<tr style="border-bottom:1px solid #1e1e3a;">'
       + '<td style="padding:12px 16px;">'
@@ -8216,15 +8216,15 @@ function renderUserTable(users) {
       +   '<span style="font-size:14px;font-weight:700;color:#9b7cff;">' + credits + '</span>'
       +   '<span style="font-size:10px;color:#8b8ba0;"> 크레딧</span>'
       +   '<div style="margin-top:4px;display:flex;gap:4px;justify-content:center;">'
-      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="grant" style="font-size:10px;padding:2px 8px;background:#6c47ff33;border:1px solid #6c47ff66;border-radius:6px;color:#9b7cff;cursor:pointer;font-weight:600;">지급</button>'
-      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="credits" style="font-size:10px;padding:2px 8px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">설정</button>'
+      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="grant" style="font-size:15px;padding:2px 8px;background:#6c47ff33;border:1px solid #6c47ff66;border-radius:6px;color:#9b7cff;cursor:pointer;font-weight:600;">지급</button>'
+      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="credits" style="font-size:15px;padding:2px 8px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">설정</button>'
       +   '</div>'
       + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">' + (statusBadge[u.status] || u.status) + '</td>'
       + '<td style="padding:12px 16px;font-size:12px;color:#8b8ba0;">' + joined + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">'
       +   '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
-      +     '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="detail" class="btn-sm" style="font-size:11px;padding:4px 10px;">상세보기</button>'
+      +     '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="detail" class="btn-sm" style="font-size:16.5px;padding:4px 10px;">상세보기</button>'
       +     statusBtn + deleteBtn
       +   '</div>'
       + '</td>'
@@ -8528,8 +8528,8 @@ function ghostCutCardHtml(c) {
     '<div style="font-size:13px;color:#e0e0f0;font-weight:600;margin-bottom:8px;">' + c.label + '</div>' +
     '<input type="file" accept="image/*" style="display:none" id="gcFile_' + c.code + '" onchange="ghostCutUpload(\\'' + c.code + '\\', this.files[0])" />' +
     '<div style="display:flex;gap:6px;justify-content:center;">' +
-      '<button class="leads-btn small" style="padding:5px 10px;font-size:11px;" onclick="document.getElementById(\\'gcFile_' + c.code + '\\').click()">업로드</button>' +
-      (c.hasSample ? '<button class="leads-btn secondary small" style="padding:5px 10px;font-size:11px;" onclick="ghostCutDelete(\\'' + c.code + '\\')">삭제</button>' : '') +
+      '<button class="leads-btn small" style="padding:5px 10px;font-size:16.5px;" onclick="document.getElementById(\\'gcFile_' + c.code + '\\').click()">업로드</button>' +
+      (c.hasSample ? '<button class="leads-btn secondary small" style="padding:5px 10px;font-size:16.5px;" onclick="ghostCutDelete(\\'' + c.code + '\\')">삭제</button>' : '') +
     '</div>' +
   '</div>'
 }
@@ -8606,7 +8606,7 @@ function renderModelStaging() {
     '<div style="width:160px;flex-shrink:0;">' +
     '<div style="position:relative;width:160px;height:160px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
     '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
-    '<button onclick="removeModelStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:22px;text-align:center;padding:0;">✕</button>' +
+    '<button onclick="removeModelStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:18px;line-height:22px;text-align:center;padding:0;">✕</button>' +
     '</div>' +
     '<input class="form-input" value="' + escHtml(item.name) + '" oninput="modelStagingList[' + i + '].name=this.value" placeholder="이름" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:11px;padding:4px 7px;"/>' +
     '<select class="form-input" onchange="modelStagingList['+i+'].gender=this.value" style="margin-top:3px;width:100%;font-size:11px;padding:3px 6px;">' + mkOpts(['미분류','여성','남성'], item.gender) + '</select>' +
@@ -8685,8 +8685,8 @@ async function loadCustomModels() {
           '<div class="name">' + m.name + '</div>' +
           '<div class="desc">' + (m.desc || '-') + '</div>' +
           '<div style="display:flex;gap:6px;margin-top:6px;">' +
-            '<button onclick="event.stopPropagation();setModelGender(\\'' + m.id + '\\',\\'여성\\')" style="flex:1;padding:5px;border-radius:6px;border:1px solid ' + (g==='여성'?'#6366f1':'#444') + ';background:' + (g==='여성'?'#6366f1':'transparent') + ';color:#fff;font-size:12px;cursor:pointer;">여성</button>' +
-            '<button onclick="event.stopPropagation();setModelGender(\\'' + m.id + '\\',\\'남성\\')" style="flex:1;padding:5px;border-radius:6px;border:1px solid ' + (g==='남성'?'#6366f1':'#444') + ';background:' + (g==='남성'?'#6366f1':'transparent') + ';color:#fff;font-size:12px;cursor:pointer;">남성</button>' +
+            '<button onclick="event.stopPropagation();setModelGender(\\'' + m.id + '\\',\\'여성\\')" style="flex:1;padding:5px;border-radius:6px;border:1px solid ' + (g==='여성'?'#6366f1':'#444') + ';background:' + (g==='여성'?'#6366f1':'transparent') + ';color:#fff;font-size:18px;cursor:pointer;">여성</button>' +
+            '<button onclick="event.stopPropagation();setModelGender(\\'' + m.id + '\\',\\'남성\\')" style="flex:1;padding:5px;border-radius:6px;border:1px solid ' + (g==='남성'?'#6366f1':'#444') + ';background:' + (g==='남성'?'#6366f1':'transparent') + ';color:#fff;font-size:18px;cursor:pointer;">남성</button>' +
           '</div>' +
         '</div>' +
         '</div>'
@@ -8755,7 +8755,7 @@ function renderBgStaging() {
     '<div style="width:160px;flex-shrink:0;">' +
     '<div style="position:relative;width:160px;height:120px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
     '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
-    '<button onclick="removeBgStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:22px;text-align:center;padding:0;">✕</button>' +
+    '<button onclick="removeBgStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:18px;line-height:22px;text-align:center;padding:0;">✕</button>' +
     '</div>' +
     '<input class="form-input" value="' + escHtml(item.name) + '" oninput="bgStagingList[' + i + '].name=this.value" placeholder="배경 이름" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:11px;padding:4px 7px;"/>' +
     '<select class="form-input" onchange="bgStagingList['+i+'].category=this.value" style="margin-top:3px;width:100%;font-size:11px;padding:3px 6px;">' + mkOpts(catList, item.category) + '</select>' +
@@ -8837,9 +8837,9 @@ async function loadCustomBgs() {
         (b.hasGenImage
           ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#dcfce7;color:#15803d;font-weight:600;">생성용 이미지 등록됨</span>'
           : '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fef3c7;color:#92400e;font-weight:600;">생성용 미등록 (원본 사용)</span>') +
-        '<button onclick="event.stopPropagation();pickBgGenImage(' + "'" + b.id + "'" + ')" style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid #ccc;background:#fff;cursor:pointer;">' +
+        '<button onclick="event.stopPropagation();pickBgGenImage(' + "'" + b.id + "'" + ')" style="font-size:15px;padding:2px 8px;border-radius:20px;border:1px solid #ccc;background:#fff;cursor:pointer;">' +
         (b.hasGenImage ? '생성용 이미지 교체' : '생성용 이미지 등록') + '</button>' +
-        '<button onclick="event.stopPropagation();toggleBgDefault(' + "'" + b.id + "'" + ')" style="font-size:10px;padding:2px 8px;border-radius:20px;cursor:pointer;' + (b.isDefault ? 'border:1px solid #111;background:#111;color:#fff;' : 'border:1px dashed #999;background:transparent;color:#666;') + '">' +
+        '<button onclick="event.stopPropagation();toggleBgDefault(' + "'" + b.id + "'" + ')" style="font-size:15px;padding:2px 8px;border-radius:20px;cursor:pointer;' + (b.isDefault ? 'border:1px solid #111;background:#111;color:#fff;' : 'border:1px dashed #999;background:transparent;color:#666;') + '">' +
         '<i class="fas fa-thumbtack" style="margin-right:3px;' + (b.isDefault ? '' : 'opacity:.5;') + '"></i>' +
         (b.isDefault ? '1번 슬롯 고정됨 (클릭해서 해제)' : '클릭해서 1번 슬롯에 고정') + '</button>' +
         '</div></div>' +
@@ -8872,7 +8872,7 @@ function renderShowcaseStaging() {
   container.innerHTML = showcaseStagingList.map((item, i) =>
     '<div style="position:relative;width:140px;height:140px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
     '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
-    '<button onclick="removeShowcaseStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:12px;line-height:22px;text-align:center;padding:0;">✕</button>' +
+    '<button onclick="removeShowcaseStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:18px;line-height:22px;text-align:center;padding:0;">✕</button>' +
     '</div>'
   ).join('')
 }
@@ -8957,8 +8957,8 @@ async function loadFeatureBgs() {
         '<div style="padding:8px;">' +
         '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + FEATURE_BG_LABELS[slot] + '</div>' +
         '<div style="display:flex;gap:6px;">' +
-        '<button onclick="pickFeatureBg(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (img ? '교체' : '업로드') + '</button>' +
-        (img ? '<button onclick="deleteFeatureBg(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
+        '<button onclick="pickFeatureBg(' + slot + ')" style="flex:1;font-size:16.5px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (img ? '교체' : '업로드') + '</button>' +
+        (img ? '<button onclick="deleteFeatureBg(' + slot + ')" style="font-size:16.5px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
         '</div></div></div>'
     }).join('')
   } catch(e) { console.error('loadFeatureBgs error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
@@ -9025,8 +9025,8 @@ async function loadHowtoVideos() {
         '<div style="padding:8px;">' +
         '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + HOWTO_VIDEO_LABELS[slot] + '</div>' +
         '<div style="display:flex;gap:6px;">' +
-        '<button onclick="pickHowtoVideo(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
-        (src ? '<button onclick="deleteHowtoVideo(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
+        '<button onclick="pickHowtoVideo(' + slot + ')" style="flex:1;font-size:16.5px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
+        (src ? '<button onclick="deleteHowtoVideo(' + slot + ')" style="font-size:16.5px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
         '</div></div></div>'
     }).join('')
   } catch(e) { console.error('loadHowtoVideos error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
@@ -9093,8 +9093,8 @@ async function loadGenLoadingVideos() {
         '<div style="padding:8px;">' +
         '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + GEN_LOADING_VIDEO_LABELS[slot] + '</div>' +
         '<div style="display:flex;gap:6px;">' +
-        '<button onclick="pickGenLoadingVideo(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
-        (src ? '<button onclick="deleteGenLoadingVideo(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
+        '<button onclick="pickGenLoadingVideo(' + slot + ')" style="flex:1;font-size:16.5px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
+        (src ? '<button onclick="deleteGenLoadingVideo(' + slot + ')" style="font-size:16.5px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
         '</div></div></div>'
     }).join('')
   } catch(e) { console.error('loadGenLoadingVideos error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
@@ -9162,8 +9162,8 @@ async function loadGcLoadingImages() {
         '<div style="padding:8px;">' +
         '<div style="font-size:12px;font-weight:600;margin-bottom:6px;">' + GC_LOADING_IMAGE_LABELS[slot] + '</div>' +
         '<div style="display:flex;gap:6px;">' +
-        '<button onclick="pickGcLoadingImage(' + slot + ')" style="flex:1;font-size:11px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
-        (src ? '<button onclick="deleteGcLoadingImage(' + slot + ')" style="font-size:11px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
+        '<button onclick="pickGcLoadingImage(' + slot + ')" style="flex:1;font-size:16.5px;padding:5px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer;">' + (src ? '교체' : '업로드') + '</button>' +
+        (src ? '<button onclick="deleteGcLoadingImage(' + slot + ')" style="font-size:16.5px;padding:5px 8px;border-radius:6px;border:1px solid #f3c;color:#e11d48;background:#fff;cursor:pointer;">삭제</button>' : '') +
         '</div></div></div>'
     }).join('')
   } catch(e) { console.error('loadGcLoadingImages error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
