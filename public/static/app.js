@@ -762,6 +762,7 @@ async function startGenLoadingVideoPlaylist() {
   if (!list.length) { player.style.display = 'none'; player.innerHTML = ''; return; }
 
   player.style.display = '';
+  player.classList.remove('gc-square');
   player.innerHTML = '';
   _genLoadingVideoIdx = 0;
   _genLoadingVideoEls = list.map((src, i) => {
@@ -836,6 +837,7 @@ async function startGcLoadingImageSlideshow() {
   if (!list.length) { player.style.display = 'none'; player.innerHTML = ''; return; }
 
   player.style.display = '';
+  player.classList.add('gc-square'); // 누끼컷 샘플은 세로(9:16) 대신 1:1 정사각형으로 표시
   player.innerHTML = '';
   _gcLoadingImageIdx = 0;
   _gcLoadingImageEls = list.map((src, i) => {

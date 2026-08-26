@@ -6966,7 +6966,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <p style="font-size:12px;font-weight:700;color:#8b8ba0;margin:0 0 10px;">디테일컷</p>
             <div id="detailCutResultsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
           </div>
-          <div class="results-grid" id="resultsGrid"></div>
+          <div class="results-grid" id="resultsGrid" style="padding:0 16px;"></div>
           <!-- 이미지 하단 ~ 버튼 상단 사이 안내 메시지 — 디테일컷 생성 완료 후에는 숨김(재생성은 원본 이미지 기준 안내라 혼동 방지) -->
           <div id="resultInfoMsg" style="padding:18px 16px 4px;text-align:center;">
             <p style="font-size:13px;color:#8b8ba0;line-height:1.6;margin:0;">
