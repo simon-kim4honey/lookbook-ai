@@ -2511,6 +2511,8 @@ footer {
 .action-progress-share-btn.link:hover { background: #33334f; }
 .action-progress-share-btn.kakao { background: #FEE500; color: #3C1E1E; }
 .action-progress-share-btn.kakao:hover { filter: brightness(0.96); }
+#actionProgressDetailCutBtn { background: var(--primary); color: var(--white); }
+#actionProgressDetailCutBtn:hover { background: var(--primary-light); }
 .action-progress-close {
   display: block;
   width: 100%;
