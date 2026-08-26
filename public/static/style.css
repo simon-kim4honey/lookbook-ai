@@ -2444,9 +2444,9 @@ footer {
 .action-progress-box {
   background: #17172b;
   border-radius: 22px;
-  padding: 60px 51px 48px;
+  padding: 60px 28px 48px;
   width: 540px;
-  max-width: 92vw;
+  max-width: 96vw;
   text-align: center;
   box-shadow: 0 20px 60px rgba(0,0,0,0.4);
 }
@@ -2482,11 +2482,12 @@ footer {
 }
 .action-progress-share {
   display: flex;
+  flex-direction: column;
   gap: 12px;
   margin-top: 24px;
 }
 .action-progress-share-btn {
-  flex: 1;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2496,6 +2497,7 @@ footer {
   border: none;
   font-size: 22.5px;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
   transition: var(--transition);
 }
@@ -2504,13 +2506,15 @@ footer {
 .action-progress-share-btn.kakao { background: #FEE500; color: #3C1E1E; }
 .action-progress-share-btn.kakao:hover { filter: brightness(0.96); }
 .action-progress-close {
+  display: block;
+  width: 100%;
   margin-top: 16px;
   background: none;
   border: none;
   color: #8b8ba0;
   font-size: 19.5px;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px 4px;
 }
 
 /* Image Modal — 확대 화면이 뷰포트를 넘지 않도록 */
