@@ -2268,7 +2268,7 @@ footer {
      대신 max-height 상당의 값을 max-width로 환산해 너비 쪽에서 비율을 지키며 제한한다. */
   position: relative;
   width: 100%;
-  max-width: calc(50vh * 9 / 16);
+  max-width: calc(70vh * 9 / 16);
   aspect-ratio: 9 / 16;
   margin: 12px auto 0;
   border-radius: 8px;
@@ -2515,6 +2515,30 @@ footer {
   font-size: 19.5px;
   cursor: pointer;
   padding: 8px 4px;
+}
+
+/* 디테일컷 모달 — 다운로드 전 1~4장 생성 시도 시(403) 모달을 닫지 않고 안내하는 인라인 메시지 */
+.detail-cut-modal-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  color: #B91C1C;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: left;
+}
+.detail-cut-modal-error::before {
+  content: '\f06a';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 
 /* Image Modal — 확대 화면이 뷰포트를 넘지 않도록 */
