@@ -2339,29 +2339,39 @@ app.get('/api/admin/users/:id', adminAuth, async (c) => {
   }
 })
 
-// GET /api/admin/users/:id/payments — 관리자용 회원별 결제내역
+// GET /api/admin/users/:id/payments — 관리자용 회원별 결제내역 (10건씩 페이지네이션)
 app.get('/api/admin/users/:id/payments', adminAuth, async (c) => {
   try {
     const db = c.env.LOOKBOOK_DB
+    const id = c.req.param('id')
+    const page = Math.max(1, parseInt(c.req.query('page') || '1'))
+    const limit = Math.max(1, parseInt(c.req.query('limit') || '10'))
+    const offset = (page - 1) * limit
+    const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM payment_logs WHERE user_id = ?`).bind(id).first()
     const payments = await db.prepare(
       `SELECT order_id, amount, credits, status, pg_provider, currency, pg_method, created_at, paid_at
-       FROM payment_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`
-    ).bind(c.req.param('id')).all()
-    return c.json({ success: true, payments: payments.results })
+       FROM payment_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(id, limit, offset).all()
+    return c.json({ success: true, payments: payments.results, total: total?.cnt || 0, page, limit })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
 })
 
-// GET /api/admin/users/:id/generations — 관리자용 회원별 생성(사용) 내역
+// GET /api/admin/users/:id/generations — 관리자용 회원별 생성(사용) 내역 (10건씩 페이지네이션)
 app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
   try {
     const db = c.env.LOOKBOOK_DB
+    const id = c.req.param('id')
+    const page = Math.max(1, parseInt(c.req.query('page') || '1'))
+    const limit = Math.max(1, parseInt(c.req.query('limit') || '10'))
+    const offset = (page - 1) * limit
+    const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM generation_logs WHERE user_id = ?`).bind(id).first()
     const generations = await db.prepare(
       `SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, created_at
-       FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`
-    ).bind(c.req.param('id')).all()
-    return c.json({ success: true, generations: generations.results })
+       FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(id, limit, offset).all()
+    return c.json({ success: true, generations: generations.results, total: total?.cnt || 0, page, limit })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -7672,10 +7682,12 @@ app.get('/admin02', (c) => {
       <div id="userDetailSummary" style="font-size:13px;color:#c8c8dc;margin-bottom:20px;line-height:1.8;"></div>
 
       <div style="font-size:13px;font-weight:700;color:#e0e0f0;margin-bottom:8px;">💳 결제내역</div>
-      <div id="userDetailPayments" style="margin-bottom:24px;">불러오는 중...</div>
+      <div id="userDetailPayments">불러오는 중...</div>
+      <div id="userDetailPaymentsPagination" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:10px;margin-bottom:24px;"></div>
 
       <div style="font-size:13px;font-weight:700;color:#e0e0f0;margin-bottom:8px;">🖼️ 사용내역(생성)</div>
       <div id="userDetailGenerations">불러오는 중...</div>
+      <div id="userDetailGenerationsPagination" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:10px;"></div>
     </div>
   </div>
 
@@ -8328,6 +8340,77 @@ async function deleteUser(id, name, email) {
 function openModal(id) { const m = document.getElementById(id); if (m) m.classList.add('open') }
 function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.remove('open') }
 
+const USER_DETAIL_LOGS_PER_PAGE = 10
+let _userDetailId = null
+let _userDetailPaymentsPage = 1
+let _userDetailGenerationsPage = 1
+
+// 결제내역/사용내역 공용 페이지네이션 렌더러 — 회원 목록의 renderUserPagination과 동일한 스타일
+function _renderDetailPagination(containerId, total, page, limit, gotoFnName) {
+  const pag = document.getElementById(containerId)
+  if (!pag) return
+  const totalPages = Math.ceil(total / limit)
+  if (totalPages <= 1) { pag.innerHTML = ''; return }
+  var html = ''
+  if (page > 1) html += '<button class="btn-sm" onclick="' + gotoFnName + '(' + (page-1) + ')">‹ 이전</button>'
+  for (var i = Math.max(1, page-2); i <= Math.min(totalPages, page+2); i++) {
+    html += '<button class="btn-sm' + (i===page ? ' btn-primary-sm' : '') + '" onclick="' + gotoFnName + '(' + i + ')">' + i + '</button>'
+  }
+  if (page < totalPages) html += '<button class="btn-sm" onclick="' + gotoFnName + '(' + (page+1) + ')">다음 ›</button>'
+  html += '<span style="font-size:11px;color:#8b8ba0;margin-left:6px;">총 ' + total + '건</span>'
+  pag.innerHTML = html
+}
+
+async function loadUserDetailPayments(page) {
+  _userDetailPaymentsPage = page || 1
+  const id = _userDetailId
+  if (!id) return
+  document.getElementById('userDetailPayments').innerHTML = '불러오는 중...'
+  try {
+    const params = new URLSearchParams({ page: _userDetailPaymentsPage, limit: USER_DETAIL_LOGS_PER_PAGE })
+    const res = await fetch('/api/admin/users/' + id + '/payments?' + params.toString(), { headers: {'X-Admin-Password':adminPassword} })
+    const data = await res.json()
+    const list = (data.success && data.payments) ? data.payments : []
+    document.getElementById('userDetailPayments').innerHTML = list.length
+      ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(p) {
+          var statusColor = p.status === 'paid' ? '#22c55e' : (p.status === 'refunded' ? '#ef4444' : '#8b8ba0')
+          return '<div style="display:flex;justify-content:space-between;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
+            + '<span>' + (p.created_at ? p.created_at.slice(0,16).replace('T',' ') : '-') + ' · ' + (p.pg_provider || '-') + '</span>'
+            + '<span>' + (p.amount != null ? p.amount.toLocaleString() : '-') + ' ' + (p.currency || '') + ' → +' + (p.credits || 0) + '크레딧</span>'
+            + '<span style="color:' + statusColor + ';font-weight:600;">' + (p.status || '-') + '</span>'
+            + '</div>'
+        }).join('') + '</div>'
+      : '<div style="font-size:12px;color:#8b8ba0;">결제 내역이 없습니다.</div>'
+    _renderDetailPagination('userDetailPaymentsPagination', data.total || 0, data.page || _userDetailPaymentsPage, data.limit || USER_DETAIL_LOGS_PER_PAGE, 'loadUserDetailPayments')
+  } catch(e) {
+    document.getElementById('userDetailPayments').innerHTML = '<div style="font-size:12px;color:#ef4444;">불러오기 실패</div>'
+  }
+}
+
+async function loadUserDetailGenerations(page) {
+  _userDetailGenerationsPage = page || 1
+  const id = _userDetailId
+  if (!id) return
+  document.getElementById('userDetailGenerations').innerHTML = '불러오는 중...'
+  try {
+    const params = new URLSearchParams({ page: _userDetailGenerationsPage, limit: USER_DETAIL_LOGS_PER_PAGE })
+    const res = await fetch('/api/admin/users/' + id + '/generations?' + params.toString(), { headers: {'X-Admin-Password':adminPassword} })
+    const data = await res.json()
+    const list = (data.success && data.generations) ? data.generations : []
+    document.getElementById('userDetailGenerations').innerHTML = list.length
+      ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(g) {
+          return '<div style="display:flex;justify-content:space-between;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
+            + '<span>' + (g.created_at ? g.created_at.slice(0,16).replace('T',' ') : '-') + ' · ' + (g.kind === 'video' ? '🎬 영상' : '🖼️ 이미지') + '</span>'
+            + '<span>' + (g.model_name || '-') + ' / ' + (g.bg_name || '-') + (g.image_count ? (' · ' + g.image_count + '장') : '') + '</span>'
+            + '</div>'
+        }).join('') + '</div>'
+      : '<div style="font-size:12px;color:#8b8ba0;">사용 내역이 없습니다.</div>'
+    _renderDetailPagination('userDetailGenerationsPagination', data.total || 0, data.page || _userDetailGenerationsPage, data.limit || USER_DETAIL_LOGS_PER_PAGE, 'loadUserDetailGenerations')
+  } catch(e) {
+    document.getElementById('userDetailGenerations').innerHTML = '<div style="font-size:12px;color:#ef4444;">불러오기 실패</div>'
+  }
+}
+
 async function openUserDetail(id, name) {
   document.getElementById('userDetailName').textContent = '👤 ' + (name || '회원 상세')
   const u = allUsers.find(function(x) { return String(x.id) === String(id) })
@@ -8349,43 +8432,15 @@ async function openUserDetail(id, name) {
   } else {
     summaryEl.innerHTML = ''
   }
+  _userDetailId = id
   document.getElementById('userDetailPayments').innerHTML = '불러오는 중...'
   document.getElementById('userDetailGenerations').innerHTML = '불러오는 중...'
+  document.getElementById('userDetailPaymentsPagination').innerHTML = ''
+  document.getElementById('userDetailGenerationsPagination').innerHTML = ''
   openModal('userDetailModal')
 
-  try {
-    const res = await fetch('/api/admin/users/' + id + '/payments', { headers: {'X-Admin-Password':adminPassword} })
-    const data = await res.json()
-    const list = (data.success && data.payments) ? data.payments : []
-    document.getElementById('userDetailPayments').innerHTML = list.length
-      ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(p) {
-          var statusColor = p.status === 'paid' ? '#22c55e' : (p.status === 'refunded' ? '#ef4444' : '#8b8ba0')
-          return '<div style="display:flex;justify-content:space-between;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
-            + '<span>' + (p.created_at ? p.created_at.slice(0,16).replace('T',' ') : '-') + ' · ' + (p.pg_provider || '-') + '</span>'
-            + '<span>' + (p.amount != null ? p.amount.toLocaleString() : '-') + ' ' + (p.currency || '') + ' → +' + (p.credits || 0) + '크레딧</span>'
-            + '<span style="color:' + statusColor + ';font-weight:600;">' + (p.status || '-') + '</span>'
-            + '</div>'
-        }).join('') + '</div>'
-      : '<div style="font-size:12px;color:#8b8ba0;">결제 내역이 없습니다.</div>'
-  } catch(e) {
-    document.getElementById('userDetailPayments').innerHTML = '<div style="font-size:12px;color:#ef4444;">불러오기 실패</div>'
-  }
-
-  try {
-    const res = await fetch('/api/admin/users/' + id + '/generations', { headers: {'X-Admin-Password':adminPassword} })
-    const data = await res.json()
-    const list = (data.success && data.generations) ? data.generations : []
-    document.getElementById('userDetailGenerations').innerHTML = list.length
-      ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(g) {
-          return '<div style="display:flex;justify-content:space-between;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
-            + '<span>' + (g.created_at ? g.created_at.slice(0,16).replace('T',' ') : '-') + ' · ' + (g.kind === 'video' ? '🎬 영상' : '🖼️ 이미지') + '</span>'
-            + '<span>' + (g.model_name || '-') + ' / ' + (g.bg_name || '-') + (g.image_count ? (' · ' + g.image_count + '장') : '') + '</span>'
-            + '</div>'
-        }).join('') + '</div>'
-      : '<div style="font-size:12px;color:#8b8ba0;">사용 내역이 없습니다.</div>'
-  } catch(e) {
-    document.getElementById('userDetailGenerations').innerHTML = '<div style="font-size:12px;color:#ef4444;">불러오기 실패</div>'
-  }
+  loadUserDetailPayments(1)
+  loadUserDetailGenerations(1)
 }
 
 function showAdminToast(msg, type) {
