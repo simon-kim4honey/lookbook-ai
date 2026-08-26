@@ -3509,6 +3509,20 @@ let _gcImageDownloaded = false;
 function _updateDetailCutModalCta() {
   const cta = document.getElementById('detailCutDownloadFirstCta');
   if (cta) cta.style.display = _gcImageDownloaded ? 'none' : '';
+  _setDetailCutModalError('');
+}
+
+// 다운로드 전에 1~4장 버튼을 눌러 서버가 403을 반환했을 때 모달을 닫지 않고 보여주는 안내 메시지.
+// CTA 다운로드 버튼 바로 위에 위치해, 메시지 확인 후 바로 아래 버튼을 누를 수 있게 한다.
+function _setDetailCutModalError(msg) {
+  const el = document.getElementById('detailCutModalError');
+  if (!el) return;
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
 }
 
 // "이미지 다운로드 후 디테일컷 생성하기" CTA — 클릭 시 다운로드를 먼저 진행하고,
@@ -3534,8 +3548,6 @@ function openDetailCutMenu() {
 }
 
 async function startDetailCutGeneration(count) {
-  closeModal('detailCutModal');
-
   const img = AppState.generatedImages[0];
   if (!img || !img.originalUrl) {
     showToast('디테일컷을 생성할 이미지가 없습니다.', 'error');
@@ -3547,6 +3559,9 @@ async function startDetailCutGeneration(count) {
     return;
   }
 
+  // 모달은 아직 닫지 않는다 — 403(다운로드 필요) 응답이면 모달을 그대로 둔 채 안내 메시지만
+  // 보여줘서, 사용자가 바로 위에 있는 "이미지 다운로드" CTA를 이어서 누를 수 있게 한다.
+  _setDetailCutModalError('');
   _showDetailCutGeneratingView();
 
   try {
@@ -3564,8 +3579,9 @@ async function startDetailCutGeneration(count) {
     if (res.status === 403) {
       _hideDetailCutGeneratingView();
       _gcImageDownloaded = false; // 서버가 다운로드 이력을 못 찾음 — 클라이언트 상태를 동기화
+      _updateDetailCutModalCta();
       const errData = await res.json().catch(() => ({}));
-      showToast(errData.error || '먼저 누끼컷 이미지를 다운로드한 후 이용할 수 있어요.', 'error');
+      _setDetailCutModalError(errData.error || '먼저 누끼컷 이미지를 다운로드한 후 이용할 수 있어요.');
       return;
     }
     if (!res.ok) {
@@ -3575,6 +3591,8 @@ async function startDetailCutGeneration(count) {
       return;
     }
 
+    // 성공했을 때만 모달을 닫고 생성 로딩 화면으로 넘어간다
+    closeModal('detailCutModal');
     const data = await res.json();
     _startDetailCutFakeProgress();
     _pollDetailCutStatus(data.jobId);

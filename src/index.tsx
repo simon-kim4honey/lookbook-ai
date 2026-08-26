@@ -7064,8 +7064,11 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 
   <!-- 디테일컷 장수 선택 모달 (누끼컷 전용) -->
   <div class="modal-overlay" id="detailCutModal" style="z-index:10500;">
-    <div class="modal-box" style="max-width:510px;">
+    <div class="modal-box" style="max-width:420px;padding:48px 24px;">
       <button class="modal-close" onclick="closeModal('detailCutModal')">×</button>
+      <!-- 다운로드 전 상태에서 1~4장 버튼을 눌러 서버가 403(DOWNLOAD_REQUIRED)을 반환했을 때만 노출.
+           모달을 닫지 않고 바로 아래 다운로드 CTA로 이어서 클릭할 수 있게 안내한다. -->
+      <div id="detailCutModalError" class="detail-cut-modal-error" style="display:none;"></div>
       <!-- 누끼컷 원본 이미지를 아직 다운로드하지 않았을 때만 노출 — openDetailCutMenu()에서 토글 -->
       <div id="detailCutDownloadFirstCta" style="display:none;margin-bottom:16px;">
         <button class="result-nav-btn primary" style="width:100%;min-height:78px;" onclick="downloadThenPromptDetailCut()">
@@ -7074,7 +7077,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
       </div>
       <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:var(--text-primary);">디테일컷 추가</h3>
       <p style="margin:0 0 18px;font-size:13px;color:#5c5c70;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 자동으로 만들어드려요. 생성은 무료 입니다.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:72px;">
           <span class="rnb-main">1장 생성</span>
         </button>
