@@ -2011,7 +2011,9 @@ app.get('/api/auth/kakao', (c) => {
     return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다.'},'*');window.close();</script>`)
   }
   // mode는 state 파라미터로 전달 (redirect_uri 변경 없이 mode 구분)
-  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}`
+  // scope=phone_number — 어드민에서 전화번호를 확인할 수 있도록 전화번호 동의항목을 명시적으로 요청
+  // (카카오 개발자 콘솔에서 전화번호 동의항목이 사업자 심사 승인된 상태여야 실제 값이 전달됨)
+  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}&scope=phone_number`
   return c.redirect(url)
 })
 
@@ -2060,6 +2062,8 @@ app.get('/api/auth/kakao/callback', async (c) => {
     const kakaoEmail = profile.kakao_account?.email || `kakao_${providerId}@kakao.local`
     const kakaoName  = profile.kakao_account?.profile?.nickname || '카카오 사용자'
     const kakaoAvatar = profile.kakao_account?.profile?.profile_image_url || null
+    // 동의항목(전화번호)을 사용자가 승인한 경우에만 값이 내려온다 — 형식은 보통 "+82 10-1234-5678"
+    const kakaoPhone = profile.kakao_account?.phone_number || null
 
     // 기존 사용자 조회 또는 신규 생성
     let isNewUser = false
@@ -2067,10 +2071,10 @@ app.get('/api/auth/kakao/callback', async (c) => {
     if (!user) {
       user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(kakaoEmail).first()
       if (user) {
-        await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(providerId, kakaoAvatar, user.id).run()
+        await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ?, phone_number = COALESCE(?, phone_number) WHERE id = ?`).bind(providerId, kakaoAvatar, kakaoPhone, user.id).run()
       } else {
         const id = genUserId()
-        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, 'active', 200, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar).run()
+        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, phone_number, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, ?, 'active', 200, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar, kakaoPhone).run()
         await db.prepare(
           `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
            VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`
@@ -2078,6 +2082,10 @@ app.get('/api/auth/kakao/callback', async (c) => {
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
         isNewUser = true
       }
+    } else if (kakaoPhone && user.phone_number !== kakaoPhone) {
+      // 기존 카카오 사용자가 이후 시점에 전화번호 동의항목을 승인한 경우, 재로그인 시 반영
+      await db.prepare(`UPDATE users SET phone_number = ? WHERE id = ?`).bind(kakaoPhone, user.id).run()
+      user.phone_number = kakaoPhone
     }
     if (!user || user.status !== 'active') throw new Error('계정이 정지 상태입니다.')
 
@@ -2310,7 +2318,7 @@ app.get('/api/admin/users', adminAuth, async (c) => {
 
     const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM users ${where}`).bind(...params).first()
     const users = await db.prepare(
-      `SELECT id, name, email, provider, status, credits, role, referrer, last_login_at, created_at FROM users ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      `SELECT id, name, email, provider, provider_id, avatar_url, phone_number, status, credits, role, referrer, last_login_at, created_at FROM users ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
     ).bind(...params, limit, offset).all()
 
     return c.json({ success: true, users: users.results, total: total?.cnt || 0, page, limit })
@@ -2323,7 +2331,7 @@ app.get('/api/admin/users', adminAuth, async (c) => {
 app.get('/api/admin/users/:id', adminAuth, async (c) => {
   try {
     const db = c.env.LOOKBOOK_DB
-    const user = await db.prepare(`SELECT id, name, email, provider, status, credits, role, referrer, last_login_at, created_at FROM users WHERE id = ?`).bind(c.req.param('id')).first()
+    const user = await db.prepare(`SELECT id, name, email, provider, provider_id, avatar_url, phone_number, status, credits, role, referrer, last_login_at, created_at FROM users WHERE id = ?`).bind(c.req.param('id')).first()
     if (!user) return c.json({ success: false, message: '존재하지 않는 사용자입니다.' }, 404)
     return c.json({ success: true, user })
   } catch (err: any) {
@@ -8324,12 +8332,23 @@ async function openUserDetail(id, name) {
   document.getElementById('userDetailName').textContent = '👤 ' + (name || '회원 상세')
   const u = allUsers.find(function(x) { return String(x.id) === String(id) })
   const summaryEl = document.getElementById('userDetailSummary')
-  summaryEl.innerHTML = u
-    ? ('이메일: ' + escHtml(u.email || '-') + '<br>'
+  if (u) {
+    var providerLabel = {kakao:'카카오 간편가입', google:'구글 간편가입', email:'이메일 가입'}[u.provider] || (u.provider || '-')
+    var avatarHtml = u.avatar_url
+      ? '<img src="' + escHtml(u.avatar_url) + '" style="width:52px;height:52px;border-radius:50%;object-fit:cover;margin-bottom:10px;display:block;" />'
+      : ''
+    summaryEl.innerHTML = avatarHtml
+      + '가입경로: ' + providerLabel + '<br>'
+      + '회원번호(provider ID): ' + (u.provider_id ? escHtml(u.provider_id) : '-') + '<br>'
+      + '닉네임: ' + escHtml(u.name || '-') + '<br>'
+      + '이메일: ' + escHtml(u.email || '-') + '<br>'
+      + '전화번호: ' + (u.phone_number ? escHtml(u.phone_number) : '-') + '<br>'
       + '추천인: ' + (u.referrer ? escHtml(u.referrer) : '-') + '<br>'
       + '보유 크레딧: ' + (u.credits != null ? u.credits : 0) + '<br>'
-      + '가입일: ' + (u.created_at ? u.created_at.slice(0,10) : '-'))
-    : ''
+      + '가입일: ' + (u.created_at ? u.created_at.slice(0,10) : '-')
+  } else {
+    summaryEl.innerHTML = ''
+  }
   document.getElementById('userDetailPayments').innerHTML = '불러오는 중...'
   document.getElementById('userDetailGenerations').innerHTML = '불러오는 중...'
   openModal('userDetailModal')
