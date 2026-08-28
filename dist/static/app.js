@@ -457,9 +457,9 @@ const STATIC_I18N = {
   'charge-current':  { ko: '현재 보유 크레딧', en: 'Current Credits', ja: '現在のクレジット' },
   'pkg-popular':     { ko: '인기', en: 'Popular', ja: '人気' },
   'pkg-btn':         { ko: '패키지를 선택하세요', en: 'Select a package', ja: 'パッケージを選択' },
-  'pkg-11':          { ko: '이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#a78bfa;">11 images</strong>', ja: '<strong style="color:#a78bfa;">11枚</strong>ダウンロード可能' },
-  'pkg-25':          { ko: '이미지 <strong style="color:#a78bfa;">25장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#a78bfa;">25 images</strong>', ja: '<strong style="color:#a78bfa;">25枚</strong>ダウンロード可能' },
-  'pkg-44':          { ko: '이미지 <strong style="color:#a78bfa;">44장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#a78bfa;">44 images</strong>', ja: '<strong style="color:#a78bfa;">44枚</strong>ダウンロード可能' },
+  'pkg-11':          { ko: '이미지 <strong style="color:#8FBFFB;">11장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#8FBFFB;">11 images</strong>', ja: '<strong style="color:#8FBFFB;">11枚</strong>ダウンロード可能' },
+  'pkg-25':          { ko: '이미지 <strong style="color:#8FBFFB;">25장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#8FBFFB;">25 images</strong>', ja: '<strong style="color:#8FBFFB;">25枚</strong>ダウンロード可能' },
+  'pkg-44':          { ko: '이미지 <strong style="color:#8FBFFB;">44장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#8FBFFB;">44 images</strong>', ja: '<strong style="color:#8FBFFB;">44枚</strong>ダウンロード可能' },
   'pkg-bonus15':     { ko: '✨ 기본 대비 15% 더 받기', en: '✨ 15% more than basic', ja: '✨ 基本より15%お得' },
   'pkg-bonus33':     { ko: '🚀 기본 대비 33% 더 받기', en: '🚀 33% more than basic', ja: '🚀 基本より33%お得' },
   // 로그인/회원가입
@@ -534,7 +534,7 @@ const AppState = {
 
 const SAMPLE_PROJECTS = [
   { id: 'p1', name: '2024 S/S 룩북', status: 'done', images: 8, created: '2024-03-15', color: '#FF6B9D', icon: '👗' },
-  { id: 'p2', name: '캐주얼 티셔츠 컷', status: 'done', images: 4, created: '2024-03-12', color: '#6C47FF', icon: '👕' },
+  { id: 'p2', name: '캐주얼 티셔츠 컷', status: 'done', images: 4, created: '2024-03-12', color: '#3182F6', icon: '👕' },
   { id: 'p3', name: '데님 라인 촬영', status: 'processing', images: 0, created: '2024-03-10', color: '#3B82F6', icon: '👖' },
   { id: 'p4', name: '원피스 봄 컬렉션', status: 'draft', images: 0, created: '2024-03-08', color: '#00D4AA', icon: '👘' },
 ];
@@ -1931,7 +1931,7 @@ function initGhostCutUI() {
       ondragover="event.preventDefault(); event.currentTarget.classList.add('drag')"
       ondragleave="event.currentTarget.classList.remove('drag')"
       ondrop="ghostCutHandleDrop(event)"
-      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px dashed rgba(255,255,255,0.25);border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;background:rgba(255,255,255,0.03);margin-top:16px;">
+      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px solid transparent;border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;background:rgba(255,255,255,0.06);margin-top:16px;">
       <div id="gcUploadPreviewWrap" style="display:none;width:100%;max-width:220px;position:relative;">
         <img id="gcUploadPreview" style="width:100%;border-radius:12px;display:block;" />
         <button type="button" id="gcUploadRemoveBtn" onclick="event.preventDefault();event.stopPropagation();ghostCutRemoveImage();" style="position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:17.55px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
@@ -2053,7 +2053,7 @@ function ghostCutHandleFile(file) {
       }
 
       ghostCutUpload_ = { dataUrl, category: data.category, categoryLabel: data.label };
-      if (statusBox) { statusBox.style.color = '#6C47FF'; statusBox.innerHTML = '<i class="fas fa-check-circle"></i> 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
+      if (statusBox) { statusBox.style.color = '#3182F6'; statusBox.innerHTML = '<i class="fas fa-check-circle"></i> 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
       if (genBtn) genBtn.disabled = false;
     } catch (err) {
       console.error('ghostcut classify error:', err);
@@ -3217,13 +3217,13 @@ function completeGeneration(images, isFallback = false) {
 function generateFallbackImages(count) {
   const gradients = [
     ['#FF6B9D', '#FF8C42'],
-    ['#6C47FF', '#00D4AA'],
-    ['#FF6B9D', '#6C47FF'],
+    ['#3182F6', '#00D4AA'],
+    ['#FF6B9D', '#3182F6'],
     ['#F59E0B', '#EF4444'],
-    ['#3B82F6', '#8B5CF6'],
-    ['#00D4AA', '#6C47FF'],
+    ['#3B82F6', '#4C8DF5'],
+    ['#00D4AA', '#3182F6'],
     ['#EC4899', '#F97316'],
-    ['#8B5CF6', '#EC4899'],
+    ['#4C8DF5', '#EC4899'],
   ];
   return Array.from({ length: count }, (_, i) => ({
     id: `placeholder_${i + 1}`,
@@ -3327,7 +3327,7 @@ function renderResults(images) {
             style="width:100%;height:auto;display:block;"
             draggable="false"
             oncontextmenu="return false"
-            onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패</span></div>');"
+            onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#3182F6,#00D4AA)'}'; this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패</span></div>');"
           />`
       : `<div style="width:100%;aspect-ratio:3/4;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
            <span style="font-size:48px;">✨</span>
@@ -4533,7 +4533,7 @@ function selectPackage(pkgId, el) {
     c.style.border = '2px solid #3a3a60';
     c.style.transform = 'scale(1)';
   });
-  el.style.border = '2px solid #6c47ff';
+  el.style.border = '2px solid #3182F6';
   el.style.transform = 'scale(1.01)';
   const cta = document.getElementById('chargeCta');
   const lbl = document.getElementById('ctaLabel');
