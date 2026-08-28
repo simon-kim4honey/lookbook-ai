@@ -1743,7 +1743,7 @@ app.get('/api/proxy/gen-image', async (c) => {
 // ────────────────────────────────────────────────────
 const sampleProjects = [
   { id: 'p1', name: '2024 S/S 룩북', status: 'done', images: 8, created: '2024-03-15', thumb_color: '#FF6B9D' },
-  { id: 'p2', name: '캐주얼 티셔츠 컷', status: 'done', images: 4, created: '2024-03-12', thumb_color: '#6C47FF' },
+  { id: 'p2', name: '캐주얼 티셔츠 컷', status: 'done', images: 4, created: '2024-03-12', thumb_color: '#3182F6' },
   { id: 'p3', name: '데님 라인 촬영', status: 'processing', images: 0, created: '2024-03-10', thumb_color: '#3B82F6' },
   { id: 'p4', name: '원피스 봄 컬렉션', status: 'draft', images: 0, created: '2024-03-08', thumb_color: '#00D4AA' },
 ]
@@ -4213,8 +4213,8 @@ app.post('/api/ghostcut/generate', async (c) => {
 function generatePlaceholderImages(count: number) {
   const colors = [
     ['#FF6B9D', '#FF8C42'],
-    ['#6C47FF', '#00D4AA'],
-    ['#FF6B9D', '#6C47FF'],
+    ['#3182F6', '#00D4AA'],
+    ['#FF6B9D', '#3182F6'],
     ['#F59E0B', '#EF4444'],
   ]
   return Array.from({ length: count }, (_, i) => ({
@@ -4691,16 +4691,16 @@ const htmlShell = (title: string, bodyContent: string, extraHead: string = '', d
 ${bodyContent}
 
 <!-- ── 크레딧 충전 패널 (모든 페이지 공통) ── -->
-<div id="chargePanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:9000;overflow-y:auto;">
+<div id="chargePanel" style="display:none;position:fixed;inset:0;background:#FFFFFF;z-index:9000;overflow-y:auto;">
   <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-      <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:24.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
-      <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;margin:0;" data-i18n="charge-title">크레딧 충전</h2>
+      <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#F2F4F6;border-radius:50%;color:#4E5968;font-size:24.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+      <h2 style="font-size:18px;font-weight:700;color:#191F28;margin:0;" data-i18n="charge-title">크레딧 충전</h2>
     </div>
-    <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="background:#E8F3FF;border:1px solid rgba(49,130,246,0.2);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
       <div>
-        <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;" data-i18n="charge-current">현재 보유 크레딧</div>
-        <div id="chargePanelCredits" style="font-size:28px;font-weight:800;color:#a78bfa;">-</div>
+        <div style="font-size:12px;color:#4E5968;margin-bottom:4px;" data-i18n="charge-current">현재 보유 크레딧</div>
+        <div id="chargePanelCredits" style="font-size:28px;font-weight:800;color:#1B64DA;">-</div>
       </div>
       <div style="font-size:32px;opacity:0.5;">💎</div>
     </div>
@@ -4710,57 +4710,57 @@ ${bodyContent}
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;">
       <div class="pkg-card" onclick="selectPackage('pkg_20000',this)" data-pkg="pkg_20000"
-           style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
+           style="background:#F2F4F6;border:2px solid #E5E8EB;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">1,000 크레딧</div>
-            <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-11">이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능</div>
+            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">1,000 크레딧</div>
+            <div style="font-size:13px;color:#6B7684;" data-i18n="pkg-11">이미지 <strong style="color:#3182F6;">11장</strong> 다운로드 가능</div>
           </div>
           <div style="text-align:right;">
-            <div id="pkgPriceOriginal_pkg_20000" style="display:none;font-size:12px;color:#8b8ba0;text-decoration:line-through;"></div>
-            <div id="pkgPrice_pkg_20000" style="font-size:22px;font-weight:800;color:#6c47ff;">20,000원</div>
+            <div id="pkgPriceOriginal_pkg_20000" style="display:none;font-size:12px;color:#8B95A1;text-decoration:line-through;"></div>
+            <div id="pkgPrice_pkg_20000" style="font-size:22px;font-weight:800;color:#3182F6;">20,000원</div>
           </div>
         </div>
       </div>
       <div class="pkg-card" onclick="selectPackage('pkg_40000',this)" data-pkg="pkg_40000"
-           style="background:linear-gradient(135deg,#1e1435,#2a1a50);border:2px solid #6c47ff;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;">
-        <div style="position:absolute;top:0;right:20px;background:linear-gradient(135deg,#6c47ff,#a855f7);color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;" data-i18n="pkg-popular">인기</div>
+           style="background:#E8F3FF;border:2px solid #3182F6;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;">
+        <div style="position:absolute;top:0;right:20px;background:#3182F6;color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;" data-i18n="pkg-popular">인기</div>
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">2,300 크레딧</div>
-            <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-25">이미지 <strong style="color:#a78bfa;">25장</strong> 다운로드 가능</div>
-            <div style="font-size:11px;color:#a78bfa;margin-top:4px;" data-i18n="pkg-bonus15">✨ 기본 대비 15% 더 받기</div>
+            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">2,300 크레딧</div>
+            <div style="font-size:13px;color:#6B7684;" data-i18n="pkg-25">이미지 <strong style="color:#1B64DA;">25장</strong> 다운로드 가능</div>
+            <div style="font-size:11px;color:#1B64DA;margin-top:4px;" data-i18n="pkg-bonus15">✨ 기본 대비 15% 더 받기</div>
           </div>
           <div style="text-align:right;">
-            <div id="pkgPriceOriginal_pkg_40000" style="display:none;font-size:12px;color:#8b8ba0;text-decoration:line-through;"></div>
-            <div id="pkgPrice_pkg_40000" style="font-size:22px;font-weight:800;color:#6c47ff;">40,000원</div>
+            <div id="pkgPriceOriginal_pkg_40000" style="display:none;font-size:12px;color:#8B95A1;text-decoration:line-through;"></div>
+            <div id="pkgPrice_pkg_40000" style="font-size:22px;font-weight:800;color:#3182F6;">40,000원</div>
           </div>
         </div>
       </div>
       <div class="pkg-card" onclick="selectPackage('pkg_60000',this)" data-pkg="pkg_60000"
-           style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
+           style="background:#F2F4F6;border:2px solid #E5E8EB;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">4,000 크레딧</div>
-            <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-44">이미지 <strong style="color:#a78bfa;">44장</strong> 다운로드 가능</div>
-            <div style="font-size:11px;color:#a78bfa;margin-top:4px;" data-i18n="pkg-bonus33">🚀 기본 대비 33% 더 받기</div>
+            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">4,000 크레딧</div>
+            <div style="font-size:13px;color:#6B7684;" data-i18n="pkg-44">이미지 <strong style="color:#3182F6;">44장</strong> 다운로드 가능</div>
+            <div style="font-size:11px;color:#1B64DA;margin-top:4px;" data-i18n="pkg-bonus33">🚀 기본 대비 33% 더 받기</div>
           </div>
           <div style="text-align:right;">
-            <div id="pkgPriceOriginal_pkg_60000" style="display:none;font-size:12px;color:#8b8ba0;text-decoration:line-through;"></div>
-            <div id="pkgPrice_pkg_60000" style="font-size:22px;font-weight:800;color:#6c47ff;">60,000원</div>
+            <div id="pkgPriceOriginal_pkg_60000" style="display:none;font-size:12px;color:#8B95A1;text-decoration:line-through;"></div>
+            <div id="pkgPrice_pkg_60000" style="font-size:22px;font-weight:800;color:#3182F6;">60,000원</div>
           </div>
         </div>
       </div>
     </div>
     <button id="chargeCta" onclick="startPayment()"
-            style="width:100%;padding:16px;background:linear-gradient(135deg,#6c47ff,#a855f7);border:none;border-radius:16px;color:white;font-size:21.6px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.5;pointer-events:none;transition:all 0.2s;">
+            style="width:100%;padding:16px;background:#3182F6;border:none;border-radius:16px;color:white;font-size:21.6px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;opacity:0.5;pointer-events:none;transition:all 0.2s;">
       <i class="fas fa-credit-card"></i>
       <span id="ctaLabel" data-i18n="pkg-btn">패키지를 선택하세요</span>
     </button>
 
-    <p style="margin-top:14px;font-size:11px;line-height:1.6;color:#8b8ba0;text-align:center;">
+    <p style="margin-top:14px;font-size:11px;line-height:1.6;color:#8B95A1;text-align:center;">
       충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다.<br />
-      환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#a78bfa;">환불정책</a>을 확인해주세요.
+      환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#3182F6;">환불정책</a>을 확인해주세요.
     </p>
 
   </div>
@@ -4855,7 +4855,7 @@ app.get('/share/:jobId/:idx', async (c) => {
     .share-tabs { flex: 0 0 auto; display: flex; gap: 6px; padding: 10px 10px 0; flex-wrap: wrap; }
     .share-tabs-bottom { padding: 8px 10px 0; }
     .share-tab { flex: 1; min-width: 60px; background: #23233d; color: #a0a0c0; border: none; border-radius: 10px; padding: 8px 4px; font-size: 14.85px; font-weight: 700; cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s; }
-    .share-tab.active { background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; }
+    .share-tab.active { background: #3182F6; color: #fff; }
     .share-img-wrap { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-top: 8px; background: #000; }
     .share-img {
       max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; display: block;
@@ -4865,7 +4865,7 @@ app.get('/share/:jobId/:idx', async (c) => {
     .share-info { flex: 0 0 auto; padding: 12px 18px 16px; text-align: center; }
     .share-title { color: #fff; font-size: 14px; font-weight: 800; margin: 0 0 4px; }
     .share-desc { color: #a0a0c0; font-size: 12px; font-weight: 600; margin: 0 0 10px; }
-    .share-cta { display: inline-flex; align-items: center; gap: 6px; background: linear-gradient(135deg,#6c47ff,#a855f7); color: #fff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 10px 22px; border-radius: 12px; }
+    .share-cta { display: inline-flex; align-items: center; gap: 6px; background: #3182F6; color: #fff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 10px 22px; border-radius: 12px; }
     .share-message { padding: 48px 28px; text-align: center; }
     .share-emoji { font-size: 40px; display: block; margin-bottom: 16px; }
     .share-msg-text { color: #e0e0f0; font-size: 15px; font-weight: 600; line-height: 1.6; margin: 0 0 24px; }
@@ -4955,7 +4955,7 @@ app.get('/terms', (c) => {
     h2 { font-size: 18px; margin-top: 32px; color: #111; }
     p, li { font-size: 15px; color: #444; }
     .date { color: #888; font-size: 14px; margin-bottom: 32px; }
-    a { color: #6c5ce7; }
+    a { color: #3182F6; }
   </style>
 </head>
 <body>
@@ -5032,7 +5032,7 @@ app.get('/privacy', (c) => {
     table { width: 100%; border-collapse: collapse; margin: 16px 0; }
     th, td { border: 1px solid #ddd; padding: 10px 14px; font-size: 14px; text-align: left; }
     th { background: #f5f5f5; }
-    a { color: #6c5ce7; }
+    a { color: #3182F6; }
   </style>
 </head>
 <body>
@@ -5235,8 +5235,6 @@ app.get('/', (c) => {
     #pricing .btn-secondary:hover { background: #f0f0f0 !important; }
 
     #navUserAvatar { background: #000 !important; box-shadow: none !important; }
-    /* 드롭다운 자체는 어두운 배경(#1e1e35)이라 크레딧 텍스트는 밝은 색 유지 — 검정으로 바꾸면 안 보임 */
-    #ddUserCredits { color: #a78bfa !important; }
     #userDropdownMenu button[onclick*="openChargePanel"] { background: #000 !important; }
 
     /* Hero */
@@ -5313,23 +5311,23 @@ app.get('/', (c) => {
         <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
           <span id="navUserCredits" style="display:none;"></span>
           <span id="navUserName" style="display:none;"></span>
-          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:36px;height:36px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(49,130,246,0.4);">?</div>
           <!-- 드롭다운 -->
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:2000;">
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">
-              <div id="ddUserName" style="font-size:14px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:2000;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #E5E8EB;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:14px;font-weight:700;color:#191F28;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:12px;color:#8B95A1;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
+                <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#3182F6;"></div>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
-            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
-            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
-            <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
-            <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
         </div>
@@ -5384,7 +5382,7 @@ app.get('/', (c) => {
       <div class="hero-visual">
         <div class="hero-showcase-single" id="heroShowcase">
           <img id="heroShowcaseImg" alt="AI 생성 룩북" style="display:none;" />
-          <div id="heroShowcasePlaceholder" style="width:100%;height:100%;background:linear-gradient(135deg,#1A1A3E,#6C47FF);display:flex;align-items:center;justify-content:center;font-size:72px;">✨</div>
+          <div id="heroShowcasePlaceholder" style="width:100%;height:100%;background:linear-gradient(135deg,#1A1A3E,#3182F6);display:flex;align-items:center;justify-content:center;font-size:72px;">✨</div>
         </div>
       </div>
     </div>
@@ -5734,7 +5732,7 @@ app.get('/dashboard', (c) => {
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
-    body { background: #0d0d1a; }
+    body { background: #F2F4F6; }
 
     .db-wrap {
       min-height: 100vh;
@@ -5742,24 +5740,24 @@ app.get('/dashboard', (c) => {
       flex-direction: column;
       align-items: center;
       padding: 48px 16px 80px;
-      background: #0d0d1a;
+      background: #F2F4F6;
     }
 
     /* ── 프로필 카드 ── */
     .db-card {
       width: 100%;
       max-width: 420px;
-      background: #16162a;
+      background: #FFFFFF;
       border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 20px rgba(15,23,42,0.08);
       margin-bottom: 16px;
     }
 
     /* 상단 헤더 (아바타 + 이름) */
     .db-card-header {
       padding: 32px 28px 24px;
-      border-bottom: 1px solid #2a2a45;
+      border-bottom: 1px solid #E5E8EB;
       display: flex;
       align-items: center;
       gap: 16px;
@@ -5768,7 +5766,7 @@ app.get('/dashboard', (c) => {
       width: 56px;
       height: 56px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #6c47ff, #a855f7);
+      background: #3182F6;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -5776,45 +5774,45 @@ app.get('/dashboard', (c) => {
       font-weight: 800;
       color: white;
       flex-shrink: 0;
-      box-shadow: 0 4px 16px rgba(108,71,255,0.4);
+      box-shadow: 0 4px 16px rgba(49,130,246,0.4);
     }
     .db-name {
       font-size: 18px;
       font-weight: 700;
-      color: #f0f0f8;
+      color: #191F28;
       margin-bottom: 3px;
     }
     .db-email {
       font-size: 13px;
-      color: #8b8ba0;
+      color: #8B95A1;
     }
 
     /* 크레딧 행 */
     .db-credit-row {
       padding: 20px 28px;
-      border-bottom: 1px solid #2a2a45;
+      border-bottom: 1px solid #E5E8EB;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     .db-credit-label {
       font-size: 13px;
-      color: #8b8ba0;
+      color: #8B95A1;
       margin-bottom: 4px;
     }
     .db-credit-val {
       font-size: 22px;
       font-weight: 800;
-      color: #6c47ff;
+      color: #3182F6;
     }
     .db-credit-sub {
       font-size: 11px;
-      color: #8b8ba0;
+      color: #8B95A1;
       margin-top: 2px;
     }
     .db-charge-btn {
       padding: 9px 20px;
-      background: #6c47ff;
+      background: #3182F6;
       color: white;
       border: none;
       border-radius: 24px;
@@ -5824,7 +5822,7 @@ app.get('/dashboard', (c) => {
       transition: background 0.15s;
       flex-shrink: 0;
     }
-    .db-charge-btn:hover { background: #7c57ff; }
+    .db-charge-btn:hover { background: #1B64DA; }
 
     /* 메뉴 항목 */
     .db-menu-item {
@@ -5833,30 +5831,30 @@ app.get('/dashboard', (c) => {
       justify-content: space-between;
       padding: 18px 28px;
       cursor: pointer;
-      border-bottom: 1px solid #2a2a45;
+      border-bottom: 1px solid #E5E8EB;
       text-decoration: none;
       transition: background 0.12s;
     }
     .db-menu-item:last-child { border-bottom: none; }
-    .db-menu-item:hover { background: #1e1e35; }
+    .db-menu-item:hover { background: #F2F4F6; }
     .db-menu-label {
       font-size: 15px;
-      color: #e0e0f0;
+      color: #333D4B;
       font-weight: 500;
     }
     .db-menu-arrow {
       font-size: 18px;
-      color: #5a5a7a;
+      color: #B0B8C1;
     }
 
     /* 로그아웃 카드 */
     .db-logout-card {
       width: 100%;
       max-width: 420px;
-      background: #16162a;
+      background: #FFFFFF;
       border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+      box-shadow: 0 4px 20px rgba(15,23,42,0.08);
     }
     .db-logout-btn {
       display: flex;
@@ -5869,7 +5867,7 @@ app.get('/dashboard', (c) => {
       cursor: pointer;
       transition: background 0.12s;
     }
-    .db-logout-btn:hover { background: #1e1e35; }
+    .db-logout-btn:hover { background: #F2F4F6; }
     .db-logout-label {
       font-size: 20.25px;
       font-weight: 600;
@@ -5887,7 +5885,7 @@ app.get('/dashboard', (c) => {
     .db-logo-icon {
       width: 36px;
       height: 36px;
-      background: linear-gradient(135deg,#6c47ff,#a855f7);
+      background: #3182F6;
       border-radius: 10px;
       display: flex;
       align-items: center;
@@ -5897,7 +5895,7 @@ app.get('/dashboard', (c) => {
     .db-logo-text {
       font-size: 18px;
       font-weight: 800;
-      color: #f0f0f8;
+      color: #191F28;
     }
 
     /* 생성하러 가기 버튼 */
@@ -5906,7 +5904,7 @@ app.get('/dashboard', (c) => {
       max-width: 420px;
       margin-top: 16px;
       padding: 16px;
-      background: linear-gradient(135deg,#6c47ff,#a855f7);
+      background: #3182F6;
       color: white;
       border: none;
       border-radius: 16px;
@@ -6007,13 +6005,13 @@ app.get('/dashboard', (c) => {
   </div>
 
   <!-- 생성 내역 패널 (해시 #history) -->
-  <div id="historyPanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;overflow-y:auto;">
+  <div id="historyPanel" style="display:none;position:fixed;inset:0;background:#FFFFFF;z-index:500;overflow-y:auto;">
     <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
       <!-- 헤더 -->
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-          <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:24.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
-          <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">생성 내역</h2>
+          <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#F2F4F6;border-radius:50%;color:#4E5968;font-size:24.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+          <h2 style="font-size:18px;font-weight:700;color:#191F28;">생성 내역</h2>
         </div>
         <!-- 사용자 메뉴 (다른 페이지와 동일한 아바타+드롭다운) -->
         <div style="display:flex;align-items:center;gap:8px;position:relative;flex-shrink:0;">
@@ -6021,33 +6019,33 @@ app.get('/dashboard', (c) => {
           <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
             <span id="navUserCredits" style="display:none;"></span>
             <span id="navUserName" style="display:none;"></span>
-            <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
-            <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:600;">
-              <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">
-                <div id="ddUserName" style="font-size:13px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
-                <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
+            <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(49,130,246,0.4);">?</div>
+            <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:600;">
+              <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #E5E8EB;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">
+                <div id="ddUserName" style="font-size:13px;font-weight:700;color:#191F28;margin-bottom:2px;"></div>
+                <div id="ddUserEmail" style="font-size:11px;color:#8B95A1;margin-bottom:6px;"></div>
                 <div style="display:flex;align-items:center;justify-content:space-between;">
-                  <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#6c47ff;"></div>
-                  <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
+                  <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#3182F6;"></div>
+                  <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
                 </div>
               </a>
-              <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-              <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
-              <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
-              <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
-              <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+              <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+              <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+              <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
+              <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
+              <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
               <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
             </div>
           </div>
         </div>
       </div>
       <!-- 14일 보관 안내 -->
-      <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
+      <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
         <span style="font-size:15px;">⏰</span>
-        <span style="font-size:12px;color:#fca5a5;line-height:1.5;">이미지는 <strong>14일 동안만 보관</strong>됩니다. 제때 다운로드하시기 바랍니다.<br/>재다운로드시 크레딧은 차감되지 않습니다.</span>
+        <span style="font-size:12px;color:#B42318;line-height:1.5;">이미지는 <strong>14일 동안만 보관</strong>됩니다. 제때 다운로드하시기 바랍니다.<br/>재다운로드시 크레딧은 차감되지 않습니다.</span>
       </div>
       <div id="historyList" style="display:flex;flex-direction:column;gap:16px;">
-        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
+        <div style="text-align:center;padding:60px 20px;color:#8B95A1;font-size:14px;">
           <div style="font-size:40px;margin-bottom:12px;">🎨</div>
           생성 내역을 불러오는 중...
         </div>
@@ -6376,7 +6374,7 @@ app.get('/dashboard', (c) => {
     _loadHistoryInFlight = true;
     if (_historyPollTimer) { clearTimeout(_historyPollTimer); _historyPollTimer = null; }
     const list = document.getElementById('historyList');
-    if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
+    if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#8B95A1;">불러오는 중...</div>';
     try {
       const token = localStorage.getItem('lookbook_token') || '';
       const res = await fetch('/api/generation/history', { headers: { 'X-Session-Token': token } });
@@ -6390,7 +6388,7 @@ app.get('/dashboard', (c) => {
 
       if (!logs.length) {
         if (!silent || changed) {
-          list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
+          list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#8B95A1;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
         }
         return;
       }
@@ -6649,11 +6647,11 @@ app.get('/credits', (c) => {
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
-    body { background: #0d0d1a; }
+    body { background: #FFFFFF; }
     .cr-wrap {
       min-height: 100vh;
       padding: 48px 16px 80px;
-      background: #0d0d1a;
+      background: #FFFFFF;
     }
     .cr-inner { max-width: 480px; margin: 0 auto; }
     .cr-logo {
@@ -6665,15 +6663,15 @@ app.get('/credits', (c) => {
     }
     .cr-logo-icon {
       width: 36px; height: 36px;
-      background: linear-gradient(135deg,#6c47ff,#a855f7);
+      background: #3182F6;
       border-radius: 10px;
       display: flex; align-items: center; justify-content: center;
       font-size: 18px;
     }
-    .cr-logo-text { font-size: 18px; font-weight: 800; color: #f0f0f8; }
+    .cr-logo-text { font-size: 18px; font-weight: 800; color: #191F28; }
     .cr-back {
-      width: 36px; height: 36px; border: none; background: #2a2a45; border-radius: 50%;
-      color: #e0e0f0; font-size: 18px; cursor: pointer;
+      width: 36px; height: 36px; border: none; background: #F2F4F6; border-radius: 50%;
+      color: #4E5968; font-size: 18px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
       text-decoration: none;
     }
@@ -6688,25 +6686,25 @@ app.get('/credits', (c) => {
 
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
         <a href="/dashboard" class="cr-back">‹</a>
-        <h1 style="font-size:18px;font-weight:700;color:#f0f0f8;margin:0;">크레딧 상세</h1>
+        <h1 style="font-size:18px;font-weight:700;color:#191F28;margin:0;">크레딧 상세</h1>
       </div>
 
       <!-- 잔여 크레딧 -->
-      <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(108,71,255,0.3);border-radius:16px;padding:16px 20px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;">
+      <div style="background:#E8F3FF;border:1px solid rgba(49,130,246,0.2);border-radius:16px;padding:16px 20px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">잔여 크레딧</div>
-          <div id="creditsPanelBalance" style="font-size:28px;font-weight:800;color:#a78bfa;">-</div>
+          <div style="font-size:12px;color:#4E5968;margin-bottom:4px;">잔여 크레딧</div>
+          <div id="creditsPanelBalance" style="font-size:28px;font-weight:800;color:#1B64DA;">-</div>
         </div>
-        <button class="db-charge-btn" onclick="openChargePanel()" style="padding:9px 20px;background:#6c47ff;color:white;border:none;border-radius:24px;font-size:17.55px;font-weight:700;cursor:pointer;">충전</button>
+        <button class="db-charge-btn" onclick="openChargePanel()" style="padding:9px 20px;background:#3182F6;color:white;border:none;border-radius:24px;font-size:17.55px;font-weight:700;cursor:pointer;">충전</button>
       </div>
 
       <!-- 유효기간/환불 안내 -->
-      <div style="background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;">
-        <span style="font-size:12px;color:#c4b5fd;line-height:1.5;">충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다. 환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#a78bfa;">환불정책</a>을 확인해주세요.</span>
+      <div style="background:#F2F4F6;border:1px solid #E5E8EB;border-radius:10px;padding:10px 14px;margin-bottom:20px;">
+        <span style="font-size:12px;color:#4E5968;line-height:1.5;">충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다. 환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#3182F6;">환불정책</a>을 확인해주세요.</span>
       </div>
 
       <div id="creditsList" style="display:flex;flex-direction:column;gap:10px;">
-        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
+        <div style="text-align:center;padding:60px 20px;color:#8B95A1;font-size:14px;">
           <div style="font-size:40px;margin-bottom:12px;">💎</div>
           크레딧 내역을 불러오는 중...
         </div>
@@ -6761,22 +6759,22 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
           <span id="navUserCredits" style="display:none;"></span>
           <span id="navUserName" style="display:none;"></span>
-          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#a855f7);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(108,71,255,0.4);">?</div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:10001;">
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">
-              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:30px;height:30px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(49,130,246,0.4);">?</div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:10001;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #E5E8EB;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#191F28;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:#8B95A1;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#6c47ff;"></div>
-                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#6c47ff;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
+                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#3182F6;"></div>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
-            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
-            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
-            <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
-            <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
         </div>
@@ -6981,15 +6979,15 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         <div class="gslide-scroll" style="padding-top:12px;">
           <!-- 디테일컷 결과 — 누끼컷 전용, 생성 완료 후에만 표시. 누끼컷 원본 이미지보다 위에 배치 -->
           <div id="detailCutResultsSection" style="display:none;padding:0 16px 16px;">
-            <p style="font-size:12px;font-weight:700;color:#8b8ba0;margin:0 0 10px;">디테일컷</p>
+            <p style="font-size:12px;font-weight:700;color:#8B95A1;margin:0 0 10px;">디테일컷</p>
             <div id="detailCutResultsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
           </div>
           <div class="results-grid" id="resultsGrid" style="padding:0 16px;"></div>
           <!-- 이미지 하단 ~ 버튼 상단 사이 안내 메시지 — 디테일컷 생성 완료 후에는 숨김(재생성은 원본 이미지 기준 안내라 혼동 방지) -->
           <div id="resultInfoMsg" style="padding:18px 16px 4px;text-align:center;">
-            <p style="font-size:13px;color:#8b8ba0;line-height:1.6;margin:0;">
-              <span style="color:#9b7cff;font-weight:600;">이미지 생성은 크레딧이 차감되지 않습니다.</span><br/>
-              오류가 있거나 마음에 들지 않으면 아래 <strong style="color:#e0e0f0;">🔄 재생성</strong> 버튼을 눌러보세요.
+            <p style="font-size:13px;color:#8B95A1;line-height:1.6;margin:0;">
+              <span style="color:#1B64DA;font-weight:600;">이미지 생성은 크레딧이 차감되지 않습니다.</span><br/>
+              오류가 있거나 마음에 들지 않으면 아래 <strong style="color:#333D4B;">🔄 재생성</strong> 버튼을 눌러보세요.
             </p>
           </div>
         </div>
@@ -7214,19 +7212,19 @@ app.get('/admin02', (c) => {
     .login-card h2{font-size:20px;font-weight:700;margin-bottom:4px;}
     .login-card p{font-size:13px;color:#8b8ba0;margin-bottom:28px;}
     .login-card input{width:100%;padding:12px 16px;background:#252540;border:1px solid #3a3a60;border-radius:10px;color:#e0e0f0;font-size:15px;outline:none;margin-bottom:12px;transition:border-color .2s;}
-    .login-card input:focus{border-color:#6c47ff;}
+    .login-card input:focus{border-color:#3182F6;}
     .login-card .err{font-size:13px;color:#ef4444;margin-bottom:10px;min-height:18px;}
     /* 헤더 */
     #adminMain{display:none;}
     .admin-header{background:#1a1a2e;border-bottom:1px solid #2e2e50;padding:14px 28px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50;}
-    .admin-header .logo{font-size:18px;font-weight:700;color:#6c47ff;}
-    .admin-header .badge{font-size:11px;background:#6c47ff22;color:#9b7cff;padding:3px 10px;border-radius:20px;border:1px solid #6c47ff44;}
+    .admin-header .logo{font-size:18px;font-weight:700;color:#3182F6;}
+    .admin-header .badge{font-size:11px;background:#3182F622;color:#5B9DF7;padding:3px 10px;border-radius:20px;border:1px solid #3182F644;}
     .admin-header .logout{margin-left:auto;font-size:13px;cursor:pointer;padding:6px 14px;border:1px solid #3a3a60;border-radius:8px;background:none;color:#e0e0f0;transition:all .2s;}
-    .admin-header .logout:hover{border-color:#6c47ff;color:#9b7cff;}
+    .admin-header .logout:hover{border-color:#3182F6;color:#5B9DF7;}
     /* 탭 */
     .tab-bar{display:flex;gap:4px;background:#1a1a2e;border-bottom:1px solid #2e2e50;padding:0 28px;}
     .tab-btn{padding:14px 20px;font-size: 18.9px;font-weight:500;cursor:pointer;border:none;background:none;color:#8b8ba0;border-bottom:2px solid transparent;transition:all .2s;}
-    .tab-btn.active{color:#9b7cff;border-bottom-color:#6c47ff;}
+    .tab-btn.active{color:#5B9DF7;border-bottom-color:#3182F6;}
     .tab-btn:hover{color:#e0e0f0;}
     .tab-panel{display:none;}
     .tab-panel.active{display:block;}
@@ -7243,42 +7241,42 @@ app.get('/admin02', (c) => {
     .toggle-switch input{opacity:0;width:0;height:0;}
     .slider{position:absolute;inset:0;cursor:pointer;background:#3a3a60;border-radius:26px;transition:.3s;}
     .slider:before{content:"";position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;}
-    input:checked+.slider{background:#6c47ff;}
+    input:checked+.slider{background:#3182F6;}
     input:checked+.slider:before{transform:translateX(22px);}
     /* 섹션 카드 */
     .section-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;padding:22px;margin-bottom:18px;}
     .section-card h3{font-size:14px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
     .section-card .section-desc{font-size:12px;color:#8b8ba0;margin-bottom:14px;}
     .section-card textarea{width:100%;background:#0f0f1a;border:1px solid #3a3a60;border-radius:10px;color:#e0e0f0;font-size:13px;font-family:inherit;line-height:1.6;padding:12px;resize:vertical;outline:none;transition:border-color .2s;}
-    .section-card textarea:focus{border-color:#6c47ff;}
+    .section-card textarea:focus{border-color:#3182F6;}
     .char-count{font-size:12px;color:#8b8ba0;text-align:right;margin-top:5px;}
     .preset-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
     .preset-btn{font-size: 16.2px;padding:4px 11px;border:1px solid #3a3a60;border-radius:20px;background:none;color:#a0a0c0;cursor:pointer;transition:all .2s;white-space:nowrap;}
-    .preset-btn:hover{border-color:#6c47ff;color:#9b7cff;background:#6c47ff11;}
+    .preset-btn:hover{border-color:#3182F6;color:#5B9DF7;background:#3182F611;}
     /* 저장바 */
     .save-bar{position:sticky;bottom:0;background:#0f0f1a;border-top:1px solid #2e2e50;padding:14px 0;display:flex;align-items:center;gap:14px;margin-top:6px;}
-    .btn-save{padding:11px 28px;background:#6c47ff;color:white;border:none;border-radius:10px;font-size: 18.9px;font-weight:600;cursor:pointer;transition:all .2s;}
+    .btn-save{padding:11px 28px;background:#3182F6;color:white;border:none;border-radius:10px;font-size: 18.9px;font-weight:600;cursor:pointer;transition:all .2s;}
     .btn-save:hover{background:#7c5bff;}
     .btn-save:disabled{background:#3a3a60;color:#8b8ba0;cursor:not-allowed;}
     .btn-cancel{padding:11px 20px;background:transparent;color:#8b8ba0;border:1.5px solid #3a3a60;border-radius:10px;font-size: 18.9px;font-weight:600;cursor:pointer;transition:all .2s;}
-    .btn-cancel:hover{border-color:#6c47ff;color:#9b7cff;}
+    .btn-cancel:hover{border-color:#3182F6;color:#5B9DF7;}
     .save-status{font-size:13px;color:#8b8ba0;}
     .save-status.ok{color:#22c55e;}
     .save-status.err{color:#ef4444;}
     .preview-box{background:#0f0f1a;border:1px solid #3a3a60;border-radius:10px;padding:14px;font-size:12px;color:#a0c0a0;line-height:1.7;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin-top:6px;}
     /* 공통 버튼 */
     .btn-sm{padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #3a3a60;background:none;color:#e0e0f0;transition:all .2s;}
-    .btn-sm:hover{border-color:#6c47ff;color:#9b7cff;}
+    .btn-sm:hover{border-color:#3182F6;color:#5B9DF7;}
     .btn-danger-sm{border-color:#ef4444;color:#ef4444;}
     .btn-danger-sm:hover{background:#ef444420;}
-    .btn-primary-sm{background:#6c47ff;border-color:#6c47ff;color:white;}
+    .btn-primary-sm{background:#3182F6;border-color:#3182F6;color:white;}
     .btn-primary-sm:hover{background:#7c5bff;}
     /* 미디어 업로드 */
     .upload-zone{border:2px dashed #3a3a60;border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:#0f0f1a;}
-    .upload-zone:hover,.upload-zone.drag{border-color:#6c47ff;background:#6c47ff0a;}
+    .upload-zone:hover,.upload-zone.drag{border-color:#3182F6;background:#3182F60a;}
     .upload-zone .icon{font-size:28px;margin-bottom:10px;color:#8b8ba0;}
     .upload-zone p{font-size:13px;color:#8b8ba0;}
-    .upload-zone p span{color:#9b7cff;text-decoration:underline;cursor:pointer;}
+    .upload-zone p span{color:#5B9DF7;text-decoration:underline;cursor:pointer;}
     /* 미디어 그리드 */
     .media-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:20px;}
     .media-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:12px;overflow:hidden;position:relative;}
@@ -7289,7 +7287,7 @@ app.get('/admin02', (c) => {
     .media-card .meta .desc{font-size:11px;color:#8b8ba0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .media-card .del-btn{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;background:#ef44449e;border:none;color:white;cursor:pointer;font-size: 16.2px;display:flex;align-items:center;justify-content:center;transition:background .2s;}
     .media-card .del-btn:hover{background:#ef4444;}
-    .media-card .custom-badge{position:absolute;top:6px;left:6px;font-size:10px;background:#6c47ffcc;color:white;padding:2px 8px;border-radius:10px;}
+    .media-card .custom-badge{position:absolute;top:6px;left:6px;font-size:10px;background:#3182F6cc;color:white;padding:2px 8px;border-radius:10px;}
     /* 업로드 폼 */
     .upload-form{background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;padding:22px;margin-top:20px;}
     .upload-form h3{font-size:14px;font-weight:600;margin-bottom:16px;}
@@ -7297,7 +7295,7 @@ app.get('/admin02', (c) => {
     .form-row.single{grid-template-columns:1fr;}
     .form-label{font-size:12px;color:#8b8ba0;margin-bottom:5px;display:block;}
     .form-input{width:100%;background:#0f0f1a;border:1px solid #3a3a60;border-radius:8px;color:#e0e0f0;font-size:13px;padding:10px 12px;outline:none;transition:border-color .2s;}
-    .form-input:focus{border-color:#6c47ff;}
+    .form-input:focus{border-color:#3182F6;}
     .upload-preview{width:100%;max-height:180px;object-fit:contain;border-radius:8px;margin-top:8px;display:none;}
     .empty-state{text-align:center;padding:48px 20px;color:#8b8ba0;font-size:13px;}
     .empty-state .icon{font-size:32px;margin-bottom:12px;opacity:.4;}
@@ -7312,7 +7310,7 @@ app.get('/admin02', (c) => {
     .leads-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
     .leads-tabroot input,.leads-tabroot select,.leads-tabroot textarea{background:#0f0f1a;border:1px solid #3a3a60;border-radius:8px;color:#e0e0f0;font-size:13px;padding:9px 12px;outline:none;font-family:inherit;}
     .leads-tabroot textarea{width:100%;min-height:90px;resize:vertical;line-height:1.6;}
-    .leads-btn{background:#6c47ff;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size: 17.55px;font-weight:600;cursor:pointer;}
+    .leads-btn{background:#3182F6;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size: 17.55px;font-weight:600;cursor:pointer;}
     .leads-btn:hover{background:#5a38e0;}
     .leads-btn.secondary{background:#252540;border:1px solid #3a3a60;color:#e0e0f0;}
     .leads-btn.small{padding:5px 10px;font-size: 16.2px;}
@@ -7324,26 +7322,26 @@ app.get('/admin02', (c) => {
     /* ── 사업자 리드(구 Genspark) 탭 ── */
     .biz-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
     .biz-stat-box{background:#0f0f1a;border:1px solid #2e2e50;border-radius:12px;padding:14px 16px;}
-    .biz-stat-box .num{font-size:20px;font-weight:700;color:#9b7cff;}
+    .biz-stat-box .num{font-size:20px;font-weight:700;color:#5B9DF7;}
     .biz-stat-box .label{font-size:11px;color:#8b8ba0;margin-top:2px;}
     .biz-stat-box-highlight{border-color:#3a2e6e;background:#161129;}
     .biz-stat-box-highlight .num{color:#4ade80;}
     .leads-notice-err{background:#3a1414;border:1px solid #6c1a1a;color:#fca5a5;border-radius:10px;padding:12px 16px;font-size:12.5px;line-height:1.6;margin-bottom:16px;white-space:pre-wrap;}
     .biz-filter-btn{cursor:pointer;border:1px solid #3a3a60;border-radius:9px;padding:7px 13px;font-size: 16.2px;color:#8b8ba0;background:#15152a;transition:.15s;}
-    .biz-filter-btn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
+    .biz-filter-btn.on{background:#3182F6;color:#fff;border-color:#3182F6;}
     .biz-pill{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:600;white-space:nowrap;}
     .biz-pill-green{background:#1a4a3a;color:#4ade80;}
     .biz-pill-red{background:#4a1a1a;color:#f87171;}
     .biz-pill-yellow{background:#4a3a1a;color:#facc15;}
     .biz-pill-gray{background:#2e2e50;color:#c0c0e0;}
     .biz-masked{color:#f87171;font-size:11px;font-style:italic;}
-    .biz-copy-btn{cursor:pointer;opacity:.5;font-size: 14.85px;border:none;background:none;color:#9b7cff;padding:0 0 0 5px;}
+    .biz-copy-btn{cursor:pointer;opacity:.5;font-size: 14.85px;border:none;background:none;color:#5B9DF7;padding:0 0 0 5px;}
     .biz-copy-btn:hover{opacity:1;}
     .biz-tablewrap{overflow:auto;max-height:calc(100vh - 420px);}
     .biz-tablewrap th{position:sticky;top:0;background:#1a1a2e;z-index:2;}
     .biz-tablewrap tr{cursor:pointer;}
     .biz-pagebtn{min-width:30px;height:28px;border-radius:7px;border:1px solid #3a3a60;background:#15152a;color:#8b8ba0;font-size: 15.48px;cursor:pointer;padding:0 6px;}
-    .biz-pagebtn.on{background:#6c47ff;color:#fff;border-color:#6c47ff;}
+    .biz-pagebtn.on{background:#3182F6;color:#fff;border-color:#3182F6;}
     .biz-pagebtn:disabled{opacity:.35;cursor:default;}
     .biz-modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,20,.75);align-items:center;justify-content:center;padding:20px;z-index:2100;}
     .biz-modal-overlay.open{display:flex;}
@@ -7408,7 +7406,7 @@ app.get('/admin02', (c) => {
       </div>
 
       <div class="section-card">
-        <h3><i class="fas fa-arrow-right" style="color:#6c47ff;font-size:12px;"></i> 앞에 추가 (Prefix)</h3>
+        <h3><i class="fas fa-arrow-right" style="color:#3182F6;font-size:12px;"></i> 앞에 추가 (Prefix)</h3>
         <div class="section-desc">기본 프롬프트 앞에 삽입. 예: [프리미엄 패션 브랜드 룩북] 고급 에디토리얼 이미지 생성.</div>
         <textarea id="fieldPrefix" rows="3" placeholder="예: [프리미엄 패션 브랜드] 고급 에디토리얼 룩북 이미지를 생성하세요."></textarea>
         <div class="char-count"><span id="cntPrefix">0</span>자</div>
@@ -7443,7 +7441,7 @@ app.get('/admin02', (c) => {
       </div>
 
       <div class="section-card">
-        <h3><i class="fas fa-arrow-left" style="color:#6c47ff;font-size:12px;"></i> 뒤에 추가 (Suffix)</h3>
+        <h3><i class="fas fa-arrow-left" style="color:#3182F6;font-size:12px;"></i> 뒤에 추가 (Suffix)</h3>
         <div class="section-desc">마지막에 삽입. 네거티브 지시나 최종 강조에 활용하세요.</div>
         <textarea id="fieldSuffix" rows="3" placeholder="예: 워터마크 없음. 텍스트 오버레이 없음. 인쇄 가능 품질."></textarea>
         <div class="char-count"><span id="cntSuffix">0</span>자</div>
@@ -7471,7 +7469,7 @@ app.get('/admin02', (c) => {
 
       <!-- 다중 업로드 폼 -->
       <div class="upload-form">
-        <h3><i class="fas fa-plus-circle" style="color:#6c47ff;"></i> 모델 추가 <span style="font-size:13px;font-weight:400;color:#888;">(여러 장 동시 업로드 가능)</span></h3>
+        <h3><i class="fas fa-plus-circle" style="color:#3182F6;"></i> 모델 추가 <span style="font-size:13px;font-weight:400;color:#888;">(여러 장 동시 업로드 가능)</span></h3>
 
         <!-- 드롭존 -->
         <div class="upload-zone multi-zone" id="modelUploadZone" onclick="document.getElementById('modelFileInput').click()">
@@ -7507,7 +7505,7 @@ app.get('/admin02', (c) => {
 
       <!-- 다중 업로드 폼 -->
       <div class="upload-form">
-        <h3><i class="fas fa-plus-circle" style="color:#6c47ff;"></i> 배경 추가 <span style="font-size:13px;font-weight:400;color:#888;">(여러 장 동시 업로드 가능)</span></h3>
+        <h3><i class="fas fa-plus-circle" style="color:#3182F6;"></i> 배경 추가 <span style="font-size:13px;font-weight:400;color:#888;">(여러 장 동시 업로드 가능)</span></h3>
 
         <!-- 기본 카테고리 (공통 적용) -->
         <div class="form-row single" style="margin-bottom:10px;">
@@ -7550,7 +7548,7 @@ app.get('/admin02', (c) => {
 
       <!-- 히어로 쇼케이스 캐러셀 -->
       <div class="upload-form">
-        <h3><i class="fas fa-images" style="color:#6c47ff;"></i> 히어로 쇼케이스 이미지 <span style="font-size:13px;font-weight:400;color:#888;">(홈 상단 박스에서 자동으로 롤링됩니다 · 여러 장 등록 가능)</span></h3>
+        <h3><i class="fas fa-images" style="color:#3182F6;"></i> 히어로 쇼케이스 이미지 <span style="font-size:13px;font-weight:400;color:#888;">(홈 상단 박스에서 자동으로 롤링됩니다 · 여러 장 등록 가능)</span></h3>
 
         <div class="upload-zone multi-zone" id="showcaseUploadZone" onclick="document.getElementById('showcaseFileInput').click()">
           <div class="icon"><i class="fas fa-images"></i></div>
@@ -7584,7 +7582,7 @@ app.get('/admin02', (c) => {
 
       <!-- 이미지 생성 로딩화면 하단 영상 슬롯 -->
       <div class="upload-form">
-        <h3><i class="fas fa-clapperboard" style="color:#9b7cff;"></i> 생성 로딩화면 영상 (모델컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 반복 재생, 20MB 이하, 미등록 시 노출 안 함)</span></h3>
+        <h3><i class="fas fa-clapperboard" style="color:#5B9DF7;"></i> 생성 로딩화면 영상 (모델컷) <span style="font-size:13px;font-weight:400;color:#888;">(최대 5개, 등록된 순서대로 반복 재생, 20MB 이하, 미등록 시 노출 안 함)</span></h3>
         <div id="genLoadingVideoGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:12px;"></div>
       </div>
 
@@ -7605,7 +7603,7 @@ app.get('/admin02', (c) => {
       <!-- 통계 카드 -->
       <div id="userStats" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:24px;">
         <div class="section-card" style="padding:16px;text-align:center;">
-          <div style="font-size:24px;font-weight:800;color:#9b7cff;" id="statTotal">-</div>
+          <div style="font-size:24px;font-weight:800;color:#5B9DF7;" id="statTotal">-</div>
           <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">전체 회원</div>
         </div>
         <div class="section-card" style="padding:16px;text-align:center;">
@@ -7891,7 +7889,7 @@ function bizCopyText(txt) {
   navigator.clipboard.writeText(txt).then(() => {
     const t = document.createElement('div')
     t.textContent = '복사됨!'
-    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#6c47ff;color:#fff;font-size:13px;padding:8px 16px;border-radius:10px;z-index:9999;'
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:#3182F6;color:#fff;font-size:13px;padding:8px 16px;border-radius:10px;z-index:9999;'
     document.body.appendChild(t)
     setTimeout(() => t.remove(), 1500)
   })
@@ -7982,7 +7980,7 @@ function bizRenderList(data) {
     const stCls = r.status === '정상영업' ? 'biz-pill-green' : r.status === '휴업처리' ? 'biz-pill-yellow' : 'biz-pill-gray'
     const dom = na(r.domain_clean) || na(r.domain)
     const domHtml = dom
-      ? '<a href="https://' + dom + '" target="_blank" rel="noopener" style="color:#9b7cff;font-size:12px;" onclick="event.stopPropagation()">' + dom + '</a>'
+      ? '<a href="https://' + dom + '" target="_blank" rel="noopener" style="color:#5B9DF7;font-size:12px;" onclick="event.stopPropagation()">' + dom + '</a>'
       : '<span style="color:#54546e;font-size:12px;">-</span>'
     const vb = r.is_valid === 1 ? '<span class="biz-pill biz-pill-green">유효</span>'
       : r.is_valid === 0 ? '<span class="biz-pill biz-pill-red">불가</span>'
@@ -7992,7 +7990,7 @@ function bizRenderList(data) {
     const emailHtml = emailMasked
       ? '<span class="biz-masked">' + (emailRaw || '마스킹됨') + '</span>'
       : emailRaw
-        ? '<span style="color:#9b7cff;">' + emailRaw + '</span><button class="biz-copy-btn" data-copy="' + bizAttrEsc(emailRaw) + '" onclick="event.stopPropagation();bizCopyFromBtn(this)">복사</button>'
+        ? '<span style="color:#5B9DF7;">' + emailRaw + '</span><button class="biz-copy-btn" data-copy="' + bizAttrEsc(emailRaw) + '" onclick="event.stopPropagation();bizCopyFromBtn(this)">복사</button>'
         : '<span style="color:#54546e;font-size:12px;">-</span>'
     const telRaw = na(r.tel) || ''
     const telMasked = telRaw.includes('개인정보')
@@ -8210,10 +8208,10 @@ function renderUserTable(users) {
   tbody.innerHTML = users.map(function(u) {
     var avatar = u.avatar_url
       ? '<img src="' + u.avatar_url + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;">'
-      : '<div style="width:28px;height:28px;border-radius:50%;background:#6c47ff44;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">' + ((u.name||'?')[0]) + '</div>'
+      : '<div style="width:28px;height:28px;border-radius:50%;background:#3182F644;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">' + ((u.name||'?')[0]) + '</div>'
     var joined = u.created_at ? u.created_at.slice(0,10) : '-'
     var isAdmin = u.role === 'admin'
-    var adminBadge = isAdmin ? ' <span style="font-size:10px;background:#6c47ff;color:white;padding:1px 6px;border-radius:8px;">Admin</span>' : ''
+    var adminBadge = isAdmin ? ' <span style="font-size:10px;background:#3182F6;color:white;padding:1px 6px;border-radius:8px;">Admin</span>' : ''
     var uid = String(u.id)
     var statusBtn = ''
     if (u.status === 'active') {
@@ -8234,12 +8232,12 @@ function renderUserTable(users) {
       +   '</div>'
       + '</td>'
       + '<td style="padding:12px 16px;">' + (providerBadge[u.provider] || u.provider) + '</td>'
-      + '<td style="padding:12px 16px;text-align:center;font-size:12px;color:' + (u.referrer ? '#9b7cff;font-weight:600;' : '#8b8ba0;') + '">' + (u.referrer ? escHtml(u.referrer) : '-') + '</td>'
+      + '<td style="padding:12px 16px;text-align:center;font-size:12px;color:' + (u.referrer ? '#5B9DF7;font-weight:600;' : '#8b8ba0;') + '">' + (u.referrer ? escHtml(u.referrer) : '-') + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">'
-      +   '<span style="font-size:14px;font-weight:700;color:#9b7cff;">' + credits + '</span>'
+      +   '<span style="font-size:14px;font-weight:700;color:#5B9DF7;">' + credits + '</span>'
       +   '<span style="font-size:10px;color:#8b8ba0;"> 크레딧</span>'
       +   '<div style="margin-top:4px;display:flex;gap:4px;justify-content:center;">'
-      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="grant" style="font-size:13.5px;padding:2px 8px;background:#6c47ff33;border:1px solid #6c47ff66;border-radius:6px;color:#9b7cff;cursor:pointer;font-weight:600;">지급</button>'
+      +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="grant" style="font-size:13.5px;padding:2px 8px;background:#3182F633;border:1px solid #3182F666;border-radius:6px;color:#5B9DF7;cursor:pointer;font-weight:600;">지급</button>'
       +     '<button data-uid="' + uid + '" data-credits="' + credits + '" data-action="credits" style="font-size:13.5px;padding:2px 8px;background:none;border:1px solid #3a3a60;border-radius:6px;color:#8b8ba0;cursor:pointer;">설정</button>'
       +   '</div>'
       + '</td>'
@@ -8677,7 +8675,7 @@ function renderModelStaging() {
   const container = document.getElementById('modelStagingItems')
   if (!modelStagingList.length) { grid.style.display = 'none'; return }
   grid.style.display = 'block'
-  document.getElementById('modelUploadZone').style.borderColor = '#6c47ff'
+  document.getElementById('modelUploadZone').style.borderColor = '#3182F6'
   const mkOpts = (list, sel) => list.map(v => '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>').join('')
   container.innerHTML = modelStagingList.map((item, i) =>
     '<div style="width:160px;flex-shrink:0;">' +
@@ -8824,7 +8822,7 @@ function renderBgStaging() {
   const container = document.getElementById('bgStagingItems')
   if (!bgStagingList.length) { grid.style.display = 'none'; return }
   grid.style.display = 'block'
-  document.getElementById('bgUploadZone').style.borderColor = '#6c47ff'
+  document.getElementById('bgUploadZone').style.borderColor = '#3182F6'
   const mkOpts = (list, sel) => list.map(v => '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+v+'</option>').join('')
   const catList = ['스튜디오','야외/자연','도심/거리','인테리어','컨셉/특수']
   const moodList = ['미니멀','내추럴','모던','빈티지','럭셔리','스트릿']
@@ -9400,44 +9398,44 @@ app.get('/payment/success', (c) => {
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>
-    body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }
-    .card { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid rgba(255,255,255,0.08); }
+    body { background: #F2F4F6; font-family: 'Pretendard', -apple-system, sans-serif; }
+    .card { background: #FFFFFF; border: 1px solid #E5E8EB; }
   </style>
   ${gaSnippet(c.env.GA4_MEASUREMENT_ID)}
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
   <div class="card rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
     <div id="loadingState">
-      <div class="animate-spin w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-      <p class="text-gray-300 text-sm">결제 확인 중...</p>
+      <div class="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <p class="text-gray-500 text-sm">결제 확인 중...</p>
     </div>
     <div id="successState" class="hidden">
-      <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-        <i class="fas fa-check text-green-400 text-2xl"></i>
+      <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-check text-green-600 text-2xl"></i>
       </div>
-      <h1 class="text-white text-2xl font-bold mb-2">결제 완료!</h1>
-      <p class="text-gray-400 text-sm mb-4" id="successMsg"></p>
-      <div class="bg-black/30 rounded-xl p-4 mb-6 text-left">
+      <h1 class="text-gray-900 text-2xl font-bold mb-2">결제 완료!</h1>
+      <p class="text-gray-500 text-sm mb-4" id="successMsg"></p>
+      <div class="bg-gray-100 rounded-xl p-4 mb-6 text-left">
         <div class="flex justify-between text-sm mb-2">
-          <span class="text-gray-400">지급 크레딧</span>
-          <span class="text-purple-300 font-bold" id="creditsGranted"></span>
+          <span class="text-gray-500">지급 크레딧</span>
+          <span class="text-blue-600 font-bold" id="creditsGranted"></span>
         </div>
         <div class="flex justify-between text-sm">
-          <span class="text-gray-400">잔여 크레딧</span>
-          <span class="text-white font-semibold" id="creditsTotal"></span>
+          <span class="text-gray-500">잔여 크레딧</span>
+          <span class="text-gray-900 font-semibold" id="creditsTotal"></span>
         </div>
       </div>
-      <button onclick="goHome()" class="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl py-3 font-semibold transition-colors">
+      <button onclick="goHome()" class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold transition-colors">
         <i class="fas fa-home mr-2"></i>서비스 이용하기
       </button>
     </div>
     <div id="errorState" class="hidden">
-      <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-        <i class="fas fa-times text-red-400 text-2xl"></i>
+      <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-times text-red-600 text-2xl"></i>
       </div>
-      <h1 class="text-white text-2xl font-bold mb-2">결제 확인 실패</h1>
-      <p class="text-gray-400 text-sm mb-6" id="errorMsg"></p>
-      <button onclick="goHome()" class="w-full bg-gray-700 hover:bg-gray-600 text-white rounded-xl py-3 font-semibold transition-colors">
+      <h1 class="text-gray-900 text-2xl font-bold mb-2">결제 확인 실패</h1>
+      <p class="text-gray-500 text-sm mb-6" id="errorMsg"></p>
+      <button onclick="goHome()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-3 font-semibold transition-colors">
         홈으로 돌아가기
       </button>
     </div>
@@ -9511,18 +9509,18 @@ app.get('/payment/fail', (c) => {
   <title>결제 실패 — Studio B</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-  <style>body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }</style>
+  <style>body { background: #F2F4F6; font-family: 'Pretendard', -apple-system, sans-serif; }</style>
   ${gaSnippet(c.env.GA4_MEASUREMENT_ID)}
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
-  <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,255,255,0.08)" class="rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
-    <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-      <i class="fas fa-times text-red-400 text-2xl"></i>
+  <div style="background:#FFFFFF;border:1px solid #E5E8EB" class="rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <i class="fas fa-times text-red-600 text-2xl"></i>
     </div>
-    <h1 class="text-white text-2xl font-bold mb-2">결제가 취소되었습니다</h1>
-    <p class="text-gray-400 text-sm mb-2" id="errMsg"></p>
-    <p class="text-gray-500 text-xs mb-6" id="errCode"></p>
-    <button onclick="location.href='/'" class="w-full bg-gray-700 hover:bg-gray-600 text-white rounded-xl py-3 font-semibold transition-colors">
+    <h1 class="text-gray-900 text-2xl font-bold mb-2">결제가 취소되었습니다</h1>
+    <p class="text-gray-500 text-sm mb-2" id="errMsg"></p>
+    <p class="text-gray-400 text-xs mb-6" id="errCode"></p>
+    <button onclick="location.href='/'" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-3 font-semibold transition-colors">
       홈으로 돌아가기
     </button>
   </div>

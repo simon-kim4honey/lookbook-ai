@@ -329,27 +329,12 @@ function t(key, ...args) {
 }
 
 async function initLocale() {
-  try {
-    const token = localStorage.getItem('lookbook_token') || '';
-    const res = await fetch('/api/locale', { headers: token ? { 'X-Session-Token': token } : {} });
-    const data = await res.json();
-    _locale = data.locale || 'ko';
-    _country = data.country || '';
-    _currency = data.currency || 'KRW';
-    _pg = data.pg || 'nicepay';
-  } catch (e) {
-    _locale = 'ko';
-  }
-  // 사용자가 직접 고른 언어가 있으면 자동감지 결과보다 우선 — 통화/PG도 함께 복원해야
-  // 페이지 이동/새로고침 후 언어는 English인데 결제는 나이스페이로 되돌아가는 문제가 생기지 않음
-  const override = localStorage.getItem(LOCALE_OVERRIDE_KEY);
-  if (override && I18N[override]) {
-    _locale = override;
-    const market = LOCALE_MARKET_MAP[override] || LOCALE_MARKET_MAP.en;
-    _currency = market.currency;
-    _pg = market.pg;
-  }
-  // HTML lang 속성 설정
+  // 영어/일본어 비활성화, 한국어만 지원 — 자동감지/서버값/저장된 선호 언어를
+  // 모두 무시하고 항상 한국어로 고정한다. (일단 비활성화, 필요 시 원복)
+  _locale = 'ko';
+  _country = 'KR';
+  _currency = 'KRW';
+  _pg = 'nicepay';
   document.documentElement.lang = _locale;
   updateLocaleSwitcherUI();
   // data-i18n 속성 정적 텍스트 교체
@@ -457,9 +442,9 @@ const STATIC_I18N = {
   'charge-current':  { ko: '현재 보유 크레딧', en: 'Current Credits', ja: '現在のクレジット' },
   'pkg-popular':     { ko: '인기', en: 'Popular', ja: '人気' },
   'pkg-btn':         { ko: '패키지를 선택하세요', en: 'Select a package', ja: 'パッケージを選択' },
-  'pkg-11':          { ko: '이미지 <strong style="color:#a78bfa;">11장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#a78bfa;">11 images</strong>', ja: '<strong style="color:#a78bfa;">11枚</strong>ダウンロード可能' },
-  'pkg-25':          { ko: '이미지 <strong style="color:#a78bfa;">25장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#a78bfa;">25 images</strong>', ja: '<strong style="color:#a78bfa;">25枚</strong>ダウンロード可能' },
-  'pkg-44':          { ko: '이미지 <strong style="color:#a78bfa;">44장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#a78bfa;">44 images</strong>', ja: '<strong style="color:#a78bfa;">44枚</strong>ダウンロード可能' },
+  'pkg-11':          { ko: '이미지 <strong style="color:#3182F6;">11장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#3182F6;">11 images</strong>', ja: '<strong style="color:#3182F6;">11枚</strong>ダウンロード可能' },
+  'pkg-25':          { ko: '이미지 <strong style="color:#1B64DA;">25장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#1B64DA;">25 images</strong>', ja: '<strong style="color:#1B64DA;">25枚</strong>ダウンロード可能' },
+  'pkg-44':          { ko: '이미지 <strong style="color:#3182F6;">44장</strong> 다운로드 가능', en: 'Download up to <strong style="color:#3182F6;">44 images</strong>', ja: '<strong style="color:#3182F6;">44枚</strong>ダウンロード可能' },
   'pkg-bonus15':     { ko: '✨ 기본 대비 15% 더 받기', en: '✨ 15% more than basic', ja: '✨ 基本より15%お得' },
   'pkg-bonus33':     { ko: '🚀 기본 대비 33% 더 받기', en: '🚀 33% more than basic', ja: '🚀 基本より33%お得' },
   // 로그인/회원가입
@@ -534,7 +519,7 @@ const AppState = {
 
 const SAMPLE_PROJECTS = [
   { id: 'p1', name: '2024 S/S 룩북', status: 'done', images: 8, created: '2024-03-15', color: '#FF6B9D', icon: '👗' },
-  { id: 'p2', name: '캐주얼 티셔츠 컷', status: 'done', images: 4, created: '2024-03-12', color: '#6C47FF', icon: '👕' },
+  { id: 'p2', name: '캐주얼 티셔츠 컷', status: 'done', images: 4, created: '2024-03-12', color: '#3182F6', icon: '👕' },
   { id: 'p3', name: '데님 라인 촬영', status: 'processing', images: 0, created: '2024-03-10', color: '#3B82F6', icon: '👖' },
   { id: 'p4', name: '원피스 봄 컬렉션', status: 'draft', images: 0, created: '2024-03-08', color: '#00D4AA', icon: '👘' },
 ];
@@ -1639,7 +1624,7 @@ async function loadCreditHistory() {
 
     const logs = data.logs || [];
     if (logs.length === 0) {
-      listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역이 없습니다.</div>';
+      listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#8B95A1;font-size:14px;">크레딧 내역이 없습니다.</div>';
       return;
     }
 
@@ -1648,24 +1633,24 @@ async function loadCreditHistory() {
       const dateStr = (row.created_at || '').replace('T', ' ').slice(0, 16);
       const label = CREDIT_REASON_LABEL[row.reason] || row.reason || '크레딧 변동';
       const krwLine = row.reason === 'payment' && row.krw_amount
-        ? `<div style="font-size:11px;color:#8b8ba0;margin-top:2px;">${Number(row.krw_amount).toLocaleString()}${row.pg_currency === 'KRW' || !row.pg_currency ? '원' : ' ' + row.pg_currency} 결제</div>`
+        ? `<div style="font-size:11px;color:#8B95A1;margin-top:2px;">${Number(row.krw_amount).toLocaleString()}${row.pg_currency === 'KRW' || !row.pg_currency ? '원' : ' ' + row.pg_currency} 결제</div>`
         : '';
       return `
-        <div style="background:#16162a;border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div style="background:#F2F4F6;border-radius:14px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;">
           <div style="min-width:0;">
-            <div style="font-size:14px;font-weight:600;color:#e0e0f0;">${label}</div>
-            <div style="font-size:11px;color:#5a5a7a;margin-top:2px;">${dateStr}</div>
+            <div style="font-size:14px;font-weight:600;color:#191F28;">${label}</div>
+            <div style="font-size:11px;color:#8B95A1;margin-top:2px;">${dateStr}</div>
             ${krwLine}
           </div>
           <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:15px;font-weight:800;color:${isPositive ? '#4ade80' : '#f87171'};">${isPositive ? '+' : ''}${row.amount.toLocaleString()}</div>
-            <div style="font-size:11px;color:#8b8ba0;margin-top:2px;">잔여 ${row.balance.toLocaleString()}</div>
+            <div style="font-size:15px;font-weight:800;color:${isPositive ? '#16A34A' : '#EF4444'};">${isPositive ? '+' : ''}${row.amount.toLocaleString()}</div>
+            <div style="font-size:11px;color:#8B95A1;margin-top:2px;">잔여 ${row.balance.toLocaleString()}</div>
           </div>
         </div>`;
     }).join('');
   } catch (err) {
     console.error('크레딧 내역 조회 실패:', err);
-    listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">크레딧 내역을 불러오지 못했습니다.</div>';
+    listEl.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#8B95A1;font-size:14px;">크레딧 내역을 불러오지 못했습니다.</div>';
   }
 }
 
@@ -1931,19 +1916,19 @@ function initGhostCutUI() {
       ondragover="event.preventDefault(); event.currentTarget.classList.add('drag')"
       ondragleave="event.currentTarget.classList.remove('drag')"
       ondrop="ghostCutHandleDrop(event)"
-      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px dashed rgba(255,255,255,0.25);border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;background:rgba(255,255,255,0.03);margin-top:16px;">
+      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px solid transparent;border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;background:#F2F4F6;margin-top:16px;">
       <div id="gcUploadPreviewWrap" style="display:none;width:100%;max-width:220px;position:relative;">
         <img id="gcUploadPreview" style="width:100%;border-radius:12px;display:block;" />
         <button type="button" id="gcUploadRemoveBtn" onclick="event.preventDefault();event.stopPropagation();ghostCutRemoveImage();" style="position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:17.55px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
           <i class="fas fa-times"></i>
         </button>
       </div>
-      <div id="gcUploadEmpty" style="text-align:center;color:#8b8ba0;">
-        <div style="font-size:14px;font-weight:600;color:#e0e0f0;">탭하여 사진 선택</div>
+      <div id="gcUploadEmpty" style="text-align:center;color:#8B95A1;">
+        <div style="font-size:14px;font-weight:600;color:#333D4B;">탭하여 사진 선택</div>
         <div style="font-size:12px;margin-top:4px;">또는 파일을 여기로 드래그하세요</div>
       </div>
     </label>
-    <div id="gcStatusBox" style="display:none;margin-top:16px;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,0.04);font-size:13px;line-height:1.6;"></div>
+    <div id="gcStatusBox" style="display:none;margin-top:16px;padding:14px 16px;border-radius:12px;background:#F2F4F6;font-size:13px;line-height:1.6;"></div>
   `;
 
   if (!document.getElementById('gcStep1Nav')) {
@@ -2029,7 +2014,7 @@ function ghostCutHandleFile(file) {
     if (previewWrap) previewWrap.style.display = '';
     if (emptyBox) emptyBox.style.display = 'none';
 
-    if (statusBox) { statusBox.style.display = ''; statusBox.style.color = '#8b8ba0'; statusBox.textContent = '🔍 상품 종류를 분석하는 중...'; }
+    if (statusBox) { statusBox.style.display = ''; statusBox.style.color = '#6B7684'; statusBox.textContent = '🔍 상품 종류를 분석하는 중...'; }
 
     try {
       const res = await fetch('/api/ghostcut/classify', {
@@ -2053,7 +2038,7 @@ function ghostCutHandleFile(file) {
       }
 
       ghostCutUpload_ = { dataUrl, category: data.category, categoryLabel: data.label };
-      if (statusBox) { statusBox.style.color = '#6C47FF'; statusBox.innerHTML = '<i class="fas fa-check-circle"></i> 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
+      if (statusBox) { statusBox.style.color = '#3182F6'; statusBox.innerHTML = '<i class="fas fa-check-circle"></i> 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
       if (genBtn) genBtn.disabled = false;
     } catch (err) {
       console.error('ghostcut classify error:', err);
@@ -3217,13 +3202,13 @@ function completeGeneration(images, isFallback = false) {
 function generateFallbackImages(count) {
   const gradients = [
     ['#FF6B9D', '#FF8C42'],
-    ['#6C47FF', '#00D4AA'],
-    ['#FF6B9D', '#6C47FF'],
+    ['#3182F6', '#00D4AA'],
+    ['#FF6B9D', '#3182F6'],
     ['#F59E0B', '#EF4444'],
-    ['#3B82F6', '#8B5CF6'],
-    ['#00D4AA', '#6C47FF'],
+    ['#3B82F6', '#4C8DF5'],
+    ['#00D4AA', '#3182F6'],
     ['#EC4899', '#F97316'],
-    ['#8B5CF6', '#EC4899'],
+    ['#4C8DF5', '#EC4899'],
   ];
   return Array.from({ length: count }, (_, i) => ({
     id: `placeholder_${i + 1}`,
@@ -3327,7 +3312,7 @@ function renderResults(images) {
             style="width:100%;height:auto;display:block;"
             draggable="false"
             oncontextmenu="return false"
-            onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#6C47FF,#00D4AA)'}'; this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패</span></div>');"
+            onerror="console.error('Image load failed:', this.src); this.parentElement.style.background='${img.gradient || 'linear-gradient(135deg,#3182F6,#00D4AA)'}'; this.style.display='none'; this.insertAdjacentHTML('afterend','<div style=\\'width:100%;aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;\\'><span style=\\'font-size:32px;\\'>⚠️</span><span style=\\'color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:0 8px;\\'>이미지 로드 실패</span></div>');"
           />`
       : `<div style="width:100%;aspect-ratio:3/4;background:${img.gradient};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
            <span style="font-size:48px;">✨</span>
@@ -4530,10 +4515,10 @@ function renderPkgPrices(isBFM) {
 function selectPackage(pkgId, el) {
   _selectedPkg = pkgId;
   document.querySelectorAll('.pkg-card').forEach(c => {
-    c.style.border = '2px solid #3a3a60';
+    c.style.border = '2px solid #E5E8EB';
     c.style.transform = 'scale(1)';
   });
-  el.style.border = '2px solid #6c47ff';
+  el.style.border = '2px solid #3182F6';
   el.style.transform = 'scale(1.01)';
   const cta = document.getElementById('chargeCta');
   const lbl = document.getElementById('ctaLabel');
