@@ -6063,14 +6063,16 @@ app.get('/dashboard', (c) => {
     <video id="histModalVideo" src="" autoplay loop muted playsinline controls controlsList="nodownload" disablePictureInPicture
       style="max-width:min(420px,90vw);max-height:calc(100dvh - 140px);object-fit:contain;border-radius:14px;display:none;"></video>
     <div id="histModalExpiry" style="font-size:11px;color:#f87171;margin-top:8px;text-align:center;"></div>
-    <button id="histModalDownloadBtn" class="result-nav-btn primary" onclick="histModalDownloadClick(this)" style="display:none;width:100%;max-width:220px;margin:14px auto 0;">
-      <i class="fas fa-download"></i> 다운로드
-    </button>
-    <button id="histModalVideoBtn" class="result-nav-btn primary" onclick="startHistVideoGeneration()" style="display:none;width:100%;max-width:220px;margin:10px auto 0;">
-      <span class="rnb-badge">50%↓</span>
-      <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
-      <span class="rnb-sub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
-    </button>
+    <div style="display:flex;gap:10px;width:100%;max-width:420px;margin:14px auto 0;">
+      <button id="histModalDownloadBtn" class="result-nav-btn primary" onclick="histModalDownloadClick(this)" style="display:none;flex:1;">
+        <i class="fas fa-download"></i> 다운로드
+      </button>
+      <button id="histModalVideoBtn" class="result-nav-btn primary" onclick="startHistVideoGeneration()" style="display:none;flex:1;">
+        <span class="rnb-badge">50%↓</span>
+        <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
+        <span class="rnb-sub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
+      </button>
+    </div>
   </div>
 
   <!-- 영상 생성 중 오버레이 (generator 페이지의 영상 생성 로딩 화면과 동일 — 대시보드에서는

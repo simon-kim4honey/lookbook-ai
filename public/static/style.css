@@ -2783,7 +2783,9 @@ footer {
   .direction-grid { grid-template-columns: 1fr; }
   .gen-options-grid { grid-template-columns: 1fr; }
   .gen-summary-grid { grid-template-columns: 1fr; }
-  .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+  /* 브랜드 블록은 전체 폭, 링크 3개 컬럼은 나란히 배치해 세로 길이를 줄임 */
+  .footer-grid { grid-template-columns: repeat(3, 1fr); gap: 28px 16px; }
+  .footer-brand { grid-column: 1 / -1; }
   .hero-stats { gap: 16px; }
   .generator-header-inner { flex-direction: column; align-items: flex-start; }
   .container-wide { padding: 0 20px; }
