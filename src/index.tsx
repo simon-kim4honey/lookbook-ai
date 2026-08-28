@@ -4691,16 +4691,16 @@ const htmlShell = (title: string, bodyContent: string, extraHead: string = '', d
 ${bodyContent}
 
 <!-- ── 크레딧 충전 패널 (모든 페이지 공통) ── -->
-<div id="chargePanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:9000;overflow-y:auto;">
+<div id="chargePanel" style="display:none;position:fixed;inset:0;background:#FFFFFF;z-index:9000;overflow-y:auto;">
   <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
-      <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:24.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
-      <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;margin:0;" data-i18n="charge-title">크레딧 충전</h2>
+      <button onclick="closeChargePanel()" style="width:36px;height:36px;border:none;background:#F2F4F6;border-radius:50%;color:#4E5968;font-size:24.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+      <h2 style="font-size:18px;font-weight:700;color:#191F28;margin:0;" data-i18n="charge-title">크레딧 충전</h2>
     </div>
-    <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(49,130,246,0.3);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="background:#E8F3FF;border:1px solid rgba(49,130,246,0.2);border-radius:16px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;">
       <div>
-        <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;" data-i18n="charge-current">현재 보유 크레딧</div>
-        <div id="chargePanelCredits" style="font-size:28px;font-weight:800;color:#8FBFFB;">-</div>
+        <div style="font-size:12px;color:#4E5968;margin-bottom:4px;" data-i18n="charge-current">현재 보유 크레딧</div>
+        <div id="chargePanelCredits" style="font-size:28px;font-weight:800;color:#1B64DA;">-</div>
       </div>
       <div style="font-size:32px;opacity:0.5;">💎</div>
     </div>
@@ -4710,43 +4710,43 @@ ${bodyContent}
     </div>
     <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:28px;">
       <div class="pkg-card" onclick="selectPackage('pkg_20000',this)" data-pkg="pkg_20000"
-           style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
+           style="background:#F2F4F6;border:2px solid #E5E8EB;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">1,000 크레딧</div>
-            <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-11">이미지 <strong style="color:#8FBFFB;">11장</strong> 다운로드 가능</div>
+            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">1,000 크레딧</div>
+            <div style="font-size:13px;color:#6B7684;" data-i18n="pkg-11">이미지 <strong style="color:#3182F6;">11장</strong> 다운로드 가능</div>
           </div>
           <div style="text-align:right;">
-            <div id="pkgPriceOriginal_pkg_20000" style="display:none;font-size:12px;color:#8b8ba0;text-decoration:line-through;"></div>
+            <div id="pkgPriceOriginal_pkg_20000" style="display:none;font-size:12px;color:#8B95A1;text-decoration:line-through;"></div>
             <div id="pkgPrice_pkg_20000" style="font-size:22px;font-weight:800;color:#3182F6;">20,000원</div>
           </div>
         </div>
       </div>
       <div class="pkg-card" onclick="selectPackage('pkg_40000',this)" data-pkg="pkg_40000"
-           style="background:linear-gradient(135deg,#1e1435,#2a1a50);border:2px solid #3182F6;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;">
+           style="background:#E8F3FF;border:2px solid #3182F6;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;position:relative;">
         <div style="position:absolute;top:0;right:20px;background:#3182F6;color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;" data-i18n="pkg-popular">인기</div>
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">2,300 크레딧</div>
-            <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-25">이미지 <strong style="color:#8FBFFB;">25장</strong> 다운로드 가능</div>
-            <div style="font-size:11px;color:#8FBFFB;margin-top:4px;" data-i18n="pkg-bonus15">✨ 기본 대비 15% 더 받기</div>
+            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">2,300 크레딧</div>
+            <div style="font-size:13px;color:#6B7684;" data-i18n="pkg-25">이미지 <strong style="color:#1B64DA;">25장</strong> 다운로드 가능</div>
+            <div style="font-size:11px;color:#1B64DA;margin-top:4px;" data-i18n="pkg-bonus15">✨ 기본 대비 15% 더 받기</div>
           </div>
           <div style="text-align:right;">
-            <div id="pkgPriceOriginal_pkg_40000" style="display:none;font-size:12px;color:#8b8ba0;text-decoration:line-through;"></div>
+            <div id="pkgPriceOriginal_pkg_40000" style="display:none;font-size:12px;color:#8B95A1;text-decoration:line-through;"></div>
             <div id="pkgPrice_pkg_40000" style="font-size:22px;font-weight:800;color:#3182F6;">40,000원</div>
           </div>
         </div>
       </div>
       <div class="pkg-card" onclick="selectPackage('pkg_60000',this)" data-pkg="pkg_60000"
-           style="background:linear-gradient(135deg,#1a1a2e,#252545);border:2px solid #3a3a60;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
+           style="background:#F2F4F6;border:2px solid #E5E8EB;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#f0f0f8;margin-bottom:4px;">4,000 크레딧</div>
-            <div style="font-size:13px;color:#8b8ba0;" data-i18n="pkg-44">이미지 <strong style="color:#8FBFFB;">44장</strong> 다운로드 가능</div>
-            <div style="font-size:11px;color:#8FBFFB;margin-top:4px;" data-i18n="pkg-bonus33">🚀 기본 대비 33% 더 받기</div>
+            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">4,000 크레딧</div>
+            <div style="font-size:13px;color:#6B7684;" data-i18n="pkg-44">이미지 <strong style="color:#3182F6;">44장</strong> 다운로드 가능</div>
+            <div style="font-size:11px;color:#1B64DA;margin-top:4px;" data-i18n="pkg-bonus33">🚀 기본 대비 33% 더 받기</div>
           </div>
           <div style="text-align:right;">
-            <div id="pkgPriceOriginal_pkg_60000" style="display:none;font-size:12px;color:#8b8ba0;text-decoration:line-through;"></div>
+            <div id="pkgPriceOriginal_pkg_60000" style="display:none;font-size:12px;color:#8B95A1;text-decoration:line-through;"></div>
             <div id="pkgPrice_pkg_60000" style="font-size:22px;font-weight:800;color:#3182F6;">60,000원</div>
           </div>
         </div>
@@ -4758,9 +4758,9 @@ ${bodyContent}
       <span id="ctaLabel" data-i18n="pkg-btn">패키지를 선택하세요</span>
     </button>
 
-    <p style="margin-top:14px;font-size:11px;line-height:1.6;color:#8b8ba0;text-align:center;">
+    <p style="margin-top:14px;font-size:11px;line-height:1.6;color:#8B95A1;text-align:center;">
       충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다.<br />
-      환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#8FBFFB;">환불정책</a>을 확인해주세요.
+      환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#3182F6;">환불정책</a>을 확인해주세요.
     </p>
 
   </div>
@@ -4955,7 +4955,7 @@ app.get('/terms', (c) => {
     h2 { font-size: 18px; margin-top: 32px; color: #111; }
     p, li { font-size: 15px; color: #444; }
     .date { color: #888; font-size: 14px; margin-bottom: 32px; }
-    a { color: #6c5ce7; }
+    a { color: #3182F6; }
   </style>
 </head>
 <body>
@@ -5032,7 +5032,7 @@ app.get('/privacy', (c) => {
     table { width: 100%; border-collapse: collapse; margin: 16px 0; }
     th, td { border: 1px solid #ddd; padding: 10px 14px; font-size: 14px; text-align: left; }
     th { background: #f5f5f5; }
-    a { color: #6c5ce7; }
+    a { color: #3182F6; }
   </style>
 </head>
 <body>
@@ -5235,8 +5235,6 @@ app.get('/', (c) => {
     #pricing .btn-secondary:hover { background: #f0f0f0 !important; }
 
     #navUserAvatar { background: #000 !important; box-shadow: none !important; }
-    /* 드롭다운 자체는 어두운 배경(#1e1e35)이라 크레딧 텍스트는 밝은 색 유지 — 검정으로 바꾸면 안 보임 */
-    #ddUserCredits { color: #8FBFFB !important; }
     #userDropdownMenu button[onclick*="openChargePanel"] { background: #000 !important; }
 
     /* Hero */
@@ -5315,21 +5313,21 @@ app.get('/', (c) => {
           <span id="navUserName" style="display:none;"></span>
           <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:36px;height:36px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:15px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(49,130,246,0.4);">?</div>
           <!-- 드롭다운 -->
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:2000;">
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">
-              <div id="ddUserName" style="font-size:14px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:12px;color:#8b8ba0;margin-bottom:6px;"></div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:44px;right:0;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:6px;min-width:220px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:2000;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #E5E8EB;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:14px;font-weight:700;color:#191F28;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:12px;color:#8B95A1;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:13px;font-weight:600;color:#3182F6;"></div>
                 <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
-            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
-            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
-            <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
-            <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
         </div>
@@ -5734,7 +5732,7 @@ app.get('/dashboard', (c) => {
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
-    body { background: #0d0d1a; }
+    body { background: #F2F4F6; }
 
     .db-wrap {
       min-height: 100vh;
@@ -5742,24 +5740,24 @@ app.get('/dashboard', (c) => {
       flex-direction: column;
       align-items: center;
       padding: 48px 16px 80px;
-      background: #0d0d1a;
+      background: #F2F4F6;
     }
 
     /* ── 프로필 카드 ── */
     .db-card {
       width: 100%;
       max-width: 420px;
-      background: #16162a;
+      background: #FFFFFF;
       border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+      box-shadow: 0 4px 20px rgba(15,23,42,0.08);
       margin-bottom: 16px;
     }
 
     /* 상단 헤더 (아바타 + 이름) */
     .db-card-header {
       padding: 32px 28px 24px;
-      border-bottom: 1px solid #2a2a45;
+      border-bottom: 1px solid #E5E8EB;
       display: flex;
       align-items: center;
       gap: 16px;
@@ -5781,25 +5779,25 @@ app.get('/dashboard', (c) => {
     .db-name {
       font-size: 18px;
       font-weight: 700;
-      color: #f0f0f8;
+      color: #191F28;
       margin-bottom: 3px;
     }
     .db-email {
       font-size: 13px;
-      color: #8b8ba0;
+      color: #8B95A1;
     }
 
     /* 크레딧 행 */
     .db-credit-row {
       padding: 20px 28px;
-      border-bottom: 1px solid #2a2a45;
+      border-bottom: 1px solid #E5E8EB;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
     .db-credit-label {
       font-size: 13px;
-      color: #8b8ba0;
+      color: #8B95A1;
       margin-bottom: 4px;
     }
     .db-credit-val {
@@ -5809,7 +5807,7 @@ app.get('/dashboard', (c) => {
     }
     .db-credit-sub {
       font-size: 11px;
-      color: #8b8ba0;
+      color: #8B95A1;
       margin-top: 2px;
     }
     .db-charge-btn {
@@ -5824,7 +5822,7 @@ app.get('/dashboard', (c) => {
       transition: background 0.15s;
       flex-shrink: 0;
     }
-    .db-charge-btn:hover { background: #7c57ff; }
+    .db-charge-btn:hover { background: #1B64DA; }
 
     /* 메뉴 항목 */
     .db-menu-item {
@@ -5833,30 +5831,30 @@ app.get('/dashboard', (c) => {
       justify-content: space-between;
       padding: 18px 28px;
       cursor: pointer;
-      border-bottom: 1px solid #2a2a45;
+      border-bottom: 1px solid #E5E8EB;
       text-decoration: none;
       transition: background 0.12s;
     }
     .db-menu-item:last-child { border-bottom: none; }
-    .db-menu-item:hover { background: #1e1e35; }
+    .db-menu-item:hover { background: #F2F4F6; }
     .db-menu-label {
       font-size: 15px;
-      color: #e0e0f0;
+      color: #333D4B;
       font-weight: 500;
     }
     .db-menu-arrow {
       font-size: 18px;
-      color: #5a5a7a;
+      color: #B0B8C1;
     }
 
     /* 로그아웃 카드 */
     .db-logout-card {
       width: 100%;
       max-width: 420px;
-      background: #16162a;
+      background: #FFFFFF;
       border-radius: 20px;
       overflow: hidden;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+      box-shadow: 0 4px 20px rgba(15,23,42,0.08);
     }
     .db-logout-btn {
       display: flex;
@@ -5869,7 +5867,7 @@ app.get('/dashboard', (c) => {
       cursor: pointer;
       transition: background 0.12s;
     }
-    .db-logout-btn:hover { background: #1e1e35; }
+    .db-logout-btn:hover { background: #F2F4F6; }
     .db-logout-label {
       font-size: 20.25px;
       font-weight: 600;
@@ -5897,7 +5895,7 @@ app.get('/dashboard', (c) => {
     .db-logo-text {
       font-size: 18px;
       font-weight: 800;
-      color: #f0f0f8;
+      color: #191F28;
     }
 
     /* 생성하러 가기 버튼 */
@@ -6007,13 +6005,13 @@ app.get('/dashboard', (c) => {
   </div>
 
   <!-- 생성 내역 패널 (해시 #history) -->
-  <div id="historyPanel" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;overflow-y:auto;">
+  <div id="historyPanel" style="display:none;position:fixed;inset:0;background:#FFFFFF;z-index:500;overflow-y:auto;">
     <div style="max-width:480px;margin:0 auto;padding:24px 16px 80px;">
       <!-- 헤더 -->
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-          <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#2a2a45;border-radius:50%;color:#e0e0f0;font-size:24.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
-          <h2 style="font-size:18px;font-weight:700;color:#f0f0f8;">생성 내역</h2>
+          <button onclick="document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="width:36px;height:36px;border:none;background:#F2F4F6;border-radius:50%;color:#4E5968;font-size:24.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">‹</button>
+          <h2 style="font-size:18px;font-weight:700;color:#191F28;">생성 내역</h2>
         </div>
         <!-- 사용자 메뉴 (다른 페이지와 동일한 아바타+드롭다운) -->
         <div style="display:flex;align-items:center;gap:8px;position:relative;flex-shrink:0;">
@@ -6022,32 +6020,32 @@ app.get('/dashboard', (c) => {
             <span id="navUserCredits" style="display:none;"></span>
             <span id="navUserName" style="display:none;"></span>
             <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(49,130,246,0.4);">?</div>
-            <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:600;">
-              <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">
-                <div id="ddUserName" style="font-size:13px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
-                <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
+            <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:600;">
+              <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';document.getElementById('historyPanel').style.display='none';history.replaceState(null,'','/dashboard');" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #E5E8EB;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">
+                <div id="ddUserName" style="font-size:13px;font-weight:700;color:#191F28;margin-bottom:2px;"></div>
+                <div id="ddUserEmail" style="font-size:11px;color:#8B95A1;margin-bottom:6px;"></div>
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                   <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#3182F6;"></div>
                   <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
                 </div>
               </a>
-              <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-              <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
-              <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
-              <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
-              <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+              <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+              <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+              <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
+              <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
+              <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
               <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
             </div>
           </div>
         </div>
       </div>
       <!-- 14일 보관 안내 -->
-      <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
+      <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:8px;">
         <span style="font-size:15px;">⏰</span>
-        <span style="font-size:12px;color:#fca5a5;line-height:1.5;">이미지는 <strong>14일 동안만 보관</strong>됩니다. 제때 다운로드하시기 바랍니다.<br/>재다운로드시 크레딧은 차감되지 않습니다.</span>
+        <span style="font-size:12px;color:#B42318;line-height:1.5;">이미지는 <strong>14일 동안만 보관</strong>됩니다. 제때 다운로드하시기 바랍니다.<br/>재다운로드시 크레딧은 차감되지 않습니다.</span>
       </div>
       <div id="historyList" style="display:flex;flex-direction:column;gap:16px;">
-        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
+        <div style="text-align:center;padding:60px 20px;color:#8B95A1;font-size:14px;">
           <div style="font-size:40px;margin-bottom:12px;">🎨</div>
           생성 내역을 불러오는 중...
         </div>
@@ -6376,7 +6374,7 @@ app.get('/dashboard', (c) => {
     _loadHistoryInFlight = true;
     if (_historyPollTimer) { clearTimeout(_historyPollTimer); _historyPollTimer = null; }
     const list = document.getElementById('historyList');
-    if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#5a5a7a;">불러오는 중...</div>';
+    if (!silent) list.innerHTML = '<div style="text-align:center;padding:40px;color:#8B95A1;">불러오는 중...</div>';
     try {
       const token = localStorage.getItem('lookbook_token') || '';
       const res = await fetch('/api/generation/history', { headers: { 'X-Session-Token': token } });
@@ -6390,7 +6388,7 @@ app.get('/dashboard', (c) => {
 
       if (!logs.length) {
         if (!silent || changed) {
-          list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
+          list.innerHTML = '<div style="text-align:center;padding:60px 20px;color:#8B95A1;font-size:14px;"><div style="font-size:40px;margin-bottom:12px;">🎨</div>아직 생성 내역이 없어요.<br/>이미지를 생성해보세요!</div>';
         }
         return;
       }
@@ -6649,11 +6647,11 @@ app.get('/credits', (c) => {
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
-    body { background: #0d0d1a; }
+    body { background: #FFFFFF; }
     .cr-wrap {
       min-height: 100vh;
       padding: 48px 16px 80px;
-      background: #0d0d1a;
+      background: #FFFFFF;
     }
     .cr-inner { max-width: 480px; margin: 0 auto; }
     .cr-logo {
@@ -6670,10 +6668,10 @@ app.get('/credits', (c) => {
       display: flex; align-items: center; justify-content: center;
       font-size: 18px;
     }
-    .cr-logo-text { font-size: 18px; font-weight: 800; color: #f0f0f8; }
+    .cr-logo-text { font-size: 18px; font-weight: 800; color: #191F28; }
     .cr-back {
-      width: 36px; height: 36px; border: none; background: #2a2a45; border-radius: 50%;
-      color: #e0e0f0; font-size: 18px; cursor: pointer;
+      width: 36px; height: 36px; border: none; background: #F2F4F6; border-radius: 50%;
+      color: #4E5968; font-size: 18px; cursor: pointer;
       display: flex; align-items: center; justify-content: center; flex-shrink: 0;
       text-decoration: none;
     }
@@ -6688,25 +6686,25 @@ app.get('/credits', (c) => {
 
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
         <a href="/dashboard" class="cr-back">‹</a>
-        <h1 style="font-size:18px;font-weight:700;color:#f0f0f8;margin:0;">크레딧 상세</h1>
+        <h1 style="font-size:18px;font-weight:700;color:#191F28;margin:0;">크레딧 상세</h1>
       </div>
 
       <!-- 잔여 크레딧 -->
-      <div style="background:linear-gradient(135deg,#1e1e35,#252545);border:1px solid rgba(49,130,246,0.3);border-radius:16px;padding:16px 20px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;">
+      <div style="background:#E8F3FF;border:1px solid rgba(49,130,246,0.2);border-radius:16px;padding:16px 20px;margin:16px 0;display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-size:12px;color:#8b8ba0;margin-bottom:4px;">잔여 크레딧</div>
-          <div id="creditsPanelBalance" style="font-size:28px;font-weight:800;color:#8FBFFB;">-</div>
+          <div style="font-size:12px;color:#4E5968;margin-bottom:4px;">잔여 크레딧</div>
+          <div id="creditsPanelBalance" style="font-size:28px;font-weight:800;color:#1B64DA;">-</div>
         </div>
         <button class="db-charge-btn" onclick="openChargePanel()" style="padding:9px 20px;background:#3182F6;color:white;border:none;border-radius:24px;font-size:17.55px;font-weight:700;cursor:pointer;">충전</button>
       </div>
 
       <!-- 유효기간/환불 안내 -->
-      <div style="background:rgba(143,191,251,0.1);border:1px solid rgba(143,191,251,0.25);border-radius:10px;padding:10px 14px;margin-bottom:20px;">
-        <span style="font-size:12px;color:#c4b5fd;line-height:1.5;">충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다. 환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#8FBFFB;">환불정책</a>을 확인해주세요.</span>
+      <div style="background:#F2F4F6;border:1px solid #E5E8EB;border-radius:10px;padding:10px 14px;margin-bottom:20px;">
+        <span style="font-size:12px;color:#4E5968;line-height:1.5;">충전한 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 미사용한 크레딧은 소멸됩니다. 환불은 결제에 사용된 결제수단(카드)으로만 처리됩니다. 자세한 내용은 <a href="/terms#refund" target="_blank" style="color:#3182F6;">환불정책</a>을 확인해주세요.</span>
       </div>
 
       <div id="creditsList" style="display:flex;flex-direction:column;gap:10px;">
-        <div style="text-align:center;padding:60px 20px;color:#5a5a7a;font-size:14px;">
+        <div style="text-align:center;padding:60px 20px;color:#8B95A1;font-size:14px;">
           <div style="font-size:40px;margin-bottom:12px;">💎</div>
           크레딧 내역을 불러오는 중...
         </div>
@@ -6762,21 +6760,21 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <span id="navUserCredits" style="display:none;"></span>
           <span id="navUserName" style="display:none;"></span>
           <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:30px;height:30px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(49,130,246,0.4);">?</div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:#1e1e35;border:1px solid #3a3a60;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.6);z-index:10001;">
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #3a3a60;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">
-              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#f0f0f8;margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:11px;color:#8b8ba0;margin-bottom:6px;"></div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:10001;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #E5E8EB;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#191F28;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:#8B95A1;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
                 <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#3182F6;"></div>
                 <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
-            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">누끼컷 만들기</a>
-            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">카톡 문의</a>
-            <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#e0e0f0;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#2a2a4a'" onmouseout="this.style.background=''">서비스소개</a>
-            <div style="height:1px;background:#3a3a60;margin:4px 0;"></div>
+            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
         </div>
@@ -6981,15 +6979,15 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         <div class="gslide-scroll" style="padding-top:12px;">
           <!-- 디테일컷 결과 — 누끼컷 전용, 생성 완료 후에만 표시. 누끼컷 원본 이미지보다 위에 배치 -->
           <div id="detailCutResultsSection" style="display:none;padding:0 16px 16px;">
-            <p style="font-size:12px;font-weight:700;color:#8b8ba0;margin:0 0 10px;">디테일컷</p>
+            <p style="font-size:12px;font-weight:700;color:#8B95A1;margin:0 0 10px;">디테일컷</p>
             <div id="detailCutResultsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
           </div>
           <div class="results-grid" id="resultsGrid" style="padding:0 16px;"></div>
           <!-- 이미지 하단 ~ 버튼 상단 사이 안내 메시지 — 디테일컷 생성 완료 후에는 숨김(재생성은 원본 이미지 기준 안내라 혼동 방지) -->
           <div id="resultInfoMsg" style="padding:18px 16px 4px;text-align:center;">
-            <p style="font-size:13px;color:#8b8ba0;line-height:1.6;margin:0;">
-              <span style="color:#5B9DF7;font-weight:600;">이미지 생성은 크레딧이 차감되지 않습니다.</span><br/>
-              오류가 있거나 마음에 들지 않으면 아래 <strong style="color:#e0e0f0;">🔄 재생성</strong> 버튼을 눌러보세요.
+            <p style="font-size:13px;color:#8B95A1;line-height:1.6;margin:0;">
+              <span style="color:#1B64DA;font-weight:600;">이미지 생성은 크레딧이 차감되지 않습니다.</span><br/>
+              오류가 있거나 마음에 들지 않으면 아래 <strong style="color:#333D4B;">🔄 재생성</strong> 버튼을 눌러보세요.
             </p>
           </div>
         </div>
@@ -9400,44 +9398,44 @@ app.get('/payment/success', (c) => {
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
   <style>
-    body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }
-    .card { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid rgba(255,255,255,0.08); }
+    body { background: #F2F4F6; font-family: 'Pretendard', -apple-system, sans-serif; }
+    .card { background: #FFFFFF; border: 1px solid #E5E8EB; }
   </style>
   ${gaSnippet(c.env.GA4_MEASUREMENT_ID)}
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
   <div class="card rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
     <div id="loadingState">
-      <div class="animate-spin w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-      <p class="text-gray-300 text-sm">결제 확인 중...</p>
+      <div class="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+      <p class="text-gray-500 text-sm">결제 확인 중...</p>
     </div>
     <div id="successState" class="hidden">
-      <div class="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-        <i class="fas fa-check text-green-400 text-2xl"></i>
+      <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-check text-green-600 text-2xl"></i>
       </div>
-      <h1 class="text-white text-2xl font-bold mb-2">결제 완료!</h1>
-      <p class="text-gray-400 text-sm mb-4" id="successMsg"></p>
-      <div class="bg-black/30 rounded-xl p-4 mb-6 text-left">
+      <h1 class="text-gray-900 text-2xl font-bold mb-2">결제 완료!</h1>
+      <p class="text-gray-500 text-sm mb-4" id="successMsg"></p>
+      <div class="bg-gray-100 rounded-xl p-4 mb-6 text-left">
         <div class="flex justify-between text-sm mb-2">
-          <span class="text-gray-400">지급 크레딧</span>
-          <span class="text-purple-300 font-bold" id="creditsGranted"></span>
+          <span class="text-gray-500">지급 크레딧</span>
+          <span class="text-blue-600 font-bold" id="creditsGranted"></span>
         </div>
         <div class="flex justify-between text-sm">
-          <span class="text-gray-400">잔여 크레딧</span>
-          <span class="text-white font-semibold" id="creditsTotal"></span>
+          <span class="text-gray-500">잔여 크레딧</span>
+          <span class="text-gray-900 font-semibold" id="creditsTotal"></span>
         </div>
       </div>
-      <button onclick="goHome()" class="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl py-3 font-semibold transition-colors">
+      <button onclick="goHome()" class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-3 font-semibold transition-colors">
         <i class="fas fa-home mr-2"></i>서비스 이용하기
       </button>
     </div>
     <div id="errorState" class="hidden">
-      <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-        <i class="fas fa-times text-red-400 text-2xl"></i>
+      <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <i class="fas fa-times text-red-600 text-2xl"></i>
       </div>
-      <h1 class="text-white text-2xl font-bold mb-2">결제 확인 실패</h1>
-      <p class="text-gray-400 text-sm mb-6" id="errorMsg"></p>
-      <button onclick="goHome()" class="w-full bg-gray-700 hover:bg-gray-600 text-white rounded-xl py-3 font-semibold transition-colors">
+      <h1 class="text-gray-900 text-2xl font-bold mb-2">결제 확인 실패</h1>
+      <p class="text-gray-500 text-sm mb-6" id="errorMsg"></p>
+      <button onclick="goHome()" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-3 font-semibold transition-colors">
         홈으로 돌아가기
       </button>
     </div>
@@ -9511,18 +9509,18 @@ app.get('/payment/fail', (c) => {
   <title>결제 실패 — Studio B</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
-  <style>body { background: #0f0f0f; font-family: 'Pretendard', -apple-system, sans-serif; }</style>
+  <style>body { background: #F2F4F6; font-family: 'Pretendard', -apple-system, sans-serif; }</style>
   ${gaSnippet(c.env.GA4_MEASUREMENT_ID)}
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
-  <div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid rgba(255,255,255,0.08)" class="rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
-    <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-      <i class="fas fa-times text-red-400 text-2xl"></i>
+  <div style="background:#FFFFFF;border:1px solid #E5E8EB" class="rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+    <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <i class="fas fa-times text-red-600 text-2xl"></i>
     </div>
-    <h1 class="text-white text-2xl font-bold mb-2">결제가 취소되었습니다</h1>
-    <p class="text-gray-400 text-sm mb-2" id="errMsg"></p>
-    <p class="text-gray-500 text-xs mb-6" id="errCode"></p>
-    <button onclick="location.href='/'" class="w-full bg-gray-700 hover:bg-gray-600 text-white rounded-xl py-3 font-semibold transition-colors">
+    <h1 class="text-gray-900 text-2xl font-bold mb-2">결제가 취소되었습니다</h1>
+    <p class="text-gray-500 text-sm mb-2" id="errMsg"></p>
+    <p class="text-gray-400 text-xs mb-6" id="errCode"></p>
+    <button onclick="location.href='/'" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-3 font-semibold transition-colors">
       홈으로 돌아가기
     </button>
   </div>
