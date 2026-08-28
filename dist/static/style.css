@@ -2694,22 +2694,29 @@ footer {
 .toast {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 10px;
+  padding: 14px 18px;
   background: #191F28;
   border: none;
-  border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.28);
   width: 100%;
-  border-left: 4px solid #3182F6;
   animation: toastSlideUp 0.3s cubic-bezier(0.4,0,0.2,1);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   color: #f2f4f6;
 }
-.toast.success { border-left-color: #34d399; }
-.toast.error { border-left-color: #f87171; }
-.toast.warning { border-left-color: #fbbf24; }
-.toast button { color: rgba(255,255,255,0.5) !important; }
+.toast .toast-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: #3182F6;
+}
+.toast.success .toast-dot { background: #34d399; }
+.toast.error .toast-dot { background: #f87171; }
+.toast.warning .toast-dot { background: #fbbf24; }
+.toast button { color: rgba(255,255,255,0.4) !important; }
 @keyframes toastSlideUp {
   from { transform: translateY(100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }

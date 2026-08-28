@@ -2011,9 +2011,11 @@ app.get('/api/auth/kakao', (c) => {
     return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다.'},'*');window.close();</script>`)
   }
   // mode는 state 파라미터로 전달 (redirect_uri 변경 없이 mode 구분)
-  // scope=phone_number — 어드민에서 전화번호를 확인할 수 있도록 전화번호 동의항목을 명시적으로 요청
-  // (카카오 개발자 콘솔에서 전화번호 동의항목이 사업자 심사 승인된 상태여야 실제 값이 전달됨)
-  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}&scope=phone_number`
+  // ⚠️ scope=phone_number는 카카오 개발자 콘솔에 전화번호 동의항목이 설정/승인되지
+  // 않은 상태에서 요청하면 카카오가 KOE205("설정하지 않은 동의 항목")로 전체 로그인을
+  // 차단한다 — 실제로 이 문제로 전체 카카오 로그인이 막혔던 적이 있어 제거함.
+  // 콘솔에서 전화번호 동의항목을 설정/승인한 뒤에만 다시 추가할 것.
+  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}`
   return c.redirect(url)
 })
 
@@ -7115,7 +7117,6 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
     <div class="modal-box" style="max-width:630px;">
       <button class="modal-close" onclick="closeModal('loginModal')">×</button>
       <div style="text-align:center;margin-bottom:20px;">
-        <div style="font-size:28px;margin-bottom:8px;">✨</div>
         <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">AI 생성을 시작하려면<br/>로그인이 필요해요</h2>
         <p style="font-size:13px;color:var(--text-muted);">가입 즉시 무료 크레딧을 드려요!</p>
       </div>
@@ -7181,7 +7182,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
         </form>
       </div>
-      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 이용약관 및 개인정보처리방침에 동의합니다.</p>
+      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);text-decoration:underline;">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);text-decoration:underline;">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
   `, modeScript, generatorDescription, c.env.GA4_MEASUREMENT_ID))
