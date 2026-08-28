@@ -7115,7 +7115,6 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
     <div class="modal-box" style="max-width:630px;">
       <button class="modal-close" onclick="closeModal('loginModal')">×</button>
       <div style="text-align:center;margin-bottom:20px;">
-        <div style="font-size:28px;margin-bottom:8px;">✨</div>
         <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">AI 생성을 시작하려면<br/>로그인이 필요해요</h2>
         <p style="font-size:13px;color:var(--text-muted);">가입 즉시 무료 크레딧을 드려요!</p>
       </div>
@@ -7181,7 +7180,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
         </form>
       </div>
-      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 이용약관 및 개인정보처리방침에 동의합니다.</p>
+      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);text-decoration:underline;">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);text-decoration:underline;">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
   `, modeScript, generatorDescription, c.env.GA4_MEASUREMENT_ID))
