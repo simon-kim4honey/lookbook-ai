@@ -2011,9 +2011,11 @@ app.get('/api/auth/kakao', (c) => {
     return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다.'},'*');window.close();</script>`)
   }
   // mode는 state 파라미터로 전달 (redirect_uri 변경 없이 mode 구분)
-  // scope=phone_number — 어드민에서 전화번호를 확인할 수 있도록 전화번호 동의항목을 명시적으로 요청
-  // (카카오 개발자 콘솔에서 전화번호 동의항목이 사업자 심사 승인된 상태여야 실제 값이 전달됨)
-  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}&scope=phone_number`
+  // ⚠️ scope=phone_number는 카카오 개발자 콘솔에 전화번호 동의항목이 설정/승인되지
+  // 않은 상태에서 요청하면 카카오가 KOE205("설정하지 않은 동의 항목")로 전체 로그인을
+  // 차단한다 — 실제로 이 문제로 전체 카카오 로그인이 막혔던 적이 있어 제거함.
+  // 콘솔에서 전화번호 동의항목을 설정/승인한 뒤에만 다시 추가할 것.
+  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}`
   return c.redirect(url)
 })
 
