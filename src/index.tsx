@@ -6080,7 +6080,7 @@ app.get('/dashboard', (c) => {
   <div class="generating-view" id="videoGeneratingView" style="position:fixed;z-index:10500;">
     <div class="gen-news-tag" id="videoGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
     <div class="gen-news" id="videoGenViewNews" style="display:none;"></div>
-    <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 영상을 생성 중입니다...</h2>
+    <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#191F28;">AI가 영상을 생성 중입니다...</h2>
     <div class="gen-progress-bar"><div class="gen-progress-fill" id="videoGenProgressFill" style="width:0%"></div></div>
     <div class="gen-status-text" id="videoGenStatusText">시작 중...</div>
     <div class="gen-status-msgs">
@@ -6926,7 +6926,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         </div>
         <!-- 생성 중 오버레이 (step-3 내부) -->
         <div class="generating-view" id="generatingView">
-          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 이미지를 생성 중입니다...</h2>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#191F28;">AI가 이미지를 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="genStatusText" data-i18n="gen-status-init" style="display:none;">시작 중...</div>
           <div class="gen-status-msgs">
@@ -6955,7 +6955,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         <div class="generating-view" id="videoGeneratingView">
           <div class="gen-news-tag" id="videoGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
           <div class="gen-news" id="videoGenViewNews" style="display:none;"></div>
-          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 영상을 생성 중입니다...</h2>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#191F28;">AI가 영상을 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="videoGenProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="videoGenStatusText">시작 중...</div>
           <div class="gen-status-msgs">
@@ -6970,7 +6970,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         <div class="generating-view" id="detailCutGeneratingView">
           <div class="gen-news-tag" id="detailCutGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
           <div class="gen-news" id="detailCutGenViewNews" style="display:none;"></div>
-          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#fff;">AI가 디테일컷을 생성 중입니다...</h2>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#191F28;">AI가 디테일컷을 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="detailCutGenProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="detailCutGenStatusText">시작 중...</div>
           <div class="gen-status-msgs">
