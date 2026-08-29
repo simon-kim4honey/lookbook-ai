@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtdoqzdw`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtdp27yu`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1859,7 +1859,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               <div class="hist-body">
                 <div class="hist-meta">#\${seqLabel} · \${dateStr} · 만료됨</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -1873,7 +1873,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
                   <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
                   <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
                   <div class="hist-actions">
-                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                   </div>
                 </div>
               </div>\`);
@@ -1887,7 +1887,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
                 <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
                 <div class="hist-meta-sub">영상을 생성하는 중입니다...</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -1910,9 +1910,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             <div class="hist-body">
               <div class="hist-meta">#\${seqLabel} · \${dateStr} · \${expLabel || ''} · 영상</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal(\${vHistModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')"><i class="fas fa-download"></i> 다운로드</button>
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${vHistModalArgs})" aria-label="다시보기" title="다시보기"><i class="fas fa-eye"></i></button>
+                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')" aria-label="다운로드" title="다운로드"><i class="fas fa-download"></i></button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -1933,7 +1933,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               <div class="hist-meta">#\${seqLabel} · \${dateStr}</div>
               <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
               <div class="hist-actions">
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -1961,7 +1961,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               <div class="hist-body">
                 <div class="hist-meta">#\${rowSeq} · \${dateStr} · 만료됨</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -1980,9 +1980,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             <div class="hist-body">
               <div class="hist-meta">#\${rowSeq} · \${dateStr} · \${expLabel || ''}</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)"><i class="fas fa-download"></i> \${dlLabel}</button>
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})" aria-label="다시보기" title="다시보기"><i class="fas fa-eye"></i></button>
+                <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)" aria-label="\${dlLabel}" title="\${dlLabel}"><i class="fas fa-download"></i></button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);

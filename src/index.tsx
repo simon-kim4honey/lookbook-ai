@@ -6413,7 +6413,7 @@ app.get('/dashboard', (c) => {
               <div class="hist-body">
                 <div class="hist-meta">#\${seqLabel} · \${dateStr} · 만료됨</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -6427,7 +6427,7 @@ app.get('/dashboard', (c) => {
                   <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
                   <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
                   <div class="hist-actions">
-                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                   </div>
                 </div>
               </div>\`);
@@ -6441,7 +6441,7 @@ app.get('/dashboard', (c) => {
                 <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
                 <div class="hist-meta-sub">영상을 생성하는 중입니다...</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -6464,9 +6464,9 @@ app.get('/dashboard', (c) => {
             <div class="hist-body">
               <div class="hist-meta">#\${seqLabel} · \${dateStr} · \${expLabel || ''} · 영상</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal(\${vHistModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')"><i class="fas fa-download"></i> 다운로드</button>
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${vHistModalArgs})" aria-label="다시보기" title="다시보기"><i class="fas fa-eye"></i></button>
+                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')" aria-label="다운로드" title="다운로드"><i class="fas fa-download"></i></button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -6487,7 +6487,7 @@ app.get('/dashboard', (c) => {
               <div class="hist-meta">#\${seqLabel} · \${dateStr}</div>
               <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
               <div class="hist-actions">
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -6515,7 +6515,7 @@ app.get('/dashboard', (c) => {
               <div class="hist-body">
                 <div class="hist-meta">#\${rowSeq} · \${dateStr} · 만료됨</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -6534,9 +6534,9 @@ app.get('/dashboard', (c) => {
             <div class="hist-body">
               <div class="hist-meta">#\${rowSeq} · \${dateStr} · \${expLabel || ''}</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)"><i class="fas fa-download"></i> \${dlLabel}</button>
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})" aria-label="다시보기" title="다시보기"><i class="fas fa-eye"></i></button>
+                <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)" aria-label="\${dlLabel}" title="\${dlLabel}"><i class="fas fa-download"></i></button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
