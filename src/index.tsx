@@ -2394,6 +2394,27 @@ app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
   }
 })
 
+// GET /api/admin/users/:id/credit-events — 관리자용 회원별 크레딧 이벤트(세부) 내역 (10건씩 페이지네이션)
+// 생성 단위(job)로 묶인 사용내역과 달리, 크레딧이 오갈 때마다(다운로드 1건당, 영상 생성,
+// 결제, 환불, 관리자 지급 등) 남는 원장(ledger)을 그대로 노출한다 — 정확한 시각까지 확인 가능.
+app.get('/api/admin/users/:id/credit-events', adminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const id = c.req.param('id')
+    const page = Math.max(1, parseInt(c.req.query('page') || '1'))
+    const limit = Math.max(1, parseInt(c.req.query('limit') || '10'))
+    const offset = (page - 1) * limit
+    const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM credit_logs WHERE user_id = ?`).bind(id).first()
+    const events = await db.prepare(
+      `SELECT id, type, amount, balance, reason, ref_id, created_at
+       FROM credit_logs WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`
+    ).bind(id, limit, offset).all()
+    return c.json({ success: true, events: events.results, total: total?.cnt || 0, page, limit })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 // PATCH /api/admin/users/:id — 회원 상태/크레딧/역할 수정
 app.patch('/api/admin/users/:id', adminAuth, async (c) => {
   try {
@@ -7703,7 +7724,11 @@ app.get('/admin02', (c) => {
 
       <div style="font-size:13px;font-weight:700;color:#e0e0f0;margin-bottom:8px;">🖼️ 사용내역(생성)</div>
       <div id="userDetailGenerations">불러오는 중...</div>
-      <div id="userDetailGenerationsPagination" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:10px;"></div>
+      <div id="userDetailGenerationsPagination" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:10px;margin-bottom:24px;"></div>
+
+      <div style="font-size:13px;font-weight:700;color:#e0e0f0;margin-bottom:8px;">📋 크레딧 이벤트 내역</div>
+      <div id="userDetailCreditEvents">불러오는 중...</div>
+      <div id="userDetailCreditEventsPagination" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:10px;"></div>
     </div>
   </div>
 
@@ -8360,6 +8385,21 @@ const USER_DETAIL_LOGS_PER_PAGE = 10
 let _userDetailId = null
 let _userDetailPaymentsPage = 1
 let _userDetailGenerationsPage = 1
+let _userDetailCreditEventsPage = 1
+
+// credit_logs.reason 코드 → 관리자 화면 표시 라벨 (사용자 대시보드의 CREDIT_REASON_LABEL과 동일한 매핑)
+const ADMIN_CREDIT_REASON_LABEL = {
+  payment:                 '크레딧 충전',
+  signup_bonus:            '가입 축하 크레딧',
+  admin_grant:             '관리자 지급',
+  admin_set:               '관리자 조정',
+  image_download:          '이미지 다운로드',
+  video_generation:        '2K 영상 생성',
+  video_generation_failed: '영상 생성 실패 환불',
+  payment_refund:          '결제 환불',
+  payment_cancel:          '결제 취소 회수',
+  payment_cancel_manual:   '결제 취소 회수',
+}
 
 // 결제내역/사용내역 공용 페이지네이션 렌더러 — 회원 목록의 renderUserPagination과 동일한 스타일
 function _renderDetailPagination(containerId, total, page, limit, gotoFnName) {
@@ -8447,6 +8487,38 @@ async function loadUserDetailGenerations(page) {
   }
 }
 
+async function loadUserDetailCreditEvents(page) {
+  _userDetailCreditEventsPage = page || 1
+  const id = _userDetailId
+  if (!id) return
+  document.getElementById('userDetailCreditEvents').innerHTML = '불러오는 중...'
+  try {
+    const params = new URLSearchParams({ page: _userDetailCreditEventsPage, limit: USER_DETAIL_LOGS_PER_PAGE })
+    const res = await fetch('/api/admin/users/' + id + '/credit-events?' + params.toString(), { headers: {'X-Admin-Password':adminPassword} })
+    const data = await res.json()
+    const list = (data.success && data.events) ? data.events : []
+    document.getElementById('userDetailCreditEvents').innerHTML = list.length
+      ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(ev) {
+          var dateStr = ev.created_at ? ev.created_at.slice(0,19).replace('T',' ') : '-'
+          var label = ADMIN_CREDIT_REASON_LABEL[ev.reason] || ev.reason || '크레딧 변동'
+          var isPositive = ev.amount > 0
+          var amountColor = isPositive ? '#4ade80' : '#f87171'
+          return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
+            + '<div><div>' + dateStr + ' · ' + escHtml(label) + '</div>'
+            + (ev.ref_id ? '<div style="color:#5a5a7a;margin-top:2px;">ref: ' + escHtml(ev.ref_id) + '</div>' : '') + '</div>'
+            + '<div style="text-align:right;flex-shrink:0;">'
+            + '<div style="color:' + amountColor + ';font-weight:700;">' + (isPositive ? '+' : '') + ev.amount.toLocaleString() + '</div>'
+            + '<div style="color:#5a5a7a;margin-top:2px;">잔액 ' + ev.balance.toLocaleString() + '</div>'
+            + '</div>'
+            + '</div>'
+        }).join('') + '</div>'
+      : '<div style="font-size:12px;color:#8b8ba0;">크레딧 이벤트가 없습니다.</div>'
+    _renderDetailPagination('userDetailCreditEventsPagination', data.total || 0, data.page || _userDetailCreditEventsPage, data.limit || USER_DETAIL_LOGS_PER_PAGE, 'loadUserDetailCreditEvents')
+  } catch(e) {
+    document.getElementById('userDetailCreditEvents').innerHTML = '<div style="font-size:12px;color:#ef4444;">불러오기 실패</div>'
+  }
+}
+
 async function openUserDetail(id, name) {
   document.getElementById('userDetailName').textContent = '👤 ' + (name || '회원 상세')
   const u = allUsers.find(function(x) { return String(x.id) === String(id) })
@@ -8471,12 +8543,15 @@ async function openUserDetail(id, name) {
   _userDetailId = id
   document.getElementById('userDetailPayments').innerHTML = '불러오는 중...'
   document.getElementById('userDetailGenerations').innerHTML = '불러오는 중...'
+  document.getElementById('userDetailCreditEvents').innerHTML = '불러오는 중...'
   document.getElementById('userDetailPaymentsPagination').innerHTML = ''
   document.getElementById('userDetailGenerationsPagination').innerHTML = ''
+  document.getElementById('userDetailCreditEventsPagination').innerHTML = ''
   openModal('userDetailModal')
 
   loadUserDetailPayments(1)
   loadUserDetailGenerations(1)
+  loadUserDetailCreditEvents(1)
 }
 
 function showAdminToast(msg, type) {

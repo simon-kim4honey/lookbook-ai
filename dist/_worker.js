@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtf5kpyu`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtf5ykpi`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -249,7 +249,8 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
 <\/script>
 </body></html>`)}catch(e){return console.error(`google callback error:`,e),o(e.message||`로그인 오류`)}}),V.get(`/api/admin/users`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=parseInt(e.req.query(`page`)||`1`),r=parseInt(e.req.query(`limit`)||`50`),i=e.req.query(`search`)||``,a=e.req.query(`status`)||``,o=(n-1)*r,s=`WHERE 1=1`,l=[];i&&(s+=` AND (name LIKE ? OR email LIKE ?)`,l.push(`%${i}%`,`%${i}%`)),a&&(s+=` AND status = ?`,l.push(a));let u=await t.prepare(`SELECT COUNT(*) as cnt FROM users ${s}`).bind(...l).first(),d=await t.prepare(`SELECT id, name, email, provider, provider_id, avatar_url, phone_number, status, credits, role, referrer, last_login_at, created_at FROM users ${s} ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(...l,r,o).all();return e.json({success:!0,users:d.results,total:u?.cnt||0,page:n,limit:r})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/users/:id`,W,async e=>{try{let t=await e.env.LOOKBOOK_DB.prepare(`SELECT id, name, email, provider, provider_id, avatar_url, phone_number, status, credits, role, referrer, last_login_at, created_at FROM users WHERE id = ?`).bind(e.req.param(`id`)).first();return t?e.json({success:!0,user:t}):e.json({success:!1,message:`존재하지 않는 사용자입니다.`},404)}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/users/:id/payments`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=Math.max(1,parseInt(e.req.query(`page`)||`1`)),i=Math.max(1,parseInt(e.req.query(`limit`)||`10`)),a=(r-1)*i,o=await t.prepare(`SELECT COUNT(*) as cnt FROM payment_logs WHERE user_id = ?`).bind(n).first(),s=await t.prepare(`SELECT order_id, amount, credits, status, pg_provider, currency, pg_method, created_at, paid_at
        FROM payment_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(n,i,a).all();return e.json({success:!0,payments:s.results,total:o?.cnt||0,page:r,limit:i})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/users/:id/generations`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=Math.max(1,parseInt(e.req.query(`page`)||`1`)),i=Math.max(1,parseInt(e.req.query(`limit`)||`10`)),a=(r-1)*i,o=await t.prepare(`SELECT COUNT(*) as cnt FROM generation_logs WHERE user_id = ?`).bind(n).first(),s=await t.prepare(`SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, image_urls, expires_at, created_at
-       FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(n,i,a).all(),l=Date.now(),u=(s.results||[]).map(e=>{let t=!e.expires_at||new Date(String(e.expires_at).replace(` `,`T`)+`Z`).getTime()<l;return{id:e.id,job_id:e.job_id,image_count:e.image_count,model_name:e.model_name,bg_name:e.bg_name,kind:e.kind,created_at:e.created_at,expires_at:e.expires_at,expired:t,video_url:t?null:e.video_url,image_urls:t?null:e.image_urls}});return e.json({success:!0,generations:u,total:o?.cnt||0,page:r,limit:i})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.patch(`/api/admin/users/:id`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await e.req.json(),r=e.req.param(`id`),i=[],a=[];if(n.status!==void 0&&(i.push(`status = ?`),a.push(n.status)),n.role!==void 0&&(i.push(`role = ?`),a.push(n.role)),n.add_credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.add_credits),l=Math.max(0,o+s);return i.push(`credits = ?`),a.push(l),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(n,i,a).all(),l=Date.now(),u=(s.results||[]).map(e=>{let t=!e.expires_at||new Date(String(e.expires_at).replace(` `,`T`)+`Z`).getTime()<l;return{id:e.id,job_id:e.job_id,image_count:e.image_count,model_name:e.model_name,bg_name:e.bg_name,kind:e.kind,created_at:e.created_at,expires_at:e.expires_at,expired:t,video_url:t?null:e.video_url,image_urls:t?null:e.image_urls}});return e.json({success:!0,generations:u,total:o?.cnt||0,page:r,limit:i})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/users/:id/credit-events`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=Math.max(1,parseInt(e.req.query(`page`)||`1`)),i=Math.max(1,parseInt(e.req.query(`limit`)||`10`)),a=(r-1)*i,o=await t.prepare(`SELECT COUNT(*) as cnt FROM credit_logs WHERE user_id = ?`).bind(n).first(),s=await t.prepare(`SELECT id, type, amount, balance, reason, ref_id, created_at
+       FROM credit_logs WHERE user_id = ? ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`).bind(n,i,a).all();return e.json({success:!0,events:s.results,total:o?.cnt||0,page:r,limit:i})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.patch(`/api/admin/users/:id`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await e.req.json(),r=e.req.param(`id`),i=[],a=[];if(n.status!==void 0&&(i.push(`status = ?`),a.push(n.status)),n.role!==void 0&&(i.push(`role = ?`),a.push(n.role)),n.add_credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.add_credits),l=Math.max(0,o+s);return i.push(`credits = ?`),a.push(l),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
          VALUES (?, 'grant', ?, ?, 'admin_grant', ?)`).bind(r,s,l,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:l})}if(n.credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.credits),l=s-o;return i.push(`credits = ?`),a.push(s),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),l!==0&&await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
            VALUES (?, ?, ?, ?, 'admin_set', ?)`).bind(r,l>0?`grant`:`deduct`,l,s,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:s})}return i.length===0?e.json({success:!1,message:`변경할 항목이 없습니다.`},400):(i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0}))}catch(t){return e.json({success:!1,message:t.message},500)}}),V.delete(`/api/admin/users/:id`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`);return await t.prepare(`UPDATE users SET status = 'deleted', updated_at = datetime('now') WHERE id = ?`).bind(n).run(),await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(n).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/stats`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status != 'deleted'`).first(),r=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'active'`).first(),i=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'suspended'`).first(),a=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE date(created_at) = date('now') AND status != 'deleted'`).first(),o=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'kakao' AND status = 'active'`).first(),s=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'google' AND status = 'active'`).first(),l=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'email' AND status = 'active'`).first();return e.json({success:!0,stats:{total:n?.cnt||0,active:r?.cnt||0,suspended:i?.cnt||0,today:a?.cnt||0,by_provider:{kakao:o?.cnt||0,google:s?.cnt||0,email:l?.cnt||0}}})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/credits/history`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`},401);let r=await t.prepare(`SELECT s.user_id, u.credits FROM user_sessions s
        JOIN users u ON u.id = s.user_id
@@ -3104,7 +3105,11 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 
       <div style="font-size:13px;font-weight:700;color:#e0e0f0;margin-bottom:8px;">🖼️ 사용내역(생성)</div>
       <div id="userDetailGenerations">불러오는 중...</div>
-      <div id="userDetailGenerationsPagination" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:10px;"></div>
+      <div id="userDetailGenerationsPagination" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:10px;margin-bottom:24px;"></div>
+
+      <div style="font-size:13px;font-weight:700;color:#e0e0f0;margin-bottom:8px;">📋 크레딧 이벤트 내역</div>
+      <div id="userDetailCreditEvents">불러오는 중...</div>
+      <div id="userDetailCreditEventsPagination" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:10px;"></div>
     </div>
   </div>
 
@@ -3761,6 +3766,21 @@ const USER_DETAIL_LOGS_PER_PAGE = 10
 let _userDetailId = null
 let _userDetailPaymentsPage = 1
 let _userDetailGenerationsPage = 1
+let _userDetailCreditEventsPage = 1
+
+// credit_logs.reason 코드 → 관리자 화면 표시 라벨 (사용자 대시보드의 CREDIT_REASON_LABEL과 동일한 매핑)
+const ADMIN_CREDIT_REASON_LABEL = {
+  payment:                 '크레딧 충전',
+  signup_bonus:            '가입 축하 크레딧',
+  admin_grant:             '관리자 지급',
+  admin_set:               '관리자 조정',
+  image_download:          '이미지 다운로드',
+  video_generation:        '2K 영상 생성',
+  video_generation_failed: '영상 생성 실패 환불',
+  payment_refund:          '결제 환불',
+  payment_cancel:          '결제 취소 회수',
+  payment_cancel_manual:   '결제 취소 회수',
+}
 
 // 결제내역/사용내역 공용 페이지네이션 렌더러 — 회원 목록의 renderUserPagination과 동일한 스타일
 function _renderDetailPagination(containerId, total, page, limit, gotoFnName) {
@@ -3848,6 +3868,38 @@ async function loadUserDetailGenerations(page) {
   }
 }
 
+async function loadUserDetailCreditEvents(page) {
+  _userDetailCreditEventsPage = page || 1
+  const id = _userDetailId
+  if (!id) return
+  document.getElementById('userDetailCreditEvents').innerHTML = '불러오는 중...'
+  try {
+    const params = new URLSearchParams({ page: _userDetailCreditEventsPage, limit: USER_DETAIL_LOGS_PER_PAGE })
+    const res = await fetch('/api/admin/users/' + id + '/credit-events?' + params.toString(), { headers: {'X-Admin-Password':adminPassword} })
+    const data = await res.json()
+    const list = (data.success && data.events) ? data.events : []
+    document.getElementById('userDetailCreditEvents').innerHTML = list.length
+      ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(ev) {
+          var dateStr = ev.created_at ? ev.created_at.slice(0,19).replace('T',' ') : '-'
+          var label = ADMIN_CREDIT_REASON_LABEL[ev.reason] || ev.reason || '크레딧 변동'
+          var isPositive = ev.amount > 0
+          var amountColor = isPositive ? '#4ade80' : '#f87171'
+          return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
+            + '<div><div>' + dateStr + ' · ' + escHtml(label) + '</div>'
+            + (ev.ref_id ? '<div style="color:#5a5a7a;margin-top:2px;">ref: ' + escHtml(ev.ref_id) + '</div>' : '') + '</div>'
+            + '<div style="text-align:right;flex-shrink:0;">'
+            + '<div style="color:' + amountColor + ';font-weight:700;">' + (isPositive ? '+' : '') + ev.amount.toLocaleString() + '</div>'
+            + '<div style="color:#5a5a7a;margin-top:2px;">잔액 ' + ev.balance.toLocaleString() + '</div>'
+            + '</div>'
+            + '</div>'
+        }).join('') + '</div>'
+      : '<div style="font-size:12px;color:#8b8ba0;">크레딧 이벤트가 없습니다.</div>'
+    _renderDetailPagination('userDetailCreditEventsPagination', data.total || 0, data.page || _userDetailCreditEventsPage, data.limit || USER_DETAIL_LOGS_PER_PAGE, 'loadUserDetailCreditEvents')
+  } catch(e) {
+    document.getElementById('userDetailCreditEvents').innerHTML = '<div style="font-size:12px;color:#ef4444;">불러오기 실패</div>'
+  }
+}
+
 async function openUserDetail(id, name) {
   document.getElementById('userDetailName').textContent = '👤 ' + (name || '회원 상세')
   const u = allUsers.find(function(x) { return String(x.id) === String(id) })
@@ -3872,12 +3924,15 @@ async function openUserDetail(id, name) {
   _userDetailId = id
   document.getElementById('userDetailPayments').innerHTML = '불러오는 중...'
   document.getElementById('userDetailGenerations').innerHTML = '불러오는 중...'
+  document.getElementById('userDetailCreditEvents').innerHTML = '불러오는 중...'
   document.getElementById('userDetailPaymentsPagination').innerHTML = ''
   document.getElementById('userDetailGenerationsPagination').innerHTML = ''
+  document.getElementById('userDetailCreditEventsPagination').innerHTML = ''
   openModal('userDetailModal')
 
   loadUserDetailPayments(1)
   loadUserDetailGenerations(1)
+  loadUserDetailCreditEvents(1)
 }
 
 function showAdminToast(msg, type) {
