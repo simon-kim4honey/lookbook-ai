@@ -8467,7 +8467,7 @@ async function loadUserDetailGenerations(page) {
             var thumbSrc = urls[0] || null
             var linkUrl = g.kind === 'video' ? g.video_url : thumbSrc
             thumbHtml = thumbSrc
-              ? '<a href="/api/proxy/gen-image?url=' + encodeURIComponent(linkUrl || thumbSrc) + '&download=1" target="_blank" rel="noopener">'
+              ? '<a href="/api/proxy/gen-image?url=' + encodeURIComponent(linkUrl || thumbSrc) + '" target="_blank" rel="noopener">'
                 + '<img src="/api/proxy/gen-image?url=' + encodeURIComponent(thumbSrc) + '" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0;display:block;" />'
                 + '</a>'
               : '<div style="width:44px;height:44px;border-radius:6px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">' + (g.kind === 'video' ? '🎬' : '🖼️') + '</div>'
