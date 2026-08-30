@@ -2361,6 +2361,10 @@ app.get('/api/admin/users/:id/payments', adminAuth, async (c) => {
 })
 
 // GET /api/admin/users/:id/generations — 관리자용 회원별 생성(사용) 내역 (10건씩 페이지네이션)
+// 생성된 이미지/영상은 사용자와 동일하게 생성일로부터 14일까지만 노출한다 — 원본 파일은
+// Atlas Cloud(외부 AI 생성사)가 호스팅하며 이 서비스가 별도로 저장/보관하지 않으므로,
+// 14일이 지난 URL은 만료되어 깨진 이미지로 뜰 수 있다. 그 이후에는 생성 기록(모델/배경/수량
+// 등 메타데이터)만 남기고 image_urls/video_url은 응답에서 제외한다.
 app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
   try {
     const db = c.env.LOOKBOOK_DB
@@ -2370,10 +2374,21 @@ app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
     const offset = (page - 1) * limit
     const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM generation_logs WHERE user_id = ?`).bind(id).first()
     const generations = await db.prepare(
-      `SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, created_at
+      `SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, image_urls, expires_at, created_at
        FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`
     ).bind(id, limit, offset).all()
-    return c.json({ success: true, generations: generations.results, total: total?.cnt || 0, page, limit })
+    const now = Date.now()
+    const results = (generations.results || []).map((g: any) => {
+      const expired = !g.expires_at || new Date(String(g.expires_at).replace(' ', 'T') + 'Z').getTime() < now
+      return {
+        id: g.id, job_id: g.job_id, image_count: g.image_count,
+        model_name: g.model_name, bg_name: g.bg_name, kind: g.kind, created_at: g.created_at,
+        expires_at: g.expires_at, expired,
+        video_url: expired ? null : g.video_url,
+        image_urls: expired ? null : g.image_urls,
+      }
+    })
+    return c.json({ success: true, generations: results, total: total?.cnt || 0, page, limit })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -6413,7 +6428,7 @@ app.get('/dashboard', (c) => {
               <div class="hist-body">
                 <div class="hist-meta">#\${seqLabel} · \${dateStr} · 만료됨</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -6427,7 +6442,7 @@ app.get('/dashboard', (c) => {
                   <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
                   <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
                   <div class="hist-actions">
-                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                   </div>
                 </div>
               </div>\`);
@@ -6441,7 +6456,7 @@ app.get('/dashboard', (c) => {
                 <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
                 <div class="hist-meta-sub">영상을 생성하는 중입니다...</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -6464,9 +6479,9 @@ app.get('/dashboard', (c) => {
             <div class="hist-body">
               <div class="hist-meta">#\${seqLabel} · \${dateStr} · \${expLabel || ''} · 영상</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal(\${vHistModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')"><i class="fas fa-download"></i> 다운로드</button>
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${vHistModalArgs})" aria-label="다시보기" title="다시보기"><i class="fas fa-eye"></i></button>
+                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')" aria-label="다운로드" title="다운로드"><i class="fas fa-download"></i></button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -6487,7 +6502,7 @@ app.get('/dashboard', (c) => {
               <div class="hist-meta">#\${seqLabel} · \${dateStr}</div>
               <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
               <div class="hist-actions">
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -6515,7 +6530,7 @@ app.get('/dashboard', (c) => {
               <div class="hist-body">
                 <div class="hist-meta">#\${rowSeq} · \${dateStr} · 만료됨</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -6534,9 +6549,9 @@ app.get('/dashboard', (c) => {
             <div class="hist-body">
               <div class="hist-meta">#\${rowSeq} · \${dateStr} · \${expLabel || ''}</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)"><i class="fas fa-download"></i> \${dlLabel}</button>
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})" aria-label="다시보기" title="다시보기"><i class="fas fa-eye"></i></button>
+                <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)" aria-label="\${dlLabel}" title="\${dlLabel}"><i class="fas fa-download"></i></button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -8400,9 +8415,29 @@ async function loadUserDetailGenerations(page) {
     const list = (data.success && data.generations) ? data.generations : []
     document.getElementById('userDetailGenerations').innerHTML = list.length
       ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(g) {
-          return '<div style="display:flex;justify-content:space-between;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
-            + '<span>' + (g.created_at ? g.created_at.slice(0,16).replace('T',' ') : '-') + ' · ' + (g.kind === 'video' ? '🎬 영상' : '🖼️ 이미지') + '</span>'
-            + '<span>' + (g.model_name || '-') + ' / ' + (g.bg_name || '-') + (g.image_count ? (' · ' + g.image_count + '장') : '') + '</span>'
+          var dateStr = g.created_at ? g.created_at.slice(0,16).replace('T',' ') : '-'
+          var kindLabel = g.kind === 'video' ? '🎬 영상' : '🖼️ 이미지'
+          var metaLine = (g.model_name || '-') + ' / ' + (g.bg_name || '-') + (g.image_count ? (' · ' + g.image_count + '장') : '')
+          var thumbHtml
+          if (g.expired) {
+            thumbHtml = '<div style="width:44px;height:44px;border-radius:6px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">⏱️</div>'
+          } else {
+            var urls = []
+            try { urls = g.image_urls ? JSON.parse(g.image_urls) : [] } catch(e) {}
+            var thumbSrc = urls[0] || null
+            var linkUrl = g.kind === 'video' ? g.video_url : thumbSrc
+            thumbHtml = thumbSrc
+              ? '<a href="/api/proxy/gen-image?url=' + encodeURIComponent(linkUrl || thumbSrc) + '&download=1" target="_blank" rel="noopener">'
+                + '<img src="/api/proxy/gen-image?url=' + encodeURIComponent(thumbSrc) + '" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0;display:block;" />'
+                + '</a>'
+              : '<div style="width:44px;height:44px;border-radius:6px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">' + (g.kind === 'video' ? '🎬' : '🖼️') + '</div>'
+          }
+          return '<div style="display:flex;align-items:center;gap:10px;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
+            + thumbHtml
+            + '<div style="flex:1;min-width:0;">'
+            + '<div>' + dateStr + ' · ' + kindLabel + (g.expired ? ' · <span style="color:#f59e0b;">보관 만료(14일)</span>' : '') + '</div>'
+            + '<div style="color:#8b8ba0;margin-top:2px;">' + metaLine + '</div>'
+            + '</div>'
             + '</div>'
         }).join('') + '</div>'
       : '<div style="font-size:12px;color:#8b8ba0;">사용 내역이 없습니다.</div>'

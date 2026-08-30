@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtdov7hn`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtf5pfqp`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -248,8 +248,8 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
 })();
 <\/script>
 </body></html>`)}catch(e){return console.error(`google callback error:`,e),o(e.message||`로그인 오류`)}}),V.get(`/api/admin/users`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=parseInt(e.req.query(`page`)||`1`),r=parseInt(e.req.query(`limit`)||`50`),i=e.req.query(`search`)||``,a=e.req.query(`status`)||``,o=(n-1)*r,s=`WHERE 1=1`,l=[];i&&(s+=` AND (name LIKE ? OR email LIKE ?)`,l.push(`%${i}%`,`%${i}%`)),a&&(s+=` AND status = ?`,l.push(a));let u=await t.prepare(`SELECT COUNT(*) as cnt FROM users ${s}`).bind(...l).first(),d=await t.prepare(`SELECT id, name, email, provider, provider_id, avatar_url, phone_number, status, credits, role, referrer, last_login_at, created_at FROM users ${s} ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(...l,r,o).all();return e.json({success:!0,users:d.results,total:u?.cnt||0,page:n,limit:r})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/users/:id`,W,async e=>{try{let t=await e.env.LOOKBOOK_DB.prepare(`SELECT id, name, email, provider, provider_id, avatar_url, phone_number, status, credits, role, referrer, last_login_at, created_at FROM users WHERE id = ?`).bind(e.req.param(`id`)).first();return t?e.json({success:!0,user:t}):e.json({success:!1,message:`존재하지 않는 사용자입니다.`},404)}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/users/:id/payments`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=Math.max(1,parseInt(e.req.query(`page`)||`1`)),i=Math.max(1,parseInt(e.req.query(`limit`)||`10`)),a=(r-1)*i,o=await t.prepare(`SELECT COUNT(*) as cnt FROM payment_logs WHERE user_id = ?`).bind(n).first(),s=await t.prepare(`SELECT order_id, amount, credits, status, pg_provider, currency, pg_method, created_at, paid_at
-       FROM payment_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(n,i,a).all();return e.json({success:!0,payments:s.results,total:o?.cnt||0,page:r,limit:i})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/users/:id/generations`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=Math.max(1,parseInt(e.req.query(`page`)||`1`)),i=Math.max(1,parseInt(e.req.query(`limit`)||`10`)),a=(r-1)*i,o=await t.prepare(`SELECT COUNT(*) as cnt FROM generation_logs WHERE user_id = ?`).bind(n).first(),s=await t.prepare(`SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, created_at
-       FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(n,i,a).all();return e.json({success:!0,generations:s.results,total:o?.cnt||0,page:r,limit:i})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.patch(`/api/admin/users/:id`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await e.req.json(),r=e.req.param(`id`),i=[],a=[];if(n.status!==void 0&&(i.push(`status = ?`),a.push(n.status)),n.role!==void 0&&(i.push(`role = ?`),a.push(n.role)),n.add_credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.add_credits),l=Math.max(0,o+s);return i.push(`credits = ?`),a.push(l),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       FROM payment_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(n,i,a).all();return e.json({success:!0,payments:s.results,total:o?.cnt||0,page:r,limit:i})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/users/:id/generations`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=Math.max(1,parseInt(e.req.query(`page`)||`1`)),i=Math.max(1,parseInt(e.req.query(`limit`)||`10`)),a=(r-1)*i,o=await t.prepare(`SELECT COUNT(*) as cnt FROM generation_logs WHERE user_id = ?`).bind(n).first(),s=await t.prepare(`SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, image_urls, expires_at, created_at
+       FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`).bind(n,i,a).all(),l=Date.now(),u=(s.results||[]).map(e=>{let t=!e.expires_at||new Date(String(e.expires_at).replace(` `,`T`)+`Z`).getTime()<l;return{id:e.id,job_id:e.job_id,image_count:e.image_count,model_name:e.model_name,bg_name:e.bg_name,kind:e.kind,created_at:e.created_at,expires_at:e.expires_at,expired:t,video_url:t?null:e.video_url,image_urls:t?null:e.image_urls}});return e.json({success:!0,generations:u,total:o?.cnt||0,page:r,limit:i})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.patch(`/api/admin/users/:id`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await e.req.json(),r=e.req.param(`id`),i=[],a=[];if(n.status!==void 0&&(i.push(`status = ?`),a.push(n.status)),n.role!==void 0&&(i.push(`role = ?`),a.push(n.role)),n.add_credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.add_credits),l=Math.max(0,o+s);return i.push(`credits = ?`),a.push(l),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
          VALUES (?, 'grant', ?, ?, 'admin_grant', ?)`).bind(r,s,l,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:l})}if(n.credits!==void 0){let o=(await t.prepare(`SELECT credits FROM users WHERE id = ?`).bind(r).first())?.credits??0,s=parseInt(n.credits),l=s-o;return i.push(`credits = ?`),a.push(s),i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),l!==0&&await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
            VALUES (?, ?, ?, ?, 'admin_set', ?)`).bind(r,l>0?`grant`:`deduct`,l,s,`admin_${Date.now()}`).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0,newCredits:s})}return i.length===0?e.json({success:!1,message:`변경할 항목이 없습니다.`},400):(i.push(`updated_at = datetime('now')`),await t.prepare(`UPDATE users SET ${i.join(`, `)} WHERE id = ?`).bind(...a,r).run(),n.status===`suspended`&&await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(r).run(),e.json({success:!0}))}catch(t){return e.json({success:!1,message:t.message},500)}}),V.delete(`/api/admin/users/:id`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`);return await t.prepare(`UPDATE users SET status = 'deleted', updated_at = datetime('now') WHERE id = ?`).bind(n).run(),await t.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(n).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/admin/stats`,W,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status != 'deleted'`).first(),r=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'active'`).first(),i=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE status = 'suspended'`).first(),a=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE date(created_at) = date('now') AND status != 'deleted'`).first(),o=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'kakao' AND status = 'active'`).first(),s=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'google' AND status = 'active'`).first(),l=await t.prepare(`SELECT COUNT(*) as cnt FROM users WHERE provider = 'email' AND status = 'active'`).first();return e.json({success:!0,stats:{total:n?.cnt||0,active:r?.cnt||0,suspended:i?.cnt||0,today:a?.cnt||0,by_provider:{kakao:o?.cnt||0,google:s?.cnt||0,email:l?.cnt||0}}})}catch(t){return e.json({success:!1,message:t.message},500)}}),V.get(`/api/credits/history`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`)||``;if(!n)return e.json({error:`로그인이 필요합니다.`},401);let r=await t.prepare(`SELECT s.user_id, u.credits FROM user_sessions s
        JOIN users u ON u.id = s.user_id
@@ -1859,7 +1859,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               <div class="hist-body">
                 <div class="hist-meta">#\${seqLabel} · \${dateStr} · 만료됨</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -1873,7 +1873,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
                   <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
                   <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
                   <div class="hist-actions">
-                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                    <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                   </div>
                 </div>
               </div>\`);
@@ -1887,7 +1887,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
                 <div class="hist-meta">#\${seqLabel} · \${dateStr} · 영상</div>
                 <div class="hist-meta-sub">영상을 생성하는 중입니다...</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -1910,9 +1910,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             <div class="hist-body">
               <div class="hist-meta">#\${seqLabel} · \${dateStr} · \${expLabel || ''} · 영상</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal(\${vHistModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')"><i class="fas fa-download"></i> 다운로드</button>
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${vHistModalArgs})" aria-label="다시보기" title="다시보기"><i class="fas fa-eye"></i></button>
+                <button class="hist-action-btn primary" onclick="downloadHistVideo('\${vUrlEsc}','\${vJobIdEsc}',this,'\${vThumbEsc}')" aria-label="다운로드" title="다운로드"><i class="fas fa-download"></i></button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -1933,7 +1933,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               <div class="hist-meta">#\${seqLabel} · \${dateStr}</div>
               <div class="hist-meta-sub">생성 오류로 크레딧이 차감되지 않았습니다</div>
               <div class="hist-actions">
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -1961,7 +1961,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               <div class="hist-body">
                 <div class="hist-meta">#\${rowSeq} · \${dateStr} · 만료됨</div>
                 <div class="hist-actions">
-                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                  <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
             </div>\`);
@@ -1980,9 +1980,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             <div class="hist-body">
               <div class="hist-meta">#\${rowSeq} · \${dateStr} · \${expLabel || ''}</div>
               <div class="hist-actions">
-                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})"><i class="fas fa-eye"></i> 다시보기</button>
-                <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)"><i class="fas fa-download"></i> \${dlLabel}</button>
-                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})"><i class="fas fa-trash"></i> 삭제</button>
+                <button class="hist-action-btn" onclick="openHistModal(\${histModalArgs})" aria-label="다시보기" title="다시보기"><i class="fas fa-eye"></i></button>
+                <button class="hist-action-btn primary" id="histDlBtn-\${log.id}-\${ui}" onclick="histRowDownload('\${jobIdEsc}','\${origEsc}',\${ui},this)" aria-label="\${dlLabel}" title="\${dlLabel}"><i class="fas fa-download"></i></button>
+                <button class="hist-action-btn danger" onclick="deleteHistItem(\${log.id})" aria-label="삭제" title="삭제"><i class="fas fa-trash"></i></button>
               </div>
             </div>
           </div>\`);
@@ -3816,9 +3816,29 @@ async function loadUserDetailGenerations(page) {
     const list = (data.success && data.generations) ? data.generations : []
     document.getElementById('userDetailGenerations').innerHTML = list.length
       ? '<div style="display:flex;flex-direction:column;gap:6px;">' + list.map(function(g) {
-          return '<div style="display:flex;justify-content:space-between;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
-            + '<span>' + (g.created_at ? g.created_at.slice(0,16).replace('T',' ') : '-') + ' · ' + (g.kind === 'video' ? '🎬 영상' : '🖼️ 이미지') + '</span>'
-            + '<span>' + (g.model_name || '-') + ' / ' + (g.bg_name || '-') + (g.image_count ? (' · ' + g.image_count + '장') : '') + '</span>'
+          var dateStr = g.created_at ? g.created_at.slice(0,16).replace('T',' ') : '-'
+          var kindLabel = g.kind === 'video' ? '🎬 영상' : '🖼️ 이미지'
+          var metaLine = (g.model_name || '-') + ' / ' + (g.bg_name || '-') + (g.image_count ? (' · ' + g.image_count + '장') : '')
+          var thumbHtml
+          if (g.expired) {
+            thumbHtml = '<div style="width:44px;height:44px;border-radius:6px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">⏱️</div>'
+          } else {
+            var urls = []
+            try { urls = g.image_urls ? JSON.parse(g.image_urls) : [] } catch(e) {}
+            var thumbSrc = urls[0] || null
+            var linkUrl = g.kind === 'video' ? g.video_url : thumbSrc
+            thumbHtml = thumbSrc
+              ? '<a href="/api/proxy/gen-image?url=' + encodeURIComponent(linkUrl || thumbSrc) + '&download=1" target="_blank" rel="noopener">'
+                + '<img src="/api/proxy/gen-image?url=' + encodeURIComponent(thumbSrc) + '" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0;display:block;" />'
+                + '</a>'
+              : '<div style="width:44px;height:44px;border-radius:6px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">' + (g.kind === 'video' ? '🎬' : '🖼️') + '</div>'
+          }
+          return '<div style="display:flex;align-items:center;gap:10px;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
+            + thumbHtml
+            + '<div style="flex:1;min-width:0;">'
+            + '<div>' + dateStr + ' · ' + kindLabel + (g.expired ? ' · <span style="color:#f59e0b;">보관 만료(14일)</span>' : '') + '</div>'
+            + '<div style="color:#8b8ba0;margin-top:2px;">' + metaLine + '</div>'
+            + '</div>'
             + '</div>'
         }).join('') + '</div>'
       : '<div style="font-size:12px;color:#8b8ba0;">사용 내역이 없습니다.</div>'
