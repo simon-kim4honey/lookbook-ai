@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtf5ykpi`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtf64v65`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3848,7 +3848,7 @@ async function loadUserDetailGenerations(page) {
             var thumbSrc = urls[0] || null
             var linkUrl = g.kind === 'video' ? g.video_url : thumbSrc
             thumbHtml = thumbSrc
-              ? '<a href="/api/proxy/gen-image?url=' + encodeURIComponent(linkUrl || thumbSrc) + '&download=1" target="_blank" rel="noopener">'
+              ? '<a href="/api/proxy/gen-image?url=' + encodeURIComponent(linkUrl || thumbSrc) + '" target="_blank" rel="noopener">'
                 + '<img src="/api/proxy/gen-image?url=' + encodeURIComponent(thumbSrc) + '" style="width:44px;height:44px;border-radius:6px;object-fit:cover;flex-shrink:0;display:block;" />'
                 + '</a>'
               : '<div style="width:44px;height:44px;border-radius:6px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">' + (g.kind === 'video' ? '🎬' : '🖼️') + '</div>'
