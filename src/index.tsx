@@ -2374,7 +2374,7 @@ app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
     const offset = (page - 1) * limit
     const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM generation_logs WHERE user_id = ?`).bind(id).first()
     const generations = await db.prepare(
-      `SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, image_urls, expires_at, created_at
+      `SELECT id, job_id, image_count, model_name, bg_name, kind, video_url, image_urls, expires_at, created_at, downloaded_indices
        FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`
     ).bind(id, limit, offset).all()
     const now = Date.now()
@@ -2386,6 +2386,7 @@ app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
         expires_at: g.expires_at, expired,
         video_url: expired ? null : g.video_url,
         image_urls: expired ? null : g.image_urls,
+        downloaded_indices: g.downloaded_indices,
       }
     })
     return c.json({ success: true, generations: results, total: total?.cnt || 0, page, limit })
@@ -8458,6 +8459,15 @@ async function loadUserDetailGenerations(page) {
           var dateStr = g.created_at ? g.created_at.slice(0,16).replace('T',' ') : '-'
           var kindLabel = g.kind === 'video' ? '🎬 영상' : '🖼️ 이미지'
           var metaLine = (g.model_name || '-') + ' / ' + (g.bg_name || '-') + (g.image_count ? (' · ' + g.image_count + '장') : '')
+          var dlIndices = []
+          try { dlIndices = g.downloaded_indices ? JSON.parse(g.downloaded_indices) : [] } catch(e) {}
+          var dlTotal = g.image_count || 1
+          var dlCount = dlIndices.length
+          var dlBadge = dlCount === 0
+            ? ' · <span style="color:#5a5a7a;">다운로드 안 함</span>'
+            : (dlCount >= dlTotal
+              ? ' · <span style="color:#4ade80;">다운로드 완료</span>'
+              : ' · <span style="color:#f59e0b;">' + dlCount + '/' + dlTotal + ' 다운로드</span>')
           var thumbHtml
           if (g.expired) {
             thumbHtml = '<div style="width:44px;height:44px;border-radius:6px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">⏱️</div>'
@@ -8475,7 +8485,7 @@ async function loadUserDetailGenerations(page) {
           return '<div style="display:flex;align-items:center;gap:10px;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
             + thumbHtml
             + '<div style="flex:1;min-width:0;">'
-            + '<div>' + dateStr + ' · ' + kindLabel + (g.expired ? ' · <span style="color:#f59e0b;">보관 만료(14일)</span>' : '') + '</div>'
+            + '<div>' + dateStr + ' · ' + kindLabel + (g.expired ? ' · <span style="color:#f59e0b;">보관 만료(14일)</span>' : '') + dlBadge + '</div>'
             + '<div style="color:#8b8ba0;margin-top:2px;">' + metaLine + '</div>'
             + '</div>'
             + '</div>'
