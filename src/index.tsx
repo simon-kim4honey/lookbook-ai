@@ -2368,6 +2368,7 @@ app.get('/api/admin/users/:id/payments', adminAuth, async (c) => {
 app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
   try {
     const db = c.env.LOOKBOOK_DB
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
     const id = c.req.param('id')
     const page = Math.max(1, parseInt(c.req.query('page') || '1'))
     const limit = Math.max(1, parseInt(c.req.query('limit') || '10'))
@@ -2378,8 +2379,17 @@ app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
        FROM generation_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`
     ).bind(id, limit, offset).all()
     const now = Date.now()
-    const results = (generations.results || []).map((g: any) => {
+    const results = await Promise.all((generations.results || []).map(async (g: any) => {
       const expired = !g.expires_at || new Date(String(g.expires_at).replace(' ', 'T') + 'Z').getTime() < now
+      // 업로드한 의류 원본 이미지는 /api/proxy/clothing/:jobId/:idx로 서빙되는 KV 백업
+      // (clothing_img:{job_id}, 14일 TTL로 자동 만료 — 사용자 화면과 별도 정책 불필요)
+      let clothingCount = 0
+      if (kv && g.job_id) {
+        try {
+          const stored = await kv.get(`clothing_img:${g.job_id}`)
+          if (stored) { const arr = JSON.parse(stored); clothingCount = Array.isArray(arr) ? arr.length : 0 }
+        } catch {}
+      }
       return {
         id: g.id, job_id: g.job_id, image_count: g.image_count,
         model_name: g.model_name, bg_name: g.bg_name, kind: g.kind, created_at: g.created_at,
@@ -2387,8 +2397,9 @@ app.get('/api/admin/users/:id/generations', adminAuth, async (c) => {
         video_url: expired ? null : g.video_url,
         image_urls: expired ? null : g.image_urls,
         downloaded_indices: g.downloaded_indices,
+        clothing_count: clothingCount,
       }
-    })
+    }))
     return c.json({ success: true, generations: results, total: total?.cnt || 0, page, limit })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
@@ -4236,6 +4247,16 @@ app.post('/api/ghostcut/generate', async (c) => {
         ).bind(sessionUser.user_id, jobId, 1, `고스트컷·${cat.label}`, cat.group, '1:1', nextSeq).run()
       } catch (logErr) {
         console.warn('[GhostCut] 생성 내역 기록 실패 (무시):', logErr)
+      }
+    }
+
+    // 관리자가 업로드한 원본 상품 이미지를 확인할 수 있도록 KV에 14일간 보관
+    // (모델컷의 clothing_img: 백업과 동일한 패턴 — /api/proxy/clothing/:jobId/:idx로 서빙)
+    if (kv) {
+      try {
+        await kv.put(`clothing_img:${jobId}`, JSON.stringify([productImageUrl]), { expirationTtl: 14 * 24 * 60 * 60 })
+      } catch (kvErr) {
+        console.warn('[GhostCut] 상품 이미지 KV 저장 실패 (무시):', kvErr)
       }
     }
 
@@ -8482,11 +8503,26 @@ async function loadUserDetailGenerations(page) {
                 + '</a>'
               : '<div style="width:44px;height:44px;border-radius:6px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">' + (g.kind === 'video' ? '🎬' : '🖼️') + '</div>'
           }
+          var clothingHtml = ''
+          if (g.clothing_count > 0) {
+            var clothingThumbs = ''
+            for (var ci = 0; ci < g.clothing_count; ci++) {
+              var cUrl = '/api/proxy/clothing/' + encodeURIComponent(g.job_id) + '/' + ci
+              clothingThumbs += '<a href="' + cUrl + '" target="_blank" rel="noopener">'
+                + '<img src="' + cUrl + '" style="width:28px;height:28px;border-radius:5px;object-fit:cover;display:block;border:1px solid #2e2e50;" />'
+                + '</a>'
+            }
+            clothingHtml = '<div style="display:flex;align-items:center;gap:5px;margin-top:5px;">'
+              + '<span style="color:#5a5a7a;flex-shrink:0;">업로드 의류</span>'
+              + '<div style="display:flex;gap:4px;">' + clothingThumbs + '</div>'
+              + '</div>'
+          }
           return '<div style="display:flex;align-items:center;gap:10px;font-size:12px;background:#0f0f1a;border:1px solid #2e2e50;border-radius:8px;padding:8px 12px;">'
             + thumbHtml
             + '<div style="flex:1;min-width:0;">'
             + '<div>' + dateStr + ' · ' + kindLabel + (g.expired ? ' · <span style="color:#f59e0b;">보관 만료(14일)</span>' : '') + dlBadge + '</div>'
             + '<div style="color:#8b8ba0;margin-top:2px;">' + metaLine + '</div>'
+            + clothingHtml
             + '</div>'
             + '</div>'
         }).join('') + '</div>'
