@@ -564,6 +564,43 @@ function initPage() {
 }
 
 // ─────────────────────────────────────────────────────────
+// PWA 설치 (데스크톱/홈 화면에 추가)
+// beforeinstallprompt는 Chrome/Edge(Windows·Mac)에서만 발생 — Safari/Firefox는
+// 자체 브라우저 메뉴로만 설치 가능해 installPWA()가 안내 토스트로 대체된다.
+// ─────────────────────────────────────────────────────────
+let deferredInstallPrompt = null;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+  });
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  showToast('데스크톱에 추가되었습니다', 'success');
+});
+
+async function installPWA() {
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    showToast('이미 앱으로 실행 중이에요', 'info');
+    return;
+  }
+  if (!deferredInstallPrompt) {
+    showToast('Chrome 브라우저 메뉴(⋮) → "EZlook 설치"에서 추가할 수 있어요', 'info', 6000);
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+}
+
+// ─────────────────────────────────────────────────────────
 // NAVBAR
 // ─────────────────────────────────────────────────────────
 function initNavbar() {
