@@ -4738,6 +4738,9 @@ const htmlShell = (title: string, bodyContent: string, extraHead: string = '', d
   <meta name="naver-site-verification" content="fda79db143bdb87618cabb15ab207023cff2f5da" />
   <meta name="google-site-verification" content="W4DGx5Ts0G07ZjGwcRMDUo1e-zAocUD1UNo2KOjyRz0" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=${BUILD_VERSION}" />
+  <link rel="manifest" href="/static/manifest.webmanifest?v=${BUILD_VERSION}" />
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png?v=${BUILD_VERSION}" />
+  <meta name="theme-color" content="#EF4444" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet" />
@@ -5434,10 +5437,10 @@ app.get('/about', (c) => {
             <i class="fas fa-bolt"></i>
             무료로 시작하기
           </button>
-          <a href="#how-it-works" class="btn btn-ghost btn-lg" style="color:#A0A0C0; border: 2px solid rgba(255,255,255,0.2);">
-            <i class="fas fa-play-circle"></i>
-            작동 방식 보기
-          </a>
+          <button onclick="installPWA()" class="btn btn-ghost btn-lg" style="color:#A0A0C0; border: 2px solid rgba(255,255,255,0.2);">
+            <i class="fas fa-download"></i>
+            데스크톱에 추가
+          </button>
         </div>
       </div>
       <div class="hero-visual">

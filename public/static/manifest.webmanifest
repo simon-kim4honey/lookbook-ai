@@ -1,0 +1,15 @@
+{
+  "name": "EZlook — AI 온모델 피팅컷 생성기",
+  "short_name": "EZlook",
+  "description": "옷 사진 한 장으로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하는 서비스",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#EF4444",
+  "lang": "ko",
+  "icons": [
+    { "src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
