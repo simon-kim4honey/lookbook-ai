@@ -546,6 +546,13 @@ function initPage() {
     if (path === '/' || path === '') {
       // 2026-09-02: 생성기 앱이 새 홈(/)이 됨 — 기존 마케팅 랜딩은 /about으로 이동
       initGenerator();
+      // /about의 "데스크톱에 추가" 버튼이 여기로 리다이렉트시킨 뒤 설치를 이어감 —
+      // 설치(또는 브라우저의 "바로가기 만들기" 폴백) 시점의 현재 문서가 항상 /(생성기)가
+      // 되도록 보장해, 설치된 앱이 /about이 아닌 /로 열리게 한다.
+      if (new URLSearchParams(location.search).get('install') === '1') {
+        history.replaceState(null, '', '/');
+        setTimeout(() => installPWA(), 600);
+      }
     } else if (path === '/dashboard') {
       initDashboard();
     } else if (path === '/about') {
@@ -598,6 +605,17 @@ async function installPWA() {
   deferredInstallPrompt.prompt();
   await deferredInstallPrompt.userChoice;
   deferredInstallPrompt = null;
+}
+
+// 데스크톱 앱(standalone)으로 실행될 때 창 크기를 앱 레이아웃(#gapp-panel 최대 480px)에
+// 맞춰 고정 — 설치 직후 기본 창 크기(마케팅 페이지 기준)로 열려 좁은 앱 내용 대비 창이
+// 과도하게 넓어 보이는 문제를 보정한다. 세션당 1회만 적용(내부 페이지 이동 때마다
+// 창이 계속 리사이즈되는 것을 방지).
+if (window.matchMedia('(display-mode: standalone)').matches && !sessionStorage.getItem('ezlook_win_sized')) {
+  try {
+    window.resizeTo(560, 860);
+    sessionStorage.setItem('ezlook_win_sized', '1');
+  } catch (e) {}
 }
 
 // ─────────────────────────────────────────────────────────
