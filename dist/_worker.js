@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtgluxeh`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtk2sgg1`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -430,7 +430,7 @@ ${t}
 </div>
 
 </body>
-</html>`;V.get(`/share/:jobId/:idx`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`jobId`),r=parseInt(e.req.param(`idx`)||`0`,10),i=t=>{let i=`${$(e)}/share/${n}/${r}`,a=t.isGhostCut?`상품 이미지로 누끼컷 만들기`:`상품 이미지로 모델컷 만들기`,o=t.isGhostCut?`클릭1번으로 AI누끼컷이 무료로 만들어 진다고?`:`클릭4번으로 AI모델컷이 무료로 만들어 진다고?`,s=t.isGhostCut?`/ghostcut`:`/generator`,l=``;if(t.state===`ok`){let e=t.sourceTabs||[];l=`
+</html>`;V.get(`/share/:jobId/:idx`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`jobId`),r=parseInt(e.req.param(`idx`)||`0`,10),i=t=>{let i=`${$(e)}/share/${n}/${r}`,a=t.isGhostCut?`상품 이미지로 누끼컷 만들기`:`상품 이미지로 모델컷 만들기`,o=t.isGhostCut?`클릭1번으로 AI누끼컷이 무료로 만들어 진다고?`:`클릭4번으로 AI모델컷이 무료로 만들어 진다고?`,s=t.isGhostCut?`/ghostcut`:`/`,l=``;if(t.state===`ok`){let e=t.sourceTabs||[];l=`
         <div class="share-card">
           ${e.length>0?`
           <div class="share-tabs">
@@ -461,12 +461,12 @@ ${t}
         <div class="share-card share-message">
           <span class="share-emoji">⏰</span>
           <p class="share-msg-text">다운로드 기간 14일이 만료되어 파일을 불러올 수 없어요.</p>
-          <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
+          <a href="/" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
         </div>`:`
         <div class="share-card share-message">
           <span class="share-emoji">🔍</span>
           <p class="share-msg-text">이미지를 찾을 수 없어요.</p>
-          <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
+          <a href="/" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
         </div>`;return`<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -634,8 +634,8 @@ ${t}
   <h2>8. 개인정보 처리방침 변경</h2>
   <p>본 방침은 법령·정책 변경에 따라 수정될 수 있으며, 변경 시 서비스 내 공지합니다.</p>
 </body>
-</html>`)),V.get(`/_home_old`,e=>e.redirect(`/generator`,302)),V.get(`/robots.txt`,e=>e.text([`User-agent: *`,`Allow: /`,`Disallow: /dashboard`,`Disallow: /api/`,`Disallow: /admin`,`Sitemap: ${U}/sitemap.xml`].join(`
-`),200,{"Content-Type":`text/plain; charset=utf-8`})),V.get(`/sitemap.xml`,e=>{let t=`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[{path:`/`,priority:`1.0`,changefreq:`weekly`},{path:`/generator`,priority:`0.9`,changefreq:`weekly`},{path:`/terms`,priority:`0.3`,changefreq:`yearly`},{path:`/privacy`,priority:`0.3`,changefreq:`yearly`}].map(e=>`  <url><loc>${U}${e.path}</loc><changefreq>${e.changefreq}</changefreq><priority>${e.priority}</priority></url>`).join(`
+</html>`)),V.get(`/_home_old`,e=>e.redirect(`/`,302)),V.get(`/robots.txt`,e=>e.text([`User-agent: *`,`Allow: /`,`Disallow: /dashboard`,`Disallow: /api/`,`Disallow: /admin`,`Sitemap: ${U}/sitemap.xml`].join(`
+`),200,{"Content-Type":`text/plain; charset=utf-8`})),V.get(`/sitemap.xml`,e=>{let t=`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${[{path:`/`,priority:`1.0`,changefreq:`weekly`},{path:`/about`,priority:`0.7`,changefreq:`monthly`},{path:`/terms`,priority:`0.3`,changefreq:`yearly`},{path:`/privacy`,priority:`0.3`,changefreq:`yearly`}].map(e=>`  <url><loc>${U}${e.path}</loc><changefreq>${e.changefreq}</changefreq><priority>${e.priority}</priority></url>`).join(`
 `)}\n</urlset>`;return e.text(t,200,{"Content-Type":`application/xml; charset=utf-8`})}),V.get(`/llms.txt`,e=>{let t=`# EZlook
 
 > AI 패션 이미지 생성 플랫폼 — 의류 이미지 한 장으로 온모델 피팅컷과 룩북 세트, 홍보 영상을 자동 생성합니다.
@@ -657,12 +657,12 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 - 회원가입 시 무료 크레딧 지급, 신용카드 등록 불필요
 
 ## 링크
-- 홈페이지: ${U}/
-- 서비스 이용(생성기): ${U}/generator
+- 홈페이지(서비스 이용): ${U}/
+- 브랜드 소개: ${U}/about
 - 이용약관: ${U}/terms
 - 개인정보처리방침: ${U}/privacy
 `;return e.text(t,200,{"Content-Type":`text/markdown; charset=utf-8`})});var Vn=[{q:`EZlook은 어떤 서비스인가요?`,a:`의류 이미지 한 장을 업로드하면 AI가 온모델 피팅컷과 룩북 세트를 자동으로 생성해주는 AI 패션 이미지 생성 플랫폼입니다. 촬영 스튜디오나 모델 섭외 없이 몇 번의 클릭만으로 전문적인 착용샷을 만들 수 있습니다.`},{q:`이미지 생성에 비용이 드나요?`,a:`이미지 생성 자체는 무료입니다. 마음에 드는 결과물을 실제 파일로 다운로드할 때만 장당 90크레딧이 차감됩니다.`},{q:`무료로 체험할 수 있나요?`,a:`네, 신용카드 등록 없이 회원가입만 하면 무료 크레딧이 바로 지급되어 AI 룩북 제작을 체험해볼 수 있습니다.`},{q:`영상도 만들 수 있나요?`,a:`네, 생성된 피팅컷 이미지를 기반으로 모델이 자연스럽게 포즈를 취하는 7초 분량의 세로형(9:16) 영상을 만들 수 있습니다.`},{q:`결과물은 얼마나 빨리 나오나요?`,a:`평균 30초, 최대 90초 이내에 고품질 온모델 피팅컷 이미지가 생성됩니다.`},{q:`크레딧은 어떻게 충전하나요?`,a:`월 정액 없이 필요한 만큼만 충전하는 방식입니다. 스타터(₩20,000 · 1,000크레딧)부터 베스트 밸류(₩60,000 · 4,000크레딧)까지 선택할 수 있습니다.`}],Hn=()=>{let e={"@type":`Organization`,name:`EZlook`,alternateName:`벌거벗은호랑이`,url:U,logo:`${U}/static/favicon.svg`,telephone:`070-4581-8166`,address:{"@type":`PostalAddress`,streetAddress:`무심서로 377-3`,addressLocality:`청주시 서원구`,addressRegion:`충청북도`,addressCountry:`KR`}};return[{"@context":`https://schema.org`,"@type":`WebSite`,name:`EZlook`,url:U,publisher:e},{"@context":`https://schema.org`,"@type":`Service`,name:`EZlook AI 패션 룩북 생성 서비스`,serviceType:`AI 패션 이미지/영상 생성`,description:`옷 사진 한 장을 업로드하면 AI 모델이 착용한 온모델 피팅컷과 룩북 세트, 홍보 영상을 자동으로 생성하는 서비스`,provider:e,areaServed:`KR`,offers:[{"@type":`Offer`,name:`스타터`,price:`20000`,priceCurrency:`KRW`,description:`1,000 크레딧 · 이미지 최대 11장`},{"@type":`Offer`,name:`인기 충전권`,price:`40000`,priceCurrency:`KRW`,description:`2,300 크레딧 · 이미지 최대 25장`},{"@type":`Offer`,name:`베스트 밸류`,price:`60000`,priceCurrency:`KRW`,description:`4,000 크레딧 · 이미지 최대 44장`}]},{"@context":`https://schema.org`,"@type":`FAQPage`,mainEntity:Vn.map(e=>({"@type":`Question`,name:e.q,acceptedAnswer:{"@type":`Answer`,text:e.a}}))}].map(e=>`<script type="application/ld+json">${JSON.stringify(e)}<\/script>`).join(`
-  `)};V.get(`/`,e=>{let t=`<link rel="canonical" href="${U}/" />\n  <meta property="og:url" content="${U}/" />\n  ${Hn()}`;return e.html(Bn(`AI 온모델 피팅컷 자동 생성`,`
+  `)};V.get(`/about`,e=>{let t=`<link rel="canonical" href="${U}/about" />\n  <meta property="og:url" content="${U}/about" />\n  ${Hn()}`;return e.html(Bn(`AI 온모델 피팅컷 자동 생성`,`
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
@@ -757,7 +757,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           </div>
         </div>
         <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')" data-i18n="nav-login">로그인</button>
-        <button class="btn btn-primary" id="navSignupBtn" onclick="location.href='/generator'" data-i18n="nav-signup">무료 시작</button>
+        <button class="btn btn-primary" id="navSignupBtn" onclick="location.href='/'" data-i18n="nav-signup">무료 시작</button>
         <button class="navbar-toggle" id="navbarToggle" onclick="toggleMobileNav()" aria-label="메뉴 열기" aria-expanded="false">
           <i class="fas fa-bars"></i>
         </button>
@@ -776,7 +776,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
                 <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
-            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
@@ -823,7 +823,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           </div>
         </div>
         <div class="hero-cta">
-          <button class="btn btn-primary btn-lg" onclick="location.href='/generator'">
+          <button class="btn btn-primary btn-lg" onclick="location.href='/'">
             <i class="fas fa-bolt"></i>
             무료로 시작하기
           </button>
@@ -907,7 +907,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             </div>
           </div>
           <div style="text-align:left;margin-top:48px;">
-            <a href="/generator" class="btn btn-primary btn-lg">
+            <a href="/" class="btn btn-primary btn-lg">
               <i class="fas fa-wand-magic-sparkles"></i>
               지금 바로 시작하기
             </a>
@@ -977,7 +977,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             <li><span class="check">✓</span> 스타일샷 세트 생성</li>
             <li><span class="check">✓</span> 일괄 다운로드</li>
           </ul>
-          <button class="btn btn-primary btn-full" onclick="location.href='/generator'">충전하고 시작하기</button>
+          <button class="btn btn-primary btn-full" onclick="location.href='/'">충전하고 시작하기</button>
         </div>
       </div>
     </div>
@@ -1007,7 +1007,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <h2 class="cta-title">지금 바로 <span class="highlight">무료로 체험</span>하세요</h2>
         <p class="cta-desc">신용카드 없이 200크레딧을 무료로 받고<br />AI 룩북 제작을 경험해보세요.</p>
         <div class="cta-actions">
-          <button class="btn btn-primary btn-lg" onclick="location.href='/generator'">
+          <button class="btn btn-primary btn-lg" onclick="location.href='/'">
             <i class="fas fa-rocket"></i>
             무료로 시작하기 →
           </button>
@@ -1032,7 +1032,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             <li><a href="#features">기능 소개</a></li>
             <li><a href="#how-it-works">이용 방법</a></li>
             <li><a href="#pricing">요금제</a></li>
-            <li><a href="/generator">데모</a></li>
+            <li><a href="/">데모</a></li>
           </ul>
         </div>
         <div class="footer-col">
@@ -1373,7 +1373,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
   <div class="db-wrap">
 
     <!-- 로고 -->
-    <a href="/generator" class="db-logo">
+    <a href="/" class="db-logo">
       <div class="db-logo-icon">✨</div>
       <span class="db-logo-text">EZlook</span>
     </a>
@@ -1401,7 +1401,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <!-- 모델컷 만들기 -->
-      <a href="/generator" class="db-menu-item">
+      <a href="/" class="db-menu-item">
         <span class="db-menu-label">모델컷 만들기</span>
         <span class="db-menu-arrow">›</span>
       </a>
@@ -1447,7 +1447,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     </div>
 
     <!-- 이미지 생성 바로가기 -->
-    <a href="/generator" class="db-gen-btn">
+    <a href="/" class="db-gen-btn">
       <i class="fas fa-wand-magic-sparkles"></i> 이미지 생성 바로가기
     </a>
 
@@ -1478,7 +1478,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
                   <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
                 </div>
               </a>
-              <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+              <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
               <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
               <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
@@ -2124,7 +2124,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 
   <div class="cr-wrap">
     <div class="cr-inner">
-      <a href="/generator" class="cr-logo">
+      <a href="/" class="cr-logo">
         <div class="cr-logo-icon">✨</div>
         <span class="cr-logo-text">EZlook</span>
       </a>
@@ -2167,7 +2167,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       loadCreditHistory();
     });
   <\/script>
-  `,``,`내 크레딧 충전/사용 내역과 잔여 크레딧을 확인하세요.`,e.env.GA4_MEASUREMENT_ID)));var Un=(e,t=`model`)=>{let n=t===`ghostcut`?`상품(옷) 이미지 한 장만 업로드하면 AI가 카테고리를 자동 인식해 고스트 마네킹(투명 마네킹) 스타일의 상품컷으로 변환해드립니다.`:`옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.`,r=t===`ghostcut`?`무료 AI 누끼컷 생성기`:`무료 AI 룩북 생성기`,i=`<script>window.__EZLOOK_MODE__=${JSON.stringify(t)};<\/script>`;return e.html(Bn(r,`
+  `,``,`내 크레딧 충전/사용 내역과 잔여 크레딧을 확인하세요.`,e.env.GA4_MEASUREMENT_ID)));var Un=(e,t=`model`)=>{let n=t===`ghostcut`?`상품(옷) 이미지 한 장만 업로드하면 AI가 카테고리를 자동 인식해 고스트 마네킹(투명 마네킹) 스타일의 상품컷으로 변환해드립니다.`:`옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.`,r=t===`ghostcut`?`무료 AI 누끼컷 생성기`:`무료 AI 룩북 생성기`,i=t===`ghostcut`?`/ghostcut`:`/`,a=`<script>window.__EZLOOK_MODE__=${JSON.stringify(t)};<\/script>\n  <link rel="canonical" href="${U}${i}" />\n  <meta property="og:url" content="${U}${i}" />`;return e.html(Bn(r,`
   <div class="toast-container" id="toastContainer"></div>
   <h1 class="sr-only">AI 룩북 생성기 — 옷 사진 한 장으로 온모델 피팅컷 무료 제작</h1>
 
@@ -2183,7 +2183,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 
     <!-- ── 상단 바 (고정) ── -->
     <header id="gapp-header">
-      <a href="/generator" class="gapp-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <a href="/" class="gapp-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
       <!-- 로그인 상태 표시 -->
       <div style="display:flex;align-items:center;gap:8px;position:relative;">
         <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:16.2px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
@@ -2200,7 +2200,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
                 <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
-            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
@@ -2434,7 +2434,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
               <span class="rnb-sub" id="videoActionSub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
             </button>
-            <button class="result-nav-btn" id="newProjectBtnCard" onclick="window.location.href='/generator'">
+            <button class="result-nav-btn" id="newProjectBtnCard" onclick="window.location.href='/'">
               <span class="rnb-main"><i class="fas fa-plus"></i> 새 프로젝트</span>
             </button>
             <button class="result-nav-btn" id="regenBtnCard" onclick="regenFromCard(0)">
@@ -2614,7 +2614,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);text-decoration:underline;">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);text-decoration:underline;">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
-  `,i,n,e.env.GA4_MEASUREMENT_ID))};V.get(`/generator`,e=>Un(e,`model`)),V.get(`/ghostcut`,e=>Un(e,`ghostcut`)),V.get(`/admin02`,e=>e.html(`<!DOCTYPE html>
+  `,a,n,e.env.GA4_MEASUREMENT_ID))};V.get(`/`,e=>Un(e,`model`)),V.get(`/generator`,e=>e.redirect(`/`,301)),V.get(`/ghostcut`,e=>Un(e,`ghostcut`)),V.get(`/admin02`,e=>e.html(`<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8"/>

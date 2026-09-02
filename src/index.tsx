@@ -4841,7 +4841,7 @@ app.get('/share/:jobId/:idx', async (c) => {
     const pageUrl = `${origin}/share/${jobId}/${idx}`
     const shareTitle = opts.isGhostCut ? '상품 이미지로 누끼컷 만들기' : '상품 이미지로 모델컷 만들기'
     const shareDesc = opts.isGhostCut ? '클릭1번으로 AI누끼컷이 무료로 만들어 진다고?' : '클릭4번으로 AI모델컷이 무료로 만들어 진다고?'
-    const shareCtaHref = opts.isGhostCut ? '/ghostcut' : '/generator'
+    const shareCtaHref = opts.isGhostCut ? '/ghostcut' : '/'
     let body = ''
     if (opts.state === 'ok') {
       const sourceTabs = opts.sourceTabs || []
@@ -4883,14 +4883,14 @@ app.get('/share/:jobId/:idx', async (c) => {
         <div class="share-card share-message">
           <span class="share-emoji">⏰</span>
           <p class="share-msg-text">다운로드 기간 14일이 만료되어 파일을 불러올 수 없어요.</p>
-          <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
+          <a href="/" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
         </div>`
     } else {
       body = `
         <div class="share-card share-message">
           <span class="share-emoji">🔍</span>
           <p class="share-msg-text">이미지를 찾을 수 없어요.</p>
-          <a href="/generator" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
+          <a href="/" class="share-cta"><i class="fas fa-wand-magic-sparkles"></i> 나도 만들어보기</a>
         </div>`
     }
 
@@ -5139,7 +5139,7 @@ app.get('/privacy', (c) => {
 
 // ─── Landing Page ───
 app.get('/_home_old', (c) => {
-  return c.redirect('/generator', 302)
+  return c.redirect('/', 302)
 })
 
 app.get('/robots.txt', (c) => {
@@ -5160,7 +5160,7 @@ app.get('/robots.txt', (c) => {
 app.get('/sitemap.xml', (c) => {
   const pages = [
     { path: '/', priority: '1.0', changefreq: 'weekly' },
-    { path: '/generator', priority: '0.9', changefreq: 'weekly' },
+    { path: '/about', priority: '0.7', changefreq: 'monthly' },
     { path: '/terms', priority: '0.3', changefreq: 'yearly' },
     { path: '/privacy', priority: '0.3', changefreq: 'yearly' },
   ]
@@ -5194,8 +5194,8 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 - 회원가입 시 무료 크레딧 지급, 신용카드 등록 불필요
 
 ## 링크
-- 홈페이지: ${AIFASHION_BASE}/
-- 서비스 이용(생성기): ${AIFASHION_BASE}/generator
+- 홈페이지(서비스 이용): ${AIFASHION_BASE}/
+- 브랜드 소개: ${AIFASHION_BASE}/about
 - 이용약관: ${AIFASHION_BASE}/terms
 - 개인정보처리방침: ${AIFASHION_BASE}/privacy
 `
@@ -5263,10 +5263,11 @@ const homeStructuredData = () => {
     .join('\n  ')
 }
 
-app.get('/', (c) => {
+app.get('/about', (c) => {
   // studiob.aifashion.co.kr는 상단 전역 미들웨어에서 이미 www로 리다이렉트됨
-  // 마케팅 홈페이지(이용약관·개인정보처리방침·사업자정보 포함)를 직접 서빙
-  const homeExtraHead = `<link rel="canonical" href="${AIFASHION_BASE}/" />\n  <meta property="og:url" content="${AIFASHION_BASE}/" />\n  ${homeStructuredData()}`
+  // 마케팅 소개 페이지(이용약관·개인정보처리방침·사업자정보 포함)를 직접 서빙
+  // 2026-09-02: 기존 마케팅 홈(/)을 /about으로, 생성기 앱(/generator)을 새 홈(/)으로 교체
+  const homeExtraHead = `<link rel="canonical" href="${AIFASHION_BASE}/about" />\n  <meta property="og:url" content="${AIFASHION_BASE}/about" />\n  ${homeStructuredData()}`
   const homeDescription = '옷 사진 한 장으로 AI 온모델 피팅컷과 룩북 세트를 무료로 자동 생성하세요. 촬영 스튜디오나 모델 섭외 없이 평균 30초 만에 완성됩니다.'
   return c.html(htmlShell('AI 온모델 피팅컷 자동 생성', `
   <!-- Toast Container -->
@@ -5363,7 +5364,7 @@ app.get('/', (c) => {
           </div>
         </div>
         <button class="btn btn-ghost" id="navLoginBtn" onclick="openModal('loginModal')" data-i18n="nav-login">로그인</button>
-        <button class="btn btn-primary" id="navSignupBtn" onclick="location.href='/generator'" data-i18n="nav-signup">무료 시작</button>
+        <button class="btn btn-primary" id="navSignupBtn" onclick="location.href='/'" data-i18n="nav-signup">무료 시작</button>
         <button class="navbar-toggle" id="navbarToggle" onclick="toggleMobileNav()" aria-label="메뉴 열기" aria-expanded="false">
           <i class="fas fa-bars"></i>
         </button>
@@ -5382,7 +5383,7 @@ app.get('/', (c) => {
                 <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
-            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
@@ -5429,7 +5430,7 @@ app.get('/', (c) => {
           </div>
         </div>
         <div class="hero-cta">
-          <button class="btn btn-primary btn-lg" onclick="location.href='/generator'">
+          <button class="btn btn-primary btn-lg" onclick="location.href='/'">
             <i class="fas fa-bolt"></i>
             무료로 시작하기
           </button>
@@ -5513,7 +5514,7 @@ app.get('/', (c) => {
             </div>
           </div>
           <div style="text-align:left;margin-top:48px;">
-            <a href="/generator" class="btn btn-primary btn-lg">
+            <a href="/" class="btn btn-primary btn-lg">
               <i class="fas fa-wand-magic-sparkles"></i>
               지금 바로 시작하기
             </a>
@@ -5583,7 +5584,7 @@ app.get('/', (c) => {
             <li><span class="check">✓</span> 스타일샷 세트 생성</li>
             <li><span class="check">✓</span> 일괄 다운로드</li>
           </ul>
-          <button class="btn btn-primary btn-full" onclick="location.href='/generator'">충전하고 시작하기</button>
+          <button class="btn btn-primary btn-full" onclick="location.href='/'">충전하고 시작하기</button>
         </div>
       </div>
     </div>
@@ -5613,7 +5614,7 @@ app.get('/', (c) => {
         <h2 class="cta-title">지금 바로 <span class="highlight">무료로 체험</span>하세요</h2>
         <p class="cta-desc">신용카드 없이 200크레딧을 무료로 받고<br />AI 룩북 제작을 경험해보세요.</p>
         <div class="cta-actions">
-          <button class="btn btn-primary btn-lg" onclick="location.href='/generator'">
+          <button class="btn btn-primary btn-lg" onclick="location.href='/'">
             <i class="fas fa-rocket"></i>
             무료로 시작하기 →
           </button>
@@ -5638,7 +5639,7 @@ app.get('/', (c) => {
             <li><a href="#features">기능 소개</a></li>
             <li><a href="#how-it-works">이용 방법</a></li>
             <li><a href="#pricing">요금제</a></li>
-            <li><a href="/generator">데모</a></li>
+            <li><a href="/">데모</a></li>
           </ul>
         </div>
         <div class="footer-col">
@@ -5984,7 +5985,7 @@ app.get('/dashboard', (c) => {
   <div class="db-wrap">
 
     <!-- 로고 -->
-    <a href="/generator" class="db-logo">
+    <a href="/" class="db-logo">
       <div class="db-logo-icon">✨</div>
       <span class="db-logo-text">EZlook</span>
     </a>
@@ -6012,7 +6013,7 @@ app.get('/dashboard', (c) => {
       </div>
 
       <!-- 모델컷 만들기 -->
-      <a href="/generator" class="db-menu-item">
+      <a href="/" class="db-menu-item">
         <span class="db-menu-label">모델컷 만들기</span>
         <span class="db-menu-arrow">›</span>
       </a>
@@ -6058,7 +6059,7 @@ app.get('/dashboard', (c) => {
     </div>
 
     <!-- 이미지 생성 바로가기 -->
-    <a href="/generator" class="db-gen-btn">
+    <a href="/" class="db-gen-btn">
       <i class="fas fa-wand-magic-sparkles"></i> 이미지 생성 바로가기
     </a>
 
@@ -6089,7 +6090,7 @@ app.get('/dashboard', (c) => {
                   <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
                 </div>
               </a>
-              <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+              <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
               <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
               <a href="https://www.aifashion.co.kr/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
@@ -6741,7 +6742,7 @@ app.get('/credits', (c) => {
 
   <div class="cr-wrap">
     <div class="cr-inner">
-      <a href="/generator" class="cr-logo">
+      <a href="/" class="cr-logo">
         <div class="cr-logo-icon">✨</div>
         <span class="cr-logo-text">EZlook</span>
       </a>
@@ -6797,7 +6798,8 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
     ? '상품(옷) 이미지 한 장만 업로드하면 AI가 카테고리를 자동 인식해 고스트 마네킹(투명 마네킹) 스타일의 상품컷으로 변환해드립니다.'
     : '옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.'
   const pageTitle = mode === 'ghostcut' ? '무료 AI 누끼컷 생성기' : '무료 AI 룩북 생성기'
-  const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};</script>`
+  const canonicalPath = mode === 'ghostcut' ? '/ghostcut' : '/'
+  const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};</script>\n  <link rel="canonical" href="${AIFASHION_BASE}${canonicalPath}" />\n  <meta property="og:url" content="${AIFASHION_BASE}${canonicalPath}" />`
   return c.html(htmlShell(pageTitle, `
   <div class="toast-container" id="toastContainer"></div>
   <h1 class="sr-only">AI 룩북 생성기 — 옷 사진 한 장으로 온모델 피팅컷 무료 제작</h1>
@@ -6814,7 +6816,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 
     <!-- ── 상단 바 (고정) ── -->
     <header id="gapp-header">
-      <a href="/generator" class="gapp-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <a href="/" class="gapp-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
       <!-- 로그인 상태 표시 -->
       <div style="display:flex;align-items:center;gap:8px;position:relative;">
         <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:16.2px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
@@ -6831,7 +6833,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
                 <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
-            <a href="/generator" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
@@ -7065,7 +7067,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
               <span class="rnb-sub" id="videoActionSub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
             </button>
-            <button class="result-nav-btn" id="newProjectBtnCard" onclick="window.location.href='/generator'">
+            <button class="result-nav-btn" id="newProjectBtnCard" onclick="window.location.href='/'">
               <span class="rnb-main"><i class="fas fa-plus"></i> 새 프로젝트</span>
             </button>
             <button class="result-nav-btn" id="regenBtnCard" onclick="regenFromCard(0)">
@@ -7247,7 +7249,8 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
   </div>
   `, modeScript, generatorDescription, c.env.GA4_MEASUREMENT_ID))
 }
-app.get('/generator', (c) => generatorPageHandler(c, 'model'))
+app.get('/', (c) => generatorPageHandler(c, 'model'))
+app.get('/generator', (c) => c.redirect('/', 301))
 app.get('/ghostcut', (c) => generatorPageHandler(c, 'ghostcut'))
 
 // ────────────────────────────────────────────────────
