@@ -607,13 +607,13 @@ async function installPWA() {
   deferredInstallPrompt = null;
 }
 
-// 데스크톱 앱(standalone)으로 실행될 때 창 크기를 앱 레이아웃(#gapp-panel 최대 480px)에
-// 맞춰 고정 — 설치 직후 기본 창 크기(마케팅 페이지 기준)로 열려 좁은 앱 내용 대비 창이
-// 과도하게 넓어 보이는 문제를 보정한다. 세션당 1회만 적용(내부 페이지 이동 때마다
-// 창이 계속 리사이즈되는 것을 방지).
+// 데스크톱 앱(standalone)으로 실행될 때 창 너비를 앱 레이아웃(#gapp-panel 최대
+// 480px)에 정확히 맞춰 고정 — 기본 설치 창 크기가 마케팅 페이지 기준이라 좁은 앱
+// 내용 옆에 빈 여백(회색 거터)이 남던 문제를 보정한다. 세션당 1회만 적용(내부
+// 페이지 이동 때마다 창이 계속 리사이즈되는 것을 방지).
 if (window.matchMedia('(display-mode: standalone)').matches && !sessionStorage.getItem('ezlook_win_sized')) {
   try {
-    window.resizeTo(560, 860);
+    window.resizeTo(480, 860);
     sessionStorage.setItem('ezlook_win_sized', '1');
   } catch (e) {}
 }
