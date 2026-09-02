@@ -544,16 +544,17 @@ function initPage() {
   // 모든 페이지에서 세션 복원 (자동 로그인)
   verifySession().then(() => {
     if (path === '/' || path === '') {
+      // 2026-09-02: 생성기 앱이 새 홈(/)이 됨 — 기존 마케팅 랜딩은 /about으로 이동
+      initGenerator();
+    } else if (path === '/dashboard') {
+      initDashboard();
+    } else if (path === '/about') {
       // Landing — 새로고침 시 항상 최상단에서 시작 (모바일 스크롤 위치 복원 방지)
       window.scrollTo(0, 0);
       // Landing — verifySession 후 UI만 업데이트됨
       initHomeShowcase();
       initHomeFeatureBgs();
       initHowtoVideos();
-    } else if (path === '/dashboard') {
-      initDashboard();
-    } else if (path === '/generator') {
-      initGenerator();
     } else if (path === '/ghostcut') {
       // UI 교체는 위에서 이미 완료됨 — 로그인 상태 확인 후 필요한 이전 작업만 재개
       resumePendingGeneration();
@@ -1848,11 +1849,11 @@ function renderProjects(projects) {
       <div class="project-actions">
         ${p.status === 'done' ?
           `<button class="project-action-btn" onclick="showToast(t('downloadSingle'), 'success'); event.stopPropagation();">다운로드</button>
-           <button class="project-action-btn primary" onclick="window.location.href='/generator'; event.stopPropagation();">재생성</button>` :
+           <button class="project-action-btn primary" onclick="window.location.href='/'; event.stopPropagation();">재생성</button>` :
           p.status === 'processing' ?
           `<button class="project-action-btn" disabled>생성중...</button>
            <button class="project-action-btn primary" onclick="event.stopPropagation();">결과 보기</button>` :
-          `<button class="project-action-btn primary" onclick="window.location.href='/generator'; event.stopPropagation();">계속 작업</button>`
+          `<button class="project-action-btn primary" onclick="window.location.href='/'; event.stopPropagation();">계속 작업</button>`
         }
       </div>
     `;
@@ -1893,7 +1894,7 @@ function initGenerator() {
 
 // ─────────────────────────────────────────────────────────
 // 누끼컷 모드 (window.__EZLOOK_MODE__ === 'ghostcut', /ghostcut 라우트)
-// /ghostcut은 /generator와 완전히 동일한 셸(모달·step-3·step-4·로딩화면 등)을
+// /ghostcut은 홈(/, 구 /generator)과 완전히 동일한 셸(모달·step-3·step-4·로딩화면 등)을
 // 그대로 서빙하고, 여기서 step-1의 내용만 교체해 재사용한다. 생성은
 // /api/generation/start가 아니라 /api/ghostcut/generate를 호출하지만, 완료 후
 // 폴링/결과화면/다운로드/공유는 기존 pollGenerationStatus()/completeGeneration()/
@@ -1954,7 +1955,7 @@ function initGhostCutUI() {
     const onclickAttr = btn.getAttribute('onclick');
     if (onclickAttr === 'regenFromCard(0)') btn.style.display = 'none';
     if (onclickAttr === 'startVideoGeneration()') btn.style.display = 'none';
-    if (onclickAttr === "window.location.href='/generator'") btn.setAttribute('onclick', "window.location.href='/ghostcut'");
+    if (onclickAttr === "window.location.href='/'") btn.setAttribute('onclick', "window.location.href='/ghostcut'");
   });
 
   // 다운로드 버튼 부제(요금)를 누끼컷 요금(140→70)으로 즉시 맞춤
@@ -4420,7 +4421,7 @@ document.addEventListener('click', (e) => {
   } catch (e) {}
   // 랜딩 페이지에서도 세션 검증 실행
   const path = window.location.pathname;
-  if (path === '/' || path === '') {
+  if (path === '/' || path === '' || path === '/about') {
     verifySession();
   }
 })();
