@@ -5437,7 +5437,7 @@ app.get('/about', (c) => {
             <i class="fas fa-bolt"></i>
             무료로 시작하기
           </button>
-          <button onclick="installPWA()" class="btn btn-ghost btn-lg" style="color:#A0A0C0; border: 2px solid rgba(255,255,255,0.2);">
+          <button onclick="location.href='/?install=1'" class="btn btn-ghost btn-lg" style="color:#A0A0C0; border: 2px solid rgba(255,255,255,0.2);">
             <i class="fas fa-download"></i>
             데스크톱에 추가
           </button>
