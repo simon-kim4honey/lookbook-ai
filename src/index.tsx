@@ -80,6 +80,10 @@ app.route('/api/admin/bizleads', bizLeadsApp)
 const ATLAS_API_BASE = 'https://api.atlascloud.ai'
 // ATLAS_API_KEY는 c.env.ATLAS_API_KEY (환경변수)로 각 라우트에서 직접 참조
 const AIFASHION_BASE = 'https://www.aifashion.co.kr'
+// AI 자동 기술도식화 생성기 — 별도 저장소(ezlook-techpack)로 개발되어 Render에 배포된 독립 서비스.
+// lookbook-ai와는 기술 스택이 완전히 달라(Next.js/NestJS/Postgres) 별도 배포 대상이며,
+// /techpack은 PC 화면에서 이 URL로 리다이렉트만 한다.
+const TECHPACK_APP_URL = 'https://ezlook-techpack-web.onrender.com'
 // 어드민 인증 미들웨어 (상단 선언 필수 — 스토어/라우트보다 먼저 참조됨)
 const adminAuth = async (c: any, next: any) => {
   const authHeader = c.req.header('X-Admin-Password')
@@ -7286,17 +7290,25 @@ app.get('/techpack', (c) => {
   <div id="techpackApp" class="techpack-app">
     <header class="techpack-header">
       <a href="/" class="techpack-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
-      <div class="techpack-header-title">AI 도식화 만들기 <span class="techpack-badge">준비 중</span></div>
+      <div class="techpack-header-title">AI 도식화 만들기</div>
       <a href="/" class="btn btn-ghost btn-sm">닫기</a>
     </header>
     <main class="techpack-main">
       <div class="techpack-empty">
         <i class="fas fa-drafting-compass"></i>
-        <h1>AI 자동 기술도식화 생성기</h1>
-        <p>상품 사진 한 장으로 공장 발주용 기술도식화(플랫 스케치)를 자동 생성하는 기능을 준비하고 있습니다.<br>출시되면 이 화면에서 바로 이용하실 수 있어요.</p>
+        <h1>AI 자동 기술도식화 생성기로 이동합니다</h1>
+        <p>잠시만 기다려주세요.</p>
       </div>
     </main>
   </div>
+  <script>
+    // .techpack-app은 PC(1024px 이상)에서만 CSS로 보이고, 좁은 화면에서는
+    // .techpack-mobile-gate만 표시된다(style.css 참고) — 그래서 리다이렉트도
+    // 같은 조건일 때만 실행해서 모바일 안내 화면이 그대로 유지되게 한다.
+    if (window.innerWidth > 1024) {
+      window.location.replace(${JSON.stringify(TECHPACK_APP_URL)})
+    }
+  </script>
   `, techpackExtraHead, 'AI가 상품 사진을 분석해 기술도식화(플랫 스케치)를 자동 생성합니다. PC 전용 기능입니다.', c.env.GA4_MEASUREMENT_ID))
 })
 
