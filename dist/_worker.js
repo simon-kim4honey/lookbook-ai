@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtk440jm`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtnsmbaa`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -781,6 +781,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             </a>
             <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
@@ -1415,6 +1416,12 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <span class="db-menu-arrow">›</span>
       </a>
 
+      <!-- 도식화 만들기 -->
+      <a href="/techpack" class="db-menu-item">
+        <span class="db-menu-label">도식화 만들기</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
       <!-- 생성 내역 -->
       <a href="/dashboard#history" class="db-menu-item" id="menuHistory">
         <span class="db-menu-label">생성 내역</span>
@@ -1483,6 +1490,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
               </a>
               <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
               <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+              <a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
               <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
               <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
@@ -2205,6 +2213,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             </a>
             <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
@@ -2617,7 +2626,31 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);text-decoration:underline;">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);text-decoration:underline;">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
-  `,a,n,e.env.GA4_MEASUREMENT_ID))};V.get(`/`,e=>Un(e,`model`)),V.get(`/generator`,e=>e.redirect(`/`,301)),V.get(`/ghostcut`,e=>Un(e,`ghostcut`)),V.get(`/admin02`,e=>e.html(`<!DOCTYPE html>
+  `,a,n,e.env.GA4_MEASUREMENT_ID))};V.get(`/`,e=>Un(e,`model`)),V.get(`/generator`,e=>e.redirect(`/`,301)),V.get(`/ghostcut`,e=>Un(e,`ghostcut`)),V.get(`/techpack`,e=>{let t=`<link rel="canonical" href="${U}/techpack" />`;return e.html(Bn(`AI 도식화 만들기`,`
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div id="techpackMobileGate" class="techpack-mobile-gate">
+    <i class="fas fa-desktop"></i>
+    <h2>PC 전용 기능입니다</h2>
+    <p>도식화 만들기는 PC(데스크톱) 화면에서만 이용하실 수 있어요.<br>PC로 www.aifashion.co.kr/techpack에 접속해주세요.</p>
+    <a href="/" class="btn btn-primary">홈으로 돌아가기</a>
+  </div>
+
+  <div id="techpackApp" class="techpack-app">
+    <header class="techpack-header">
+      <a href="/" class="techpack-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <div class="techpack-header-title">AI 도식화 만들기 <span class="techpack-badge">준비 중</span></div>
+      <a href="/" class="btn btn-ghost btn-sm">닫기</a>
+    </header>
+    <main class="techpack-main">
+      <div class="techpack-empty">
+        <i class="fas fa-drafting-compass"></i>
+        <h1>AI 자동 기술도식화 생성기</h1>
+        <p>상품 사진 한 장으로 공장 발주용 기술도식화(플랫 스케치)를 자동 생성하는 기능을 준비하고 있습니다.<br>출시되면 이 화면에서 바로 이용하실 수 있어요.</p>
+      </div>
+    </main>
+  </div>
+  `,t,`AI가 상품 사진을 분석해 기술도식화(플랫 스케치)를 자동 생성합니다. PC 전용 기능입니다.`,e.env.GA4_MEASUREMENT_ID))}),V.get(`/admin02`,e=>e.html(`<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8"/>

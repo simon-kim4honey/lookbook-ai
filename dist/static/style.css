@@ -3366,3 +3366,64 @@ button, a { touch-action: manipulation; }
 .hist-action-btn.primary:hover { filter: brightness(1.08); }
 .hist-action-btn.danger { color: #EF4444; }
 .hist-action-btn.danger:hover { background: rgba(239,68,68,0.12); }
+
+/* ─────────────────────────────────────────────────────────
+   도식화 만들기 (/techpack) — PC 전용, 데스크톱 전체화면 레이아웃
+   모델컷/누끼컷의 #gapp(모바일 480px 중앙 패널)과 달리 화면 전체를 씀.
+   ───────────────────────────────────────────────────────── */
+.techpack-mobile-gate {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px;
+  background: #FFFFFF;
+}
+.techpack-mobile-gate i { font-size: 40px; color: #3182F6; margin-bottom: 16px; }
+.techpack-mobile-gate h2 { font-size: 20px; font-weight: 700; color: #191F28; margin-bottom: 10px; }
+.techpack-mobile-gate p { font-size: 14px; color: #4E5968; line-height: 1.6; margin-bottom: 24px; }
+
+.techpack-app {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: #F2F4F6;
+}
+.techpack-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 60px;
+  padding: 0 24px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E5E8EB;
+}
+.techpack-logo { font-size: 18px; text-decoration: none; }
+.techpack-header-title { font-size: 15px; font-weight: 600; color: #191F28; display: flex; align-items: center; gap: 8px; }
+.techpack-badge { font-size: 11px; font-weight: 700; color: #8B95A1; background: #F2F4F6; border-radius: 20px; padding: 3px 10px; }
+.techpack-header .btn-sm { margin-left: auto; }
+.techpack-main {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+.techpack-empty { max-width: 480px; text-align: center; }
+.techpack-empty i { font-size: 48px; color: #3182F6; margin-bottom: 20px; }
+.techpack-empty h1 { font-size: 24px; font-weight: 700; color: #191F28; margin-bottom: 12px; }
+.techpack-empty p { font-size: 14px; color: #4E5968; line-height: 1.7; }
+
+/* 1024px 미만(태블릿·모바일)에서는 안내 화면만, 도구는 숨김 */
+@media (max-width: 1024px) {
+  .techpack-mobile-gate { display: flex; }
+  .techpack-app { display: none; }
+}
