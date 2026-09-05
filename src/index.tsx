@@ -5388,6 +5388,7 @@ app.get('/about', (c) => {
             </a>
             <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
@@ -6027,6 +6028,12 @@ app.get('/dashboard', (c) => {
         <span class="db-menu-arrow">›</span>
       </a>
 
+      <!-- 도식화 만들기 -->
+      <a href="/techpack" class="db-menu-item">
+        <span class="db-menu-label">도식화 만들기</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
       <!-- 생성 내역 -->
       <a href="/dashboard#history" class="db-menu-item" id="menuHistory">
         <span class="db-menu-label">생성 내역</span>
@@ -6095,6 +6102,7 @@ app.get('/dashboard', (c) => {
               </a>
               <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
               <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+              <a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
               <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
               <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
@@ -6838,6 +6846,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             </a>
             <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
@@ -7255,6 +7264,41 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 app.get('/', (c) => generatorPageHandler(c, 'model'))
 app.get('/generator', (c) => c.redirect('/', 301))
 app.get('/ghostcut', (c) => generatorPageHandler(c, 'ghostcut'))
+
+// ────────────────────────────────────────────────────
+// 도식화 만들기 (AI Technical Flat Sketch) — PC 전용
+// 모델컷/누끼컷과 달리 #gapp(모바일 480px 중앙 패널) 셸을 쓰지 않고
+// 데스크톱 화면 전체를 쓰는 별도 레이아웃. 실제 생성 파이프라인은
+// 아직 미구현 — 진입점(메뉴·라우트·PC 전용 안내)만 우선 마련.
+// ────────────────────────────────────────────────────
+app.get('/techpack', (c) => {
+  const techpackExtraHead = `<link rel="canonical" href="${AIFASHION_BASE}/techpack" />`
+  return c.html(htmlShell('AI 도식화 만들기', `
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div id="techpackMobileGate" class="techpack-mobile-gate">
+    <i class="fas fa-desktop"></i>
+    <h2>PC 전용 기능입니다</h2>
+    <p>도식화 만들기는 PC(데스크톱) 화면에서만 이용하실 수 있어요.<br>PC로 www.aifashion.co.kr/techpack에 접속해주세요.</p>
+    <a href="/" class="btn btn-primary">홈으로 돌아가기</a>
+  </div>
+
+  <div id="techpackApp" class="techpack-app">
+    <header class="techpack-header">
+      <a href="/" class="techpack-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <div class="techpack-header-title">AI 도식화 만들기 <span class="techpack-badge">준비 중</span></div>
+      <a href="/" class="btn btn-ghost btn-sm">닫기</a>
+    </header>
+    <main class="techpack-main">
+      <div class="techpack-empty">
+        <i class="fas fa-drafting-compass"></i>
+        <h1>AI 자동 기술도식화 생성기</h1>
+        <p>상품 사진 한 장으로 공장 발주용 기술도식화(플랫 스케치)를 자동 생성하는 기능을 준비하고 있습니다.<br>출시되면 이 화면에서 바로 이용하실 수 있어요.</p>
+      </div>
+    </main>
+  </div>
+  `, techpackExtraHead, 'AI가 상품 사진을 분석해 기술도식화(플랫 스케치)를 자동 생성합니다. PC 전용 기능입니다.', c.env.GA4_MEASUREMENT_ID))
+})
 
 // ────────────────────────────────────────────────────
 // Admin Page  GET /admin
