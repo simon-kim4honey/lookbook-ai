@@ -1925,6 +1925,39 @@ async function signTechpackHandoffToken(
   return `${signingInput}.${base64url(signature)}`
 }
 
+function base64urlToBytes(b64url: string): Uint8Array {
+  const padded = b64url.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (b64url.length % 4)) % 4)
+  const bin = atob(padded)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes
+}
+
+// ezlook-techpack-api가 서버-투-서버로 호출할 때 쓰는, 같은 TECHPACK_HANDOFF_SECRET으로
+// 서명된 단명 토큰을 검증한다(반대 방향 — signTechpackHandoffToken은 우리가 발급, 이건
+// 상대가 발급한 걸 우리가 검증). payload는 { sub: <lookbook user id> }만 필요하다.
+async function verifyTechpackServerToken(secret: string, token: string): Promise<{ sub: string } | null> {
+  const parts = token.split('.')
+  if (parts.length !== 3) return null
+  const [headerPart, payloadPart, signaturePart] = parts
+  const encoder = new TextEncoder()
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+    )
+    const valid = await crypto.subtle.verify(
+      'HMAC', key, base64urlToBytes(signaturePart), encoder.encode(`${headerPart}.${payloadPart}`)
+    )
+    if (!valid) return null
+    const payload = JSON.parse(new TextDecoder().decode(base64urlToBytes(payloadPart)))
+    if (!payload?.sub || typeof payload.exp !== 'number') return null
+    if (payload.exp < Math.floor(Date.now() / 1000)) return null
+    return { sub: String(payload.sub) }
+  } catch {
+    return null
+  }
+}
+
 // ────────────────────────────────────────────────────
 // 추천인(제휴사) 목록 — 회원가입 드롭다운/할인·보너스 정책에서 공통 사용
 const REFERRER_OPTIONS = ['BFM회원', '코오롱 FnC', '한섬'] as const
@@ -2028,6 +2061,56 @@ app.get('/api/techpack/handoff-token', async (c) => {
     })
     return c.json({ success: true, token: handoffToken })
   } catch (err: any) {
+    return c.json({ success: false, message: '서버 오류' }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// GET /api/techpack/upload-history — ezlook-techpack(도식화 서비스)가 사용자의 모델컷/
+// 누끼컷 업로드 이력을 도식화용 이미지로 재사용할 수 있도록 노출한다. 브라우저가 아니라
+// ezlook-techpack-api 서버가 직접 호출하는 서버-투-서버 엔드포인트라 CORS와 무관하다 —
+// Authorization: Bearer 헤더에 TECHPACK_HANDOFF_SECRET으로 서명한 단명 토큰(sub=lookbook
+// user id)을 담아 인증한다. 원본 의류 이미지는 clothing_img:{job_id} KV에 14일간만
+// 보관되므로, 그 이후 업로드는 자연히 목록에서 사라진다(별도 만료 처리 불필요).
+// ────────────────────────────────────────────────────
+app.get('/api/techpack/upload-history', async (c) => {
+  try {
+    const auth = c.req.header('authorization') || ''
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+    const verified = token ? await verifyTechpackServerToken(c.env.TECHPACK_HANDOFF_SECRET, token) : null
+    if (!verified) return c.json({ success: false, message: '인증에 실패했습니다.' }, 401)
+
+    const db = c.env.LOOKBOOK_DB
+    const kv: KVNamespace | undefined = (c.env as any)?.LOOKBOOK_KV
+    const origin = getOrigin(c)
+
+    const logs = await db.prepare(
+      `SELECT job_id, model_name, created_at FROM generation_logs
+       WHERE user_id = ? AND (kind IS NULL OR kind != 'video') ORDER BY created_at DESC LIMIT 30`
+    ).bind(verified.sub).all()
+
+    const uploads: { job_id: string; created_at: string; label: string; images: string[] }[] = []
+    if (kv) {
+      for (const g of (logs.results || []) as any[]) {
+        try {
+          const stored = await kv.get(`clothing_img:${g.job_id}`)
+          if (!stored) continue
+          const arr = JSON.parse(stored)
+          if (!Array.isArray(arr) || arr.length === 0) continue
+          const isGhostCut = !!(g.model_name && String(g.model_name).startsWith('고스트컷'))
+          uploads.push({
+            job_id: g.job_id,
+            created_at: g.created_at,
+            label: isGhostCut ? '누끼컷' : '모델컷',
+            images: arr.map((_: string, i: number) => `${origin}/api/proxy/clothing/${encodeURIComponent(g.job_id)}/${i}`),
+          })
+        } catch {}
+      }
+    }
+
+    return c.json({ success: true, uploads })
+  } catch (err: any) {
+    console.error('techpack/upload-history error:', err)
     return c.json({ success: false, message: '서버 오류' }, 500)
   }
 })
