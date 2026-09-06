@@ -2033,19 +2033,6 @@ app.get('/api/techpack/handoff-token', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
-// TEMP DEBUG — ezlook-techpack과 TECHPACK_HANDOFF_SECRET이 서로 같은 값인지
-// 확인하기 위한 임시 엔드포인트. 실제 비밀값은 절대 반환하지 않고, 되돌릴 수
-// 없는 짧은 해시(지문)와 길이만 반환한다. 원인 확인 후 반드시 삭제할 것.
-// ────────────────────────────────────────────────────
-app.get('/api/techpack/debug-secret-fingerprint', async (c) => {
-  const secret = c.env.TECHPACK_HANDOFF_SECRET || ''
-  const data = new TextEncoder().encode(secret)
-  const hash = await crypto.subtle.digest('SHA-256', data)
-  const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
-  return c.json({ fingerprint: hex.slice(0, 16), length: secret.length })
-})
-
-// ────────────────────────────────────────────────────
 // POST /api/auth/logout — 로그아웃 (세션 삭제)
 // ────────────────────────────────────────────────────
 app.post('/api/auth/logout', async (c) => {
