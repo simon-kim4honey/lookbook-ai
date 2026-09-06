@@ -2116,6 +2116,31 @@ app.get('/api/techpack/upload-history', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
+// GET /api/techpack/account-summary — 도식화(ezlook-techpack) 화면 안에서도 EZlook
+// 본서비스의 계정 메뉴(이름/이메일/남은 크레딧)를 그대로 보여주기 위한 서버-투-서버
+// 엔드포인트. 인증 방식은 upload-history와 동일(Bearer + TECHPACK_HANDOFF_SECRET
+// 서명 토큰). 충전/생성내역 등 실제 조작은 여전히 lookbook-ai 화면으로 이동해서
+// 하므로, 여기서는 표시용 요약 정보만 내려준다.
+// ────────────────────────────────────────────────────
+app.get('/api/techpack/account-summary', async (c) => {
+  try {
+    const auth = c.req.header('authorization') || ''
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
+    const verified = token ? await verifyTechpackServerToken(c.env.TECHPACK_HANDOFF_SECRET, token) : null
+    if (!verified) return c.json({ success: false, message: '인증에 실패했습니다.' }, 401)
+
+    const db = c.env.LOOKBOOK_DB
+    const user: any = await db.prepare(`SELECT name, email, credits FROM users WHERE id = ?`).bind(verified.sub).first()
+    if (!user) return c.json({ success: false, message: '사용자를 찾을 수 없습니다.' }, 404)
+
+    return c.json({ success: true, name: user.name, email: user.email, credits: user.credits })
+  } catch (err: any) {
+    console.error('techpack/account-summary error:', err)
+    return c.json({ success: false, message: '서버 오류' }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
 // POST /api/auth/logout — 로그아웃 (세션 삭제)
 // ────────────────────────────────────────────────────
 app.post('/api/auth/logout', async (c) => {
