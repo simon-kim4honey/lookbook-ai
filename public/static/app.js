@@ -1296,10 +1296,14 @@ function oauthLogin(provider, btn) {
 
   function handleOAuthSuccess(data) {
     const { token, user } = data;
-    if (_isTechpackPopup()) { _completeTechpackPopupLogin(token); return; }
+    // techpack 팝업이어도 lookbook-ai 자체 로그인 상태는 항상 먼저 저장해야 한다 —
+    // 팝업 핸드오프만 하고 바로 return해버리면, 나중에 lookbook-ai를 직접 열었을 때
+    // (예: 도식화 화면의 "모델컷 만들기" 링크) 로그인 흔적이 없어 다시 로그인
+    // 화면이 뜨는 버그가 있었다.
     AppState.user = user;
     localStorage.setItem('lookbook_token', token);
     localStorage.setItem('lookbook_user', JSON.stringify(user));
+    if (_isTechpackPopup()) { _completeTechpackPopupLogin(token); return; }
     localStorage.removeItem('oauth_result');
     _setAuthButtonsBusy(false);
     updateUserUI();
@@ -1467,10 +1471,13 @@ async function handleLogin(e) {
     const data = await res.json();
 
     if (data.success) {
-      if (_isTechpackPopup()) { _completeTechpackPopupLogin(data.token); return; }
+      // techpack 팝업이어도 lookbook-ai 자체 로그인 상태는 항상 먼저 저장한다 —
+      // handleOAuthSuccess와 같은 이유(팝업 핸드오프만 하고 return하면 lookbook-ai
+      // 자체 로그인 흔적이 안 남는 버그).
       AppState.user = data.user;
       localStorage.setItem('lookbook_token', data.token);
       localStorage.setItem('lookbook_user', JSON.stringify(data.user));
+      if (_isTechpackPopup()) { _completeTechpackPopupLogin(data.token); return; }
       updateUserUI();
       closeModal('loginModal');
       showToast(t('welcome', data.user.name), 'success');
@@ -1584,6 +1591,9 @@ async function handleSignup(e) {
       AppState.user = data.user;
       localStorage.setItem('lookbook_token', data.token);
       localStorage.setItem('lookbook_user', JSON.stringify(data.user));
+      // 이메일 로그인/OAuth와 같은 이유로, techpack 팝업에서 회원가입한 경우도
+      // 핸드오프를 완료해야 한다(안 그러면 팝업이 안 닫히고 계속 남아있게 된다).
+      if (_isTechpackPopup()) { _completeTechpackPopupLogin(data.token); return; }
       updateUserUI();
       closeModal('loginModal');
       showToast(t('signupDone'), 'success');
