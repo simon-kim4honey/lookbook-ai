@@ -6869,7 +6869,11 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
   // ezlook-techpack(별도 서비스)이 로그인 팝업(?techpack_popup=1)으로 이 페이지를 열었을 때,
   // 로그인 완료 후 만든 핸드오프 토큰을 postMessage로 보낼 대상 origin — '*' 대신 정확히
   // 이 값으로만 보내서 다른 origin이 팝업을 열어도 토큰이 새지 않게 한다.
-  const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};window.__TECHPACK_APP_ORIGIN__=${JSON.stringify(new URL(TECHPACK_APP_URL).origin)};</script>\n  <link rel="canonical" href="${AIFASHION_BASE}${canonicalPath}" />\n  <meta property="og:url" content="${AIFASHION_BASE}${canonicalPath}" />`
+  // 이 <script>는 <head>에서 동기 실행되어 body가 파싱되기 전에 끝난다(app.js는 defer라
+  // body 렌더링을 막지 못해 이 체크를 app.js에 두면 #gapp이 잠깐 그려졌다 사라지는
+  // 깜빡임이 생긴다) — techpack_popup=1이면 #gapp을 document.write로 즉시 숨겨서
+  // 로그인 모달만 보이게 한다(모달은 #gapp 밖의 형제 엘리먼트라 영향 없음).
+  const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};window.__TECHPACK_APP_ORIGIN__=${JSON.stringify(new URL(TECHPACK_APP_URL).origin)};if(new URLSearchParams(location.search).get('techpack_popup')==='1'){document.write('<style>#gapp{display:none!important}</style>')}</script>\n  <link rel="canonical" href="${AIFASHION_BASE}${canonicalPath}" />\n  <meta property="og:url" content="${AIFASHION_BASE}${canonicalPath}" />`
   return c.html(htmlShell(pageTitle, `
   <div class="toast-container" id="toastContainer"></div>
   <h1 class="sr-only">AI 룩북 생성기 — 옷 사진 한 장으로 온모델 피팅컷 무료 제작</h1>
