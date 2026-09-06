@@ -34,6 +34,10 @@ type Bindings = {
   ANTHROPIC_API_KEY?: string
   // GA4 측정 ID (예: G-XXXXXXXXXX) — 미설정 시 GA 스니펫 자체를 삽입하지 않음
   GA4_MEASUREMENT_ID?: string
+  // ezlook-techpack(별도 서비스) 로그인 연동용 핸드오프 토큰 서명 키
+  // (wrangler secret put TECHPACK_HANDOFF_SECRET — ezlook-techpack-api의
+  // 동일 이름 env var와 같은 값이어야 한다)
+  TECHPACK_HANDOFF_SECRET: string
 }
 
 // GA4 gtag.js 스니펫 — GA4_MEASUREMENT_ID 미설정 시 빈 문자열(추적 없음)
@@ -1893,6 +1897,34 @@ function publicUser(u: any) {
   return { id: u.id, name: u.name, email: u.email, role: u.role, credits: u.credits, avatar_url: u.avatar_url, provider: u.provider, referrer: u.referrer ?? null }
 }
 
+// ── ezlook-techpack 핸드오프용 JWT (HMAC-SHA256, 자체 서명 — 새 npm 의존성 없이
+// Web Crypto만 사용). 세션 토큰 자체를 넘기지 않고, 짧은 만료시간을 가진
+// 별도 토큰만 한 번 발급해서 다른 서비스로 넘겨준다.
+function base64url(bytes: ArrayBuffer | Uint8Array): string {
+  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+  let str = ''
+  for (const b of arr) str += String.fromCharCode(b)
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+async function signTechpackHandoffToken(
+  secret: string,
+  payload: { sub: string; email: string; name: string }
+): Promise<string> {
+  const header = { alg: 'HS256', typ: 'JWT' }
+  const now = Math.floor(Date.now() / 1000)
+  const body = { ...payload, iat: now, exp: now + 60 } // 60초 — 즉시 교환용, 저장/재사용 목적 아님
+  const encoder = new TextEncoder()
+  const headerPart = base64url(encoder.encode(JSON.stringify(header)))
+  const payloadPart = base64url(encoder.encode(JSON.stringify(body)))
+  const signingInput = `${headerPart}.${payloadPart}`
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(signingInput))
+  return `${signingInput}.${base64url(signature)}`
+}
+
 // ────────────────────────────────────────────────────
 // 추천인(제휴사) 목록 — 회원가입 드롭다운/할인·보너스 정책에서 공통 사용
 const REFERRER_OPTIONS = ['BFM회원', '코오롱 FnC', '한섬'] as const
@@ -1975,6 +2007,26 @@ app.get('/api/auth/me', async (c) => {
     const user = await getUserFromToken(db, token || null)
     if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
     return c.json({ success: true, user: publicUser(user) })
+  } catch (err: any) {
+    return c.json({ success: false, message: '서버 오류' }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// GET /api/techpack/handoff-token — ezlook-techpack(별도 서비스) 로그인 연동.
+// 현재 세션(X-Session-Token)이 유효할 때만, 그 사용자 정보를 담은 60초짜리
+// 서명된 토큰을 발급한다. ezlook-techpack은 이 토큰을 검증해서 자체 세션을 만든다.
+// ────────────────────────────────────────────────────
+app.get('/api/techpack/handoff-token', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const token = c.req.header('X-Session-Token') || c.req.query('token')
+    const user = await getUserFromToken(db, token || null)
+    if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+    const handoffToken = await signTechpackHandoffToken(c.env.TECHPACK_HANDOFF_SECRET, {
+      sub: user.id, email: user.email, name: user.name,
+    })
+    return c.json({ success: true, token: handoffToken })
   } catch (err: any) {
     return c.json({ success: false, message: '서버 오류' }, 500)
   }
@@ -7294,7 +7346,7 @@ app.get('/techpack', (c) => {
       <a href="/" class="btn btn-ghost btn-sm">닫기</a>
     </header>
     <main class="techpack-main">
-      <div class="techpack-empty">
+      <div class="techpack-empty" id="techpackEmpty">
         <i class="fas fa-drafting-compass"></i>
         <h1>AI 자동 기술도식화 생성기로 이동합니다</h1>
         <p>잠시만 기다려주세요.</p>
@@ -7303,10 +7355,29 @@ app.get('/techpack', (c) => {
   </div>
   <script>
     // .techpack-app은 PC(1024px 이상)에서만 CSS로 보이고, 좁은 화면에서는
-    // .techpack-mobile-gate만 표시된다(style.css 참고) — 그래서 리다이렉트도
+    // .techpack-mobile-gate만 표시된다(style.css 참고) — 그래서 아래 로직도
     // 같은 조건일 때만 실행해서 모바일 안내 화면이 그대로 유지되게 한다.
     if (window.innerWidth > 1024) {
-      window.location.replace(${JSON.stringify(TECHPACK_APP_URL)})
+      (async () => {
+        const empty = document.getElementById('techpackEmpty')
+        function showLoginRequired() {
+          if (!empty) return
+          empty.innerHTML = '<i class="fas fa-lock"></i>'
+            + '<h1>로그인이 필요합니다</h1>'
+            + '<p>도식화 만들기는 로그인 후 이용하실 수 있어요.</p>'
+            + '<a href="/" class="btn btn-primary" style="margin-top:16px;display:inline-block">로그인하러 가기</a>'
+        }
+        const lookbookToken = localStorage.getItem('lookbook_token')
+        if (!lookbookToken) { showLoginRequired(); return }
+        try {
+          const res = await fetch('/api/techpack/handoff-token', { headers: { 'X-Session-Token': lookbookToken } })
+          const data = await res.json()
+          if (!res.ok || !data.success || !data.token) { showLoginRequired(); return }
+          window.location.replace(${JSON.stringify(TECHPACK_APP_URL)} + '/?auth_token=' + encodeURIComponent(data.token))
+        } catch (err) {
+          showLoginRequired()
+        }
+      })()
     }
   </script>
   `, techpackExtraHead, 'AI가 상품 사진을 분석해 기술도식화(플랫 스케치)를 자동 생성합니다. PC 전용 기능입니다.', c.env.GA4_MEASUREMENT_ID))
