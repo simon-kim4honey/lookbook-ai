@@ -543,6 +543,18 @@ function initPage() {
   // /ghostcut의 UI 교체는 DOMContentLoaded 시점에 이미 실행됨(위 참고) — 여기서는 생략
   // 모든 페이지에서 세션 복원 (자동 로그인)
   verifySession().then(() => {
+    // ezlook-techpack이 로그인 전용 팝업으로 이 페이지(/)를 열었을 때 —
+    // 이미 로그인되어 있으면 바로 핸드오프하고 창을 닫고, 아니면 로그인 모달만 띄운다.
+    // 생성기 초기화(initGenerator) 등 나머지 작업은 이 팝업 창에서는 불필요하다.
+    if (_isTechpackPopup()) {
+      const existingToken = localStorage.getItem('lookbook_token');
+      if (existingToken) {
+        _completeTechpackPopupLogin(existingToken).then((ok) => { if (!ok) openModal('loginModal'); });
+      } else {
+        openModal('loginModal');
+      }
+      return;
+    }
     if (path === '/' || path === '') {
       // 2026-09-02: 생성기 앱이 새 홈(/)이 됨 — 기존 마케팅 랜딩은 /about으로 이동
       initGenerator();
@@ -1224,6 +1236,27 @@ function _setAuthButtonsBusy(busy, activeBtn) {
   });
 }
 
+// ── ezlook-techpack(별도 서비스)이 이 홈페이지를 로그인 전용 팝업으로 띄웠을 때(?techpack_popup=1)
+// 로그인이 끝나면 핸드오프 토큰을 opener(ezlook-techpack)에게 postMessage로 전달하고 창을 닫는다.
+// 모델컷(/)·누끼컷(/ghostcut)의 기존 로그인 모달/OAuth 팝업 로직은 그대로 두고, 이 분기만 얹는다.
+function _isTechpackPopup() {
+  try { return new URLSearchParams(window.location.search).get('techpack_popup') === '1'; } catch (e) { return false; }
+}
+
+async function _completeTechpackPopupLogin(lookbookToken) {
+  try {
+    const res = await fetch('/api/techpack/handoff-token', { headers: { 'X-Session-Token': lookbookToken } });
+    const data = await res.json();
+    if (res.ok && data.success && data.token) {
+      const targetOrigin = window.__TECHPACK_APP_ORIGIN__ || '*';
+      if (window.opener) window.opener.postMessage({ type: 'techpack_login_success', token: data.token }, targetOrigin);
+      setTimeout(() => { try { window.close(); } catch (e) {} }, 200);
+      return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
 function oauthLogin(provider, btn) {
   // 이전 oauth_result 잔여 데이터 제거
   localStorage.removeItem('oauth_result');
@@ -1263,6 +1296,7 @@ function oauthLogin(provider, btn) {
 
   function handleOAuthSuccess(data) {
     const { token, user } = data;
+    if (_isTechpackPopup()) { _completeTechpackPopupLogin(token); return; }
     AppState.user = user;
     localStorage.setItem('lookbook_token', token);
     localStorage.setItem('lookbook_user', JSON.stringify(user));
@@ -1433,6 +1467,7 @@ async function handleLogin(e) {
     const data = await res.json();
 
     if (data.success) {
+      if (_isTechpackPopup()) { _completeTechpackPopupLogin(data.token); return; }
       AppState.user = data.user;
       localStorage.setItem('lookbook_token', data.token);
       localStorage.setItem('lookbook_user', JSON.stringify(data.user));

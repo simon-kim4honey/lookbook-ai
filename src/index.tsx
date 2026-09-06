@@ -34,6 +34,10 @@ type Bindings = {
   ANTHROPIC_API_KEY?: string
   // GA4 측정 ID (예: G-XXXXXXXXXX) — 미설정 시 GA 스니펫 자체를 삽입하지 않음
   GA4_MEASUREMENT_ID?: string
+  // ezlook-techpack(별도 서비스) 로그인 연동용 핸드오프 토큰 서명 키
+  // (wrangler secret put TECHPACK_HANDOFF_SECRET — ezlook-techpack-api의
+  // 동일 이름 env var와 같은 값이어야 한다)
+  TECHPACK_HANDOFF_SECRET: string
 }
 
 // GA4 gtag.js 스니펫 — GA4_MEASUREMENT_ID 미설정 시 빈 문자열(추적 없음)
@@ -80,6 +84,10 @@ app.route('/api/admin/bizleads', bizLeadsApp)
 const ATLAS_API_BASE = 'https://api.atlascloud.ai'
 // ATLAS_API_KEY는 c.env.ATLAS_API_KEY (환경변수)로 각 라우트에서 직접 참조
 const AIFASHION_BASE = 'https://www.aifashion.co.kr'
+// AI 자동 기술도식화 생성기 — 별도 저장소(ezlook-techpack)로 개발되어 Render에 배포된 독립 서비스.
+// lookbook-ai와는 기술 스택이 완전히 달라(Next.js/NestJS/Postgres) 별도 배포 대상이며,
+// /techpack은 PC 화면에서 이 URL로 리다이렉트만 한다.
+const TECHPACK_APP_URL = 'https://ezlook-techpack-web.onrender.com'
 // 어드민 인증 미들웨어 (상단 선언 필수 — 스토어/라우트보다 먼저 참조됨)
 const adminAuth = async (c: any, next: any) => {
   const authHeader = c.req.header('X-Admin-Password')
@@ -1889,6 +1897,34 @@ function publicUser(u: any) {
   return { id: u.id, name: u.name, email: u.email, role: u.role, credits: u.credits, avatar_url: u.avatar_url, provider: u.provider, referrer: u.referrer ?? null }
 }
 
+// ── ezlook-techpack 핸드오프용 JWT (HMAC-SHA256, 자체 서명 — 새 npm 의존성 없이
+// Web Crypto만 사용). 세션 토큰 자체를 넘기지 않고, 짧은 만료시간을 가진
+// 별도 토큰만 한 번 발급해서 다른 서비스로 넘겨준다.
+function base64url(bytes: ArrayBuffer | Uint8Array): string {
+  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
+  let str = ''
+  for (const b of arr) str += String.fromCharCode(b)
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+async function signTechpackHandoffToken(
+  secret: string,
+  payload: { sub: string; email: string; name: string }
+): Promise<string> {
+  const header = { alg: 'HS256', typ: 'JWT' }
+  const now = Math.floor(Date.now() / 1000)
+  const body = { ...payload, iat: now, exp: now + 60 } // 60초 — 즉시 교환용, 저장/재사용 목적 아님
+  const encoder = new TextEncoder()
+  const headerPart = base64url(encoder.encode(JSON.stringify(header)))
+  const payloadPart = base64url(encoder.encode(JSON.stringify(body)))
+  const signingInput = `${headerPart}.${payloadPart}`
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(signingInput))
+  return `${signingInput}.${base64url(signature)}`
+}
+
 // ────────────────────────────────────────────────────
 // 추천인(제휴사) 목록 — 회원가입 드롭다운/할인·보너스 정책에서 공통 사용
 const REFERRER_OPTIONS = ['BFM회원', '코오롱 FnC', '한섬'] as const
@@ -1971,6 +2007,26 @@ app.get('/api/auth/me', async (c) => {
     const user = await getUserFromToken(db, token || null)
     if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
     return c.json({ success: true, user: publicUser(user) })
+  } catch (err: any) {
+    return c.json({ success: false, message: '서버 오류' }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// GET /api/techpack/handoff-token — ezlook-techpack(별도 서비스) 로그인 연동.
+// 현재 세션(X-Session-Token)이 유효할 때만, 그 사용자 정보를 담은 60초짜리
+// 서명된 토큰을 발급한다. ezlook-techpack은 이 토큰을 검증해서 자체 세션을 만든다.
+// ────────────────────────────────────────────────────
+app.get('/api/techpack/handoff-token', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const token = c.req.header('X-Session-Token') || c.req.query('token')
+    const user = await getUserFromToken(db, token || null)
+    if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+    const handoffToken = await signTechpackHandoffToken(c.env.TECHPACK_HANDOFF_SECRET, {
+      sub: user.id, email: user.email, name: user.name,
+    })
+    return c.json({ success: true, token: handoffToken })
   } catch (err: any) {
     return c.json({ success: false, message: '서버 오류' }, 500)
   }
@@ -5388,6 +5444,7 @@ app.get('/about', (c) => {
             </a>
             <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
@@ -6027,6 +6084,12 @@ app.get('/dashboard', (c) => {
         <span class="db-menu-arrow">›</span>
       </a>
 
+      <!-- 도식화 만들기 -->
+      <a href="/techpack" class="db-menu-item">
+        <span class="db-menu-label">도식화 만들기</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
       <!-- 생성 내역 -->
       <a href="/dashboard#history" class="db-menu-item" id="menuHistory">
         <span class="db-menu-label">생성 내역</span>
@@ -6095,6 +6158,7 @@ app.get('/dashboard', (c) => {
               </a>
               <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
               <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+              <a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
               <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
               <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
@@ -6802,7 +6866,10 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
     : '옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.'
   const pageTitle = mode === 'ghostcut' ? '무료 AI 누끼컷 생성기' : '무료 AI 룩북 생성기'
   const canonicalPath = mode === 'ghostcut' ? '/ghostcut' : '/'
-  const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};</script>\n  <link rel="canonical" href="${AIFASHION_BASE}${canonicalPath}" />\n  <meta property="og:url" content="${AIFASHION_BASE}${canonicalPath}" />`
+  // ezlook-techpack(별도 서비스)이 로그인 팝업(?techpack_popup=1)으로 이 페이지를 열었을 때,
+  // 로그인 완료 후 만든 핸드오프 토큰을 postMessage로 보낼 대상 origin — '*' 대신 정확히
+  // 이 값으로만 보내서 다른 origin이 팝업을 열어도 토큰이 새지 않게 한다.
+  const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};window.__TECHPACK_APP_ORIGIN__=${JSON.stringify(new URL(TECHPACK_APP_URL).origin)};</script>\n  <link rel="canonical" href="${AIFASHION_BASE}${canonicalPath}" />\n  <meta property="og:url" content="${AIFASHION_BASE}${canonicalPath}" />`
   return c.html(htmlShell(pageTitle, `
   <div class="toast-container" id="toastContainer"></div>
   <h1 class="sr-only">AI 룩북 생성기 — 옷 사진 한 장으로 온모델 피팅컷 무료 제작</h1>
@@ -6838,6 +6905,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             </a>
             <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
@@ -7255,6 +7323,52 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 app.get('/', (c) => generatorPageHandler(c, 'model'))
 app.get('/generator', (c) => c.redirect('/', 301))
 app.get('/ghostcut', (c) => generatorPageHandler(c, 'ghostcut'))
+
+// ────────────────────────────────────────────────────
+// 도식화 만들기 (AI Technical Flat Sketch) — PC 전용
+// 모델컷/누끼컷과 달리 #gapp(모바일 480px 중앙 패널) 셸을 쓰지 않고
+// 데스크톱 화면 전체를 쓰는 별도 레이아웃. 실제 생성 파이프라인은
+// 아직 미구현 — 진입점(메뉴·라우트·PC 전용 안내)만 우선 마련.
+// ────────────────────────────────────────────────────
+app.get('/techpack', (c) => {
+  const techpackExtraHead = `<link rel="canonical" href="${AIFASHION_BASE}/techpack" />`
+  return c.html(htmlShell('AI 도식화 만들기', `
+  <div class="toast-container" id="toastContainer"></div>
+
+  <div id="techpackMobileGate" class="techpack-mobile-gate">
+    <i class="fas fa-desktop"></i>
+    <h2>PC 전용 기능입니다</h2>
+    <p>도식화 만들기는 PC(데스크톱) 화면에서만 이용하실 수 있어요.<br>PC로 www.aifashion.co.kr/techpack에 접속해주세요.</p>
+    <a href="/" class="btn btn-primary">홈으로 돌아가기</a>
+  </div>
+
+  <div id="techpackApp" class="techpack-app">
+    <header class="techpack-header">
+      <a href="/" class="techpack-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <div class="techpack-header-title">AI 도식화 만들기</div>
+      <a href="/" class="btn btn-ghost btn-sm">닫기</a>
+    </header>
+    <main class="techpack-main">
+      <div class="techpack-empty" id="techpackEmpty">
+        <i class="fas fa-drafting-compass"></i>
+        <h1>AI 자동 기술도식화 생성기로 이동합니다</h1>
+        <p>잠시만 기다려주세요.</p>
+      </div>
+    </main>
+  </div>
+  <script>
+    // .techpack-app은 PC(1024px 이상)에서만 CSS로 보이고, 좁은 화면에서는
+    // .techpack-mobile-gate만 표시된다(style.css 참고) — 그래서 리다이렉트도
+    // 같은 조건일 때만 실행해서 모바일 안내 화면이 그대로 유지되게 한다.
+    // 로그인 여부는 여기서 확인하지 않는다 — 모델컷(/)·누끼컷(/ghostcut)과 같은
+    // 패턴으로, ezlook-techpack 쪽 화면을 먼저 보여주고 실제로 "생성" 버튼을
+    // 누르는 시점에만 로그인 팝업(이 사이트의 /?techpack_popup=1)이 뜬다.
+    if (window.innerWidth > 1024) {
+      window.location.replace(${JSON.stringify(TECHPACK_APP_URL)})
+    }
+  </script>
+  `, techpackExtraHead, 'AI가 상품 사진을 분석해 기술도식화(플랫 스케치)를 자동 생성합니다. PC 전용 기능입니다.', c.env.GA4_MEASUREMENT_ID))
+})
 
 // ────────────────────────────────────────────────────
 // Admin Page  GET /admin
