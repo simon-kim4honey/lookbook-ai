@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtp856fw`,_t=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtp9va0x`,_t=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2178,7 +2178,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       loadCreditHistory();
     });
   <\/script>
-  `,``,`내 크레딧 충전/사용 내역과 잔여 크레딧을 확인하세요.`,e.env.GA4_MEASUREMENT_ID)));var Kn=(e,t=`model`)=>{let n=t===`ghostcut`?`상품(옷) 이미지 한 장만 업로드하면 AI가 카테고리를 자동 인식해 고스트 마네킹(투명 마네킹) 스타일의 상품컷으로 변환해드립니다.`:`옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.`,r=t===`ghostcut`?`무료 AI 누끼컷 생성기`:`무료 AI 룩북 생성기`,i=t===`ghostcut`?`/ghostcut`:`/`,a=`<script>window.__EZLOOK_MODE__=${JSON.stringify(t)};<\/script>\n  <link rel="canonical" href="${U}${i}" />\n  <meta property="og:url" content="${U}${i}" />`;return e.html(Un(r,`
+  `,``,`내 크레딧 충전/사용 내역과 잔여 크레딧을 확인하세요.`,e.env.GA4_MEASUREMENT_ID)));var Kn=(e,t=`model`)=>{let n=t===`ghostcut`?`상품(옷) 이미지 한 장만 업로드하면 AI가 카테고리를 자동 인식해 고스트 마네킹(투명 마네킹) 스타일의 상품컷으로 변환해드립니다.`:`옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.`,r=t===`ghostcut`?`무료 AI 누끼컷 생성기`:`무료 AI 룩북 생성기`,i=t===`ghostcut`?`/ghostcut`:`/`,a=`<script>window.__EZLOOK_MODE__=${JSON.stringify(t)};window.__TECHPACK_APP_ORIGIN__=${JSON.stringify(new URL(vt).origin)};<\/script>\n  <link rel="canonical" href="${U}${i}" />\n  <meta property="og:url" content="${U}${i}" />`;return e.html(Un(r,`
   <div class="toast-container" id="toastContainer"></div>
   <h1 class="sr-only">AI 룩북 생성기 — 옷 사진 한 장으로 온모델 피팅컷 무료 제작</h1>
 
@@ -2652,29 +2652,13 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
   </div>
   <script>
     // .techpack-app은 PC(1024px 이상)에서만 CSS로 보이고, 좁은 화면에서는
-    // .techpack-mobile-gate만 표시된다(style.css 참고) — 그래서 아래 로직도
+    // .techpack-mobile-gate만 표시된다(style.css 참고) — 그래서 리다이렉트도
     // 같은 조건일 때만 실행해서 모바일 안내 화면이 그대로 유지되게 한다.
+    // 로그인 여부는 여기서 확인하지 않는다 — 모델컷(/)·누끼컷(/ghostcut)과 같은
+    // 패턴으로, ezlook-techpack 쪽 화면을 먼저 보여주고 실제로 "생성" 버튼을
+    // 누르는 시점에만 로그인 팝업(이 사이트의 /?techpack_popup=1)이 뜬다.
     if (window.innerWidth > 1024) {
-      (async () => {
-        const empty = document.getElementById('techpackEmpty')
-        function showLoginRequired() {
-          if (!empty) return
-          empty.innerHTML = '<i class="fas fa-lock"></i>'
-            + '<h1>로그인이 필요합니다</h1>'
-            + '<p>도식화 만들기는 로그인 후 이용하실 수 있어요.</p>'
-            + '<a href="/" class="btn btn-primary" style="margin-top:16px;display:inline-block">로그인하러 가기</a>'
-        }
-        const lookbookToken = localStorage.getItem('lookbook_token')
-        if (!lookbookToken) { showLoginRequired(); return }
-        try {
-          const res = await fetch('/api/techpack/handoff-token', { headers: { 'X-Session-Token': lookbookToken } })
-          const data = await res.json()
-          if (!res.ok || !data.success || !data.token) { showLoginRequired(); return }
-          window.location.replace(${JSON.stringify(vt)} + '/?auth_token=' + encodeURIComponent(data.token))
-        } catch (err) {
-          showLoginRequired()
-        }
-      })()
+      window.location.replace(${JSON.stringify(vt)})
     }
   <\/script>
   `,t,`AI가 상품 사진을 분석해 기술도식화(플랫 스케치)를 자동 생성합니다. PC 전용 기능입니다.`,e.env.GA4_MEASUREMENT_ID))}),V.get(`/admin02`,e=>e.html(`<!DOCTYPE html>
