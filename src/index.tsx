@@ -6866,7 +6866,10 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
     : '옷 사진을 업로드하고 AI 모델과 배경을 선택하면 평균 30초 만에 온모델 피팅컷이 완성됩니다. 신용카드 없이 무료로 체험해보세요.'
   const pageTitle = mode === 'ghostcut' ? '무료 AI 누끼컷 생성기' : '무료 AI 룩북 생성기'
   const canonicalPath = mode === 'ghostcut' ? '/ghostcut' : '/'
-  const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};</script>\n  <link rel="canonical" href="${AIFASHION_BASE}${canonicalPath}" />\n  <meta property="og:url" content="${AIFASHION_BASE}${canonicalPath}" />`
+  // ezlook-techpack(별도 서비스)이 로그인 팝업(?techpack_popup=1)으로 이 페이지를 열었을 때,
+  // 로그인 완료 후 만든 핸드오프 토큰을 postMessage로 보낼 대상 origin — '*' 대신 정확히
+  // 이 값으로만 보내서 다른 origin이 팝업을 열어도 토큰이 새지 않게 한다.
+  const modeScript = `<script>window.__EZLOOK_MODE__=${JSON.stringify(mode)};window.__TECHPACK_APP_ORIGIN__=${JSON.stringify(new URL(TECHPACK_APP_URL).origin)};</script>\n  <link rel="canonical" href="${AIFASHION_BASE}${canonicalPath}" />\n  <meta property="og:url" content="${AIFASHION_BASE}${canonicalPath}" />`
   return c.html(htmlShell(pageTitle, `
   <div class="toast-container" id="toastContainer"></div>
   <h1 class="sr-only">AI 룩북 생성기 — 옷 사진 한 장으로 온모델 피팅컷 무료 제작</h1>
@@ -7355,29 +7358,13 @@ app.get('/techpack', (c) => {
   </div>
   <script>
     // .techpack-app은 PC(1024px 이상)에서만 CSS로 보이고, 좁은 화면에서는
-    // .techpack-mobile-gate만 표시된다(style.css 참고) — 그래서 아래 로직도
+    // .techpack-mobile-gate만 표시된다(style.css 참고) — 그래서 리다이렉트도
     // 같은 조건일 때만 실행해서 모바일 안내 화면이 그대로 유지되게 한다.
+    // 로그인 여부는 여기서 확인하지 않는다 — 모델컷(/)·누끼컷(/ghostcut)과 같은
+    // 패턴으로, ezlook-techpack 쪽 화면을 먼저 보여주고 실제로 "생성" 버튼을
+    // 누르는 시점에만 로그인 팝업(이 사이트의 /?techpack_popup=1)이 뜬다.
     if (window.innerWidth > 1024) {
-      (async () => {
-        const empty = document.getElementById('techpackEmpty')
-        function showLoginRequired() {
-          if (!empty) return
-          empty.innerHTML = '<i class="fas fa-lock"></i>'
-            + '<h1>로그인이 필요합니다</h1>'
-            + '<p>도식화 만들기는 로그인 후 이용하실 수 있어요.</p>'
-            + '<a href="/" class="btn btn-primary" style="margin-top:16px;display:inline-block">로그인하러 가기</a>'
-        }
-        const lookbookToken = localStorage.getItem('lookbook_token')
-        if (!lookbookToken) { showLoginRequired(); return }
-        try {
-          const res = await fetch('/api/techpack/handoff-token', { headers: { 'X-Session-Token': lookbookToken } })
-          const data = await res.json()
-          if (!res.ok || !data.success || !data.token) { showLoginRequired(); return }
-          window.location.replace(${JSON.stringify(TECHPACK_APP_URL)} + '/?auth_token=' + encodeURIComponent(data.token))
-        } catch (err) {
-          showLoginRequired()
-        }
-      })()
+      window.location.replace(${JSON.stringify(TECHPACK_APP_URL)})
     }
   </script>
   `, techpackExtraHead, 'AI가 상품 사진을 분석해 기술도식화(플랫 스케치)를 자동 생성합니다. PC 전용 기능입니다.', c.env.GA4_MEASUREMENT_ID))
