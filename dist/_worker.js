@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mtthrpw0`;function _t(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vt=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mttibl45`;function _t(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -568,12 +568,13 @@ ${t}
 
   <h2 id="refund">제8조 (청약철회 및 환불)</h2>
   <p>① 이용자는 크레딧 결제일 또는 크레딧이 실제로 지급(공급)된 날 중 더 늦은 날로부터 7일 이내에는 「전자상거래 등에서의 소비자보호에 관한 법률」 제17조에 따라 청약철회를 요청할 수 있습니다. 단, 해당 크레딧을 일부라도 사용(이미지 생성)한 경우에는 사용하지 않은 나머지 크레딧에 대해 일할 계산하여 환불이 가능합니다.</p>
-  <p>② 크레딧을 전부 사용한 경우, 또는 제1항의 기간이 경과한 경우에는 원칙적으로 청약철회 및 환불이 제한됩니다.</p>
+  <p>② 제1항의 법정 청약철회 기간(7일)이 지난 후에는 「전자상거래법」상 청약철회는 제한되나, 미사용 크레딧이 남아있다면 제⑦항에 따른 크레딧 사용 기한(1년) 내에는 계속해서 취소·환불을 요청할 수 있습니다. 크레딧을 전부 사용한 경우에는 환불할 대상이 없어 환불이 제한됩니다.</p>
   <p>③ 서비스 오류(AI 생성 실패, 결제 중복 등) 등 회사의 귀책사유로 정상적인 서비스 제공이 불가능한 경우, 이용자는 사용 여부와 관계없이 전액 환불을 요청할 수 있습니다.</p>
-  <p>④ 환불 신청은 크레딧을 충전(결제)하신 날로부터 7일 이내에 카카오톡 채널 문의(사용자 메뉴 내 '카톡문의' 또는 <a href="http://pf.kakao.com/_wFyCX" target="_blank">http://pf.kakao.com/_wFyCX</a>)를 통해 결제 정보(주문번호, 결제일시, 결제수단)와 함께 접수해 주시기 바랍니다. 환불은 신청 접수 후 3영업일 이내에 결제 수단과 동일한 방법으로 처리됩니다.</p>
+  <p>④ 환불 신청은 카카오톡 채널 문의(사용자 메뉴 내 '카톡문의' 또는 <a href="http://pf.kakao.com/_wFyCX" target="_blank">http://pf.kakao.com/_wFyCX</a>)를 통해 결제 정보(주문번호, 결제일시, 결제수단)와 함께 접수해 주시기 바랍니다. 환불은 신청 접수 후 3영업일 이내에 결제 수단과 동일한 방법으로 처리됩니다.</p>
   <p>⑤ 이용자의 단순 변심에 의한 환불 시, 이미 사용한 크레딧에 해당하는 금액은 환불 대상에서 제외됩니다.</p>
   <p>⑥ 환불은 결제에 사용된 결제수단(카드) 승인 취소 방식으로만 처리되며, 현금 지급이나 계좌이체를 통한 환불은 불가합니다.</p>
-  <p>⑦ 충전된 크레딧의 사용 기한은 결제일로부터 1년이며, 기한 내 사용하지 않은 크레딧은 별도 안내 없이 소멸됩니다.</p>
+  <p>⑦ 충전된 크레딧의 사용 및 취소·환불 기한은 결제일로부터 1년이며, 기한 내 사용하지 않은 크레딧은 별도 안내 없이 소멸됩니다.</p>
+  <p>⑧ 구매한 크레딧은 다른 회원에게 양도, 대여, 매매할 수 없습니다.</p>
 
   <h2>제9조 (분쟁 해결)</h2>
   <p>본 약관과 관련한 분쟁은 대한민국 법률을 적용하며, 관할 법원은 민사소송법에 따릅니다.</p>
