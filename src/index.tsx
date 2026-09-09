@@ -22,13 +22,13 @@ type Bindings = {
   KAKAO_JS_KEY: string
   // 어드민
   ADMIN_PASSWORD: string
-  // 토스페이먼츠 (결제위젯 v2, 주문서형·결제창형 연동 키. API 베이스는 테스트/운영 동일 도메인이며
-  // 키가 test_/live_ 접두사로 모드를 구분한다 — sandbox 전용 별도 도메인 없음)
+  // 토스페이먼츠 (결제위젯 v2). 반드시 "API 개별연동 키"를 사용할 것 — "주문서형·결제창형
+  // 연동 키"는 TossPayments().payment().requestPayment() 방식에서 지원하지 않는다(토스가
+  // 직접 에러로 알려줌: "API 개별 연동 키의 클라이언트 키로 SDK를 연동해주세요").
+  // API 베이스는 테스트/운영 동일 도메인이며 키가 test_/live_ 접두사로 모드를 구분한다.
   TOSS_CLIENT_KEY: string
   TOSS_SECRET_KEY: string
   TOSS_API_BASE: string
-  // 토스 개발자센터에서 발급하는 웹훅 서명 검증용 시크릿 (아직 서명 검증 로직 미구현 — /payment/toss/webhook 참고)
-  TOSS_WEBHOOK_SECRET?: string
   // Atlas Cloud AI (이미지 생성 전용)
   ATLAS_API_KEY: string
   // OpenAI (이미지 분류/라벨링 전용 — gpt-4o-mini, AtlasCloud엔 없는 모델)
@@ -3261,15 +3261,15 @@ app.get('/payment/toss/fail', (c) => {
 })
 
 // ────────────────────────────────────────────────────
-// POST /payment/toss/webhook — 토스페이먼츠 결제 상태 변경 통보 (Webhooks)
+// POST /payment/toss/webhook — 토스페이먼츠 결제 상태 변경 통보 (Webhooks, PAYMENT_STATUS_CHANGED)
 // 관리자가 토스 개발자센터 콘솔 등에서 카드결제를 취소하면 이 웹훅으로 통보됨.
 // 정책: 지급된 크레딧 중 아직 남아있는 만큼만 회수 (min(지급크레딧, 현재잔액)), 0 미만으로는 내려가지 않음.
 //
-// ⚠️ 서명 검증 미구현 — 반드시 운영 전 확인할 것.
-// 토스 개발자센터에서 웹훅 시크릿을 발급받아 TOSS_WEBHOOK_SECRET으로 설정하고,
-// 최신 공식 문서(웹훅 검증 가이드)를 기준으로 서명 헤더 검증 로직을 추가하기 전까지는
-// 이 라우트가 누구나 위조 가능한 상태다 — 아래에서 TOSS_WEBHOOK_SECRET 미설정 시
-// 크레딧 회수 로직을 실행하지 않고 로그만 남기도록 안전장치를 걸어두었다(fail-closed).
+// PAYMENT_STATUS_CHANGED 이벤트는 토스 웹훅 헤더에 서명(tosspayments-webhook-signature)이
+// 붙지 않는다(그 헤더는 payout.changed/seller.changed 전용) — 그래서 서명 검증 대신,
+// 웹훅 본문의 내용을 그대로 믿지 않고 토스 결제 조회 API(GET /v1/payments/{paymentKey})를
+// 우리 시크릿키로 직접 호출해서 실제로 취소된 상태가 맞는지 재확인한 뒤에만 크레딧을 건드린다.
+// (CANCEL_STATUS_CHANGED 이벤트는 해외 간편결제 전용이라 국내 카드결제엔 발송되지 않으므로 무시)
 // ────────────────────────────────────────────────────
 app.post('/payment/toss/webhook', async (c) => {
   const db: D1Database = c.env.LOOKBOOK_DB
@@ -3282,21 +3282,16 @@ app.post('/payment/toss/webhook', async (c) => {
       return ackOk()
     }
 
-    // TODO: TOSS_WEBHOOK_SECRET + 실제 서명 헤더(예: TossPayments-Signature)로 rawText 검증.
-    // 시크릿이 없으면 위변조 여부를 확인할 수 없으므로, 크레딧을 건드리지 않고 로그만 남긴다.
-    if (!c.env.TOSS_WEBHOOK_SECRET) {
-      console.error('토스 웹훅 수신했으나 TOSS_WEBHOOK_SECRET 미설정 — 서명 검증 불가, 크레딧 처리 건너뜀:', JSON.stringify(body).slice(0, 500))
+    if (String(body.eventType || '') !== 'PAYMENT_STATUS_CHANGED') {
       return ackOk()
     }
-
-    const eventType = String(body.eventType || '')
     const data = body.data || {}
     const orderId = String(data.orderId || '')
     const paymentKey = String(data.paymentKey || '')
-    const status = String(data.status || '')
+    const reportedStatus = String(data.status || '')
 
-    const isCanceled = eventType === 'PAYMENT_STATUS_CHANGED' && (status === 'CANCELED' || status === 'PARTIAL_CANCELED')
-    if (!isCanceled) {
+    const isCanceled = reportedStatus === 'CANCELED' || reportedStatus === 'PARTIAL_CANCELED'
+    if (!isCanceled || !orderId || !paymentKey) {
       return ackOk()
     }
 
@@ -3309,7 +3304,23 @@ app.post('/payment/toss/webhook', async (c) => {
       return ackOk()
     }
     if (log.status === 'canceled') {
-      // 이미 처리된 취소 건에 대한 중복 통보 — 그대로 확인 응답만
+      // 이미 처리된 취소 건에 대한 중복 통보(최대 7회 재전송 정책) — 그대로 확인 응답만
+      return ackOk()
+    }
+
+    // 웹훅 본문은 서명이 없어 위조 가능하므로, 결제 조회 API로 실제 상태를 직접 재확인한다.
+    const apiBase = c.env.TOSS_API_BASE || 'https://api.tosspayments.com'
+    const secretKey = c.env.TOSS_SECRET_KEY || ''
+    const lookupResp = await fetch(`${apiBase}/v1/payments/${encodeURIComponent(paymentKey)}`, {
+      headers: { 'Authorization': 'Basic ' + btoa(`${secretKey}:`) },
+    })
+    if (!lookupResp.ok) {
+      console.error('토스 웹훅: 결제 조회 API 실패 — 크레딧 처리 보류:', paymentKey, lookupResp.status)
+      return ackOk()
+    }
+    const payment = await lookupResp.json() as any
+    if (payment.orderId !== orderId || (payment.status !== 'CANCELED' && payment.status !== 'PARTIAL_CANCELED')) {
+      console.error('토스 웹훅: 조회 결과가 웹훅 내용과 불일치 — 위조 의심, 크레딧 처리 건너뜀:', orderId, payment.orderId, payment.status)
       return ackOk()
     }
 
