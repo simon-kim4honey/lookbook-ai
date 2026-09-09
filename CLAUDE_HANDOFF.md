@@ -91,10 +91,9 @@ LOOKBOOK_DB  → Cloudflare D1 (lookbook-ai-production)
 KAKAO_CLIENT_ID / KAKAO_CLIENT_SECRET
 GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET
 ADMIN_PASSWORD
-TOSS_CLIENT_KEY
+TOSS_CLIENT_KEY    (반드시 "API 개별연동 키" — "주문서형·결제창형 연동 키"는 지원 안 됨)
 TOSS_SECRET_KEY
 TOSS_API_BASE      (https://api.tosspayments.com — 테스트/운영 동일 도메인, 키의 test_/live_ 접두사로 구분)
-TOSS_WEBHOOK_SECRET (선택 — 미설정 시 웹훅 크레딧 회수 로직이 동작하지 않음, /payment/toss/webhook 참고)
 ATLAS_API_KEY
 OPENAI_API_KEY
 ```
