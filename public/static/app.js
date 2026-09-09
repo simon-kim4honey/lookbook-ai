@@ -320,7 +320,7 @@ const I18N = {
 let _locale = 'ko'; // 기본값, initLocale()에서 갱신
 let _country = '';
 let _currency = 'KRW';
-let _pg = 'nicepay';
+let _pg = 'toss';
 const LOCALE_OVERRIDE_KEY = 'lookbook_locale_override';
 function t(key, ...args) {
   const dict = I18N[_locale] || I18N['en'];
@@ -334,7 +334,7 @@ async function initLocale() {
   _locale = 'ko';
   _country = 'KR';
   _currency = 'KRW';
-  _pg = 'nicepay';
+  _pg = 'toss';
   document.documentElement.lang = _locale;
   updateLocaleSwitcherUI();
   // data-i18n 속성 정적 텍스트 교체
@@ -342,9 +342,9 @@ async function initLocale() {
 }
 
 // 언어별 기본 통화/PG — 서버의 resolveLocaleProfile()과 동일한 매핑.
-// 수동으로 언어를 바꾸면 결제 통화/PG도 함께 바뀜(한국어→나이스페이/KRW, 그 외→Stripe)
+// 수동으로 언어를 바꾸면 결제 통화/PG도 함께 바뀜(한국어→토스/KRW, 그 외→Stripe)
 const LOCALE_MARKET_MAP = {
-  ko: { currency: 'KRW', pg: 'nicepay' },
+  ko: { currency: 'KRW', pg: 'toss' },
   ja: { currency: 'JPY', pg: 'stripe' },
   en: { currency: 'USD', pg: 'stripe' },
 };
@@ -4636,7 +4636,7 @@ async function startPayment() {
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   if (!sessionToken) { showToast(t('loginRequired'), 'error'); return; }
 
-  // 한국(나이스페이) 외 시장은 Stripe Checkout으로 분기
+  // 한국(토스) 외 시장은 Stripe Checkout으로 분기
   if (_pg === 'stripe') { return startStripePayment(); }
 
   const cta = document.getElementById('chargeCta');
@@ -4650,44 +4650,46 @@ async function startPayment() {
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || '결제 준비 실패');
-    if (!data.clientId) throw new Error('결제 설정 오류 (NICEPAY_CLIENT_ID 미설정)');
+    if (!data.clientKey) throw new Error('결제 설정 오류 (TOSS_CLIENT_KEY 미설정)');
 
-    if (!window.AUTHNICE) await loadNicepaySDK();
+    if (!window.TossPayments) await loadTossSDK();
 
-    // 나이스페이먼츠 서버 승인 모델: 결제창 인증 완료 후 우리 서버(/payment/return)로
-    // 결제창이 직접 POST → 서버에서 승인 API 호출까지 끝난 뒤 결과 페이지로 리다이렉트됨
-    const payReq = {
-      clientId: data.clientId,
-      method: 'card',
+    // 토스페이먼츠 서버 승인 모델: 결제창 인증 완료 후 브라우저가 successUrl로 리다이렉트되고,
+    // 그 라우트(/payment/toss/success)에서 서버가 승인(confirm) API를 호출해 결제를 확정한다.
+    const tossPayments = TossPayments(data.clientKey);
+    const payment = tossPayments.payment({ customerKey: data.userId || 'ANONYMOUS' });
+
+    const paymentParams = {
+      method: 'CARD',
+      amount: { currency: 'KRW', value: data.amount },
       orderId: data.orderId,
-      amount: data.amount,
-      goodsName: data.orderName,
-      buyerName: data.customerName,
-      returnUrl: location.origin + '/payment/return',
-      fnError: function (result) {
-        if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-        showToast(t('payFail', result && result.errorMsg || ''), 'error');
-      },
+      orderName: data.orderName,
+      customerName: data.customerName,
+      successUrl: location.origin + '/payment/toss/success',
+      failUrl: location.origin + '/payment/toss/fail',
     };
     // 카카오 로그인 등 이메일 미동의 계정은 내부용 가짜 이메일(@kakao.local)이 저장되어
-    // 있는데, 이걸 그대로 보내면 나이스페이 인증 단계에서 거부됨(U116) — 실제 이메일일 때만 전달
+    // 있는데, 이걸 그대로 보내면 인증 단계에서 거부될 수 있어 실제 이메일일 때만 전달
     if (data.customerEmail && !data.customerEmail.endsWith('@kakao.local')) {
-      payReq.buyerEmail = data.customerEmail;
+      paymentParams.customerEmail = data.customerEmail;
     }
-    AUTHNICE.requestPay(payReq);
+    await payment.requestPayment(paymentParams);
   } catch (e) {
     if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
-    showToast(t('payFail', e.message), 'error');
+    // 사용자가 결제창을 직접 닫은 경우(USER_CANCEL)는 에러 토스트를 띄우지 않는다
+    if (e && e.code !== 'USER_CANCEL') {
+      showToast(t('payFail', (e && e.message) || ''), 'error');
+    }
   }
 }
 
-function loadNicepaySDK() {
+function loadTossSDK() {
   return new Promise((resolve, reject) => {
-    if (window.AUTHNICE) { resolve(); return; }
+    if (window.TossPayments) { resolve(); return; }
     const s = document.createElement('script');
-    s.src = 'https://pay.nicepay.co.kr/v1/js/';
+    s.src = 'https://js.tosspayments.com/v2/standard';
     s.onload = resolve;
-    s.onerror = () => reject(new Error('나이스페이먼츠 SDK 로드 실패'));
+    s.onerror = () => reject(new Error('토스페이먼츠 SDK 로드 실패'));
     document.head.appendChild(s);
   });
 }
