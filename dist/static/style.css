@@ -1275,8 +1275,8 @@ footer {
   --gapp-arrow-bg: rgba(23,24,29,0.55);       /* 카드 위 화살표 버튼 배경(구 흰색 반투명) */
   --gapp-arrow-border: rgba(255,255,255,0.18);
   --gapp-arrow-bg-hover: rgba(43,44,52,0.8);
-  --gapp-slot-bg: rgba(255,255,255,0.85);          /* 업로드 슬롯 카드 — 흰색 반투명 유리 느낌(70%→85%) */
-  --gapp-slot-bg-hover: rgba(255,255,255,0.92);
+  --gapp-slot-bg: rgba(255,255,255,0.15);          /* 업로드 슬롯 카드 — 흰색 유리 느낌, 투명도 85%(=불투명도 15%) */
+  --gapp-slot-bg-hover: rgba(255,255,255,0.25);
   --gapp-slot-hover-tint: linear-gradient(rgba(22,101,52,0.05), rgba(22,101,52,0.05)); /* 호버 시 다크그린 5% 틴트 */
   --gapp-slot-hover-border: #166534;               /* 호버 시 다크그린 라인 */
   --gapp-slot-blur: blur(6px);
@@ -1777,14 +1777,14 @@ footer {
   padding: 10px 10px 8px;
   font-size: 12px;
   font-weight: 700;
-  color: #4E5968;
+  color: var(--gapp-text-secondary, #4E5968);
   letter-spacing: 0.3px;
   text-align: center;
-  border-bottom: 1px solid rgba(0,0,0,0.08);
+  border-bottom: 1px solid var(--gapp-border, #E5E8EB);
   flex-shrink: 0;
 }
 .cslot--filled .cslot-label {
-  color: #1B64DA;
+  color: var(--gapp-accent, #1B64DA);
   border-bottom-color: rgba(124,58,237,0.2);
 }
 
@@ -1820,7 +1820,7 @@ footer {
 .cslot-plus {
   display: block;
   font-size: 26px;
-  color: #B0B8C1;
+  color: var(--gapp-text-muted, #B0B8C1);
   line-height: 1;
   font-weight: 300;
 }
@@ -1834,7 +1834,7 @@ footer {
 .cslot-hint {
   display: block;
   font-size: 11px;
-  color: #8B95A1;
+  color: var(--gapp-text-muted, #8B95A1);
   text-align: center;
   line-height: 1.5;
 }
