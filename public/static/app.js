@@ -2945,8 +2945,7 @@ function renderModelCardHTML(model) {
     : `/api/proxy/model-image/${model.id}`;
   return `<img src="${imgSrc}" alt="${displayName}"
       onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-    <div class="swipe-card-fallback" style="display:none;">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>
-    <div class="swipe-card-label">${displayName}</div>`;
+    <div class="swipe-card-fallback" style="display:none;">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>`;
 }
 
 function renderModelGrid(models) {
