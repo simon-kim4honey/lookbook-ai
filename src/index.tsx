@@ -7145,16 +7145,14 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <div style="font-size:32px;">⏳</div><p data-i18n="gen-loading">모델 불러오는 중...</p>
           </div>
           <div class="swipe-stack-wrap" id="modelSwipeWrap" style="display:none;">
-            <div class="swipe-stack-row">
-              <button class="swipe-nav-arrow" id="modelPrevBtn" aria-label="이전 모델"><i class="fas fa-chevron-left"></i></button>
+            <div class="swipe-stack-area">
+              <button class="swipe-nav-arrow prev" id="modelPrevBtn" aria-label="이전 모델"><i class="fas fa-chevron-left"></i></button>
               <div class="swipe-stack" id="modelGrid"></div>
-              <button class="swipe-nav-arrow" id="modelNextBtn" aria-label="다음 모델"><i class="fas fa-chevron-right"></i></button>
+              <button class="swipe-nav-arrow next" id="modelNextBtn" aria-label="다음 모델"><i class="fas fa-chevron-right"></i></button>
             </div>
-            <div class="swipe-progress" id="modelProgress"></div>
             <div class="swipe-stack-footer">
               <button class="swipe-select-btn" id="modelSelectBtn">이 모델 선택</button>
             </div>
-            <p class="swipe-hint">좌우로 넘기고, 위로 스와이프하거나 버튼으로 선택하세요</p>
           </div>
         </div>
         <div class="gslide-nav">
@@ -7183,16 +7181,14 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <div style="font-size:32px;">⏳</div><p data-i18n="bg-loading">배경 불러오는 중...</p>
           </div>
           <div class="swipe-stack-wrap" id="bgSwipeWrap" style="display:none;">
-            <div class="swipe-stack-row">
-              <button class="swipe-nav-arrow" id="bgPrevBtn" aria-label="이전 배경"><i class="fas fa-chevron-left"></i></button>
+            <div class="swipe-stack-area">
+              <button class="swipe-nav-arrow prev" id="bgPrevBtn" aria-label="이전 배경"><i class="fas fa-chevron-left"></i></button>
               <div class="swipe-stack" id="bgGrid"></div>
-              <button class="swipe-nav-arrow" id="bgNextBtn" aria-label="다음 배경"><i class="fas fa-chevron-right"></i></button>
+              <button class="swipe-nav-arrow next" id="bgNextBtn" aria-label="다음 배경"><i class="fas fa-chevron-right"></i></button>
             </div>
-            <div class="swipe-progress" id="bgProgress"></div>
             <div class="swipe-stack-footer">
               <button class="swipe-select-btn" id="bgSelectBtn">이 배경 선택</button>
             </div>
-            <p class="swipe-hint">좌우로 넘기고, 위로 스와이프하거나 버튼으로 선택하세요</p>
           </div>
         </div>
         <!-- 생성 중 오버레이 (step-3 내부) -->
