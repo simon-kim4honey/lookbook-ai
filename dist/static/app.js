@@ -2792,6 +2792,8 @@ function initSwipeStack(opts) {
   const EASE = 'cubic-bezier(.22,1,.36,1)'; // 참고 영상과 같은 부드러운 ease-out 곡선
   let navigating = false; // 넘김 애니메이션 도중 중복 트리거 방지
   let hasRenderedOnce = false; // 첫 렌더(페이지 로드)에는 mount 애니메이션을 주지 않기 위한 플래그
+  let skipMountAnim = false; // exitAndAdvance가 FLIP으로 이미 가운데까지 이동시킨 직후의 render()에서는
+                              // 별도의 페이드인 mount 애니메이션을 다시 걸지 않기 위한 1회성 플래그
 
   // 끝까지 가면 처음으로 이어지는 순환 인덱스
   function wrapIndex(i) {
@@ -2876,20 +2878,25 @@ function initSwipeStack(opts) {
     curCard.addEventListener('mousedown', onDragStart);
     // 첫 렌더(페이지 로드) 이후부터는 새 가운데 카드가 살짝 작아진 채 옅게
     // 나타났다가 자라나도록 해서, exitAndAdvance의 페이드/확대와 이어지는
-    // 하나의 연속된 움직임처럼 보이게 한다.
-    if (hasRenderedOnce) {
+    // 하나의 연속된 움직임처럼 보이게 한다 — 단, exitAndAdvance가 FLIP으로
+    // peek 카드를 이미 가운데 위치/크기까지 이동시켜 둔 직후의 render()에서는
+    // (skipMountAnim) 다시 스케일다운→페이드인을 걸면 방금 끝난 이동 애니메이션
+    // 위에 또 다른 애니메이션이 겹쳐 보여 부자연스럽다 — 그 경우는 건너뛴다.
+    const doMountAnim = hasRenderedOnce && !skipMountAnim;
+    if (doMountAnim) {
       curCard.style.transform = 'scale(0.94)';
       curCard.style.opacity = '0';
     }
     stackEl.appendChild(curCard);
     syncBgBlur(curCard);
-    if (hasRenderedOnce) {
+    if (doMountAnim) {
       void curCard.offsetWidth; // 강제 리플로우 — 위에서 준 초기 상태가 실제로 적용된 뒤 트랜지션이 걸리도록
       curCard.style.transition = `transform ${EXIT_MS}ms ${EASE}, opacity ${EXIT_MS}ms ${EASE}`;
       curCard.style.transform = 'translateX(0) scale(1)';
       curCard.style.opacity = '1';
     }
     hasRenderedOnce = true;
+    skipMountAnim = false;
     // 별도의 "선택" 버튼 없이, 화면 중앙에 있는(현재) 카드가 곧 선택된 항목이다 —
     // 다음 단계/생성 버튼을 누르는 시점에 바로 이 카드가 적용된다.
     opts.onConfirm(curItem);
@@ -2949,10 +2956,16 @@ function initSwipeStack(opts) {
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
 
-  // direction: 1(다음) 또는 -1(이전) — 현재 카드가 화면 밖으로 슬라이드되어 사라지는
-  // 동안, 반대쪽(도착 방향)에서 peek 중이던 카드도 함께 옅어지며 살짝 확대되어
-  // "다가오는" 느낌을 준다. .swipe-card.role-prev/next의 CSS transition이
-  // opacity/transform 모두를 이 곡선으로 처리하므로 여기서는 목표값만 바꾼다.
+  // direction: 1(다음) 또는 -1(이전).
+  // "가운데로 이동해야 하는 카드가 중간에서 그냥 나타나는" 것처럼 보이던 문제 —
+  // 기존에는 peek 카드가 제자리에서 옅어지며 사라지고, 그와 별개로 완전히 새로운
+  // 카드가 가운데서 0->1 페이드인으로 "나타났다." 실제로 peek 위치에 있던
+  // 카드가 가운데까지 이동해 오는 것처럼 보이게 하기 위해, FLIP(First-Last-
+  // Invert-Play) 기법으로 peek 카드의 현재 화면 좌표(rect)와 가운데 슬롯의
+  // 목표 좌표(rect) 차이를 실제 transform(translate+scale+역회전)으로 만들어
+  // 그 카드 자신을 가운데까지 이동·확대시킨다. 애니메이션이 끝나면 render()가
+  // DOM을 정리하며 진짜 role-current 엘리먼트로 교체하는데, 그때는 이미 시각적
+  // 위치/크기가 목표와 동일하므로 교체가 눈에 띄지 않는다.
   function exitAndAdvance(direction, fromCard) {
     if (navigating || state.items.length <= 1) return;
     navigating = true;
@@ -2969,14 +2982,42 @@ function initSwipeStack(opts) {
     }
     const incoming = stackArea.querySelector(direction > 0 ? '.swipe-card.role-next' : '.swipe-card.role-prev');
     if (incoming) {
-      const tilt = direction > 0 ? '6deg' : '-6deg';
-      incoming.style.opacity = '0';
-      incoming.style.transform = `translateY(-50%) scale(1.04) rotate(${tilt})`;
+      // top:50%+translateY(-50%)(퍼센트 기반 중앙정렬)과 scale/rotate가 섞인 transform
+      // 위에 또 scale(scaleX,scaleY)를 덧씌우면, transform-origin 기준 매트릭스 합성
+      // 과정에서 안쪽의 translateY(-50%)까지 함께 스케일되어 버려 목표 Y좌표에서
+      // 계속 어긋나는 문제가 있었다(실측 확인됨). 이를 피하기 위해 애니메이션
+      // 시작 직전에 현재 화면상 실제 위치/크기(rect)를 그대로 px 절대값(left/top/
+      // width/height)으로 고정해 퍼센트·중첩 transform을 모두 제거한 뒤, 순수
+      // translate+scale 하나만으로 목표 위치까지 이동시킨다.
+      const areaRect = stackArea.getBoundingClientRect();
+      const restRect = incoming.getBoundingClientRect(); // 지금 peek 위치/크기(회전·중앙정렬 포함, 화면 좌표)
+
+      incoming.style.zIndex = '3'; // 나가는 카드(0)와 반대편 peek(1)보다 위에서 이동
+      incoming.style.transition = 'none';
+      incoming.style.transform = 'none';
+      incoming.style.top = (restRect.top - areaRect.top) + 'px';
+      incoming.style.left = (restRect.left - areaRect.left) + 'px';
+      incoming.style.right = 'auto';
+      incoming.style.width = restRect.width + 'px';
+      incoming.style.height = restRect.height + 'px';
+      void incoming.offsetWidth; // 강제 리플로우 — 위 px 고정 상태를 확정한 뒤 트랜지션이 걸리도록
+
+      const startRect = incoming.getBoundingClientRect(); // px로 고정된 실제 시작 rect(=restRect와 사실상 동일)
+      const endRect = stackEl.getBoundingClientRect();     // 도착해야 할 가운데 슬롯의 위치/크기
+      const scaleX = endRect.width / startRect.width;
+      const scaleY = endRect.height / startRect.height;
+      const dx = (endRect.left + endRect.width / 2) - (startRect.left + startRect.width / 2);
+      const dy = (endRect.top + endRect.height / 2) - (startRect.top + startRect.height / 2);
+
+      incoming.style.transition = `transform ${EXIT_MS}ms ${EASE}, opacity ${EXIT_MS}ms ${EASE}`;
+      incoming.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
+      incoming.style.opacity = '1';
       syncBgBlur(incoming);
     }
     setTimeout(() => {
       state.index = wrapIndex(state.index + direction);
       navigating = false;
+      skipMountAnim = true; // 방금 FLIP으로 가운데까지 이동시켰으므로 다시 페이드인하지 않음
       render();
     }, EXIT_MS);
   }
