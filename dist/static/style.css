@@ -1275,12 +1275,12 @@ footer {
   --gapp-arrow-bg: rgba(23,24,29,0.55);       /* 카드 위 화살표 버튼 배경(구 흰색 반투명) */
   --gapp-arrow-border: rgba(255,255,255,0.18);
   --gapp-arrow-bg-hover: rgba(43,44,52,0.8);
-  --gapp-slot-bg: rgba(255,255,255,0.15);          /* 업로드 슬롯 카드 — 흰색 유리 느낌, 투명도 85%(=불투명도 15%) */
-  --gapp-slot-bg-hover: rgba(255,255,255,0.25);
-  --gapp-slot-hover-tint: linear-gradient(rgba(22,101,52,0.05), rgba(22,101,52,0.05)); /* 호버 시 다크그린 5% 틴트 */
-  --gapp-slot-hover-border: #166534;               /* 호버 시 다크그린 라인 */
-  --gapp-slot-blur: blur(6px);
-  --gapp-slot-disabled-bg: linear-gradient(135deg, #2B2C34 0%, #14532D 100%); /* 잠긴 슬롯: 다크그레이 → 다크그린 */
+  --gapp-slot-bg: linear-gradient(135deg, #14532D 0%, #1B3B2E 100%); /* 대기 중 슬롯 — 다크그린 혼합(요청: 잠김 색상과 맞바꿈) */
+  --gapp-slot-bg-hover: linear-gradient(135deg, #196B39 0%, #234A38 100%); /* 호버 시 살짝 밝은 버전 */
+  --gapp-slot-hover-tint: none; /* 배경 자체가 이미 다크그린이라 별도 틴트 오버레이는 불필요 */
+  --gapp-slot-hover-border: #22C55E;               /* 호버 시 밝은 그린 라인으로 강조 */
+  --gapp-slot-blur: none;
+  --gapp-slot-disabled-bg: #2B2C34; /* 잠긴 슬롯 — 다크그레이 단색(요청: 대기 색상과 맞바꿈) */
   --gapp-slot-disabled-opacity: 1;
   --gapp-slot-lock-color: rgba(255,255,255,0.6);   /* 잠금 아이콘/문구 — 2D 픽토그램, 60% 불투명도 */
 
