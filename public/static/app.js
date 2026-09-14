@@ -2835,6 +2835,13 @@ function initSwipeStack(opts) {
   // 보이는 문제가 있었다 — 전체 목록의 이미지를 미리 Image()로 받아 브라우저
   // 캐시에 데워두면, 실제 카드에 <img>가 새로 만들어질 때도 이미 캐시에 있는
   // 리소스라 네트워크 왕복 없이 즉시 그려진다.
+  // new Image(); img.src = url 만으로는 "네트워크에 요청을 보내 바이트를
+  // 캐시에 받아두는 것"까지만 보장하고, 실제 화면에 그리기 전 필요한 "디코딩"은
+  // 새 <img> 엘리먼트가 DOM에 붙는 시점에 처음 시작된다 — 이 디코딩 자체가
+  // 한 프레임 이상 걸리면(특히 저사양 모바일) 여전히 깜빡임/빈 카드로 보일 수
+  // 있다. HTMLImageElement.decode()를 함께 호출해 디코딩까지 미리 끝내두면
+  // 나중에 같은 src로 새 <img>가 만들어져도 브라우저의 디코드 캐시를 그대로
+  // 재사용해 추가 디코딩 없이 바로 그려진다.
   const preloadedSrcs = new Set();
   function preloadAllImages() {
     if (!opts.getImageSrc) return;
@@ -2844,6 +2851,7 @@ function initSwipeStack(opts) {
       preloadedSrcs.add(src);
       const img = new Image();
       img.src = src;
+      if (img.decode) img.decode().catch(() => {});
     });
   }
 
@@ -2907,7 +2915,13 @@ function initSwipeStack(opts) {
     drag.dy = p.clientY - drag.startY; // 탭/스와이프 구분용으로만 추적 — 카드는 좌우로만 움직임
     drag.card.style.transform = `translateX(${drag.dx}px) rotate(${drag.dx / 20}deg)`;
   }
-  const TAP_MOVE_TOLERANCE = 10; // 이 정도 이하로 움직였으면 스와이프가 아니라 탭/클릭으로 간주
+  // 모바일 터치는 손가락이 화면에 닿는 순간 접촉면이 바뀌면서 마우스보다 훨씬
+  // 큰 좌표 흔들림(보통 10px 이상)이 자연스럽게 발생한다 — 기존 10px는 마우스
+  // 기준으로는 적당했지만 실제 터치에서는 "탭"인데도 스와이프 문턱(threshold)에
+  // 못 미쳐 아무 반응도 없는 것처럼 보이는 경우가 많았다(=체크 표시가 잘 안
+  // 먹히는 문제의 원인). 스와이프로 오인되지 않을 만큼은 여전히 작은 값으로
+  // 넉넉하게 올림.
+  const TAP_MOVE_TOLERANCE = 22;
 
   function onDragEnd() {
     if (!drag.active) return;
@@ -2922,8 +2936,11 @@ function initSwipeStack(opts) {
       card.style.transform = '';
       // 스와이프로 이어지지 않은 순수 탭/클릭 — 이미 선택된(가운데) 카드를
       // 사용자가 직접 짚었다는 반응으로 우측 상단에 파란 체크 아이콘을 보여준다.
+      // toggle이었을 때는 두 번째 탭에서 배지가 다시 사라져 "선택이 안 먹힌다"는
+      // 오해를 샀다 — 탭할 때마다 항상 보이도록 add로 변경(다음 렌더/스와이프에서
+      // 새 카드 엘리먼트가 만들어지며 자연히 초기화됨).
       if (Math.abs(dx) <= TAP_MOVE_TOLERANCE && Math.abs(dy) <= TAP_MOVE_TOLERANCE) {
-        card.classList.toggle('is-tapped');
+        card.classList.add('is-tapped');
       }
     }
   }
