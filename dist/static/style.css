@@ -2277,11 +2277,17 @@ footer {
   overflow: hidden;
   background: #000;
 }
-/* 누끼컷 로딩화면 샘플 이미지 전용 — 세로 높이는 위 9:16 박스와 동일하게 유지한 채
-   가로 폭만 넓혀 1:1 정사각형으로 보이도록 한다(모델컷 영상 프로모 박스는 영향 없음). */
-.gen-video-promo-player.gc-square {
-  max-width: 50vh;
-  aspect-ratio: 1 / 1;
+/* 생성 로딩화면 하단 프로모 미리보기(모델컷 영상 재생 목록 + 누끼컷 이미지 슬라이드쇼
+   양쪽 다 해당) 전용 — 세로 높이는 위 9:16 박스와 동일하게 유지한 채 가로 폭을 넓혀
+   4:3 세로형으로 보이도록 한다. 인물 얼굴은 보통 위쪽에 있으므로 object-position을
+   top으로 둬서 잘릴 경우 아래쪽만 잘리게 한다(얼굴이 잘리는 것 방지). */
+.gen-video-promo-player.gc-4x3 {
+  max-width: calc(50vh * 3 / 4);
+  aspect-ratio: 3 / 4;
+}
+.gen-video-promo-player.gc-4x3 video,
+.gen-video-promo-player.gc-4x3 img {
+  object-position: top;
 }
 /* 여러 영상을 겹쳐 두고 opacity 크로스페이드로 전환 — src 교체 시 생기는 깜빡임(블랙 프레임) 방지.
    업로드 영상은 박스와 동일한 9:16 세로 비율로 등록하는 것을 전제로 함 —
