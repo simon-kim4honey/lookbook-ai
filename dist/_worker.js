@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mttigrn5`;function _t(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vt=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mu0xzrwt`;function _t(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2337,7 +2337,18 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           <div id="modelsLoading" class="grid-loading">
             <div style="font-size:32px;">⏳</div><p data-i18n="gen-loading">모델 불러오는 중...</p>
           </div>
-          <div class="select-grid" id="modelGrid"></div>
+          <div class="swipe-stack-wrap" id="modelSwipeWrap" style="display:none;">
+            <div class="swipe-stack-row">
+              <button class="swipe-nav-arrow" id="modelPrevBtn" aria-label="이전 모델"><i class="fas fa-chevron-left"></i></button>
+              <div class="swipe-stack" id="modelGrid"></div>
+              <button class="swipe-nav-arrow" id="modelNextBtn" aria-label="다음 모델"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="swipe-progress" id="modelProgress"></div>
+            <div class="swipe-stack-footer">
+              <button class="swipe-select-btn" id="modelSelectBtn">이 모델 선택</button>
+            </div>
+            <p class="swipe-hint">좌우로 넘기고, 위로 스와이프하거나 버튼으로 선택하세요</p>
+          </div>
         </div>
         <div class="gslide-nav">
           <div class="gslide-nav-inner">
@@ -2364,7 +2375,18 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           <div id="bgsLoading" class="grid-loading">
             <div style="font-size:32px;">⏳</div><p data-i18n="bg-loading">배경 불러오는 중...</p>
           </div>
-          <div class="select-grid" id="bgGrid"></div>
+          <div class="swipe-stack-wrap" id="bgSwipeWrap" style="display:none;">
+            <div class="swipe-stack-row">
+              <button class="swipe-nav-arrow" id="bgPrevBtn" aria-label="이전 배경"><i class="fas fa-chevron-left"></i></button>
+              <div class="swipe-stack" id="bgGrid"></div>
+              <button class="swipe-nav-arrow" id="bgNextBtn" aria-label="다음 배경"><i class="fas fa-chevron-right"></i></button>
+            </div>
+            <div class="swipe-progress" id="bgProgress"></div>
+            <div class="swipe-stack-footer">
+              <button class="swipe-select-btn" id="bgSelectBtn">이 배경 선택</button>
+            </div>
+            <p class="swipe-hint">좌우로 넘기고, 위로 스와이프하거나 버튼으로 선택하세요</p>
+          </div>
         </div>
         <!-- 생성 중 오버레이 (step-3 내부) -->
         <div class="generating-view" id="generatingView">

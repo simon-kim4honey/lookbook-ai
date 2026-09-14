@@ -106,6 +106,11 @@ const I18N = {
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 배경이 없습니다</p><p style="font-size:13px">관리자 페이지에서 배경을 먼저 등록해주세요</p></div>',
     bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">배경 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
     skipCard: '선택 없음<br>(랜덤)',
+    swipeSelectModel: '이 모델 선택',
+    swipeSelectBg: '이 배경 선택',
+    swipeSelected: '선택됨',
+    swipeNoModels: '조건에 맞는 모델이 없습니다',
+    swipeNoBgs: '조건에 맞는 배경이 없습니다',
     randomModel: (name) => `랜덤 모델이 선택됐습니다: ${name}`,
     randomBg: (name) => `랜덤 배경이 선택됐습니다: ${name}`,
     randomAssigned: '랜덤 자동 배정',
@@ -194,6 +199,11 @@ const I18N = {
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">No backgrounds registered</p><p style="font-size:13px">Please add backgrounds in the admin page</p></div>',
     bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load backgrounds</p><p style="font-size:13px">Please try again later</p></div>',
     skipCard: 'No selection<br>(Random)',
+    swipeSelectModel: 'Select this model',
+    swipeSelectBg: 'Select this background',
+    swipeSelected: 'Selected',
+    swipeNoModels: 'No models match the filter',
+    swipeNoBgs: 'No backgrounds match the filter',
     randomModel: (name) => `Random model selected: ${name}`,
     randomBg: (name) => `Random background selected: ${name}`,
     randomAssigned: 'Randomly assigned',
@@ -277,6 +287,11 @@ const I18N = {
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景が登録されていません</p><p style="font-size:13px">管理ページで背景を登録してください</p></div>',
     bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景の読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
     skipCard: '選択なし<br>(ランダム)',
+    swipeSelectModel: 'このモデルを選択',
+    swipeSelectBg: 'この背景を選択',
+    swipeSelected: '選択済み',
+    swipeNoModels: '条件に合うモデルがありません',
+    swipeNoBgs: '条件に合う背景がありません',
     randomModel: (name) => `ランダムモデルが選択されました: ${name}`,
     randomBg: (name) => `ランダム背景が選択されました: ${name}`,
     randomAssigned: 'ランダム自動割り当て',
@@ -816,9 +831,9 @@ async function startGenLoadingVideoPlaylist() {
 
   player.style.display = '';
   // 이미지 생성 로딩화면의 영상생성 홍보 미리보기는 실제 영상(세로 9:16)이 아니라
-  // 박스 폭 공백을 줄이기 위해 1:1 정사각형으로 재생한다 — 실제 영상 생성 결과물의
+  // 박스 폭 공백을 줄이기 위해 4:3 세로형으로 재생한다 — 실제 영상 생성 결과물의
   // 비율과는 무관(결과물은 그대로 세로형 유지).
-  player.classList.add('gc-square');
+  player.classList.add('gc-4x3');
   player.innerHTML = '';
   _genLoadingVideoIdx = 0;
   _genLoadingVideoEls = list.map((src, i) => {
@@ -893,7 +908,7 @@ async function startGcLoadingImageSlideshow() {
   if (!list.length) { player.style.display = 'none'; player.innerHTML = ''; return; }
 
   player.style.display = '';
-  player.classList.add('gc-square'); // 누끼컷 샘플은 세로(9:16) 대신 1:1 정사각형으로 표시
+  player.classList.add('gc-4x3'); // 누끼컷 샘플은 세로(9:16) 대신 4:3 세로형으로 표시
   player.innerHTML = '';
   _gcLoadingImageIdx = 0;
   _gcLoadingImageEls = list.map((src, i) => {
@@ -2295,7 +2310,7 @@ async function loadModelsFromAPI() {
         loading.innerHTML = t('noModels');
       }
     } else {
-      showGrid('modelsLoading', 'modelGrid', () => renderModelGrid(AppState.allModels));
+      showGrid('modelsLoading', 'modelSwipeWrap', () => renderModelGrid(AppState.allModels));
     }
   } catch (err) {
     console.error('Models load error:', err);
@@ -2338,7 +2353,7 @@ async function loadBackgroundsFromAPI() {
         loading.innerHTML = t('noBgs');
       }
     } else {
-      showGrid('bgsLoading', 'bgGrid', () => renderBgGrid(AppState.allBackgrounds));
+      showGrid('bgsLoading', 'bgSwipeWrap', () => renderBgGrid(AppState.allBackgrounds));
     }
   } catch (err) {
     console.error('Backgrounds load error:', err);
@@ -2454,7 +2469,7 @@ function changeStep(newStep) {
   // Step 2: 모델 그리드
   if (newStep === 2) {
     if (AppState.allModels.length > 0) {
-      showGrid('modelsLoading', 'modelGrid', () => renderModelGrid(AppState.allModels));
+      showGrid('modelsLoading', 'modelSwipeWrap', () => renderModelGrid(AppState.allModels));
     } else {
       loadModelsFromAPI();
     }
@@ -2463,7 +2478,7 @@ function changeStep(newStep) {
   // Step 3: 배경 그리드
   if (newStep === 3) {
     if (AppState.allBackgrounds.length > 0) {
-      showGrid('bgsLoading', 'bgGrid', () => renderBgGrid(AppState.allBackgrounds));
+      showGrid('bgsLoading', 'bgSwipeWrap', () => renderBgGrid(AppState.allBackgrounds));
     } else {
       loadBackgroundsFromAPI();
     }
@@ -2773,45 +2788,163 @@ function updateGridScrollBtns(wrapId) {
 // fixGridHeight — 새 구조에서는 CSS flex:1 로 자동처리, 빈 함수 유지
 function fixGridHeight(wrapId) { /* no-op: CSS .gslide-grid { flex:1 } 으로 처리 */ }
 
+// ─────────────────────────────────────────────────────────
+// 공용 스와이프 카드 스택 컴포넌트 (모델/배경 선택에서 재사용)
+// 좌우 스와이프(또는 화살표 버튼) = 이전/다음 카드, 위로 스와이프(또는 하단 버튼) = 선택
+// ─────────────────────────────────────────────────────────
+function initSwipeStack(opts) {
+  const stackEl = document.getElementById(opts.stackId);
+  if (!stackEl) return null;
+
+  const state = { index: 0, items: opts.items || [] };
+  const drag = { active: false, card: null, startX: 0, startY: 0, dx: 0, dy: 0 };
+  const SWIPE_THRESHOLD = 60;
+
+  function currentItem() { return state.items[state.index]; }
+
+  function render() {
+    stackEl.innerHTML = '';
+    const total = state.items.length;
+    if (total === 0) {
+      stackEl.innerHTML = `<div class="swipe-stack-empty">${opts.emptyText || '표시할 항목이 없습니다.'}</div>`;
+      updateFooter();
+      return;
+    }
+    const visibleCount = Math.min(3, total - state.index);
+    for (let offset = visibleCount - 1; offset >= 0; offset--) {
+      const item = state.items[state.index + offset];
+      const card = document.createElement('div');
+      card.className = 'swipe-card' + (opts.isSelected(item) ? ' is-selected' : '');
+      card.style.transform = `translateY(${offset * 10}px) scale(${1 - offset * 0.05})`;
+      card.style.zIndex = String(10 - offset);
+      if (offset === 2) card.style.opacity = '0.6';
+      card.innerHTML = opts.renderCard(item) + '<div class="swipe-card-selected-badge"><i class="fas fa-check"></i></div>';
+      if (offset === 0) {
+        card.addEventListener('touchstart', onDragStart, { passive: true });
+        card.addEventListener('mousedown', onDragStart);
+      }
+      stackEl.appendChild(card);
+    }
+    updateFooter();
+  }
+
+  function onDragStart(e) {
+    const p = e.touches ? e.touches[0] : e;
+    drag.active = true;
+    drag.card = e.currentTarget;
+    drag.card.classList.add('dragging');
+    drag.startX = p.clientX; drag.startY = p.clientY; drag.dx = 0; drag.dy = 0;
+  }
+  function onDragMove(e) {
+    if (!drag.active) return;
+    const p = e.touches ? e.touches[0] : e;
+    drag.dx = p.clientX - drag.startX;
+    drag.dy = p.clientY - drag.startY;
+    drag.card.style.transform = `translate(${drag.dx}px, ${drag.dy}px) rotate(${drag.dx / 20}deg)`;
+  }
+  function onDragEnd() {
+    if (!drag.active) return;
+    drag.active = false;
+    drag.card.classList.remove('dragging');
+    const { dx, dy } = drag;
+    if (Math.abs(dy) > SWIPE_THRESHOLD && Math.abs(dy) > Math.abs(dx) && dy < 0) {
+      confirmSelect();
+    } else if (Math.abs(dx) > SWIPE_THRESHOLD) {
+      if (dx < 0) goNext(); else goPrev();
+    } else {
+      render();
+    }
+  }
+  document.addEventListener('touchmove', onDragMove, { passive: true });
+  document.addEventListener('touchend', onDragEnd);
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragEnd);
+
+  function goPrev() { if (state.index > 0) { state.index--; render(); } }
+  function goNext() { if (state.index < state.items.length - 1) { state.index++; render(); } }
+  function confirmSelect() {
+    const item = currentItem();
+    if (item) opts.onConfirm(item);
+    render();
+  }
+
+  function updateFooter() {
+    const prevBtn = document.getElementById(opts.prevBtnId);
+    const nextBtn = document.getElementById(opts.nextBtnId);
+    const selectBtn = document.getElementById(opts.selectBtnId);
+    const progress = document.getElementById(opts.progressId);
+    const total = state.items.length;
+    if (prevBtn) prevBtn.disabled = state.index === 0;
+    if (nextBtn) nextBtn.disabled = total === 0 || state.index >= total - 1;
+    if (selectBtn) {
+      const item = currentItem();
+      const sel = item ? opts.isSelected(item) : false;
+      selectBtn.disabled = !item;
+      selectBtn.classList.toggle('is-selected', sel);
+      selectBtn.innerHTML = sel
+        ? `<i class="fas fa-check"></i> ${opts.selectedLabel || '선택됨'}`
+        : (opts.selectLabel || '선택');
+    }
+    if (progress) progress.textContent = total ? `${state.index + 1} / ${total}` : '';
+  }
+
+  const prevBtnEl = opts.prevBtnId && document.getElementById(opts.prevBtnId);
+  const nextBtnEl = opts.nextBtnId && document.getElementById(opts.nextBtnId);
+  const selectBtnEl = opts.selectBtnId && document.getElementById(opts.selectBtnId);
+  if (prevBtnEl) prevBtnEl.onclick = goPrev;
+  if (nextBtnEl) nextBtnEl.onclick = goNext;
+  if (selectBtnEl) selectBtnEl.onclick = confirmSelect;
+
+  render();
+
+  return {
+    render,
+    setItems(newItems) { state.items = newItems || []; state.index = 0; render(); },
+  };
+}
+
+let modelSwipeStack = null;
+let bgSwipeStack = null;
+
+function renderModelCardHTML(model) {
+  if (model.__skip) {
+    return `<div class="swipe-card-fallback" style="background:var(--gray-1);font-size:32px;">🚫</div>
+      <div class="swipe-card-label">${t('skipCard')}</div>`;
+  }
+  const displayName = model.name && !model.name.match(/^\d+$/)
+    ? model.name : `모델 ${model.name || model.id}`;
+  const imgSrc = model.isCustom
+    ? `/api/proxy/custom-model/${model.customId}`
+    : `/api/proxy/model-image/${model.id}`;
+  return `<img src="${imgSrc}" alt="${displayName}"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <div class="swipe-card-fallback" style="display:none;">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>
+    <div class="swipe-card-label">${displayName}</div>`;
+}
+
 function renderModelGrid(models) {
-  const grid = document.getElementById('modelGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
+  const items = [{ __skip: true }, ...models];
+  const isSelected = (item) => item.__skip ? !AppState.selectedModel : AppState.selectedModel?.id === item.id;
+  const onConfirm = (item) => { AppState.selectedModel = item.__skip ? null : item; };
 
-  // 스킵 카드
-  const skipCard = document.createElement('div');
-  skipCard.className = 'grid-skip-card' + (!AppState.selectedModel ? ' selected' : '');
-  skipCard.innerHTML = `<p>${t('skipCard')}</p>`;
-  skipCard.addEventListener('click', () => {
-    AppState.selectedModel = null;
-    document.querySelectorAll('#modelGrid .grid-card, #modelGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
-    skipCard.classList.add('selected');
-  });
-  grid.appendChild(skipCard);
-
-  models.forEach((model) => {
-    const displayName = model.name && !model.name.match(/^\d+$/)
-      ? model.name : `모델 ${model.name || model.id}`;
-    const imgSrc = model.isCustom
-      ? `/api/proxy/custom-model/${model.customId}`
-      : `/api/proxy/model-image/${model.id}`;
-
-    const card = document.createElement('div');
-    card.className = 'grid-card' + (AppState.selectedModel?.id === model.id ? ' selected' : '');
-    card.innerHTML = `
-      <img src="${imgSrc}" alt="${displayName}"
-        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="grid-card-fallback">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>
-      <div class="grid-card-check"><i class="fas fa-check"></i></div>`;
-
-    card.addEventListener('click', () => {
-      AppState.selectedModel = model;
-      document.querySelectorAll('#modelGrid .grid-card, #modelGrid .grid-skip-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
+  if (!modelSwipeStack) {
+    modelSwipeStack = initSwipeStack({
+      stackId: 'modelGrid',
+      items,
+      prevBtnId: 'modelPrevBtn',
+      nextBtnId: 'modelNextBtn',
+      selectBtnId: 'modelSelectBtn',
+      progressId: 'modelProgress',
+      selectLabel: t('swipeSelectModel'),
+      selectedLabel: t('swipeSelected'),
+      emptyText: t('swipeNoModels'),
+      renderCard: renderModelCardHTML,
+      isSelected,
+      onConfirm,
     });
-    grid.appendChild(card);
-  });
-
+  } else {
+    modelSwipeStack.setItems(items);
+  }
 }
 
 let modelFilterState = { gender: null, age: null, mood: null };
@@ -2840,33 +2973,39 @@ function filterModels(type, value, btn) {
 // STEP 3: Background Selection — 그리드 UI
 // ─────────────────────────────────────────────────────────
 
+function renderBgCardHTML(bg) {
+  const imgSrc = bg.isCustom
+    ? `/api/proxy/custom-bg/${bg.customId}`
+    : `/api/proxy/bg-image/${bg.id}`;
+  return `${bg.isDefault ? `<span class="swipe-card-badge">기본(${bg.category || '스튜디오'})</span>` : ''}
+    <img src="${imgSrc}" alt="${bg.name || ''}"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+    <div class="swipe-card-fallback" style="display:none;">🖼️</div>
+    <div class="swipe-card-label">${bg.name || ''}</div>`;
+}
+
 function renderBgGrid(bgs) {
-  const grid = document.getElementById('bgGrid');
-  if (!grid) return;
-  grid.innerHTML = '';
+  const isSelected = (item) => AppState.selectedBg?.id === item.id;
+  const onConfirm = (item) => { AppState.selectedBg = item; };
 
-  bgs.forEach((bg) => {
-    const imgSrc = bg.isCustom
-      ? `/api/proxy/custom-bg/${bg.customId}`
-      : `/api/proxy/bg-image/${bg.id}`;
-
-    const card = document.createElement('div');
-    card.className = 'grid-card' + (AppState.selectedBg?.id === bg.id ? ' selected' : '');
-    card.innerHTML = `
-      ${bg.isDefault ? `<span class="grid-card-default-badge">기본(${bg.category || '스튜디오'})</span>` : ''}
-      <img src="${imgSrc}" alt="${bg.name}"
-        onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-      <div class="grid-card-fallback">🖼️</div>
-      <div class="grid-card-check"><i class="fas fa-check"></i></div>`;
-
-    card.addEventListener('click', () => {
-      AppState.selectedBg = bg;
-      document.querySelectorAll('#bgGrid .grid-card').forEach(c => c.classList.remove('selected'));
-      card.classList.add('selected');
+  if (!bgSwipeStack) {
+    bgSwipeStack = initSwipeStack({
+      stackId: 'bgGrid',
+      items: bgs,
+      prevBtnId: 'bgPrevBtn',
+      nextBtnId: 'bgNextBtn',
+      selectBtnId: 'bgSelectBtn',
+      progressId: 'bgProgress',
+      selectLabel: t('swipeSelectBg'),
+      selectedLabel: t('swipeSelected'),
+      emptyText: t('swipeNoBgs'),
+      renderCard: renderBgCardHTML,
+      isSelected,
+      onConfirm,
     });
-    grid.appendChild(card);
-  });
-
+  } else {
+    bgSwipeStack.setItems(bgs);
+  }
 }
 
 function filterBg(category, btn) {
