@@ -1270,16 +1270,19 @@ footer {
   --gapp-glow-2: rgba(236,72,153,0.4);
   --gapp-nav-bg: rgba(23,24,29,0.97);   /* 하단 고정 내비게이션 바 배경(구 rgba(255,255,255,0.97)) */
   --gapp-accent: #A78BFA;          /* 강조 텍스트/아이콘 단색(그라데이션을 쓸 수 없는 곳), 로고 색과 통일 */
-  --gapp-scrim: rgba(5,5,8,0.9);    /* 블러 배경 위 가독성용 스크림 — 훨씬 더 어둡게(구 흰색 rgba(255,255,255,0.76)) */
+  --gapp-scrim: rgba(15,15,20,0.62);    /* 블러 배경 위 가독성용 스크림 — 너무 어둡다는 피드백으로 0.9→0.62(약 30% 밝게) */
   --gapp-fallback-gradient: linear-gradient(135deg, #2B2C34, #202127); /* 이미지 로드 실패 시 카드 배경(구 파스텔 그라데이션) */
   --gapp-arrow-bg: rgba(23,24,29,0.55);       /* 카드 위 화살표 버튼 배경(구 흰색 반투명) */
   --gapp-arrow-border: rgba(255,255,255,0.18);
   --gapp-arrow-bg-hover: rgba(43,44,52,0.8);
-  --gapp-slot-bg: rgba(255,255,255,0.7);          /* 업로드 슬롯 카드 — 흰색 반투명 유리 느낌 */
-  --gapp-slot-bg-hover: rgba(255,255,255,0.85);
+  --gapp-slot-bg: rgba(255,255,255,0.85);          /* 업로드 슬롯 카드 — 흰색 반투명 유리 느낌(70%→85%) */
+  --gapp-slot-bg-hover: rgba(255,255,255,0.92);
+  --gapp-slot-hover-tint: linear-gradient(rgba(22,101,52,0.05), rgba(22,101,52,0.05)); /* 호버 시 다크그린 5% 틴트 */
+  --gapp-slot-hover-border: #166534;               /* 호버 시 다크그린 라인 */
   --gapp-slot-blur: blur(6px);
   --gapp-slot-disabled-bg: linear-gradient(135deg, #2B2C34 0%, #14532D 100%); /* 잠긴 슬롯: 다크그레이 → 다크그린 */
   --gapp-slot-disabled-opacity: 1;
+  --gapp-slot-lock-color: rgba(255,255,255,0.6);   /* 잠금 아이콘/문구 — 2D 픽토그램, 60% 불투명도 */
 
   /* 전역 토큰(:root)을 #gapp 안에서만 재정의 — CSS 커스텀 프로퍼티는 자손에게만
      상속되므로, #gapp 바깥(다른 페이지)의 var(--text-muted)/var(--border)/
@@ -1338,8 +1341,15 @@ footer {
   white-space: nowrap;
   letter-spacing: -0.3px;
 }
-.gapp-logo-ez { color: #A78BFA; font-weight: 800; }
-.gapp-logo-look { color: #A78BFA; font-weight: 300; }
+.gapp-logo-ez,
+.gapp-logo-look {
+  background: var(--gapp-gradient, #A78BFA);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.gapp-logo-ez { font-weight: 800; }
+.gapp-logo-look { font-weight: 300; }
 
 /* ── 슬라이드 컨테이너 ── */
 #gapp-slides {
@@ -1610,7 +1620,7 @@ footer {
 .gstep-title {
   font-size: 22px;
   font-weight: 800;
-  color: var(--gapp-text, #191F28);
+  color: var(--gapp-text-secondary, #191F28);
   margin: 0 0 6px;
   line-height: 1.3;
   letter-spacing: -0.6px;
@@ -1646,7 +1656,7 @@ footer {
 }
 .gfilter-bar .filter-tag.active,
 .gfilter-bar .bg-cat.active {
-  background: var(--gapp-gradient-2, #3182F6) !important;
+  background: var(--gapp-gradient, #3182F6) !important;
   border-color: transparent !important;
   color: #fff !important;
 }
@@ -1717,8 +1727,8 @@ footer {
   user-select: none;
 }
 .cslot:hover {
-  border-color: rgba(124,58,237,0.35);
-  background: var(--gapp-slot-bg-hover, #E8F3FF);
+  border-color: var(--gapp-slot-hover-border, rgba(124,58,237,0.35));
+  background: var(--gapp-slot-hover-tint, none), var(--gapp-slot-bg-hover, #E8F3FF);
 }
 .cslot.drag-over {
   border-color: var(--gapp-accent, #3182F6);
@@ -1731,8 +1741,8 @@ footer {
   cursor: default;
 }
 .cslot--filled:hover {
-  border-color: rgba(124,58,237,0.6);
-  background: var(--gapp-slot-bg, #F2F4F6);
+  border-color: var(--gapp-slot-hover-border, rgba(124,58,237,0.6));
+  background: var(--gapp-slot-hover-tint, none), var(--gapp-slot-bg, #F2F4F6);
 }
 /* 상의/하의 ↔ 전체 상호 배타: 반대쪽 그룹이 채워지면 비활성화 —
    다른 슬롯과 구분되도록 다크그레이→다크그린 그라데이션의 "잠김" 전용 배경을 쓴다 */
@@ -1814,7 +1824,10 @@ footer {
   line-height: 1;
   font-weight: 300;
 }
-.cslot--disabled .cslot-plus,
+.cslot--disabled .cslot-lock-icon {
+  font-size: 22px;
+  color: var(--gapp-slot-lock-color, rgba(255,255,255,0.6));
+}
 .cslot--disabled .cslot-hint {
   color: rgba(255,255,255,0.85);
 }
