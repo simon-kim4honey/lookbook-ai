@@ -3210,6 +3210,9 @@ button, a { touch-action: manipulation; }
   z-index: 1;
   opacity: 0.78;
   cursor: default;
+  /* 사진/블러 배경이 둘 다 밝은 톤일 때 카드 경계가 안 보이던 문제 —
+     사진 색과 무관하게 항상 구분되도록 테두리와 그림자를 추가로 얹음 */
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.1), 0 12px 28px rgba(0,0,0,0.16);
   transition: opacity 0.32s cubic-bezier(.22,1,.36,1), transform 0.32s cubic-bezier(.22,1,.36,1);
 }
 .swipe-card.role-prev { left: -18vw; }
