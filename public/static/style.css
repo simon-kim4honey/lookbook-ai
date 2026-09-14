@@ -3113,10 +3113,11 @@ button, a { touch-action: manipulation; }
   position: relative;
   height: 100%;
   max-height: 100%;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 3 / 4; /* 실제 사진 로드 전 기본값 — JS가 사진의 실제 비율로 덮어씀(letterbox 방지) */
   max-width: 86%;
   overflow: visible;
   touch-action: pan-y;
+  transition: aspect-ratio 0.22s ease;
 }
 
 .swipe-stack-empty {
