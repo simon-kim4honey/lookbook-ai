@@ -7124,6 +7124,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 
       <!-- STEP 2 · 모델 선택 -->
       <div class="gslide" id="step-2">
+        <div class="gslide-bg-blur" id="modelStepBgBlur"></div>
         <div class="gslide-header">
           <div class="gstep-nav">
             <span class="gstep-item"><span class="gstep-circle">1</span><span class="gstep-text" data-i18n="stepnav-1">상품 업로드</span></span>
@@ -7165,6 +7166,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 
       <!-- STEP 3 · 배경 선택 -->
       <div class="gslide" id="step-3">
+        <div class="gslide-bg-blur" id="bgStepBgBlur"></div>
         <div class="gslide-header">
           <div class="gstep-nav">
             <span class="gstep-item"><span class="gstep-circle">1</span><span class="gstep-text" data-i18n="stepnav-1">상품 업로드</span></span>
