@@ -3188,23 +3188,31 @@ button, a { touch-action: manipulation; }
   transition: transform 0.22s cubic-bezier(.2,.8,.2,1), opacity 0.22s;
 }
 
-/* 이전/다음 카드 — 가운데 카드 밑에 숨는 게 아니라 좌우 옆으로 뚜렷이 보이도록 배치 */
-.swipe-card.role-prev {
-  transform: translateX(-78%) scale(0.82);
-  z-index: 1;
-  opacity: 0.6;
-  cursor: default;
-}
 .swipe-card.role-current {
   transform: translateX(0) scale(1);
   z-index: 2;
 }
+
+/* 이전/다음 카드 — 가운데 카드(.swipe-stack)의 축소 복사본이 아니라, .swipe-stack-area
+   자체의 좌우 가장자리에 도킹되는 독립적인 카드다. 가운데 카드 크기를 기준으로
+   %만큼 밀어내는 방식은 min(vw,dvh) 중 어느 쪽이 적용되느냐(화면 비율)에 따라
+   여백이 들쭉날쭉해지고 심하면 거의 안 보이는 문제가 있었다 — 뷰포트 크기에만
+   좌우되는 고정 폭으로 area 가장자리에 직접 붙여 항상 일정하게 보이도록 한다. */
+.swipe-card.role-prev,
 .swipe-card.role-next {
-  transform: translateX(78%) scale(0.82);
+  position: absolute;
+  inset: auto;
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(24vw, 16dvh);
+  aspect-ratio: 3 / 4;
   z-index: 1;
-  opacity: 0.6;
+  opacity: 0.7;
   cursor: default;
+  transition: opacity 0.18s ease;
 }
+.swipe-card.role-prev { left: 0; }
+.swipe-card.role-next { right: 0; }
 
 .swipe-card.dragging {
   transition: none;
