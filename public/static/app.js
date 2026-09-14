@@ -2786,7 +2786,7 @@ function initSwipeStack(opts) {
   const stackArea = stackEl.parentElement; // .swipe-stack-area
 
   const state = { index: 0, items: opts.items || [] };
-  const drag = { active: false, card: null, startX: 0, startY: 0, dx: 0, dy: 0 };
+  const drag = { active: false, card: null, startX: 0, startY: 0, dx: 0, dy: 0, lastX: 0, lastTime: 0, velocity: 0 };
   const SWIPE_THRESHOLD = 60;
   const EXIT_MS = 460; // 카드 넘어가는 속도를 한 번 더 늦춰달라는 요청 반영 (기존 380ms)
   const EASE = 'cubic-bezier(.22,1,.36,1)'; // 참고 영상과 같은 부드러운 ease-out 곡선
@@ -2914,12 +2914,26 @@ function initSwipeStack(opts) {
     drag.card = e.currentTarget;
     drag.card.classList.add('dragging');
     drag.startX = p.clientX; drag.startY = p.clientY; drag.dx = 0; drag.dy = 0;
+    drag.lastX = p.clientX;
+    drag.lastTime = performance.now();
+    drag.velocity = 0;
   }
   function onDragMove(e) {
     if (!drag.active) return;
     const p = e.touches ? e.touches[0] : e;
     drag.dx = p.clientX - drag.startX;
     drag.dy = p.clientY - drag.startY; // 탭/스와이프 구분용으로만 추적 — 카드는 좌우로만 움직임
+    // 순간 속도(px/ms) 추적 — 손을 떼는 순간 "얼마나 세게 튕겼는지"를 판단해
+    // 플링(fling) 제스처를 인식하는 데 쓴다. 프레임마다의 좌표 흔들림(노이즈)이
+    // 그대로 반영되지 않도록 지수이동평균으로 부드럽게 다듬는다.
+    const now = performance.now();
+    const dt = now - drag.lastTime;
+    if (dt > 0) {
+      const instVelocity = (p.clientX - drag.lastX) / dt;
+      drag.velocity = drag.velocity * 0.7 + instVelocity * 0.3;
+    }
+    drag.lastX = p.clientX;
+    drag.lastTime = now;
     drag.card.style.transform = `translateX(${drag.dx}px) rotate(${drag.dx / 20}deg)`;
   }
   // 모바일 터치는 손가락이 화면에 닿는 순간 접촉면이 바뀌면서 마우스보다 훨씬
@@ -2929,17 +2943,33 @@ function initSwipeStack(opts) {
   // 먹히는 문제의 원인). 스와이프로 오인되지 않을 만큼은 여전히 작은 값으로
   // 넉넉하게 올림.
   const TAP_MOVE_TOLERANCE = 22;
+  // 손을 뗄 때 순간 속도가 이 값(px/ms)을 넘으면, 이동 거리가 SWIPE_THRESHOLD에
+  // 못 미쳐도 "빠르게 튕긴" 플링 제스처로 보고 카드를 넘긴다. 0.5px/ms ≈ 500px/s로,
+  // 카드 폭을 반 초 안에 훑고 지나가는 정도의 확실한 손목 스냅에 해당한다.
+  const FLING_VELOCITY = 0.5;
 
   function onDragEnd() {
     if (!drag.active) return;
     drag.active = false;
     const card = drag.card;
     card.classList.remove('dragging');
-    const { dx, dy } = drag;
-    if (Math.abs(dx) > SWIPE_THRESHOLD && state.items.length > 1) {
-      exitAndAdvance(dx < 0 ? 1 : -1, card);
+    const { dx, dy, velocity } = drag;
+    const crossedDistance = Math.abs(dx) > SWIPE_THRESHOLD;
+    // 탭할 때의 미세한 흔들림까지 플링으로 오인하지 않도록, 최소한
+    // TAP_MOVE_TOLERANCE는 넘어간 "방향이 있는" 움직임일 때만 플링으로 인정한다.
+    const isFling = !crossedDistance && Math.abs(velocity) > FLING_VELOCITY && Math.abs(dx) > TAP_MOVE_TOLERANCE;
+    if ((crossedDistance || isFling) && state.items.length > 1) {
+      const direction = (crossedDistance ? dx : velocity) < 0 ? 1 : -1;
+      // 세게 튕길수록(플링) 카드가 더 빠르게 반응하도록 전환 시간을 속도에 비례해
+      // 단축한다 — 문턱 속도의 1배~2배 사이를 180ms~EXIT_MS 사이로 매핑, 그 이상은
+      // 더 줄이지 않도록 clamp.
+      const speedFactor = Math.min(Math.abs(velocity) / FLING_VELOCITY, 2);
+      const durationMs = isFling ? Math.max(180, EXIT_MS - speedFactor * 90) : EXIT_MS;
+      exitAndAdvance(direction, card, durationMs);
     } else {
-      card.style.transition = 'transform 0.2s ease';
+      // 문턱을 못 넘긴 드래그 — 손을 놓으면 자석에 끌리듯 살짝 튕기며(오버슈트)
+      // 가운데로 되돌아오는 스프링 느낌의 바운스로 되돌린다.
+      card.style.transition = 'transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1)';
       card.style.transform = '';
       // 스와이프로 이어지지 않은 순수 탭/클릭 — 이미 선택된(가운데) 카드를
       // 사용자가 직접 짚었다는 반응으로 우측 상단에 파란 체크 아이콘을 보여준다.
@@ -2956,6 +2986,29 @@ function initSwipeStack(opts) {
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
 
+  // 특정 role(prev/next)의 CSS가 정하는 "쉬고 있을 때의" 진짜(회전 없는)
+  // 위치/크기(rect)를 재는 헬퍼 — 실제로 그 슬롯에 카드가 있든 없든, 보이지
+  // 않는 프로브 엘리먼트를 잠깐 붙였다 떼서 값을 읽는다(절대위치라 다른
+  // 형제 레이아웃에 영향 없고, 같은 동기 실행 안에서 삽입→측정→제거가 끝나
+  // 화면엔 전혀 비치지 않는다).
+  // 회전까지 포함한 채로 재면 바운딩 박스가 회전된 사각형 기준으로 부풀어
+  // 있어(피타고라스 확장) 실제 크기보다 커 보인다(실측으로 확인됨) — 게다가
+  // peek 슬롯은 가운데 슬롯과 레이아웃 폭 자체가 다르므로(55% vs 68%) 단순히
+  // transform의 scale 값만 비교해서도 안 되고, 반드시 "회전을 뺀 채로 실제
+  // 렌더링된 크기"를 직접 재야 한다. 나가는 카드가 도착해야 할 반대편 peek
+  // 슬롯의 정확한 좌표를 구할 때 쓴다.
+  function measureRoleRect(role) {
+    const probe = document.createElement('div');
+    probe.className = `swipe-card role-${role}`;
+    probe.style.visibility = 'hidden';
+    probe.style.pointerEvents = 'none';
+    probe.style.transform = 'translateY(-50%) scale(0.94)'; // .role-prev/next의 resting transform에서 rotate만 뺀 값
+    stackArea.appendChild(probe);
+    const rect = probe.getBoundingClientRect();
+    probe.remove();
+    return rect;
+  }
+
   // direction: 1(다음) 또는 -1(이전).
   // "가운데로 이동해야 하는 카드가 중간에서 그냥 나타나는" 것처럼 보이던 문제 —
   // 기존에는 peek 카드가 제자리에서 옅어지며 사라지고, 그와 별개로 완전히 새로운
@@ -2966,19 +3019,36 @@ function initSwipeStack(opts) {
   // 그 카드 자신을 가운데까지 이동·확대시킨다. 애니메이션이 끝나면 render()가
   // DOM을 정리하며 진짜 role-current 엘리먼트로 교체하는데, 그때는 이미 시각적
   // 위치/크기가 목표와 동일하므로 교체가 눈에 띄지 않는다.
-  function exitAndAdvance(direction, fromCard) {
+  function exitAndAdvance(direction, fromCard, durationMs) {
     if (navigating || state.items.length <= 1) return;
     navigating = true;
+    // 플링(빠르게 튕기는 스와이프)일수록 durationMs가 더 짧게 넘어온다 — 버튼
+    // 클릭 등 속도 정보가 없는 호출은 기본 EXIT_MS를 그대로 쓴다.
+    const ms = durationMs || EXIT_MS;
     const card = fromCard || stackEl.querySelector('.swipe-card.role-current');
     if (card) {
-      card.style.transition = `transform ${EXIT_MS}ms ${EASE}, opacity ${EXIT_MS}ms ${EASE}`;
-      // 화면 밖까지 완전히 빠져나가는 대신, 일정 거리만 이동한 뒤 다음 중앙
-      // 카드(peek 카드, z-index:1)보다 아래로 가라앉듯 보이도록 이동 거리를
-      // 줄이고 z-index를 낮춘다 — "어느정도 넘어가면 중앙카드 아래로 위치
-      // 변경됨" 요청 반영.
+      // "가운데서 나가는 카드도 화면 밖으로 사라지는 게 아니라 반대편 peek
+      // 자리로 가야 하는 거 아니냐"는 피드백 — 실제로 이 카드(인덱스 i)는
+      // 전환이 끝나면 새로운 prev/next 카드로 다시 등장할 항목이다. incoming과
+      // 똑같은 FLIP 방식으로, 지금 가운데 위치에서 도착해야 할 반대편 peek
+      // 슬롯(role-prev 또는 role-next)의 실제 좌표까지 이동·축소·회전시킨다.
+      const targetRole = direction > 0 ? 'prev' : 'next';
+      const targetTiltDeg = direction > 0 ? -6 : 6; // .swipe-card.role-prev/next의 resting rotate 값
+      const startRect = card.getBoundingClientRect(); // 지금 위치(드래그로 이미 움직여진 상태 포함, 회전 없음)
+      const endRect = measureRoleRect(targetRole); // 도착해야 할 반대편 peek 슬롯의 회전 없는 진짜 크기/위치
+
+      const scaleX = endRect.width / startRect.width;
+      const scaleY = endRect.height / startRect.height;
+      const dx = (endRect.left + endRect.width / 2) - (startRect.left + startRect.width / 2);
+      const dy = (endRect.top + endRect.height / 2) - (startRect.top + startRect.height / 2);
+
+      card.style.transition = `transform ${ms}ms ${EASE}, opacity ${ms}ms ${EASE}`;
+      // 반대편 peek 슬롯에 도착하면 그 자리의 기존 카드(z-index:1)에 자연스럽게
+      // 가려지도록 z-index를 더 낮춰 "가라앉듯" 보이게 한다 — 그 슬롯은 잠시 뒤
+      // render()가 바로 이 카드와 같은 항목으로 다시 채우므로 교체가 눈에 안 띈다.
       card.style.zIndex = '0';
-      card.style.transform = `translateX(${direction > 0 ? '-58%' : '58%'}) scale(0.9)`;
-      card.style.opacity = '0';
+      card.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY}) rotate(${targetTiltDeg}deg)`;
+      card.style.opacity = '0.78'; // peek 카드의 기본 불투명도와 맞춤 — 도착 후 자연스럽게 "peek 카드처럼" 보이게
     }
     const incoming = stackArea.querySelector(direction > 0 ? '.swipe-card.role-next' : '.swipe-card.role-prev');
     if (incoming) {
@@ -3009,7 +3079,7 @@ function initSwipeStack(opts) {
       const dx = (endRect.left + endRect.width / 2) - (startRect.left + startRect.width / 2);
       const dy = (endRect.top + endRect.height / 2) - (startRect.top + startRect.height / 2);
 
-      incoming.style.transition = `transform ${EXIT_MS}ms ${EASE}, opacity ${EXIT_MS}ms ${EASE}`;
+      incoming.style.transition = `transform ${ms}ms ${EASE}, opacity ${ms}ms ${EASE}`;
       incoming.style.transform = `translate(${dx}px, ${dy}px) scale(${scaleX}, ${scaleY})`;
       incoming.style.opacity = '1';
       syncBgBlur(incoming);
@@ -3019,7 +3089,7 @@ function initSwipeStack(opts) {
       navigating = false;
       skipMountAnim = true; // 방금 FLIP으로 가운데까지 이동시켰으므로 다시 페이드인하지 않음
       render();
-    }, EXIT_MS);
+    }, ms);
   }
 
   function goPrev() { exitAndAdvance(-1); }
