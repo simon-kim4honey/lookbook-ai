@@ -2807,6 +2807,28 @@ function initSwipeStack(opts) {
   }
   function currentItem() { return state.items[state.index]; }
 
+  // 카드 프레임(.swipe-stack)의 비율을 현재 카드 사진의 실제 비율로 맞춘다.
+  // 고정 3:4 비율로 강제하면 사진 비율이 다를 때 object-fit:contain이 큰
+  // 레터박스(여백)를 만들어 카드가 작아 보이는 문제가 생기므로, 사진 비율에
+  // 맞춰 프레임 자체를 키우거나 줄여 여백 없이 화면을 최대한 채운다.
+  function syncStackAspect(card) {
+    const img = card && card.querySelector('img');
+    if (!img) { stackEl.style.aspectRatio = ''; return; }
+    const apply = () => {
+      if (img.naturalWidth && img.naturalHeight) {
+        const ratio = img.naturalWidth / img.naturalHeight;
+        stackEl.style.aspectRatio = String(Math.max(0.5, Math.min(1.6, ratio)));
+      } else {
+        stackEl.style.aspectRatio = '';
+      }
+    };
+    if (img.complete) apply();
+    else {
+      img.addEventListener('load', apply, { once: true });
+      img.addEventListener('error', () => { stackEl.style.aspectRatio = ''; }, { once: true });
+    }
+  }
+
   function cardEl(item, role) {
     const card = document.createElement('div');
     card.className = `swipe-card role-${role}` + (opts.isSelected(item) ? ' is-selected' : '');
@@ -2832,6 +2854,7 @@ function initSwipeStack(opts) {
     curCard.addEventListener('touchstart', onDragStart, { passive: true });
     curCard.addEventListener('mousedown', onDragStart);
     stackEl.appendChild(curCard);
+    syncStackAspect(curCard);
     if (total > 1) {
       const nextCard = cardEl(state.items[wrapIndex(state.index + 1)], 'next');
       stackEl.appendChild(nextCard);
@@ -2876,7 +2899,9 @@ function initSwipeStack(opts) {
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
 
-  // direction: 1(다음) 또는 -1(이전) — 현재 카드가 화면 밖으로 슬라이드되어 사라진 뒤 다음/이전 카드로 갱신
+  // direction: 1(다음) 또는 -1(이전) — 현재 카드가 화면 밖으로 슬라이드되어 사라지는
+  // 동시에, 옆에서 peek 중이던 카드(다음이면 role-next, 이전이면 role-prev)를 중앙으로
+  // 애니메이션시켜 방향에 상관없이 "카드가 자연스럽게 들어오는" 느낌을 준다.
   function exitAndAdvance(direction, fromCard) {
     if (navigating || state.items.length <= 1) return;
     navigating = true;
@@ -2885,6 +2910,14 @@ function initSwipeStack(opts) {
       card.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
       card.style.transform = `translateX(${direction > 0 ? '-140%' : '140%'}) rotate(${direction > 0 ? -8 : 8}deg)`;
       card.style.opacity = '0';
+    }
+    const incoming = stackEl.querySelector(direction > 0 ? '.swipe-card.role-next' : '.swipe-card.role-prev');
+    if (incoming) {
+      incoming.style.zIndex = '3';
+      incoming.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
+      incoming.style.transform = 'translateX(0) scale(1)';
+      incoming.style.opacity = '1';
+      syncStackAspect(incoming);
     }
     setTimeout(() => {
       state.index = wrapIndex(state.index + direction);
