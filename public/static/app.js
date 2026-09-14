@@ -2783,6 +2783,7 @@ function fixGridHeight(wrapId) { /* no-op: CSS .gslide-grid { flex:1 } 으로 �
 function initSwipeStack(opts) {
   const stackEl = document.getElementById(opts.stackId);
   if (!stackEl) return null;
+  const stackArea = stackEl.parentElement; // .swipe-stack-area
 
   const state = { index: 0, items: opts.items || [] };
   const drag = { active: false, card: null, startX: 0, startY: 0, dx: 0, dy: 0 };
@@ -2815,8 +2816,21 @@ function initSwipeStack(opts) {
     if (img && img.src) bgBlurEl.style.backgroundImage = `url("${img.src}")`;
   }
 
+  // 이전/다음 카드는 더 이상 가운데 카드(.swipe-stack)의 축소 복사본이 아니라,
+  // .swipe-stack-area의 좌우 가장자리에 독립적으로 도킹되는 별도 크기의
+  // 카드다(CSS의 .swipe-card.role-prev/next 참고) — 가운데 카드 크기에 따라
+  // 여백/가시성이 달라지던 문제(뷰포트 비율에 따라 min(vw,dvh) 중 어느 쪽이
+  // 적용되느냐에 좌우됨)를 완전히 없애기 위함. .swipe-stack이 아니라
+  // stackArea에 직접 붙이므로, render() 시작 시 이전에 붙여둔 peek 카드를
+  // 먼저 지워줘야 한다(stackEl.innerHTML='' 로는 안 지워짐).
+  function clearPeekCards() {
+    stackArea.querySelectorAll(':scope > .swipe-card.role-prev, :scope > .swipe-card.role-next')
+      .forEach((el) => el.remove());
+  }
+
   function render() {
     stackEl.innerHTML = '';
+    clearPeekCards();
     const total = state.items.length;
     if (total === 0) {
       stackEl.innerHTML = `<div class="swipe-stack-empty">${opts.emptyText || '표시할 항목이 없습니다.'}</div>`;
@@ -2826,7 +2840,7 @@ function initSwipeStack(opts) {
     // 카드가 1~2장뿐이어도 이전/다음이 같은 카드를 가리킬 수 있음(순환) — 그래도 그대로 보여준다
     if (total > 1) {
       const prevCard = cardEl(state.items[wrapIndex(state.index - 1)], 'prev');
-      stackEl.appendChild(prevCard);
+      stackArea.insertBefore(prevCard, stackEl);
     }
     const curItem = state.items[state.index];
     const curCard = cardEl(curItem, 'current');
@@ -2839,7 +2853,7 @@ function initSwipeStack(opts) {
     opts.onConfirm(curItem);
     if (total > 1) {
       const nextCard = cardEl(state.items[wrapIndex(state.index + 1)], 'next');
-      stackEl.appendChild(nextCard);
+      stackArea.appendChild(nextCard);
     }
     updateFooter();
   }
@@ -2884,9 +2898,10 @@ function initSwipeStack(opts) {
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
 
-  // direction: 1(다음) 또는 -1(이전) — 현재 카드가 화면 밖으로 슬라이드되어 사라지는
-  // 동시에, 옆에서 peek 중이던 카드(다음이면 role-next, 이전이면 role-prev)를 중앙으로
-  // 애니메이션시켜 방향에 상관없이 "카드가 자연스럽게 들어오는" 느낌을 준다.
+  // direction: 1(다음) 또는 -1(이전) — 현재 카드가 화면 밖으로 슬라이드되어 사라진다.
+  // 옆에서 peek 중이던 카드(다음이면 role-next, 이전이면 role-prev)는 이제 가운데
+  // 카드와 별도 크기/위치를 쓰는 독립적인 카드라 그 자리로 그대로 모핑시키지 않고,
+  // 살짝 페이드아웃만 시킨 뒤 render()가 새 가운데 카드를 만든다.
   function exitAndAdvance(direction, fromCard) {
     if (navigating || state.items.length <= 1) return;
     navigating = true;
@@ -2896,12 +2911,10 @@ function initSwipeStack(opts) {
       card.style.transform = `translateX(${direction > 0 ? '-140%' : '140%'}) rotate(${direction > 0 ? -8 : 8}deg)`;
       card.style.opacity = '0';
     }
-    const incoming = stackEl.querySelector(direction > 0 ? '.swipe-card.role-next' : '.swipe-card.role-prev');
+    const incoming = stackArea.querySelector(direction > 0 ? '.swipe-card.role-next' : '.swipe-card.role-prev');
     if (incoming) {
-      incoming.style.zIndex = '3';
-      incoming.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
-      incoming.style.transform = 'translateX(0) scale(1)';
-      incoming.style.opacity = '1';
+      incoming.style.transition = 'opacity 0.18s ease';
+      incoming.style.opacity = '0';
       syncBgBlur(incoming);
     }
     setTimeout(() => {
