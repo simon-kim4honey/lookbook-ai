@@ -2708,7 +2708,7 @@ function renderSlots() {
       slot.classList.add('cslot--disabled');
       body.innerHTML = `
         <span class="cslot-empty">
-          <span class="cslot-plus">🔒</span>
+          <span class="cslot-plus cslot-lock-icon"><i class="fas fa-lock"></i></span>
           <span class="cslot-hint">${t('slotLockedHint', cat)}</span>
         </span>`;
       if (removeBtn) removeBtn.classList.add('hidden');
