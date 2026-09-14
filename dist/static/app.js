@@ -2886,8 +2886,8 @@ function initSwipeStack(opts) {
     if (!drag.active) return;
     const p = e.touches ? e.touches[0] : e;
     drag.dx = p.clientX - drag.startX;
-    drag.dy = p.clientY - drag.startY;
-    drag.card.style.transform = `translate(${drag.dx}px, ${drag.dy}px) rotate(${drag.dx / 20}deg)`;
+    drag.dy = p.clientY - drag.startY; // 탭/스와이프 구분용으로만 추적 — 카드는 좌우로만 움직임
+    drag.card.style.transform = `translateX(${drag.dx}px) rotate(${drag.dx / 20}deg)`;
   }
   const TAP_MOVE_TOLERANCE = 10; // 이 정도 이하로 움직였으면 스와이프가 아니라 탭/클릭으로 간주
 
@@ -2929,8 +2929,9 @@ function initSwipeStack(opts) {
     }
     const incoming = stackArea.querySelector(direction > 0 ? '.swipe-card.role-next' : '.swipe-card.role-prev');
     if (incoming) {
+      const tilt = direction > 0 ? '6deg' : '-6deg';
       incoming.style.opacity = '0';
-      incoming.style.transform = 'translateY(-50%) scale(1.04)';
+      incoming.style.transform = `translateY(-50%) scale(1.04) rotate(${tilt})`;
       syncBgBlur(incoming);
     }
     setTimeout(() => {
