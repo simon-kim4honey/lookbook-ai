@@ -105,9 +105,6 @@ const I18N = {
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">모델 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 배경이 없습니다</p><p style="font-size:13px">관리자 페이지에서 배경을 먼저 등록해주세요</p></div>',
     bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">배경 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
-    swipeSelectModel: '이 모델 선택',
-    swipeSelectBg: '이 배경 선택',
-    swipeSelected: '선택됨',
     swipeNoModels: '조건에 맞는 모델이 없습니다',
     swipeNoBgs: '조건에 맞는 배경이 없습니다',
     randomModel: (name) => `랜덤 모델이 선택됐습니다: ${name}`,
@@ -197,9 +194,6 @@ const I18N = {
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load models</p><p style="font-size:13px">Please try again later</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">No backgrounds registered</p><p style="font-size:13px">Please add backgrounds in the admin page</p></div>',
     bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load backgrounds</p><p style="font-size:13px">Please try again later</p></div>',
-    swipeSelectModel: 'Select this model',
-    swipeSelectBg: 'Select this background',
-    swipeSelected: 'Selected',
     swipeNoModels: 'No models match the filter',
     swipeNoBgs: 'No backgrounds match the filter',
     randomModel: (name) => `Random model selected: ${name}`,
@@ -284,9 +278,6 @@ const I18N = {
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">モデルの読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景が登録されていません</p><p style="font-size:13px">管理ページで背景を登録してください</p></div>',
     bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景の読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
-    swipeSelectModel: 'このモデルを選択',
-    swipeSelectBg: 'この背景を選択',
-    swipeSelected: '選択済み',
     swipeNoModels: '条件に合うモデルがありません',
     swipeNoBgs: '条件に合う背景がありません',
     randomModel: (name) => `ランダムモデルが選択されました: ${name}`,
@@ -2857,8 +2848,8 @@ function initSwipeStack(opts) {
 
   function cardEl(item, role) {
     const card = document.createElement('div');
-    card.className = `swipe-card role-${role}` + (opts.isSelected(item) ? ' is-selected' : '');
-    card.innerHTML = opts.renderCard(item) + '<div class="swipe-card-selected-badge"><i class="fas fa-check"></i></div>';
+    card.className = `swipe-card role-${role}`;
+    card.innerHTML = opts.renderCard(item);
     return card;
   }
 
@@ -2891,6 +2882,9 @@ function initSwipeStack(opts) {
     stackEl.appendChild(curCard);
     syncStackSize(curCard);
     syncBgBlur(curCard);
+    // 별도의 "선택" 버튼 없이, 화면 중앙에 있는(현재) 카드가 곧 선택된 항목이다 —
+    // 다음 단계/생성 버튼을 누르는 시점에 바로 이 카드가 적용된다.
+    opts.onConfirm(curItem);
     if (total > 1) {
       const nextCard = cardEl(state.items[wrapIndex(state.index + 1)], 'next');
       stackEl.appendChild(nextCard);
@@ -2918,12 +2912,8 @@ function initSwipeStack(opts) {
     drag.active = false;
     const card = drag.card;
     card.classList.remove('dragging');
-    const { dx, dy } = drag;
-    if (Math.abs(dy) > SWIPE_THRESHOLD && Math.abs(dy) > Math.abs(dx) && dy < 0) {
-      card.style.transition = 'transform 0.2s ease';
-      card.style.transform = '';
-      confirmSelect();
-    } else if (Math.abs(dx) > SWIPE_THRESHOLD && state.items.length > 1) {
+    const { dx } = drag;
+    if (Math.abs(dx) > SWIPE_THRESHOLD && state.items.length > 1) {
       exitAndAdvance(dx < 0 ? 1 : -1, card);
     } else {
       card.style.transition = 'transform 0.2s ease';
@@ -2965,36 +2955,19 @@ function initSwipeStack(opts) {
 
   function goPrev() { exitAndAdvance(-1); }
   function goNext() { exitAndAdvance(1); }
-  function confirmSelect() {
-    const item = currentItem();
-    if (item) opts.onConfirm(item);
-    render();
-  }
 
   function updateFooter() {
     const prevBtn = document.getElementById(opts.prevBtnId);
     const nextBtn = document.getElementById(opts.nextBtnId);
-    const selectBtn = document.getElementById(opts.selectBtnId);
     const total = state.items.length;
     if (prevBtn) prevBtn.disabled = total <= 1;
     if (nextBtn) nextBtn.disabled = total <= 1;
-    if (selectBtn) {
-      const item = currentItem();
-      const sel = item ? opts.isSelected(item) : false;
-      selectBtn.disabled = !item;
-      selectBtn.classList.toggle('is-selected', sel);
-      selectBtn.innerHTML = sel
-        ? `<i class="fas fa-check"></i> ${opts.selectedLabel || '선택됨'}`
-        : (opts.selectLabel || '선택');
-    }
   }
 
   const prevBtnEl = opts.prevBtnId && document.getElementById(opts.prevBtnId);
   const nextBtnEl = opts.nextBtnId && document.getElementById(opts.nextBtnId);
-  const selectBtnEl = opts.selectBtnId && document.getElementById(opts.selectBtnId);
   if (prevBtnEl) prevBtnEl.onclick = goPrev;
   if (nextBtnEl) nextBtnEl.onclick = goNext;
-  if (selectBtnEl) selectBtnEl.onclick = confirmSelect;
 
   render();
 
@@ -3019,7 +2992,6 @@ function renderModelCardHTML(model) {
 }
 
 function renderModelGrid(models) {
-  const isSelected = (item) => AppState.selectedModel?.id === item.id;
   const onConfirm = (item) => { AppState.selectedModel = item; };
 
   if (!modelSwipeStack) {
@@ -3028,13 +3000,9 @@ function renderModelGrid(models) {
       items: models,
       prevBtnId: 'modelPrevBtn',
       nextBtnId: 'modelNextBtn',
-      selectBtnId: 'modelSelectBtn',
-      selectLabel: t('swipeSelectModel'),
-      selectedLabel: t('swipeSelected'),
       emptyText: t('swipeNoModels'),
       renderCard: renderModelCardHTML,
       bgBlurId: 'modelStepBgBlur',
-      isSelected,
       onConfirm,
     });
   } else {
@@ -3075,12 +3043,10 @@ function renderBgCardHTML(bg) {
   return `${bg.isDefault ? `<span class="swipe-card-badge">기본(${bg.category || '스튜디오'})</span>` : ''}
     <img src="${imgSrc}" alt="${bg.name || ''}"
       onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-    <div class="swipe-card-fallback" style="display:none;">🖼️</div>
-    <div class="swipe-card-label">${bg.name || ''}</div>`;
+    <div class="swipe-card-fallback" style="display:none;">🖼️</div>`;
 }
 
 function renderBgGrid(bgs) {
-  const isSelected = (item) => AppState.selectedBg?.id === item.id;
   const onConfirm = (item) => { AppState.selectedBg = item; };
 
   if (!bgSwipeStack) {
@@ -3089,13 +3055,9 @@ function renderBgGrid(bgs) {
       items: bgs,
       prevBtnId: 'bgPrevBtn',
       nextBtnId: 'bgNextBtn',
-      selectBtnId: 'bgSelectBtn',
-      selectLabel: t('swipeSelectBg'),
-      selectedLabel: t('swipeSelected'),
       emptyText: t('swipeNoBgs'),
       renderCard: renderBgCardHTML,
       bgBlurId: 'bgStepBgBlur',
-      isSelected,
       onConfirm,
     });
   } else {

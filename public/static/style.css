@@ -3089,7 +3089,7 @@ button, a { touch-action: manipulation; }
   z-index: 0;
   background-size: cover;
   background-position: center;
-  filter: blur(36px) saturate(1.2);
+  filter: blur(18px) saturate(1.2);
   transform: scale(1.15); /* 블러로 가장자리가 비치 않도록 살짝 확대 */
   pointer-events: none;
 }
@@ -3232,27 +3232,6 @@ button, a { touch-action: manipulation; }
   pointer-events: none;
 }
 
-.swipe-card-selected-badge {
-  display: none;
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--primary);
-  color: white;
-  font-size: 13px;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 8px rgba(49,130,246,0.5);
-  pointer-events: none;
-}
-
-.swipe-card.is-selected .swipe-card-selected-badge {
-  display: flex;
-}
-
 .swipe-card-fallback {
   position: absolute;
   inset: 0;
@@ -3294,33 +3273,6 @@ button, a { touch-action: manipulation; }
 
 @media (hover: hover) {
   .swipe-nav-arrow:hover { background: rgba(255,255,255,0.75); }
-}
-
-.swipe-stack-footer {
-  flex-shrink: 0;
-  width: 100%;
-  max-width: 260px;
-}
-
-.swipe-select-btn {
-  width: 100%;
-  padding: 13px;
-  border-radius: 12px;
-  border: none;
-  background: var(--text-primary);
-  color: #fff;
-  font-weight: 700;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.swipe-select-btn.is-selected {
-  background: var(--primary);
-}
-
-.swipe-select-btn:disabled {
-  opacity: 0.4;
-  pointer-events: none;
 }
 
 /* ─── PC 전용 그리드 스크롤 화살표 ─── */

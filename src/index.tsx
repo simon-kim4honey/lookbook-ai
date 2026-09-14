@@ -7151,9 +7151,6 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               <div class="swipe-stack" id="modelGrid"></div>
               <button class="swipe-nav-arrow next" id="modelNextBtn" aria-label="다음 모델"><i class="fas fa-chevron-right"></i></button>
             </div>
-            <div class="swipe-stack-footer">
-              <button class="swipe-select-btn" id="modelSelectBtn">이 모델 선택</button>
-            </div>
           </div>
         </div>
         <div class="gslide-nav">
@@ -7187,9 +7184,6 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               <button class="swipe-nav-arrow prev" id="bgPrevBtn" aria-label="이전 배경"><i class="fas fa-chevron-left"></i></button>
               <div class="swipe-stack" id="bgGrid"></div>
               <button class="swipe-nav-arrow next" id="bgNextBtn" aria-label="다음 배경"><i class="fas fa-chevron-right"></i></button>
-            </div>
-            <div class="swipe-stack-footer">
-              <button class="swipe-select-btn" id="bgSelectBtn">이 배경 선택</button>
             </div>
           </div>
         </div>
