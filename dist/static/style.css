@@ -3103,8 +3103,12 @@ button, a { touch-action: manipulation; }
   inset: 0;
   background: rgba(255,255,255,0.76);
 }
-/* .gslide-bg-blur 뒤에 오는 모든 형제(헤더/필터바/그리드/네비 등)는 그 위에 뜨도록 */
-.gslide-bg-blur ~ * {
+/* .gslide-bg-blur 뒤에 오는 형제(헤더/필터바/그리드/네비 등)는 그 위에 뜨도록 —
+   .generating-view는 제외한다: 그 자신이 이미 position:absolute + inset:0로
+   step 전체(헤더 포함)를 덮는 오버레이라, 여기서 position:relative로 되돌리면
+   오버레이가 풀려 헤더가 그대로 보여버린다(생성 시작해도 1/2/3 단계 표시줄이
+   안 사라지던 원인). */
+.gslide-bg-blur ~ *:not(.generating-view) {
   position: relative;
   z-index: 1;
 }
@@ -3210,7 +3214,7 @@ button, a { touch-action: manipulation; }
 .swipe-card img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover; /* 카드 비율과 다른 사진도 확대해 여백 없이 꽉 채움(가장자리는 일부 잘릴 수 있음) */
   display: block;
   pointer-events: none;
 }
