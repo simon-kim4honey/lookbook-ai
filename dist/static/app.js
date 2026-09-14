@@ -2862,6 +2862,15 @@ function initSwipeStack(opts) {
     return card;
   }
 
+  // 화면 전체 배경(.gslide-bg-blur)을 현재 카드 사진으로 갱신한다 — 카드에
+  // 이미 렌더링된 <img>의 src를 그대로 재사용해 URL 생성 로직 중복을 피한다.
+  const bgBlurEl = opts.bgBlurId && document.getElementById(opts.bgBlurId);
+  function syncBgBlur(card) {
+    if (!bgBlurEl) return;
+    const img = card && card.querySelector('img');
+    if (img && img.src) bgBlurEl.style.backgroundImage = `url("${img.src}")`;
+  }
+
   function render() {
     stackEl.innerHTML = '';
     const total = state.items.length;
@@ -2881,6 +2890,7 @@ function initSwipeStack(opts) {
     curCard.addEventListener('mousedown', onDragStart);
     stackEl.appendChild(curCard);
     syncStackSize(curCard);
+    syncBgBlur(curCard);
     if (total > 1) {
       const nextCard = cardEl(state.items[wrapIndex(state.index + 1)], 'next');
       stackEl.appendChild(nextCard);
@@ -2944,6 +2954,7 @@ function initSwipeStack(opts) {
       incoming.style.transform = 'translateX(0) scale(1)';
       incoming.style.opacity = '1';
       syncStackSize(incoming);
+      syncBgBlur(incoming);
     }
     setTimeout(() => {
       state.index = wrapIndex(state.index + direction);
@@ -3022,6 +3033,7 @@ function renderModelGrid(models) {
       selectedLabel: t('swipeSelected'),
       emptyText: t('swipeNoModels'),
       renderCard: renderModelCardHTML,
+      bgBlurId: 'modelStepBgBlur',
       isSelected,
       onConfirm,
     });
@@ -3082,6 +3094,7 @@ function renderBgGrid(bgs) {
       selectedLabel: t('swipeSelected'),
       emptyText: t('swipeNoBgs'),
       renderCard: renderBgCardHTML,
+      bgBlurId: 'bgStepBgBlur',
       isSelected,
       onConfirm,
     });

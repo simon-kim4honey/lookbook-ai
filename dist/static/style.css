@@ -3080,6 +3080,32 @@ button, a { touch-action: manipulation; }
 .skip-card .skip-sub { font-size: 12px; }
 .gap-12 { gap: 12px; }
 
+/* 현재 카드 사진을 확대·블러 처리해 화면 전체 배경으로 깔아주는 레이어.
+   카드를 스와이프하면 JS(syncBgBlur)가 background-image를 바꿔 함께 전환된다.
+   .gslide가 position:absolute인 컨테이닝 블록이라 inset:0로 화면 전체를 덮는다. */
+.gslide-bg-blur {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(36px) saturate(1.2);
+  transform: scale(1.15); /* 블러로 가장자리가 비치 않도록 살짝 확대 */
+  pointer-events: none;
+}
+.gslide-bg-blur::after {
+  /* 블러 위에 반투명 흰 스크림을 깔아 텍스트/카드 가독성 확보 */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.76);
+}
+/* .gslide-bg-blur 뒤에 오는 모든 형제(헤더/필터바/그리드/네비 등)는 그 위에 뜨도록 */
+.gslide-bg-blur ~ * {
+  position: relative;
+  z-index: 1;
+}
+
 /* ── 모델/배경 스와이프 카드 선택 UI ──
    가운데 프레임(.gslide-grid, flex:1) 안에서 스크롤 없이 세로 공간을 꽉 채우도록
    .swipe-stack-wrap도 flex:1로 남은 높이를 전부 가져간다. 카드는 그 안에서
