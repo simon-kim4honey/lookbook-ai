@@ -2830,7 +2830,25 @@ function initSwipeStack(opts) {
       .forEach((el) => el.remove());
   }
 
+  // 스와이프할 때마다 카드가 통째로(이미지 포함) 새로 만들어지다 보니, 이미지가
+  // 아직 네트워크에서 안 온 상태로 카드가 나타나 잠깐 깜빡이거나 빈 카드처럼
+  // 보이는 문제가 있었다 — 전체 목록의 이미지를 미리 Image()로 받아 브라우저
+  // 캐시에 데워두면, 실제 카드에 <img>가 새로 만들어질 때도 이미 캐시에 있는
+  // 리소스라 네트워크 왕복 없이 즉시 그려진다.
+  const preloadedSrcs = new Set();
+  function preloadAllImages() {
+    if (!opts.getImageSrc) return;
+    state.items.forEach((item) => {
+      const src = opts.getImageSrc(item);
+      if (!src || preloadedSrcs.has(src)) return;
+      preloadedSrcs.add(src);
+      const img = new Image();
+      img.src = src;
+    });
+  }
+
   function render() {
+    preloadAllImages();
     stackEl.innerHTML = '';
     clearPeekCards();
     const total = state.items.length;
@@ -2973,12 +2991,16 @@ function initSwipeStack(opts) {
 let modelSwipeStack = null;
 let bgSwipeStack = null;
 
+function modelImageSrc(model) {
+  return model.isCustom
+    ? `/api/proxy/custom-model/${model.customId}`
+    : `/api/proxy/model-image/${model.id}`;
+}
+
 function renderModelCardHTML(model) {
   const displayName = model.name && !model.name.match(/^\d+$/)
     ? model.name : `모델 ${model.name || model.id}`;
-  const imgSrc = model.isCustom
-    ? `/api/proxy/custom-model/${model.customId}`
-    : `/api/proxy/model-image/${model.id}`;
+  const imgSrc = modelImageSrc(model);
   return `<img src="${imgSrc}" alt="${displayName}"
       onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
     <div class="swipe-card-fallback" style="display:none;">${model.gender === '남성' ? '🧍‍♂️' : '🧍‍♀️'}</div>`;
@@ -2995,6 +3017,7 @@ function renderModelGrid(models) {
       nextBtnId: 'modelNextBtn',
       emptyText: t('swipeNoModels'),
       renderCard: renderModelCardHTML,
+      getImageSrc: modelImageSrc,
       bgBlurId: 'modelStepBgBlur',
       onConfirm,
     });
@@ -3029,10 +3052,14 @@ function filterModels(type, value, btn) {
 // STEP 3: Background Selection — 그리드 UI
 // ─────────────────────────────────────────────────────────
 
-function renderBgCardHTML(bg) {
-  const imgSrc = bg.isCustom
+function bgImageSrc(bg) {
+  return bg.isCustom
     ? `/api/proxy/custom-bg/${bg.customId}`
     : `/api/proxy/bg-image/${bg.id}`;
+}
+
+function renderBgCardHTML(bg) {
+  const imgSrc = bgImageSrc(bg);
   return `${bg.isDefault ? `<span class="swipe-card-badge">기본(${bg.category || '스튜디오'})</span>` : ''}
     <img src="${imgSrc}" alt="${bg.name || ''}"
       onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
@@ -3050,6 +3077,7 @@ function renderBgGrid(bgs) {
       nextBtnId: 'bgNextBtn',
       emptyText: t('swipeNoBgs'),
       renderCard: renderBgCardHTML,
+      getImageSrc: bgImageSrc,
       bgBlurId: 'bgStepBgBlur',
       onConfirm,
     });

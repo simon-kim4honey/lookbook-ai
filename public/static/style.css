@@ -1264,17 +1264,22 @@ footer {
   --gapp-text: #F2F2F5;            /* 본문 강조 텍스트(구 #191F28/#333D4B) */
   --gapp-text-secondary: #B7B7C2;  /* 보조 텍스트(구 #4E5968/#6B7684) */
   --gapp-text-muted: #82828E;      /* 옅은 텍스트(구 #8B95A1/#B0B8C1) */
-  --gapp-gradient: linear-gradient(135deg, #7C3AED 0%, #2563EB 100%); /* 주요 CTA: 다음 단계/AI 생성 시작/충전 */
+  --gapp-gradient: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); /* 주요 CTA: 다음 단계/AI 생성 시작/충전 — 다크그린→다크블루 */
   --gapp-gradient-2: linear-gradient(135deg, #EC4899 0%, #F97316 100%); /* 강조: 선택된 필터/단계, 결과 화면 주요 버튼 */
-  --gapp-glow: rgba(124,58,237,0.45);
+  --gapp-glow: rgba(30,58,138,0.45);
   --gapp-glow-2: rgba(236,72,153,0.4);
   --gapp-nav-bg: rgba(23,24,29,0.97);   /* 하단 고정 내비게이션 바 배경(구 rgba(255,255,255,0.97)) */
   --gapp-accent: #A78BFA;          /* 강조 텍스트/아이콘 단색(그라데이션을 쓸 수 없는 곳), 로고 색과 통일 */
-  --gapp-scrim: rgba(10,10,13,0.72);    /* 블러 배경 위 가독성용 스크림(구 흰색 rgba(255,255,255,0.76)) */
+  --gapp-scrim: rgba(5,5,8,0.9);    /* 블러 배경 위 가독성용 스크림 — 훨씬 더 어둡게(구 흰색 rgba(255,255,255,0.76)) */
   --gapp-fallback-gradient: linear-gradient(135deg, #2B2C34, #202127); /* 이미지 로드 실패 시 카드 배경(구 파스텔 그라데이션) */
   --gapp-arrow-bg: rgba(23,24,29,0.55);       /* 카드 위 화살표 버튼 배경(구 흰색 반투명) */
   --gapp-arrow-border: rgba(255,255,255,0.18);
   --gapp-arrow-bg-hover: rgba(43,44,52,0.8);
+  --gapp-slot-bg: rgba(255,255,255,0.7);          /* 업로드 슬롯 카드 — 흰색 반투명 유리 느낌 */
+  --gapp-slot-bg-hover: rgba(255,255,255,0.85);
+  --gapp-slot-blur: blur(6px);
+  --gapp-slot-disabled-bg: linear-gradient(135deg, #2B2C34 0%, #14532D 100%); /* 잠긴 슬롯: 다크그레이 → 다크그린 */
+  --gapp-slot-disabled-opacity: 1;
 
   /* 전역 토큰(:root)을 #gapp 안에서만 재정의 — CSS 커스텀 프로퍼티는 자손에게만
      상속되므로, #gapp 바깥(다른 페이지)의 var(--text-muted)/var(--border)/
@@ -1702,7 +1707,9 @@ footer {
   border-radius: 16px;
   overflow: hidden;
   border: 1.5px solid transparent;
-  background: var(--gapp-surface-2, #F2F4F6);
+  background: var(--gapp-slot-bg, #F2F4F6);
+  backdrop-filter: var(--gapp-slot-blur, none);
+  -webkit-backdrop-filter: var(--gapp-slot-blur, none);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
   /* label 기본 스타일 초기화 */
@@ -1711,11 +1718,11 @@ footer {
 }
 .cslot:hover {
   border-color: rgba(124,58,237,0.35);
-  background: var(--gapp-surface-3, #E8F3FF);
+  background: var(--gapp-slot-bg-hover, #E8F3FF);
 }
 .cslot.drag-over {
   border-color: var(--gapp-accent, #3182F6);
-  background: var(--gapp-surface-3, #E8F3FF);
+  background: var(--gapp-slot-bg-hover, #E8F3FF);
 }
 /* 이미지 채워진 슬롯: 테두리 solid + 포인트 컬러 */
 .cslot--filled {
@@ -1725,17 +1732,19 @@ footer {
 }
 .cslot--filled:hover {
   border-color: rgba(124,58,237,0.6);
-  background: var(--gapp-surface-2, #F2F4F6);
+  background: var(--gapp-slot-bg, #F2F4F6);
 }
-/* 상의/하의 ↔ 전체 상호 배타: 반대쪽 그룹이 채워지면 비활성화 */
+/* 상의/하의 ↔ 전체 상호 배타: 반대쪽 그룹이 채워지면 비활성화 —
+   다른 슬롯과 구분되도록 다크그레이→다크그린 그라데이션의 "잠김" 전용 배경을 쓴다 */
 .cslot--disabled {
   cursor: not-allowed;
-  opacity: 0.35;
+  opacity: var(--gapp-slot-disabled-opacity, 0.35);
   border-style: dashed;
+  background: var(--gapp-slot-disabled-bg, transparent);
 }
 .cslot--disabled:hover {
   border-color: var(--gapp-border, #E5E8EB);
-  background: var(--gapp-surface-2, #F2F4F6);
+  background: var(--gapp-slot-disabled-bg, var(--gapp-slot-bg, #F2F4F6));
 }
 
 /* Step1: clothing-slots가 gslide-body 남은 공간을 꽉 채우도록 */
@@ -1758,14 +1767,14 @@ footer {
   padding: 10px 10px 8px;
   font-size: 12px;
   font-weight: 700;
-  color: var(--gapp-text-secondary, #4E5968);
+  color: #4E5968;
   letter-spacing: 0.3px;
   text-align: center;
-  border-bottom: 1px solid var(--gapp-border, #E5E8EB);
+  border-bottom: 1px solid rgba(0,0,0,0.08);
   flex-shrink: 0;
 }
 .cslot--filled .cslot-label {
-  color: var(--gapp-accent, #1B64DA);
+  color: #1B64DA;
   border-bottom-color: rgba(124,58,237,0.2);
 }
 
@@ -1801,14 +1810,18 @@ footer {
 .cslot-plus {
   display: block;
   font-size: 26px;
-  color: var(--gapp-text-muted, #B0B8C1);
+  color: #B0B8C1;
   line-height: 1;
   font-weight: 300;
+}
+.cslot--disabled .cslot-plus,
+.cslot--disabled .cslot-hint {
+  color: rgba(255,255,255,0.85);
 }
 .cslot-hint {
   display: block;
   font-size: 11px;
-  color: var(--gapp-text-muted, #8B95A1);
+  color: #8B95A1;
   text-align: center;
   line-height: 1.5;
 }
