@@ -44,6 +44,7 @@
 
 html {
   scroll-behavior: smooth;
+  overscroll-behavior-y: none; /* 모바일 브라우저의 아래로 당겨 새로고침 제스처 비활성화 */
 }
 
 .sr-only {
@@ -64,6 +65,7 @@ body {
   background: var(--white);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none; /* 모바일 브라우저의 아래로 당겨 새로고침 제스처 비활성화 */
 }
 
 /* Typography */
@@ -1371,6 +1373,7 @@ footer {
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain; /* 이 영역 끝에서 스크롤이 상위(body)로 번져 새로고침 제스처를 트리거하지 않도록 */
 }
 .gslide-grid::-webkit-scrollbar { width: 3px; }
 .gslide-grid::-webkit-scrollbar-track { background: transparent; }
