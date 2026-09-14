@@ -1264,10 +1264,31 @@ footer {
   --gapp-text: #F2F2F5;            /* 본문 강조 텍스트(구 #191F28/#333D4B) */
   --gapp-text-secondary: #B7B7C2;  /* 보조 텍스트(구 #4E5968/#6B7684) */
   --gapp-text-muted: #82828E;      /* 옅은 텍스트(구 #8B95A1/#B0B8C1) */
-  --gapp-gradient: linear-gradient(135deg, #7C3AED 0%, #2563EB 100%); /* 주요 CTA: 다음 단계/AI 생성 시작/충전 */
+  --gapp-gradient: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); /* 주요 CTA: 다음 단계/AI 생성 시작/충전 — 다크그린→다크블루 */
   --gapp-gradient-2: linear-gradient(135deg, #EC4899 0%, #F97316 100%); /* 강조: 선택된 필터/단계, 결과 화면 주요 버튼 */
-  --gapp-glow: rgba(124,58,237,0.45);
+  --gapp-glow: rgba(30,58,138,0.45);
   --gapp-glow-2: rgba(236,72,153,0.4);
+  --gapp-nav-bg: rgba(23,24,29,0.97);   /* 하단 고정 내비게이션 바 배경(구 rgba(255,255,255,0.97)) */
+  --gapp-accent: #A78BFA;          /* 강조 텍스트/아이콘 단색(그라데이션을 쓸 수 없는 곳), 로고 색과 통일 */
+  --gapp-scrim: rgba(5,5,8,0.9);    /* 블러 배경 위 가독성용 스크림 — 훨씬 더 어둡게(구 흰색 rgba(255,255,255,0.76)) */
+  --gapp-fallback-gradient: linear-gradient(135deg, #2B2C34, #202127); /* 이미지 로드 실패 시 카드 배경(구 파스텔 그라데이션) */
+  --gapp-arrow-bg: rgba(23,24,29,0.55);       /* 카드 위 화살표 버튼 배경(구 흰색 반투명) */
+  --gapp-arrow-border: rgba(255,255,255,0.18);
+  --gapp-arrow-bg-hover: rgba(43,44,52,0.8);
+  --gapp-slot-bg: rgba(255,255,255,0.7);          /* 업로드 슬롯 카드 — 흰색 반투명 유리 느낌 */
+  --gapp-slot-bg-hover: rgba(255,255,255,0.85);
+  --gapp-slot-blur: blur(6px);
+  --gapp-slot-disabled-bg: linear-gradient(135deg, #2B2C34 0%, #14532D 100%); /* 잠긴 슬롯: 다크그레이 → 다크그린 */
+  --gapp-slot-disabled-opacity: 1;
+
+  /* 전역 토큰(:root)을 #gapp 안에서만 재정의 — CSS 커스텀 프로퍼티는 자손에게만
+     상속되므로, #gapp 바깥(다른 페이지)의 var(--text-muted)/var(--border)/
+     var(--text-primary) 사용처는 전혀 영향받지 않는다. #gapp 안에서 이미 이
+     전역 토큰들을 쓰고 있는(따로 다크 전용 값으로 고치지 않은) 규칙들까지
+     한 번에 다크 테마에 맞게 바뀐다. */
+  --text-muted: var(--gapp-text-muted);
+  --border: var(--gapp-border);
+  --text-primary: var(--gapp-text);
 
   position: fixed;
   inset: 0;
@@ -1433,32 +1454,33 @@ footer {
 }
 /* 네비 버튼 — 모서리를 의상 슬롯(cslot)과 동일한 14px로 통일 */
 .gslide-nav .step-nav-back {
-  background: #F2F4F6 !important;
-  border-color: #F2F4F6 !important;
-  color: #4E5968 !important;
+  background: var(--gapp-surface-2, #F2F4F6) !important;
+  border-color: var(--gapp-surface-2, #F2F4F6) !important;
+  color: var(--gapp-text-secondary, #4E5968) !important;
   border-radius: 14px !important;
 }
 .gslide-nav .step-nav-back:hover {
-  background: #E5E8EB !important;
-  color: #191F28 !important;
+  background: var(--gapp-surface-3, #E5E8EB) !important;
+  color: var(--gapp-text, #191F28) !important;
 }
 .gslide-nav .step-nav-next {
-  background: #3182F6 !important;
+  background: var(--gapp-gradient, #3182F6) !important;
   border: none !important;
   color: #fff !important;
-  box-shadow: 0 4px 16px rgba(49,130,246,0.4) !important;
+  box-shadow: 0 4px 16px var(--gapp-glow, rgba(49,130,246,0.4)) !important;
   border-radius: 14px !important;
 }
 .gslide-nav .step-nav-next:hover {
-  background: #1B64DA !important;
+  filter: brightness(1.08);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(49,130,246,0.5) !important;
+  box-shadow: 0 6px 20px var(--gapp-glow, rgba(49,130,246,0.5)) !important;
 }
 .gslide-nav .step-nav-next:disabled {
-  background: #F2F4F6 !important;
-  color: #B0B8C1 !important;
+  background: var(--gapp-surface-2, #F2F4F6) !important;
+  color: var(--gapp-text-muted, #B0B8C1) !important;
   box-shadow: none !important;
   transform: none !important;
+  filter: none;
 }
 
 /* 결과화면 하단 2x2 버튼 그리드 (이미지다운/영상생성 · 새프로젝트/재생성) */
@@ -1482,8 +1504,8 @@ footer {
   border: none;
   cursor: pointer;
   transition: var(--transition, all 0.2s);
-  background: #F2F4F6;
-  color: #4E5968;
+  background: var(--gapp-surface-2, #F2F4F6);
+  color: var(--gapp-text-secondary, #4E5968);
 }
 .result-nav-btn .rnb-badge {
   position: absolute;
@@ -1504,8 +1526,8 @@ footer {
   font-size: 13.5px;
 }
 .result-nav-btn:hover {
-  background: #E5E8EB;
-  color: #191F28;
+  background: var(--gapp-surface-3, #E5E8EB);
+  color: var(--gapp-text, #191F28);
 }
 .result-nav-btn .rnb-main {
   display: flex;
@@ -1527,14 +1549,14 @@ footer {
   font-size: 13.5px;
 }
 .result-nav-btn.primary {
-  background: #3182F6;
+  background: var(--gapp-gradient, #3182F6);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(49,130,246,0.4);
+  box-shadow: 0 4px 16px var(--gapp-glow, rgba(49,130,246,0.4));
 }
 .result-nav-btn.primary:hover {
-  background: #1B64DA;
+  filter: brightness(1.08);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(49,130,246,0.5);
+  box-shadow: 0 6px 20px var(--gapp-glow, rgba(49,130,246,0.5));
 }
 .result-nav-btn:disabled {
   opacity: 0.5;
@@ -1564,38 +1586,38 @@ footer {
   justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  background: #F2F4F6;
-  color: #8B95A1;
+  background: var(--gapp-surface-2, #F2F4F6);
+  color: var(--gapp-text-muted, #8B95A1);
   transition: var(--transition, all 0.2s);
 }
 .gstep-text {
   font-size: 11px;
   font-weight: 600;
-  color: #8B95A1;
+  color: var(--gapp-text-muted, #8B95A1);
   letter-spacing: 0.2px;
 }
 .gstep-item.active .gstep-circle {
-  background: #3182F6;
+  background: var(--gapp-gradient, #3182F6);
   color: #fff;
 }
 .gstep-item.active .gstep-text {
-  color: #3182F6;
+  color: var(--gapp-accent, #3182F6);
 }
 .gstep-sep {
-  color: #D1D6DB;
+  color: var(--gapp-border, #D1D6DB);
   font-size: 12px;
 }
 .gstep-title {
   font-size: 22px;
   font-weight: 800;
-  color: #191F28;
+  color: var(--gapp-text, #191F28);
   margin: 0 0 6px;
   line-height: 1.3;
   letter-spacing: -0.6px;
 }
 .gstep-sub {
   font-size: 13px;
-  color: #6B7684;
+  color: var(--gapp-text-secondary, #6B7684);
   margin: 0 0 12px;
 }
 
@@ -1613,9 +1635,9 @@ footer {
 /* 필터 버튼 — 화이트 테마 */
 .gfilter-bar .filter-tag,
 .gfilter-bar .bg-cat {
-  background: #F2F4F6 !important;
-  border-color: #F2F4F6 !important;
-  color: #4E5968 !important;
+  background: var(--gapp-surface-2, #F2F4F6) !important;
+  border-color: var(--gapp-surface-2, #F2F4F6) !important;
+  color: var(--gapp-text-secondary, #4E5968) !important;
   font-size: 16.2px !important;
   padding: 6px 14px !important;
   border-radius: 20px !important;
@@ -1624,14 +1646,14 @@ footer {
 }
 .gfilter-bar .filter-tag.active,
 .gfilter-bar .bg-cat.active {
-  background: #3182F6 !important;
-  border-color: #3182F6 !important;
+  background: var(--gapp-gradient-2, #3182F6) !important;
+  border-color: transparent !important;
   color: #fff !important;
 }
 .gfilter-bar .filter-tag:hover,
 .gfilter-bar .bg-cat:hover {
-  background: #E5E8EB !important;
-  color: #191F28 !important;
+  background: var(--gapp-surface-3, #E5E8EB) !important;
+  color: var(--gapp-text, #191F28) !important;
 }
 
 /* ── 로딩 ── */
@@ -1643,13 +1665,13 @@ footer {
   height: 100%;
   min-height: 200px;
   gap: 10px;
-  color: #B0B8C1;
+  color: var(--gapp-text-muted, #B0B8C1);
   font-size: 13px;
 }
 
 /* ── Step 1 부제목 ── */
 #gapp .gstep-sub {
-  color: #6B7684;
+  color: var(--gapp-text-secondary, #6B7684);
   font-size: 13px;
   line-height: 1.6;
   margin: -8px 0 14px;
@@ -1685,7 +1707,9 @@ footer {
   border-radius: 16px;
   overflow: hidden;
   border: 1.5px solid transparent;
-  background: #F2F4F6;
+  background: var(--gapp-slot-bg, #F2F4F6);
+  backdrop-filter: var(--gapp-slot-blur, none);
+  -webkit-backdrop-filter: var(--gapp-slot-blur, none);
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
   /* label 기본 스타일 초기화 */
@@ -1693,32 +1717,34 @@ footer {
   user-select: none;
 }
 .cslot:hover {
-  border-color: rgba(49,130,246,0.35);
-  background: #E8F3FF;
+  border-color: rgba(124,58,237,0.35);
+  background: var(--gapp-slot-bg-hover, #E8F3FF);
 }
 .cslot.drag-over {
-  border-color: #3182F6;
-  background: #E8F3FF;
+  border-color: var(--gapp-accent, #3182F6);
+  background: var(--gapp-slot-bg-hover, #E8F3FF);
 }
-/* 이미지 채워진 슬롯: 테두리 solid + 블루 */
+/* 이미지 채워진 슬롯: 테두리 solid + 포인트 컬러 */
 .cslot--filled {
   border-style: solid;
-  border-color: rgba(49,130,246,0.5);
+  border-color: rgba(124,58,237,0.5);
   cursor: default;
 }
 .cslot--filled:hover {
-  border-color: rgba(49,130,246,0.6);
-  background: #F2F4F6;
+  border-color: rgba(124,58,237,0.6);
+  background: var(--gapp-slot-bg, #F2F4F6);
 }
-/* 상의/하의 ↔ 전체 상호 배타: 반대쪽 그룹이 채워지면 비활성화 */
+/* 상의/하의 ↔ 전체 상호 배타: 반대쪽 그룹이 채워지면 비활성화 —
+   다른 슬롯과 구분되도록 다크그레이→다크그린 그라데이션의 "잠김" 전용 배경을 쓴다 */
 .cslot--disabled {
   cursor: not-allowed;
-  opacity: 0.35;
+  opacity: var(--gapp-slot-disabled-opacity, 0.35);
   border-style: dashed;
+  background: var(--gapp-slot-disabled-bg, transparent);
 }
 .cslot--disabled:hover {
-  border-color: #E5E8EB;
-  background: #F2F4F6;
+  border-color: var(--gapp-border, #E5E8EB);
+  background: var(--gapp-slot-disabled-bg, var(--gapp-slot-bg, #F2F4F6));
 }
 
 /* Step1: clothing-slots가 gslide-body 남은 공간을 꽉 채우도록 */
@@ -1744,12 +1770,12 @@ footer {
   color: #4E5968;
   letter-spacing: 0.3px;
   text-align: center;
-  border-bottom: 1px solid #E5E8EB;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
   flex-shrink: 0;
 }
 .cslot--filled .cslot-label {
   color: #1B64DA;
-  border-bottom-color: rgba(49,130,246,0.2);
+  border-bottom-color: rgba(124,58,237,0.2);
 }
 
 /* 슬롯 본문 (이미지 or 플레이스홀더) — span이므로 block 명시 */
@@ -1787,6 +1813,10 @@ footer {
   color: #B0B8C1;
   line-height: 1;
   font-weight: 300;
+}
+.cslot--disabled .cslot-plus,
+.cslot--disabled .cslot-hint {
+  color: rgba(255,255,255,0.85);
 }
 .cslot-hint {
   display: block;
@@ -2192,7 +2222,7 @@ footer {
   position: absolute;
   inset: 0;
   z-index: 10;
-  background: #FFFFFF;
+  background: var(--gapp-surface, #FFFFFF);
   display: none;
   flex-direction: column;
   align-items: center;
@@ -2228,7 +2258,7 @@ footer {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #3182F6;
+  background: var(--gapp-accent, #3182F6);
   transform: translate(50%, -50%);
   box-shadow: 0 0 3px 1px rgba(49,130,246,0.35);
   animation: gen-progress-glow 1.1s ease-in-out infinite;
@@ -2260,15 +2290,15 @@ footer {
 .gen-video-promo-box {
   margin-top: 28px;
   padding: 16px;
-  background: #F2F4F6;
-  border: 1px solid #E5E8EB;
+  background: var(--gapp-surface-2, #F2F4F6);
+  border: 1px solid var(--gapp-border, #E5E8EB);
   border-radius: 12px;
   max-width: 480px;
   width: 100%;
   box-sizing: border-box;
   text-align: center;
 }
-.gen-video-promo-text { font-size: 13px; font-weight: 600; color: #191F28; line-height: 1.5; margin: 0; }
+.gen-video-promo-text { font-size: 13px; font-weight: 600; color: var(--gapp-text, #191F28); line-height: 1.5; margin: 0; }
 .gen-video-promo-player {
   /* width:100% + aspect-ratio + max-height를 각각 독립적으로 주면, 화면이 짧아 max-height가
      실제로 높이를 잘라낼 때 너비는 그대로 100%로 남아 9:16 비율이 깨진다(실제로 발생 확인됨) —
@@ -2316,8 +2346,8 @@ footer {
 .gen-news {
   margin-top: 20px;
   padding: 14px 16px;
-  background: #F2F4F6;
-  border: 1px solid #E5E8EB;
+  background: var(--gapp-surface-2, #F2F4F6);
+  border: 1px solid var(--gapp-border, #E5E8EB);
   border-radius: 12px;
   max-width: 480px;
   width: 100%;
@@ -2327,7 +2357,7 @@ footer {
 }
 @keyframes gen-news-fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 #videoGenViewNews, #detailCutGenViewNews { margin-top: 0; margin-bottom: 40px; }
-.gen-news-tag { font-size: 12px; font-weight: 700; color: #3182F6; margin-bottom: 6px; letter-spacing: 0.02em; }
+.gen-news-tag { font-size: 12px; font-weight: 700; color: var(--gapp-accent, #3182F6); margin-bottom: 6px; letter-spacing: 0.02em; }
 .gen-news-headline {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -2336,7 +2366,7 @@ footer {
   min-height: 42px; /* 14px * 1.5줄간격 * 2줄 — 헤드라인이 1줄이어도 박스 높이가 줄어들지 않도록 고정 */
   font-size: 14px;
   font-weight: 600;
-  color: #191F28;
+  color: var(--gapp-text, #191F28);
   text-decoration: none;
   line-height: 1.5;
 }
@@ -2380,7 +2410,7 @@ footer {
 .result-card {
   border-radius: var(--radius-md);
   overflow: hidden;
-  background: var(--gray-2);
+  background: var(--gapp-surface-2, var(--gray-2));
   transition: var(--transition);
   width: 100%;
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -2461,7 +2491,7 @@ footer {
 
 /* ─── Action Progress Modal (다운로드/재생성 진행 팝업) ─── */
 .action-progress-box {
-  background: #FFFFFF;
+  background: var(--gapp-surface, #FFFFFF);
   border-radius: 24px;
   padding: 40px 28px 32px;
   width: 480px;
@@ -2473,8 +2503,8 @@ footer {
   width: 48px;
   height: 48px;
   margin: 0 auto 20px;
-  border: 4px solid #E8F3FF;
-  border-top-color: #3182F6;
+  border: 4px solid var(--gapp-surface-2, #E8F3FF);
+  border-top-color: var(--gapp-accent, #3182F6);
   border-radius: 50%;
   animation: action-progress-spin 0.8s linear infinite;
 }
@@ -2494,7 +2524,7 @@ footer {
 }
 @keyframes action-progress-pop { from { transform: scale(0.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .action-progress-text {
-  color: #191F28;
+  color: var(--gapp-text, #191F28);
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 4px;
@@ -2520,8 +2550,8 @@ footer {
   cursor: pointer;
   transition: var(--transition);
 }
-.action-progress-share-btn.link { background: #F2F4F6; color: #333D4B; }
-.action-progress-share-btn.link:hover { background: #E5E8EB; }
+.action-progress-share-btn.link { background: var(--gapp-surface-2, #F2F4F6); color: var(--gapp-text-secondary, #333D4B); }
+.action-progress-share-btn.link:hover { background: var(--gapp-surface-3, #E5E8EB); }
 .action-progress-share-btn.kakao { background: #FEE500; color: #3C1E1E; }
 .action-progress-share-btn.kakao:hover { filter: brightness(0.96); }
 #actionProgressDetailCutBtn { background: var(--primary); color: var(--white); }
@@ -2532,7 +2562,7 @@ footer {
   margin-top: 16px;
   background: none;
   border: none;
-  color: #8B95A1;
+  color: var(--gapp-text-muted, #8B95A1);
   font-size: 17.55px;
   cursor: pointer;
   padding: 8px 4px;
@@ -3114,11 +3144,11 @@ button, a { touch-action: manipulation; }
   pointer-events: none;
 }
 .gslide-bg-blur::after {
-  /* 블러 위에 반투명 흰 스크림을 깔아 텍스트/카드 가독성 확보 */
+  /* 블러 위에 반투명 스크림을 깔아 텍스트/카드 가독성 확보 */
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255,255,255,0.76);
+  background: var(--gapp-scrim, rgba(255,255,255,0.76));
 }
 /* .gslide-bg-blur 뒤에 오는 형제(헤더/필터바/그리드/네비 등)는 그 위에 뜨도록 —
    .generating-view는 제외한다: 그 자신이 이미 position:absolute + inset:0로
@@ -3199,7 +3229,7 @@ button, a { touch-action: manipulation; }
   border-radius: 24px;
   overflow: hidden;
   cursor: grab;
-  background: #fff;
+  background: var(--gapp-surface-2, #fff);
   box-shadow: 0 12px 28px rgba(0,0,0,0.16);
   -webkit-tap-highlight-color: transparent;
   user-select: none;
@@ -3313,7 +3343,7 @@ button, a { touch-action: manipulation; }
   align-items: center;
   justify-content: center;
   font-size: 48px;
-  background: linear-gradient(135deg, #f0e6ff, #e6f0ff);
+  background: var(--gapp-fallback-gradient, linear-gradient(135deg, #f0e6ff, #e6f0ff));
 }
 
 /* 화살표 — 카드 위에 반투명하게 떠 있는 오버레이 (좌우 여백을 차지하지 않아 카드가 더 커짐) */
@@ -3325,8 +3355,8 @@ button, a { touch-action: manipulation; }
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: rgba(255,255,255,0.5);
-  border: 1px solid rgba(255,255,255,0.6);
+  background: var(--gapp-arrow-bg, rgba(255,255,255,0.5));
+  border: 1px solid var(--gapp-arrow-border, rgba(255,255,255,0.6));
   color: var(--text-primary);
   font-size: 15px;
   cursor: pointer;
@@ -3346,7 +3376,7 @@ button, a { touch-action: manipulation; }
 }
 
 @media (hover: hover) {
-  .swipe-nav-arrow:hover { background: rgba(255,255,255,0.75); }
+  .swipe-nav-arrow:hover { background: var(--gapp-arrow-bg-hover, rgba(255,255,255,0.75)); }
 }
 
 /* ─── PC 전용 그리드 스크롤 화살표 ─── */
