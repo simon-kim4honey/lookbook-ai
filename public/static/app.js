@@ -90,7 +90,7 @@ const I18N = {
     uploadHint: '상의·하의·전체(원피스/세트) 중 하나 이상 업로드해주세요.',
     notClothingErr: (cat) => {
       const label = { TOP: '상의', BOTTOM: '하의', DRESS: '전체' }[cat] || '의류';
-      return `장난치지 마세요. ${label} 상품 사진을 업로드해주세요.`;
+      return `${label} 슬롯에는 ${label} 사진만 올려주세요.`;
     },
     slotLockedErr: (cat) => {
       return cat === 'DRESS'
@@ -180,7 +180,7 @@ const I18N = {
     uploadHint: 'Please upload at least one of: top, bottom, or full outfit.',
     notClothingErr: (cat) => {
       const label = { TOP: 'top', BOTTOM: 'bottom', DRESS: 'full outfit' }[cat] || 'clothing';
-      return `Nice try. Please upload an actual ${label} product photo.`;
+      return `This slot is for ${label} photos only. Please upload a ${label} photo.`;
     },
     slotLockedErr: (cat) => {
       return cat === 'DRESS'
@@ -264,7 +264,7 @@ const I18N = {
     uploadHint: 'トップス・ボトムス・全身のいずれかをアップロードしてください。',
     notClothingErr: (cat) => {
       const label = { TOP: 'トップス', BOTTOM: 'ボトムス', DRESS: 'ワンピース/セット' }[cat] || '衣類';
-      return `ふざけないでください。${label}の商品写真をアップロードしてください。`;
+      return `このスロットには${label}の写真のみアップロードできます。`;
     },
     slotLockedErr: (cat) => {
       return cat === 'DRESS'
