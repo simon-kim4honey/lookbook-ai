@@ -2788,8 +2788,10 @@ function initSwipeStack(opts) {
   const state = { index: 0, items: opts.items || [] };
   const drag = { active: false, card: null, startX: 0, startY: 0, dx: 0, dy: 0 };
   const SWIPE_THRESHOLD = 60;
-  const EXIT_MS = 220;
+  const EXIT_MS = 380; // 참고 영상 수준의 자연스러운 속도 — 기존 220ms는 너무 급작스러웠음
+  const EASE = 'cubic-bezier(.22,1,.36,1)'; // 참고 영상과 같은 부드러운 ease-out 곡선
   let navigating = false; // 넘김 애니메이션 도중 중복 트리거 방지
+  let hasRenderedOnce = false; // 첫 렌더(페이지 로드)에는 mount 애니메이션을 주지 않기 위한 플래그
 
   // 끝까지 가면 처음으로 이어지는 순환 인덱스
   function wrapIndex(i) {
@@ -2846,8 +2848,22 @@ function initSwipeStack(opts) {
     const curCard = cardEl(curItem, 'current');
     curCard.addEventListener('touchstart', onDragStart, { passive: true });
     curCard.addEventListener('mousedown', onDragStart);
+    // 첫 렌더(페이지 로드) 이후부터는 새 가운데 카드가 살짝 작아진 채 옅게
+    // 나타났다가 자라나도록 해서, exitAndAdvance의 페이드/확대와 이어지는
+    // 하나의 연속된 움직임처럼 보이게 한다.
+    if (hasRenderedOnce) {
+      curCard.style.transform = 'scale(0.94)';
+      curCard.style.opacity = '0';
+    }
     stackEl.appendChild(curCard);
     syncBgBlur(curCard);
+    if (hasRenderedOnce) {
+      void curCard.offsetWidth; // 강제 리플로우 — 위에서 준 초기 상태가 실제로 적용된 뒤 트랜지션이 걸리도록
+      curCard.style.transition = `transform ${EXIT_MS}ms ${EASE}, opacity ${EXIT_MS}ms ${EASE}`;
+      curCard.style.transform = 'translateX(0) scale(1)';
+      curCard.style.opacity = '1';
+    }
+    hasRenderedOnce = true;
     // 별도의 "선택" 버튼 없이, 화면 중앙에 있는(현재) 카드가 곧 선택된 항목이다 —
     // 다음 단계/생성 버튼을 누르는 시점에 바로 이 카드가 적용된다.
     opts.onConfirm(curItem);
@@ -2898,23 +2914,23 @@ function initSwipeStack(opts) {
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
 
-  // direction: 1(다음) 또는 -1(이전) — 현재 카드가 화면 밖으로 슬라이드되어 사라진다.
-  // 옆에서 peek 중이던 카드(다음이면 role-next, 이전이면 role-prev)는 이제 가운데
-  // 카드와 별도 크기/위치를 쓰는 독립적인 카드라 그 자리로 그대로 모핑시키지 않고,
-  // 살짝 페이드아웃만 시킨 뒤 render()가 새 가운데 카드를 만든다.
+  // direction: 1(다음) 또는 -1(이전) — 현재 카드가 화면 밖으로 슬라이드되어 사라지는
+  // 동안, 반대쪽(도착 방향)에서 peek 중이던 카드도 함께 옅어지며 살짝 확대되어
+  // "다가오는" 느낌을 준다. .swipe-card.role-prev/next의 CSS transition이
+  // opacity/transform 모두를 이 곡선으로 처리하므로 여기서는 목표값만 바꾼다.
   function exitAndAdvance(direction, fromCard) {
     if (navigating || state.items.length <= 1) return;
     navigating = true;
     const card = fromCard || stackEl.querySelector('.swipe-card.role-current');
     if (card) {
-      card.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
-      card.style.transform = `translateX(${direction > 0 ? '-140%' : '140%'}) rotate(${direction > 0 ? -8 : 8}deg)`;
+      card.style.transition = `transform ${EXIT_MS}ms ${EASE}, opacity ${EXIT_MS}ms ${EASE}`;
+      card.style.transform = `translateX(${direction > 0 ? '-115%' : '115%'})`;
       card.style.opacity = '0';
     }
     const incoming = stackArea.querySelector(direction > 0 ? '.swipe-card.role-next' : '.swipe-card.role-prev');
     if (incoming) {
-      incoming.style.transition = 'opacity 0.18s ease';
       incoming.style.opacity = '0';
+      incoming.style.transform = 'translateY(-50%) scale(1.04)';
       syncBgBlur(incoming);
     }
     setTimeout(() => {
