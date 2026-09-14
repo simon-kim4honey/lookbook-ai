@@ -2798,54 +2798,6 @@ function initSwipeStack(opts) {
   }
   function currentItem() { return state.items[state.index]; }
 
-  // 카드 프레임(.swipe-stack)의 실제 픽셀 크기를 현재 카드 사진의 실제 비율에 맞춰
-  // 계산한다. CSS aspect-ratio + max-width 조합은 사진 비율에 따라 width가
-  // max-width에 걸려 클램프될 때 height까지 같이 줄어드는 기기가 있어(카드가
-  // 작아 보이는 원인) — object-fit:contain과 동일한 계산을 JS에서 직접 해서
-  // 가용 영역(.swipe-stack-area) 안에서 사진 비율을 유지한 채 가능한 가장 큰
-  // 박스 크기를 px로 고정 지정한다.
-  //
-  // 이미지가 로드되는 시점에 .swipe-stack-area가 아직 실제 레이아웃 높이를
-  // 갖추지 못한 상태(스텝 전환 애니메이션 도중 등)일 수 있어, 그 순간의
-  // clientWidth/Height만 믿고 한 번 계산하면 매우 작은 카드가 고정되어버리는
-  // 문제가 있었다(실제 기기 리포트: 카드가 계속 작게 보임). ResizeObserver로
-  // 영역 크기가 바뀔 때마다 마지막 현재 카드 기준으로 다시 계산해, 레이아웃이
-  // 늦게 자리잡아도 결국 올바른 크기로 맞춰지도록 한다.
-  let lastCurCard = null;
-  const stackArea = stackEl.parentElement;
-  const MIN_AREA_PX = 80; // 이보다 작으면 아직 레이아웃이 자리잡기 전이라고 보고 계산을 건너뜀
-
-  function syncStackSize(card) {
-    if (card) lastCurCard = card;
-    const target = card || lastCurCard;
-    const img = target && target.querySelector('img');
-    const resetDefault = () => { stackEl.style.width = ''; stackEl.style.height = ''; };
-    if (!img || !stackArea) { resetDefault(); return; }
-    const fit = () => {
-      if (!img.naturalWidth || !img.naturalHeight) { resetDefault(); return; }
-      const areaW = stackArea.clientWidth;
-      const areaH = stackArea.clientHeight;
-      if (areaW < MIN_AREA_PX || areaH < MIN_AREA_PX) return; // 아직 레이아웃 전 — ResizeObserver가 다시 호출해줄 것
-      const ratio = Math.max(0.5, Math.min(1.6, img.naturalWidth / img.naturalHeight));
-      const maxW = areaW * 0.72; // 좌우로 이전/다음 카드가 보일 여백 확보
-      let h = areaH;
-      let w = h * ratio;
-      if (w > maxW) { w = maxW; h = w / ratio; }
-      stackEl.style.width = `${Math.round(w)}px`;
-      stackEl.style.height = `${Math.round(h)}px`;
-    };
-    if (img.complete) fit();
-    else {
-      img.addEventListener('load', fit, { once: true });
-      img.addEventListener('error', resetDefault, { once: true });
-    }
-  }
-
-  if (stackArea && typeof ResizeObserver !== 'undefined') {
-    const ro = new ResizeObserver(() => syncStackSize());
-    ro.observe(stackArea);
-  }
-
   function cardEl(item, role) {
     const card = document.createElement('div');
     card.className = `swipe-card role-${role}`;
@@ -2880,7 +2832,6 @@ function initSwipeStack(opts) {
     curCard.addEventListener('touchstart', onDragStart, { passive: true });
     curCard.addEventListener('mousedown', onDragStart);
     stackEl.appendChild(curCard);
-    syncStackSize(curCard);
     syncBgBlur(curCard);
     // 별도의 "선택" 버튼 없이, 화면 중앙에 있는(현재) 카드가 곧 선택된 항목이다 —
     // 다음 단계/생성 버튼을 누르는 시점에 바로 이 카드가 적용된다.
@@ -2943,7 +2894,6 @@ function initSwipeStack(opts) {
       incoming.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
       incoming.style.transform = 'translateX(0) scale(1)';
       incoming.style.opacity = '1';
-      syncStackSize(incoming);
       syncBgBlur(incoming);
     }
     setTimeout(() => {
