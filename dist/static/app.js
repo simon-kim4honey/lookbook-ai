@@ -105,7 +105,6 @@ const I18N = {
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">모델 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">등록된 배경이 없습니다</p><p style="font-size:13px">관리자 페이지에서 배경을 먼저 등록해주세요</p></div>',
     bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">배경 목록 로딩 실패</p><p style="font-size:13px">잠시 후 다시 시도해주세요</p></div>',
-    skipCard: '선택 없음<br>(랜덤)',
     swipeSelectModel: '이 모델 선택',
     swipeSelectBg: '이 배경 선택',
     swipeSelected: '선택됨',
@@ -198,7 +197,6 @@ const I18N = {
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load models</p><p style="font-size:13px">Please try again later</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">No backgrounds registered</p><p style="font-size:13px">Please add backgrounds in the admin page</p></div>',
     bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">Failed to load backgrounds</p><p style="font-size:13px">Please try again later</p></div>',
-    skipCard: 'No selection<br>(Random)',
     swipeSelectModel: 'Select this model',
     swipeSelectBg: 'Select this background',
     swipeSelected: 'Selected',
@@ -286,7 +284,6 @@ const I18N = {
     modelLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">モデルの読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
     noBgs: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">🖼️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景が登録されていません</p><p style="font-size:13px">管理ページで背景を登録してください</p></div>',
     bgLoadFail: '<div style="padding:40px;text-align:center;color:var(--text-muted)"><div style="font-size:48px;margin-bottom:16px">⚠️</div><p style="font-weight:700;font-size:16px;margin-bottom:6px">背景の読み込みに失敗しました</p><p style="font-size:13px">しばらくしてから再試行してください</p></div>',
-    skipCard: '選択なし<br>(ランダム)',
     swipeSelectModel: 'このモデルを選択',
     swipeSelectBg: 'この背景を選択',
     swipeSelected: '選択済み',
@@ -2799,8 +2796,23 @@ function initSwipeStack(opts) {
   const state = { index: 0, items: opts.items || [] };
   const drag = { active: false, card: null, startX: 0, startY: 0, dx: 0, dy: 0 };
   const SWIPE_THRESHOLD = 60;
+  const EXIT_MS = 220;
+  let navigating = false; // 넘김 애니메이션 도중 중복 트리거 방지
 
+  // 끝까지 가면 처음으로 이어지는 순환 인덱스
+  function wrapIndex(i) {
+    const n = state.items.length;
+    if (n === 0) return 0;
+    return ((i % n) + n) % n;
+  }
   function currentItem() { return state.items[state.index]; }
+
+  function cardEl(item, role) {
+    const card = document.createElement('div');
+    card.className = `swipe-card role-${role}` + (opts.isSelected(item) ? ' is-selected' : '');
+    card.innerHTML = opts.renderCard(item) + '<div class="swipe-card-selected-badge"><i class="fas fa-check"></i></div>';
+    return card;
+  }
 
   function render() {
     stackEl.innerHTML = '';
@@ -2810,25 +2822,25 @@ function initSwipeStack(opts) {
       updateFooter();
       return;
     }
-    const visibleCount = Math.min(3, total - state.index);
-    for (let offset = visibleCount - 1; offset >= 0; offset--) {
-      const item = state.items[state.index + offset];
-      const card = document.createElement('div');
-      card.className = 'swipe-card' + (opts.isSelected(item) ? ' is-selected' : '');
-      card.style.transform = `translateY(${offset * 10}px) scale(${1 - offset * 0.05})`;
-      card.style.zIndex = String(10 - offset);
-      if (offset === 2) card.style.opacity = '0.6';
-      card.innerHTML = opts.renderCard(item) + '<div class="swipe-card-selected-badge"><i class="fas fa-check"></i></div>';
-      if (offset === 0) {
-        card.addEventListener('touchstart', onDragStart, { passive: true });
-        card.addEventListener('mousedown', onDragStart);
-      }
-      stackEl.appendChild(card);
+    // 카드가 1~2장뿐이어도 이전/다음이 같은 카드를 가리킬 수 있음(순환) — 그래도 그대로 보여준다
+    if (total > 1) {
+      const prevCard = cardEl(state.items[wrapIndex(state.index - 1)], 'prev');
+      stackEl.appendChild(prevCard);
+    }
+    const curItem = state.items[state.index];
+    const curCard = cardEl(curItem, 'current');
+    curCard.addEventListener('touchstart', onDragStart, { passive: true });
+    curCard.addEventListener('mousedown', onDragStart);
+    stackEl.appendChild(curCard);
+    if (total > 1) {
+      const nextCard = cardEl(state.items[wrapIndex(state.index + 1)], 'next');
+      stackEl.appendChild(nextCard);
     }
     updateFooter();
   }
 
   function onDragStart(e) {
+    if (navigating) return;
     const p = e.touches ? e.touches[0] : e;
     drag.active = true;
     drag.card = e.currentTarget;
@@ -2845,14 +2857,18 @@ function initSwipeStack(opts) {
   function onDragEnd() {
     if (!drag.active) return;
     drag.active = false;
-    drag.card.classList.remove('dragging');
+    const card = drag.card;
+    card.classList.remove('dragging');
     const { dx, dy } = drag;
     if (Math.abs(dy) > SWIPE_THRESHOLD && Math.abs(dy) > Math.abs(dx) && dy < 0) {
+      card.style.transition = 'transform 0.2s ease';
+      card.style.transform = '';
       confirmSelect();
-    } else if (Math.abs(dx) > SWIPE_THRESHOLD) {
-      if (dx < 0) goNext(); else goPrev();
+    } else if (Math.abs(dx) > SWIPE_THRESHOLD && state.items.length > 1) {
+      exitAndAdvance(dx < 0 ? 1 : -1, card);
     } else {
-      render();
+      card.style.transition = 'transform 0.2s ease';
+      card.style.transform = '';
     }
   }
   document.addEventListener('touchmove', onDragMove, { passive: true });
@@ -2860,8 +2876,25 @@ function initSwipeStack(opts) {
   document.addEventListener('mousemove', onDragMove);
   document.addEventListener('mouseup', onDragEnd);
 
-  function goPrev() { if (state.index > 0) { state.index--; render(); } }
-  function goNext() { if (state.index < state.items.length - 1) { state.index++; render(); } }
+  // direction: 1(다음) 또는 -1(이전) — 현재 카드가 화면 밖으로 슬라이드되어 사라진 뒤 다음/이전 카드로 갱신
+  function exitAndAdvance(direction, fromCard) {
+    if (navigating || state.items.length <= 1) return;
+    navigating = true;
+    const card = fromCard || stackEl.querySelector('.swipe-card.role-current');
+    if (card) {
+      card.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
+      card.style.transform = `translateX(${direction > 0 ? '-140%' : '140%'}) rotate(${direction > 0 ? -8 : 8}deg)`;
+      card.style.opacity = '0';
+    }
+    setTimeout(() => {
+      state.index = wrapIndex(state.index + direction);
+      navigating = false;
+      render();
+    }, EXIT_MS);
+  }
+
+  function goPrev() { exitAndAdvance(-1); }
+  function goNext() { exitAndAdvance(1); }
   function confirmSelect() {
     const item = currentItem();
     if (item) opts.onConfirm(item);
@@ -2872,10 +2905,9 @@ function initSwipeStack(opts) {
     const prevBtn = document.getElementById(opts.prevBtnId);
     const nextBtn = document.getElementById(opts.nextBtnId);
     const selectBtn = document.getElementById(opts.selectBtnId);
-    const progress = document.getElementById(opts.progressId);
     const total = state.items.length;
-    if (prevBtn) prevBtn.disabled = state.index === 0;
-    if (nextBtn) nextBtn.disabled = total === 0 || state.index >= total - 1;
+    if (prevBtn) prevBtn.disabled = total <= 1;
+    if (nextBtn) nextBtn.disabled = total <= 1;
     if (selectBtn) {
       const item = currentItem();
       const sel = item ? opts.isSelected(item) : false;
@@ -2885,7 +2917,6 @@ function initSwipeStack(opts) {
         ? `<i class="fas fa-check"></i> ${opts.selectedLabel || '선택됨'}`
         : (opts.selectLabel || '선택');
     }
-    if (progress) progress.textContent = total ? `${state.index + 1} / ${total}` : '';
   }
 
   const prevBtnEl = opts.prevBtnId && document.getElementById(opts.prevBtnId);
@@ -2899,7 +2930,7 @@ function initSwipeStack(opts) {
 
   return {
     render,
-    setItems(newItems) { state.items = newItems || []; state.index = 0; render(); },
+    setItems(newItems) { state.items = newItems || []; state.index = 0; navigating = false; render(); },
   };
 }
 
@@ -2907,10 +2938,6 @@ let modelSwipeStack = null;
 let bgSwipeStack = null;
 
 function renderModelCardHTML(model) {
-  if (model.__skip) {
-    return `<div class="swipe-card-fallback" style="background:var(--gray-1);font-size:32px;">🚫</div>
-      <div class="swipe-card-label">${t('skipCard')}</div>`;
-  }
   const displayName = model.name && !model.name.match(/^\d+$/)
     ? model.name : `모델 ${model.name || model.id}`;
   const imgSrc = model.isCustom
@@ -2923,18 +2950,16 @@ function renderModelCardHTML(model) {
 }
 
 function renderModelGrid(models) {
-  const items = [{ __skip: true }, ...models];
-  const isSelected = (item) => item.__skip ? !AppState.selectedModel : AppState.selectedModel?.id === item.id;
-  const onConfirm = (item) => { AppState.selectedModel = item.__skip ? null : item; };
+  const isSelected = (item) => AppState.selectedModel?.id === item.id;
+  const onConfirm = (item) => { AppState.selectedModel = item; };
 
   if (!modelSwipeStack) {
     modelSwipeStack = initSwipeStack({
       stackId: 'modelGrid',
-      items,
+      items: models,
       prevBtnId: 'modelPrevBtn',
       nextBtnId: 'modelNextBtn',
       selectBtnId: 'modelSelectBtn',
-      progressId: 'modelProgress',
       selectLabel: t('swipeSelectModel'),
       selectedLabel: t('swipeSelected'),
       emptyText: t('swipeNoModels'),
@@ -2943,7 +2968,7 @@ function renderModelGrid(models) {
       onConfirm,
     });
   } else {
-    modelSwipeStack.setItems(items);
+    modelSwipeStack.setItems(models);
   }
 }
 
@@ -2995,7 +3020,6 @@ function renderBgGrid(bgs) {
       prevBtnId: 'bgPrevBtn',
       nextBtnId: 'bgNextBtn',
       selectBtnId: 'bgSelectBtn',
-      progressId: 'bgProgress',
       selectLabel: t('swipeSelectBg'),
       selectedLabel: t('swipeSelected'),
       emptyText: t('swipeNoBgs'),
