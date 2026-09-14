@@ -831,9 +831,9 @@ async function startGenLoadingVideoPlaylist() {
 
   player.style.display = '';
   // 이미지 생성 로딩화면의 영상생성 홍보 미리보기는 실제 영상(세로 9:16)이 아니라
-  // 박스 폭 공백을 줄이기 위해 1:1 정사각형으로 재생한다 — 실제 영상 생성 결과물의
+  // 박스 폭 공백을 줄이기 위해 4:3 세로형으로 재생한다 — 실제 영상 생성 결과물의
   // 비율과는 무관(결과물은 그대로 세로형 유지).
-  player.classList.add('gc-square');
+  player.classList.add('gc-4x3');
   player.innerHTML = '';
   _genLoadingVideoIdx = 0;
   _genLoadingVideoEls = list.map((src, i) => {
@@ -908,7 +908,7 @@ async function startGcLoadingImageSlideshow() {
   if (!list.length) { player.style.display = 'none'; player.innerHTML = ''; return; }
 
   player.style.display = '';
-  player.classList.add('gc-square'); // 누끼컷 샘플은 세로(9:16) 대신 1:1 정사각형으로 표시
+  player.classList.add('gc-4x3'); // 누끼컷 샘플은 세로(9:16) 대신 4:3 세로형으로 표시
   player.innerHTML = '';
   _gcLoadingImageIdx = 0;
   _gcLoadingImageEls = list.map((src, i) => {
