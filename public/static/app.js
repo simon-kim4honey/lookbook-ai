@@ -2788,7 +2788,7 @@ function initSwipeStack(opts) {
   const state = { index: 0, items: opts.items || [] };
   const drag = { active: false, card: null, startX: 0, startY: 0, dx: 0, dy: 0 };
   const SWIPE_THRESHOLD = 60;
-  const EXIT_MS = 380; // 참고 영상 수준의 자연스러운 속도 — 기존 220ms는 너무 급작스러웠음
+  const EXIT_MS = 460; // 카드 넘어가는 속도를 한 번 더 늦춰달라는 요청 반영 (기존 380ms)
   const EASE = 'cubic-bezier(.22,1,.36,1)'; // 참고 영상과 같은 부드러운 ease-out 곡선
   let navigating = false; // 넘김 애니메이션 도중 중복 트리거 방지
   let hasRenderedOnce = false; // 첫 렌더(페이지 로드)에는 mount 애니메이션을 주지 않기 위한 플래그
@@ -2924,7 +2924,12 @@ function initSwipeStack(opts) {
     const card = fromCard || stackEl.querySelector('.swipe-card.role-current');
     if (card) {
       card.style.transition = `transform ${EXIT_MS}ms ${EASE}, opacity ${EXIT_MS}ms ${EASE}`;
-      card.style.transform = `translateX(${direction > 0 ? '-115%' : '115%'})`;
+      // 화면 밖까지 완전히 빠져나가는 대신, 일정 거리만 이동한 뒤 다음 중앙
+      // 카드(peek 카드, z-index:1)보다 아래로 가라앉듯 보이도록 이동 거리를
+      // 줄이고 z-index를 낮춘다 — "어느정도 넘어가면 중앙카드 아래로 위치
+      // 변경됨" 요청 반영.
+      card.style.zIndex = '0';
+      card.style.transform = `translateX(${direction > 0 ? '-58%' : '58%'}) scale(0.9)`;
       card.style.opacity = '0';
     }
     const incoming = stackArea.querySelector(direction > 0 ? '.swipe-card.role-next' : '.swipe-card.role-prev');
