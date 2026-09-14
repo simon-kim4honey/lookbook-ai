@@ -2022,19 +2022,19 @@ function initGhostCutUI() {
       ondragover="event.preventDefault(); event.currentTarget.classList.add('drag')"
       ondragleave="event.currentTarget.classList.remove('drag')"
       ondrop="ghostCutHandleDrop(event)"
-      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px solid transparent;border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;background:#F2F4F6;margin-top:16px;">
+      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px solid transparent;border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;background:var(--gapp-surface-2,#F2F4F6);margin-top:16px;">
       <div id="gcUploadPreviewWrap" style="display:none;width:100%;max-width:220px;position:relative;">
         <img id="gcUploadPreview" style="width:100%;border-radius:12px;display:block;" />
         <button type="button" id="gcUploadRemoveBtn" onclick="event.preventDefault();event.stopPropagation();ghostCutRemoveImage();" style="position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:17.55px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
           <i class="fas fa-times"></i>
         </button>
       </div>
-      <div id="gcUploadEmpty" style="text-align:center;color:#8B95A1;">
-        <div style="font-size:14px;font-weight:600;color:#333D4B;">탭하여 사진 선택</div>
+      <div id="gcUploadEmpty" style="text-align:center;color:var(--gapp-text-muted,#8B95A1);">
+        <div style="font-size:14px;font-weight:600;color:var(--gapp-text-secondary,#333D4B);">탭하여 사진 선택</div>
         <div style="font-size:12px;margin-top:4px;">또는 파일을 여기로 드래그하세요</div>
       </div>
     </label>
-    <div id="gcStatusBox" style="display:none;margin-top:16px;padding:14px 16px;border-radius:12px;background:#F2F4F6;font-size:13px;line-height:1.6;"></div>
+    <div id="gcStatusBox" style="display:none;margin-top:16px;padding:14px 16px;border-radius:12px;background:var(--gapp-surface-2,#F2F4F6);font-size:13px;line-height:1.6;"></div>
   `;
 
   if (!document.getElementById('gcStep1Nav')) {
@@ -2120,7 +2120,7 @@ function ghostCutHandleFile(file) {
     if (previewWrap) previewWrap.style.display = '';
     if (emptyBox) emptyBox.style.display = 'none';
 
-    if (statusBox) { statusBox.style.display = ''; statusBox.style.color = '#6B7684'; statusBox.textContent = '🔍 상품 종류를 분석하는 중...'; }
+    if (statusBox) { statusBox.style.display = ''; statusBox.style.color = 'var(--gapp-text-secondary,#6B7684)'; statusBox.textContent = '🔍 상품 종류를 분석하는 중...'; }
 
     try {
       const res = await fetch('/api/ghostcut/classify', {
@@ -2144,7 +2144,7 @@ function ghostCutHandleFile(file) {
       }
 
       ghostCutUpload_ = { dataUrl, category: data.category, categoryLabel: data.label };
-      if (statusBox) { statusBox.style.color = '#3182F6'; statusBox.innerHTML = '<i class="fas fa-check-circle"></i> 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
+      if (statusBox) { statusBox.style.color = 'var(--gapp-accent,#3182F6)'; statusBox.innerHTML = '<i class="fas fa-check-circle"></i> 상품 이미지 분석이 완료되었습니다. 아래 버튼을 눌러 생성을 시작하세요.'; }
       if (genBtn) genBtn.disabled = false;
     } catch (err) {
       console.error('ghostcut classify error:', err);

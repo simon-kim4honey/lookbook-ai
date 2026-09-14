@@ -116,7 +116,7 @@ Country: ${r}`,a=await fetch(`https://api.anthropic.com/v1/messages`,{method:`PO
   `).bind(n).all();if(!r.length)return e.json({success:!1,message:`더 이상 뽑을 수 있는 리드가 없습니다 (조건에 맞는 리드가 모두 소진됨).`},404);let i=(await t.prepare(`SELECT COALESCE(MAX(mail_batch), 0) + 1 AS n FROM biz_leads`).first())?.n||1,a=new Date().toISOString(),o=r.map(e=>e.id),s=[];for(let e=0;e<o.length;e+=90){let n=o.slice(e,e+90),r=n.map(()=>`?`).join(`,`);s.push(t.prepare(`UPDATE biz_leads SET mail_sent_at = ?, mail_batch = ? WHERE id IN (${r})`).bind(a,i,...n))}await t.batch(s);let l=lt(r.map(e=>({name:e.name,email:e.email})));return new Response(l,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${i}.xlsx"`,"X-Batch-Id":String(i),"X-Batch-Count":String(r.length)}})}),B.get(`/mail-batch/:batchId`,async e=>{let t=parseInt(e.req.param(`batchId`));if(!t)return e.json({success:!1,message:`잘못된 배치 번호`},400);let{results:n}=await e.env.LOOKBOOK_DB.prepare(`
     SELECT id, ${ht} AS name, ${mt} AS email
     FROM biz_leads WHERE mail_batch = ? ORDER BY id
-  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mu180iz6`;function _t(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vt=e=>e?`
+  `).bind(t).all();if(!n.length)return e.json({success:!1,message:`해당 배치를 찾을 수 없습니다.`},404);let r=lt(n.map(e=>({name:e.name,email:e.email})));return new Response(r,{status:200,headers:{"Content-Type":`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,"Content-Disposition":`attachment; filename="bizleads_mail_batch_${t}.xlsx"`,"X-Batch-Id":String(t),"X-Batch-Count":String(n.length)}})});var gt=`mu18ksiy`;function _t(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2200,27 +2200,27 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       <a href="/" class="gapp-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
       <!-- 로그인 상태 표시 -->
       <div style="display:flex;align-items:center;gap:8px;position:relative;">
-        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:16.2px;padding:6px 12px;background:var(--primary-bg);border:1px solid var(--primary);border-radius:20px;color:var(--primary);cursor:pointer;font-weight:600;">로그인</button>
+        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:16.2px;padding:6px 12px;background:var(--gapp-surface-2,var(--primary-bg));border:1px solid var(--gapp-accent,var(--primary));border-radius:20px;color:var(--gapp-accent,var(--primary));cursor:pointer;font-weight:600;">로그인</button>
         <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
           <span id="navUserCredits" style="display:none;"></span>
           <span id="navUserName" style="display:none;"></span>
-          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:30px;height:30px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(49,130,246,0.4);">?</div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:10001;">
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #E5E8EB;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">
-              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#191F28;margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:11px;color:#8B95A1;margin-bottom:6px;"></div>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:30px;height:30px;border-radius:50%;background:var(--gapp-gradient,var(--primary));display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(49,130,246,0.4);">?</div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:var(--gapp-surface,#FFFFFF);border:1px solid var(--gapp-border,#E5E8EB);border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:10001;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid var(--gapp-border,#E5E8EB);margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:var(--gapp-text,#191F28);margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:var(--gapp-text-muted,#8B95A1);margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#3182F6;"></div>
-                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
+                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:var(--gapp-accent,#3182F6);"></div>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:var(--gapp-gradient,#3182F6);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
               </div>
             </a>
-            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
-            ${_t(e)?`<a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>`:``}
-            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
-            <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
-            <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            ${_t(e)?`<a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">도식화 만들기</a>`:``}
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:var(--gapp-border,#E5E8EB);margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
           </div>
         </div>
@@ -2382,7 +2382,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         </div>
         <!-- 생성 중 오버레이 (step-3 내부) -->
         <div class="generating-view" id="generatingView">
-          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#191F28;">AI가 이미지를 생성 중입니다...</h2>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:var(--gapp-text,#191F28);">AI가 이미지를 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="genProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="genStatusText" data-i18n="gen-status-init" style="display:none;">시작 중...</div>
           <div class="gen-status-msgs">
@@ -2411,7 +2411,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <div class="generating-view" id="videoGeneratingView">
           <div class="gen-news-tag" id="videoGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
           <div class="gen-news" id="videoGenViewNews" style="display:none;"></div>
-          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#191F28;">AI가 영상을 생성 중입니다...</h2>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:var(--gapp-text,#191F28);">AI가 영상을 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="videoGenProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="videoGenStatusText">시작 중...</div>
           <div class="gen-status-msgs">
@@ -2426,7 +2426,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <div class="generating-view" id="detailCutGeneratingView">
           <div class="gen-news-tag" id="detailCutGenViewNewsHeading" style="display:none;">📰 오늘의 패션 뉴스</div>
           <div class="gen-news" id="detailCutGenViewNews" style="display:none;"></div>
-          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:#191F28;">AI가 디테일컷을 생성 중입니다...</h2>
+          <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;color:var(--gapp-text,#191F28);">AI가 디테일컷을 생성 중입니다...</h2>
           <div class="gen-progress-bar"><div class="gen-progress-fill" id="detailCutGenProgressFill" style="width:0%"></div></div>
           <div class="gen-status-text" id="detailCutGenStatusText">시작 중...</div>
           <div class="gen-status-msgs">
@@ -2439,15 +2439,15 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <div class="gslide-scroll" style="padding-top:12px;">
           <!-- 디테일컷 결과 — 누끼컷 전용, 생성 완료 후에만 표시. 누끼컷 원본 이미지보다 위에 배치 -->
           <div id="detailCutResultsSection" style="display:none;padding:0 16px 16px;">
-            <p style="font-size:12px;font-weight:700;color:#8B95A1;margin:0 0 10px;">디테일컷</p>
+            <p style="font-size:12px;font-weight:700;color:var(--gapp-text-muted,#8B95A1);margin:0 0 10px;">디테일컷</p>
             <div id="detailCutResultsGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
           </div>
           <div class="results-grid" id="resultsGrid" style="padding:0 16px;"></div>
           <!-- 이미지 하단 ~ 버튼 상단 사이 안내 메시지 — 디테일컷 생성 완료 후에는 숨김(재생성은 원본 이미지 기준 안내라 혼동 방지) -->
           <div id="resultInfoMsg" style="padding:18px 16px 4px;text-align:center;">
-            <p style="font-size:13px;color:#8B95A1;line-height:1.6;margin:0;">
-              <span style="color:#1B64DA;font-weight:600;">이미지 생성은 크레딧이 차감되지 않습니다.</span><br/>
-              오류가 있거나 마음에 들지 않으면 아래 <strong style="color:#333D4B;">🔄 재생성</strong> 버튼을 눌러보세요.
+            <p style="font-size:13px;color:var(--gapp-text-muted,#8B95A1);line-height:1.6;margin:0;">
+              <span style="color:var(--gapp-accent,#1B64DA);font-weight:600;">이미지 생성은 크레딧이 차감되지 않습니다.</span><br/>
+              오류가 있거나 마음에 들지 않으면 아래 <strong style="color:var(--gapp-text-secondary,#333D4B);">🔄 재생성</strong> 버튼을 눌러보세요.
             </p>
           </div>
         </div>
