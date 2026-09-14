@@ -2807,25 +2807,34 @@ function initSwipeStack(opts) {
   }
   function currentItem() { return state.items[state.index]; }
 
-  // 카드 프레임(.swipe-stack)의 비율을 현재 카드 사진의 실제 비율로 맞춘다.
-  // 고정 3:4 비율로 강제하면 사진 비율이 다를 때 object-fit:contain이 큰
-  // 레터박스(여백)를 만들어 카드가 작아 보이는 문제가 생기므로, 사진 비율에
-  // 맞춰 프레임 자체를 키우거나 줄여 여백 없이 화면을 최대한 채운다.
-  function syncStackAspect(card) {
+  // 카드 프레임(.swipe-stack)의 실제 픽셀 크기를 현재 카드 사진의 실제 비율에 맞춰
+  // 계산한다. CSS aspect-ratio + max-width 조합은 사진 비율에 따라 width가
+  // max-width에 걸려 클램프될 때 height까지 같이 줄어드는 기기가 있어(카드가
+  // 작아 보이는 원인) — object-fit:contain과 동일한 계산을 JS에서 직접 해서
+  // 가용 영역(.swipe-stack-area) 안에서 사진 비율을 유지한 채 가능한 가장 큰
+  // 박스 크기를 px로 고정 지정한다.
+  function syncStackSize(card) {
     const img = card && card.querySelector('img');
-    if (!img) { stackEl.style.aspectRatio = ''; return; }
-    const apply = () => {
-      if (img.naturalWidth && img.naturalHeight) {
-        const ratio = img.naturalWidth / img.naturalHeight;
-        stackEl.style.aspectRatio = String(Math.max(0.5, Math.min(1.6, ratio)));
-      } else {
-        stackEl.style.aspectRatio = '';
-      }
+    const area = stackEl.parentElement;
+    const resetDefault = () => { stackEl.style.width = ''; stackEl.style.height = ''; };
+    if (!img || !area) { resetDefault(); return; }
+    const fit = () => {
+      if (!img.naturalWidth || !img.naturalHeight) { resetDefault(); return; }
+      const areaW = area.clientWidth;
+      const areaH = area.clientHeight;
+      if (!areaW || !areaH) { resetDefault(); return; }
+      const ratio = Math.max(0.5, Math.min(1.6, img.naturalWidth / img.naturalHeight));
+      const maxW = areaW * 0.72; // 좌우로 이전/다음 카드가 보일 여백 확보
+      let h = areaH;
+      let w = h * ratio;
+      if (w > maxW) { w = maxW; h = w / ratio; }
+      stackEl.style.width = `${Math.round(w)}px`;
+      stackEl.style.height = `${Math.round(h)}px`;
     };
-    if (img.complete) apply();
+    if (img.complete) fit();
     else {
-      img.addEventListener('load', apply, { once: true });
-      img.addEventListener('error', () => { stackEl.style.aspectRatio = ''; }, { once: true });
+      img.addEventListener('load', fit, { once: true });
+      img.addEventListener('error', resetDefault, { once: true });
     }
   }
 
@@ -2854,7 +2863,7 @@ function initSwipeStack(opts) {
     curCard.addEventListener('touchstart', onDragStart, { passive: true });
     curCard.addEventListener('mousedown', onDragStart);
     stackEl.appendChild(curCard);
-    syncStackAspect(curCard);
+    syncStackSize(curCard);
     if (total > 1) {
       const nextCard = cardEl(state.items[wrapIndex(state.index + 1)], 'next');
       stackEl.appendChild(nextCard);
@@ -2917,7 +2926,7 @@ function initSwipeStack(opts) {
       incoming.style.transition = 'transform 0.22s ease, opacity 0.22s ease';
       incoming.style.transform = 'translateX(0) scale(1)';
       incoming.style.opacity = '1';
-      syncStackAspect(incoming);
+      syncStackSize(incoming);
     }
     setTimeout(() => {
       state.index = wrapIndex(state.index + direction);
