@@ -1280,7 +1280,7 @@ footer {
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 다크그린이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22C55E;               /* 호버 시 밝은 그린 라인으로 강조 */
   --gapp-slot-blur: none;
-  --gapp-slot-disabled-bg: #2B2C34; /* 잠긴 슬롯 — 다크그레이 단색(요청: 대기 색상과 맞바꿈) */
+  --gapp-slot-disabled-bg: linear-gradient(135deg, #1A1B20 0%, #2B2C34 100%); /* 잠긴 슬롯 — 어두운 다크그레이 그라데이션 */
   --gapp-slot-disabled-opacity: 1;
   --gapp-slot-lock-color: rgba(255,255,255,0.6);   /* 잠금 아이콘/문구 — 2D 픽토그램, 60% 불투명도 */
 
