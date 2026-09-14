@@ -2801,7 +2801,8 @@ function initSwipeStack(opts) {
   function cardEl(item, role) {
     const card = document.createElement('div');
     card.className = `swipe-card role-${role}`;
-    card.innerHTML = opts.renderCard(item);
+    card.innerHTML = opts.renderCard(item) +
+      '<div class="swipe-card-tap-badge"><i class="fas fa-check"></i></div>';
     return card;
   }
 
@@ -2858,17 +2859,24 @@ function initSwipeStack(opts) {
     drag.dy = p.clientY - drag.startY;
     drag.card.style.transform = `translate(${drag.dx}px, ${drag.dy}px) rotate(${drag.dx / 20}deg)`;
   }
+  const TAP_MOVE_TOLERANCE = 10; // 이 정도 이하로 움직였으면 스와이프가 아니라 탭/클릭으로 간주
+
   function onDragEnd() {
     if (!drag.active) return;
     drag.active = false;
     const card = drag.card;
     card.classList.remove('dragging');
-    const { dx } = drag;
+    const { dx, dy } = drag;
     if (Math.abs(dx) > SWIPE_THRESHOLD && state.items.length > 1) {
       exitAndAdvance(dx < 0 ? 1 : -1, card);
     } else {
       card.style.transition = 'transform 0.2s ease';
       card.style.transform = '';
+      // 스와이프로 이어지지 않은 순수 탭/클릭 — 이미 선택된(가운데) 카드를
+      // 사용자가 직접 짚었다는 반응으로 우측 상단에 파란 체크 아이콘을 보여준다.
+      if (Math.abs(dx) <= TAP_MOVE_TOLERANCE && Math.abs(dy) <= TAP_MOVE_TOLERANCE) {
+        card.classList.toggle('is-tapped');
+      }
     }
   }
   document.addEventListener('touchmove', onDragMove, { passive: true });
