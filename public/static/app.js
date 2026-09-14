@@ -2813,16 +2813,28 @@ function initSwipeStack(opts) {
   // 작아 보이는 원인) — object-fit:contain과 동일한 계산을 JS에서 직접 해서
   // 가용 영역(.swipe-stack-area) 안에서 사진 비율을 유지한 채 가능한 가장 큰
   // 박스 크기를 px로 고정 지정한다.
+  //
+  // 이미지가 로드되는 시점에 .swipe-stack-area가 아직 실제 레이아웃 높이를
+  // 갖추지 못한 상태(스텝 전환 애니메이션 도중 등)일 수 있어, 그 순간의
+  // clientWidth/Height만 믿고 한 번 계산하면 매우 작은 카드가 고정되어버리는
+  // 문제가 있었다(실제 기기 리포트: 카드가 계속 작게 보임). ResizeObserver로
+  // 영역 크기가 바뀔 때마다 마지막 현재 카드 기준으로 다시 계산해, 레이아웃이
+  // 늦게 자리잡아도 결국 올바른 크기로 맞춰지도록 한다.
+  let lastCurCard = null;
+  const stackArea = stackEl.parentElement;
+  const MIN_AREA_PX = 80; // 이보다 작으면 아직 레이아웃이 자리잡기 전이라고 보고 계산을 건너뜀
+
   function syncStackSize(card) {
-    const img = card && card.querySelector('img');
-    const area = stackEl.parentElement;
+    if (card) lastCurCard = card;
+    const target = card || lastCurCard;
+    const img = target && target.querySelector('img');
     const resetDefault = () => { stackEl.style.width = ''; stackEl.style.height = ''; };
-    if (!img || !area) { resetDefault(); return; }
+    if (!img || !stackArea) { resetDefault(); return; }
     const fit = () => {
       if (!img.naturalWidth || !img.naturalHeight) { resetDefault(); return; }
-      const areaW = area.clientWidth;
-      const areaH = area.clientHeight;
-      if (!areaW || !areaH) { resetDefault(); return; }
+      const areaW = stackArea.clientWidth;
+      const areaH = stackArea.clientHeight;
+      if (areaW < MIN_AREA_PX || areaH < MIN_AREA_PX) return; // 아직 레이아웃 전 — ResizeObserver가 다시 호출해줄 것
       const ratio = Math.max(0.5, Math.min(1.6, img.naturalWidth / img.naturalHeight));
       const maxW = areaW * 0.72; // 좌우로 이전/다음 카드가 보일 여백 확보
       let h = areaH;
@@ -2836,6 +2848,11 @@ function initSwipeStack(opts) {
       img.addEventListener('load', fit, { once: true });
       img.addEventListener('error', resetDefault, { once: true });
     }
+  }
+
+  if (stackArea && typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(() => syncStackSize());
+    ro.observe(stackArea);
   }
 
   function cardEl(item, role) {
