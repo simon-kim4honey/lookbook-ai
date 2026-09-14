@@ -1275,8 +1275,8 @@ footer {
   --gapp-arrow-bg: rgba(23,24,29,0.55);       /* 카드 위 화살표 버튼 배경(구 흰색 반투명) */
   --gapp-arrow-border: rgba(255,255,255,0.18);
   --gapp-arrow-bg-hover: rgba(43,44,52,0.8);
-  --gapp-slot-bg: linear-gradient(135deg, #14532D 0%, #1B3B2E 100%); /* 대기 중 슬롯 — 다크그린 혼합(요청: 잠김 색상과 맞바꿈) */
-  --gapp-slot-bg-hover: linear-gradient(135deg, #196B39 0%, #234A38 100%); /* 호버 시 살짝 밝은 버전 */
+  --gapp-slot-bg: linear-gradient(135deg, #0A2A17 0%, #0E1E17 100%); /* 대기 중 슬롯 — 다크그린 혼합, 기존 대비 50% 더 어둡게 */
+  --gapp-slot-bg-hover: linear-gradient(135deg, #0D361D 0%, #12251C 100%); /* 호버 시 살짝 밝은 버전(마찬가지로 50% 어둡게) */
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 다크그린이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22C55E;               /* 호버 시 밝은 그린 라인으로 강조 */
   --gapp-slot-blur: none;
