@@ -1276,8 +1276,15 @@ footer {
   --gapp-arrow-bg: rgba(23,24,29,0.55);       /* 카드 위 화살표 버튼 배경(구 흰색 반투명) */
   --gapp-arrow-border: rgba(255,255,255,0.18);
   --gapp-arrow-bg-hover: rgba(43,44,52,0.8);
-  --gapp-slot-bg: linear-gradient(135deg, #0A2A17 0%, #2E0A14 33%, #0D1B2E 66%, #2B2C34 100%); /* 대기 중 슬롯 — 다크그린 + 다크레드 + 다크블루 + 다크그레이 그라데이션 */
-  --gapp-slot-bg-hover: linear-gradient(135deg, #0D361D 0%, #3D0F1C 33%, #11233A 66%, #34353D 100%); /* 호버 시 살짝 밝은 버전 */
+  /* 시작색=끝색으로 한 바퀴를 닫은 4색 그라데이션. background-size를 50%로 축소해
+     타일 2개가 항상 나란히 채워지도록 하고(.cslot 참고), background-position을
+     타일 폭만큼 애니메이션으로 밀어 색이 흐르게 한다 — 이전에는 background-size를
+     300%로 "확대"해서 위치만 옮겼는데, 그러면 매 순간 전체 그라데이션의 1/3만
+     보여서 양 끝(다크그린 0%, 다크그레이 100%)이 대부분의 구간에서 시야 밖으로
+     밀려나 "다크그린이 빠진 것처럼" 보이는 문제가 있었다. 타일을 "축소해서 반복"
+     시키면 항상 4색이 전부 보이면서 색 위치만 자리를 바꾸며 흐르는 효과가 난다. */
+  --gapp-slot-bg: linear-gradient(135deg, #0A2A17 0%, #2E0A14 25%, #0D1B2E 50%, #2B2C34 75%, #0A2A17 100%); /* 대기 중 슬롯 — 다크그린 + 다크레드 + 다크블루 + 다크그레이 그라데이션 */
+  --gapp-slot-bg-hover: linear-gradient(135deg, #0D361D 0%, #3D0F1C 25%, #11233A 50%, #34353D 75%, #0D361D 100%); /* 호버 시 살짝 밝은 버전 */
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 다크그린이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22C55E;               /* 호버 시 밝은 그린 라인으로 강조 */
   --gapp-slot-blur: none;
@@ -1344,7 +1351,12 @@ footer {
 }
 .gapp-logo-ez,
 .gapp-logo-look {
-  background: var(--gapp-gradient, #A78BFA);
+  /* 슬롯/버튼과 동일한 방식(4색 팔레트 + 50% 타일 반복)으로 로고 글자색이
+     천천히 흐르도록 함 */
+  background: var(--gapp-slot-bg-hover, #A78BFA);
+  background-size: 50% 50%;
+  background-repeat: repeat;
+  animation: cslotGradientShift 10s ease infinite;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1475,7 +1487,12 @@ footer {
   color: var(--gapp-text, #191F28) !important;
 }
 .gslide-nav .step-nav-next {
-  background: var(--gapp-gradient, #3182F6) !important;
+  /* 활성화됐을 때(클릭 가능 상태) 업로드 슬롯과 동일한 방식으로 그라데이션 색이
+     천천히 흐르도록 함 — 슬롯과 같은 4색 팔레트/타일 반복 기법 재사용 */
+  background: var(--gapp-slot-bg-hover, var(--gapp-gradient, #3182F6)) !important;
+  background-size: 50% 50% !important;
+  background-repeat: repeat !important;
+  animation: cslotGradientShift 10s ease infinite;
   border: none !important;
   color: #fff !important;
   box-shadow: 0 4px 16px var(--gapp-glow, rgba(49,130,246,0.4)) !important;
@@ -1492,6 +1509,7 @@ footer {
   box-shadow: none !important;
   transform: none !important;
   filter: none;
+  animation: none; /* 비활성 상태는 정적으로 — 클릭 가능할 때만 그라데이션이 움직임 */
 }
 
 /* 결과화면 하단 2x2 버튼 그리드 (이미지다운/영상생성 · 새프로젝트/재생성) */
@@ -1719,7 +1737,8 @@ footer {
   overflow: hidden;
   border: 1.5px solid transparent;
   background: var(--gapp-slot-bg, #F2F4F6);
-  background-size: 300% 300%;
+  background-size: 50% 50%;
+  background-repeat: repeat;
   animation: cslotGradientShift 10s ease infinite;
   backdrop-filter: var(--gapp-slot-blur, none);
   -webkit-backdrop-filter: var(--gapp-slot-blur, none);
@@ -1734,7 +1753,7 @@ footer {
   50% { background-position: 100% 50%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cslot { animation: none; }
+  .cslot, .gslide-nav .step-nav-next, .gapp-logo-ez, .gapp-logo-look { animation: none; }
 }
 .cslot:hover {
   border-color: var(--gapp-slot-hover-border, rgba(124,58,237,0.35));
@@ -1761,6 +1780,13 @@ footer {
   opacity: var(--gapp-slot-disabled-opacity, 0.35);
   border-style: dashed;
   background: var(--gapp-slot-disabled-bg, transparent);
+  /* 잠긴 슬롯은 시작/끝 색이 다른 단순 2색 그라데이션이라, 활성 슬롯과 같은
+     50% 타일 반복을 쓰면 타일 경계에서 색이 뚝 끊기는 이음매가 생긴다.
+     잠긴 슬롯은 움직일 필요도 없으므로(비활성 상태를 정적으로 표현) 애니메이션을
+     끄고 원래처럼 확대(300%)해서 이음매 없이 한 번만 보여준다. */
+  background-size: 300% 300%;
+  background-repeat: no-repeat;
+  animation: none;
 }
 .cslot--disabled:hover {
   border-color: var(--gapp-border, #E5E8EB);
@@ -1835,7 +1861,7 @@ footer {
   font-weight: 300;
 }
 .cslot--disabled .cslot-lock-icon {
-  font-size: 26px; /* 다른 슬롯의 + 아이콘(.cslot-plus)과 동일한 크기로 통일 */
+  font-size: 16px; /* 기존(22px)보다 더 작게 */
   color: var(--gapp-slot-lock-color, rgba(255,255,255,0.48));
 }
 .cslot--disabled .cslot-hint {
