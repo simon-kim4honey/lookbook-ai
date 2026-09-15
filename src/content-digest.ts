@@ -206,6 +206,36 @@ digest.post('/generate', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
+// 진단용: RSS 요청이 실제로 어떻게 응답받는지 직접 확인
+// (Cloudflare 로그 접근 없이도 원인 파악 가능하게)
+// ────────────────────────────────────────────────────
+digest.get('/debug-rss', async (c) => {
+  const keyword = c.req.query('kw') || KEYWORDS[0]
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'LookbookAI-ContentDigestBot/1.0' },
+      signal: AbortSignal.timeout(12000),
+    })
+    const text = await res.text()
+    const items = parseRSSItems(text)
+    return c.json({
+      success: true,
+      keyword,
+      url,
+      httpStatus: res.status,
+      contentType: res.headers.get('content-type'),
+      bodyLength: text.length,
+      bodyPreview: text.slice(0, 800),
+      parsedItemCount: items.length,
+      firstItems: items.slice(0, 3),
+    })
+  } catch (e: any) {
+    return c.json({ success: false, keyword, url, error: String(e?.message || e) })
+  }
+})
+
+// ────────────────────────────────────────────────────
 // 조회 / 검토 / 발행 표시
 // ────────────────────────────────────────────────────
 digest.get('/list', async (c) => {
