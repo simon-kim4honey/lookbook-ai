@@ -69,12 +69,10 @@ function parseRSSItems(xml: string): RawArticle[] {
   return items
 }
 
-async function fetchNewsFromRSS(keyword: string, maxItems: number, daysBack: number): Promise<RawArticle[]> {
-  const to = new Date()
-  const from = new Date(to.getTime() - daysBack * 24 * 60 * 60 * 1000)
-  const fmt = (d: Date) => d.toISOString().slice(0, 10)
-  const q = `${keyword} after:${fmt(from)} before:${fmt(to)}`
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=ko&gl=KR&ceid=KR:ko`
+async function fetchNewsFromRSS(keyword: string, maxItems: number): Promise<RawArticle[]> {
+  // Google News RSS의 after:/before: 날짜 연산자는 결과를 0건으로 만들 만큼 불안정해서
+  // 쿼리에서 날짜 제한을 빼고, 대신 아래 collectArticles()에서 pubDate로 직접 필터링한다.
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': 'LookbookAI-ContentDigestBot/1.0' },
@@ -89,13 +87,16 @@ async function fetchNewsFromRSS(keyword: string, maxItems: number, daysBack: num
 }
 
 async function collectArticles(daysBack: number): Promise<RawArticle[]> {
-  const pools = await Promise.all(KEYWORDS.map((kw) => fetchNewsFromRSS(kw, 8, daysBack)))
+  const pools = await Promise.all(KEYWORDS.map((kw) => fetchNewsFromRSS(kw, 12)))
+  const cutoff = Date.now() - daysBack * 24 * 60 * 60 * 1000
   const seen = new Set<string>()
   const merged: RawArticle[] = []
   for (const pool of pools) {
     for (const a of pool) {
       const key = a.link || a.title
       if (!key || seen.has(key)) continue
+      const t = a.pubDate ? Date.parse(a.pubDate) : NaN
+      if (!isNaN(t) && t < cutoff) continue // 발행일이 파싱되는데 기간 밖이면 제외 (파싱 실패시엔 일단 포함)
       seen.add(key)
       merged.push(a)
     }
