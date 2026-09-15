@@ -385,6 +385,21 @@ digest.get('/debug-news', async (c) => {
   }
 })
 
+// 진단용: 실제 "기사 생성"이 쓰는 collectArticles() 경로를 그대로 돌려서
+// 키워드별로 몇 건 나왔고, 날짜 필터 전/후로 몇 건이 남는지 그대로 보여준다.
+digest.get('/debug-collect', async (c) => {
+  const perKeyword = await Promise.all(
+    KEYWORDS.map(async (kw) => ({ keyword: kw, count: (await fetchNewsFromNaver(c.env, kw, 12)).length }))
+  )
+  const collected = await collectArticles(c.env, 7)
+  return c.json({
+    success: true,
+    perKeyword,
+    afterDedupeAndDateFilter: collected.length,
+    sample: collected.slice(0, 3),
+  })
+})
+
 // 진단용: 검색어트렌드/쇼핑인사이트 데이터랩 API 원시 응답 직접 확인
 digest.get('/debug-trends', async (c) => {
   if (!c.env.NAVER_CLIENT_ID || !c.env.NAVER_CLIENT_SECRET) {
