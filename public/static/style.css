@@ -1281,9 +1281,9 @@ footer {
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 다크그린이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22C55E;               /* 호버 시 밝은 그린 라인으로 강조 */
   --gapp-slot-blur: none;
-  --gapp-slot-disabled-bg: linear-gradient(135deg, #1A1B20 0%, #2B2C34 100%); /* 잠긴 슬롯 — 어두운 다크그레이 그라데이션 */
+  --gapp-slot-disabled-bg: linear-gradient(135deg, #15161A 0%, #22232A 100%); /* 잠긴 슬롯 — 어두운 다크그레이 그라데이션 (기존보다 20% 더 어둡게) */
   --gapp-slot-disabled-opacity: 1;
-  --gapp-slot-lock-color: rgba(255,255,255,0.6);   /* 잠금 아이콘/문구 — 2D 픽토그램, 60% 불투명도 */
+  --gapp-slot-lock-color: rgba(255,255,255,0.48);   /* 잠금 아이콘/문구 — 2D 픽토그램, 기존(60%)보다 20% 더 어둡게(48%) */
 
   /* 전역 토큰(:root)을 #gapp 안에서만 재정의 — CSS 커스텀 프로퍼티는 자손에게만
      상속되므로, #gapp 바깥(다른 페이지)의 var(--text-muted)/var(--border)/
@@ -1835,11 +1835,11 @@ footer {
   font-weight: 300;
 }
 .cslot--disabled .cslot-lock-icon {
-  font-size: 22px;
-  color: var(--gapp-slot-lock-color, rgba(255,255,255,0.6));
+  font-size: 26px; /* 다른 슬롯의 + 아이콘(.cslot-plus)과 동일한 크기로 통일 */
+  color: var(--gapp-slot-lock-color, rgba(255,255,255,0.48));
 }
 .cslot--disabled .cslot-hint {
-  color: rgba(255,255,255,0.85);
+  color: rgba(255,255,255,0.68);
 }
 .cslot-hint {
   display: block;
