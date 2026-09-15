@@ -2614,6 +2614,16 @@ app.patch('/api/admin/users/:id', adminAuth, async (c) => {
     const vals: any[]   = []
     if (body.status  !== undefined) { sets.push(`status = ?`);  vals.push(body.status) }
     if (body.role    !== undefined) { sets.push(`role = ?`);    vals.push(body.role) }
+    // 카카오/구글 등 소셜 가입 회원에게도 이메일/비밀번호 로그인을 추가로
+    // 지원하기 위해(예: BFM 관리자 대시보드는 이메일/비밀번호로만 로그인) —
+    // provider와 무관하게 password_hash를 직접 설정할 수 있게 한다.
+    if (body.set_password !== undefined) {
+      if (typeof body.set_password !== 'string' || body.set_password.length < 6) {
+        return c.json({ success: false, message: '비밀번호는 6자 이상이어야 합니다.' }, 400)
+      }
+      sets.push(`password_hash = ?`)
+      vals.push(await hashPassword(body.set_password))
+    }
 
     // 크레딧: add_credits(증감) 또는 credits(절대값 설정) 지원
     if (body.add_credits !== undefined) {
@@ -2679,6 +2689,90 @@ app.delete('/api/admin/users/:id', adminAuth, async (c) => {
     await db.prepare(`UPDATE users SET status = 'deleted', updated_at = datetime('now') WHERE id = ?`).bind(id).run()
     await db.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(id).run()
     return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// BFM 관리자 전용 API — /api/admin/*(공유 ADMIN_PASSWORD)와는 별개로, 일반
+// 회원 로그인 세션(X-Session-Token)을 그대로 쓰되 role='bfm_admin'인 계정만
+// 통과시킨다. 추천인이 'BFM회원'인 회원의 이름/이메일/보유크레딧/결제내역만
+// 읽기 전용으로 조회 가능 — 그 외 회원 정보나 다른 관리 기능은 접근 불가.
+// role='bfm_admin'은 /admin02(운영자 전체 관리자)에서 "BFM 관리자 지정"
+// 버튼으로만 부여할 수 있다.
+// ────────────────────────────────────────────────────
+const bfmAdminAuth = async (c: any, next: any) => {
+  const db = c.env.LOOKBOOK_DB
+  const token = c.req.header('X-Session-Token') || ''
+  const user = await getUserFromToken(db, token || null)
+  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  if (user.role !== 'bfm_admin') return c.json({ success: false, message: 'BFM 관리자 권한이 없습니다.' }, 403)
+  await next()
+}
+
+// POST /api/bfm/login — BFM 관리자 전용 로그인. 소셜(카카오/구글) 가입 회원도
+// 관리자가 /api/admin/users/:id에 set_password로 비밀번호를 설정해두면 이메일+
+// 비밀번호로 로그인할 수 있도록, 기존 /api/auth/login과 달리 provider='email'
+// 제한을 두지 않는다. 그 외 검증(활성 상태, password_hash 존재 여부, 비밀번호
+// 일치)은 동일 — 기존 /api/auth/login 자체는 건드리지 않고 별도 엔드포인트로
+// 분리해, 일반 소비자 로그인 동작에는 영향을 주지 않는다.
+app.post('/api/bfm/login', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const body: any = await c.req.json()
+    const email = (body.email || '').trim().toLowerCase()
+    const password = body.password || ''
+    if (!email || !password) return c.json({ success: false, message: '이메일과 비밀번호를 입력해주세요.' }, 400)
+    const user: any = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(email).first()
+    if (!user || user.status !== 'active' || !user.password_hash) {
+      return c.json({ success: false, message: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401)
+    }
+    const ok = await verifyPassword(password, user.password_hash)
+    if (!ok) return c.json({ success: false, message: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401)
+    if (user.role !== 'bfm_admin') return c.json({ success: false, message: 'BFM 관리자 권한이 없습니다.' }, 403)
+    const token = await createSession(db, user.id)
+    return c.json({ success: true, token, user: publicUser(user) })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /api/bfm/members — 추천인이 'BFM회원'인 회원 목록 (이름/이메일/보유크레딧/상태/가입일)
+app.get('/api/bfm/members', bfmAdminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const page = Math.max(1, parseInt(c.req.query('page') || '1'))
+    const limit = Math.max(1, Math.min(50, parseInt(c.req.query('limit') || '20')))
+    const offset = (page - 1) * limit
+    const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE referrer = 'BFM회원'`).first()
+    const members = await db.prepare(
+      `SELECT id, name, email, credits, status, created_at FROM users WHERE referrer = 'BFM회원' ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(limit, offset).all()
+    return c.json({ success: true, members: members.results, total: total?.cnt || 0, page, limit })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /api/bfm/members/:id/payments — BFM 추천 회원의 결제내역 (10건씩 페이지네이션)
+// scope 체크: 대상 회원이 실제로 referrer='BFM회원'인지 매번 확인해, BFM 관리자가
+// URL의 id만 바꿔서 다른(비-BFM) 회원의 결제내역을 열람하지 못하도록 막는다.
+app.get('/api/bfm/members/:id/payments', bfmAdminAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const id = c.req.param('id')
+    const target = await db.prepare(`SELECT id FROM users WHERE id = ? AND referrer = 'BFM회원'`).bind(id).first()
+    if (!target) return c.json({ success: false, message: '조회 권한이 없는 회원입니다.' }, 403)
+    const page = Math.max(1, parseInt(c.req.query('page') || '1'))
+    const limit = Math.max(1, parseInt(c.req.query('limit') || '10'))
+    const offset = (page - 1) * limit
+    const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM payment_logs WHERE user_id = ?`).bind(id).first()
+    const payments = await db.prepare(
+      `SELECT order_id, amount, credits, status, pg_provider, currency, pg_method, created_at, paid_at
+       FROM payment_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(id, limit, offset).all()
+    return c.json({ success: true, payments: payments.results, total: total?.cnt || 0, page, limit })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -8528,7 +8622,9 @@ function renderUserTable(users) {
       : '<div style="width:28px;height:28px;border-radius:50%;background:#3182F644;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;">' + ((u.name||'?')[0]) + '</div>'
     var joined = u.created_at ? u.created_at.slice(0,10) : '-'
     var isAdmin = u.role === 'admin'
-    var adminBadge = isAdmin ? ' <span style="font-size:10px;background:#3182F6;color:white;padding:1px 6px;border-radius:8px;">Admin</span>' : ''
+    var isBfmAdmin = u.role === 'bfm_admin'
+    var adminBadge = isAdmin ? ' <span style="font-size:10px;background:#3182F6;color:white;padding:1px 6px;border-radius:8px;">Admin</span>'
+      : (isBfmAdmin ? ' <span style="font-size:10px;background:#22C55E;color:white;padding:1px 6px;border-radius:8px;">BFM Admin</span>' : '')
     var uid = String(u.id)
     var statusBtn = ''
     if (u.status === 'active') {
@@ -8536,7 +8632,14 @@ function renderUserTable(users) {
     } else if (u.status === 'suspended') {
       statusBtn = '<button data-uid="' + uid + '" data-action="activate" class="btn-sm btn-primary-sm" style="font-size:14.85px;padding:4px 10px;">활성화</button>'
     }
-    var deleteBtn = !isAdmin ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||'') + '" data-email="' + escHtml(u.email||'') + '" data-action="delete" class="btn-sm btn-danger-sm" style="font-size:14.85px;padding:4px 10px;">삭제</button>' : ''
+    // BFM 관리자 지정/해제 — 일반 관리자(admin)에게는 표시하지 않음(이미 전체 권한 보유)
+    var bfmBtn = isBfmAdmin
+      ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="revoke_bfm" class="btn-sm btn-danger-sm" style="font-size:14.85px;padding:4px 10px;">BFM 해제</button>'
+      : (!isAdmin ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="grant_bfm" class="btn-sm" style="font-size:14.85px;padding:4px 10px;background:#22C55E33;border:1px solid #22C55E66;color:#22C55E;">BFM 관리자 지정</button>' : '')
+    var deleteBtn = (!isAdmin && !isBfmAdmin) ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||'') + '" data-email="' + escHtml(u.email||'') + '" data-action="delete" class="btn-sm btn-danger-sm" style="font-size:14.85px;padding:4px 10px;">삭제</button>' : ''
+    // 카카오/구글 등 소셜 가입 회원도 이메일/비밀번호로 로그인(예: BFM 관리자
+    // 대시보드)할 수 있도록, provider와 무관하게 비밀번호를 직접 설정하는 버튼
+    var pwBtn = '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="set_password" class="btn-sm" style="font-size:14.85px;padding:4px 10px;">비밀번호 설정</button>'
     var credits = (u.credits != null) ? u.credits : 0
     return '<tr style="border-bottom:1px solid #1e1e3a;">'
       + '<td style="padding:12px 16px;">'
@@ -8563,7 +8666,7 @@ function renderUserTable(users) {
       + '<td style="padding:12px 16px;text-align:center;">'
       +   '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
       +     '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="detail" class="btn-sm" style="font-size:14.85px;padding:4px 10px;">상세보기</button>'
-      +     statusBtn + deleteBtn
+      +     statusBtn + bfmBtn + pwBtn + deleteBtn
       +   '</div>'
       + '</td>'
       + '</tr>'
@@ -8635,6 +8738,39 @@ async function grantCredits(id, current) {
     })
     const data = await res.json()
     if (data.success) { showAdminToast('크레딧 ' + action + ' 완료 → ' + data.newCredits + '크레딧', 'ok'); loadUsers() }
+    else showAdminToast(data.message || '실패', 'err')
+  } catch(e) { showAdminToast('서버 오류', 'err') }
+}
+
+async function setUserRole(id, role, label) {
+  if (!confirm('"' + label + '"하시겠습니까?')) return
+  try {
+    const res = await fetch('/api/admin/users/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ role })
+    })
+    const data = await res.json()
+    if (data.success) { showAdminToast(label + ' 완료', 'ok'); loadUsers() }
+    else showAdminToast(data.message || '실패', 'err')
+  } catch(e) { showAdminToast('서버 오류', 'err') }
+}
+
+async function setPassword(id, name) {
+  // 카카오/구글 등 소셜 가입 회원에게도 이메일/비밀번호 로그인(예: BFM 관리자
+  // 대시보드는 이메일/비밀번호로만 로그인)을 지원하기 위해, provider와 무관하게
+  // 비밀번호를 직접 설정한다.
+  const val = prompt('"' + name + '"님의 새 비밀번호를 입력하세요 (6자 이상):')
+  if (val === null) return
+  if (val.length < 6) { showAdminToast('비밀번호는 6자 이상이어야 합니다', 'err'); return }
+  try {
+    const res = await fetch('/api/admin/users/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ set_password: val })
+    })
+    const data = await res.json()
+    if (data.success) showAdminToast('비밀번호 설정 완료', 'ok')
     else showAdminToast(data.message || '실패', 'err')
   } catch(e) { showAdminToast('서버 오류', 'err') }
 }
@@ -9766,6 +9902,9 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (action === 'delete') { deleteUser(uid, btn.dataset.name || '', btn.dataset.email || '') }
     else if (action === 'credits') { adjustCredits(uid, parseInt(btn.dataset.credits || '0')) }
     else if (action === 'grant')   { grantCredits(uid, parseInt(btn.dataset.credits || '0')) }
+    else if (action === 'grant_bfm')  { setUserRole(uid, 'bfm_admin', '"' + (btn.dataset.name || '') + '"님을 BFM 관리자로 지정') }
+    else if (action === 'revoke_bfm') { setUserRole(uid, 'user', '"' + (btn.dataset.name || '') + '"님의 BFM 관리자 권한 해제') }
+    else if (action === 'set_password') { setPassword(uid, btn.dataset.name || '') }
     else if (action === 'detail')  { openUserDetail(uid, btn.dataset.name || '') }
   })
 
@@ -9785,6 +9924,210 @@ app.get('/admin/leads', (c) => c.redirect('/admin02', 302))
 // ── /admin → /admin02 포워드 (도메인이 www 하나로 통합됨) ──
 app.get('/admin', (c) => {
   return c.redirect('/admin02', 302)
+})
+
+// ────────────────────────────────────────────────────
+// GET /bfm-admin — BFM 관리자 전용 대시보드. /admin02(운영자 전체 관리자,
+// 공유 비밀번호)과 완전히 별개 — 일반 회원 로그인(이메일/비밀번호)을 그대로
+// 쓰고, role='bfm_admin'인 계정만 통과한다(서버가 /api/bfm/* 에서 검증).
+// 추천인이 'BFM회원'인 회원의 이름/이메일/보유크레딧/결제내역만 읽기 전용으로
+// 볼 수 있다 — 그 외 회원 정보나 관리 기능(정지/삭제/크레딧 지급 등)은 없음.
+// ────────────────────────────────────────────────────
+app.get('/bfm-admin', (c) => {
+  return c.html(`<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BFM 관리자 — Studio B</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    body { background: #F2F4F6; font-family: 'Pretendard', -apple-system, sans-serif; }
+    .card { background: #FFFFFF; border: 1px solid #E5E8EB; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { padding: 10px 12px; font-size: 13px; text-align: left; border-bottom: 1px solid #E5E8EB; }
+    th { color: #6B7684; font-weight: 600; font-size: 12px; }
+    .btn { cursor: pointer; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-xl font-bold text-gray-900 mb-1"><i class="fas fa-building-user mr-2 text-green-600"></i>BFM 관리자</h1>
+    <p class="text-sm text-gray-500 mb-6">추천인이 "BFM회원"인 회원의 보유크레딧과 결제내역을 조회할 수 있습니다.</p>
+
+    <div id="loginBox" class="card rounded-2xl p-6 max-w-sm">
+      <h2 class="font-semibold text-gray-900 mb-4">로그인</h2>
+      <input id="loginEmail" type="email" placeholder="이메일" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-2">
+      <input id="loginPassword" type="password" placeholder="비밀번호" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-3">
+      <button onclick="bfmLogin()" class="w-full bg-green-600 hover:bg-green-700 text-white rounded-lg py-2 text-sm font-semibold btn">로그인</button>
+      <p id="loginErr" class="text-red-500 text-xs mt-2" hidden></p>
+    </div>
+
+    <div id="deniedBox" class="card rounded-2xl p-6 text-sm text-red-500" hidden>
+      BFM 관리자 권한이 없는 계정입니다. 운영자에게 BFM 관리자 지정을 요청하세요.
+      <button onclick="bfmLogout()" class="ml-2 text-gray-500 underline btn">다시 로그인</button>
+    </div>
+
+    <div id="mainBox" hidden>
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-sm text-gray-500" id="memberCount"></span>
+        <button onclick="bfmLogout()" class="text-xs text-gray-400 underline btn">로그아웃</button>
+      </div>
+      <div class="card rounded-2xl overflow-hidden">
+        <table>
+          <thead>
+            <tr><th>이름</th><th>이메일</th><th>보유크레딧</th><th>상태</th><th>가입일</th><th></th></tr>
+          </thead>
+          <tbody id="memberTbody"></tbody>
+        </table>
+      </div>
+      <div id="memberPaging" class="flex gap-2 justify-center mt-4 text-sm"></div>
+    </div>
+  </div>
+
+  <!-- 결제내역 모달 -->
+  <div id="paymentsModal" class="fixed inset-0 bg-black/40 items-center justify-center p-4" style="display:none;" onclick="if(event.target===this) closePaymentsModal()">
+    <div class="card rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold text-gray-900" id="paymentsModalTitle">결제내역</h3>
+        <button onclick="closePaymentsModal()" class="text-gray-400 btn"><i class="fas fa-times"></i></button>
+      </div>
+      <table>
+        <thead><tr><th>주문번호</th><th>크레딧</th><th>금액</th><th>상태</th><th>결제일</th></tr></thead>
+        <tbody id="paymentsTbody"></tbody>
+      </table>
+      <p id="paymentsEmpty" class="text-sm text-gray-400 text-center py-6" hidden>결제 내역이 없습니다.</p>
+    </div>
+  </div>
+
+  <script>
+    const TOKEN_KEY = 'lookbook_token';
+    function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
+    function show(id) { document.getElementById(id).hidden = false; }
+    function hide(id) { document.getElementById(id).hidden = true; }
+
+    async function bfmLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errEl = document.getElementById('loginErr');
+      hide('loginErr');
+      if (!email || !password) { errEl.textContent = '이메일과 비밀번호를 입력해주세요.'; show('loginErr'); return; }
+      try {
+        const res = await fetch('/api/bfm/login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!data.success) { errEl.textContent = data.message || '로그인에 실패했습니다.'; show('loginErr'); return; }
+        localStorage.setItem(TOKEN_KEY, data.token);
+        await checkAuthAndLoad();
+      } catch (e) { errEl.textContent = '서버 오류가 발생했습니다.'; show('loginErr'); }
+    }
+
+    function bfmLogout() {
+      localStorage.removeItem(TOKEN_KEY);
+      hide('mainBox'); hide('deniedBox'); show('loginBox');
+    }
+
+    let memberPage = 1;
+    const MEMBER_LIMIT = 20;
+
+    async function checkAuthAndLoad() {
+      const token = getToken();
+      if (!token) { show('loginBox'); return; }
+      await loadMembers(1);
+    }
+
+    async function loadMembers(page) {
+      memberPage = page;
+      try {
+        const res = await fetch('/api/bfm/members?page=' + page + '&limit=' + MEMBER_LIMIT, {
+          headers: { 'X-Session-Token': getToken() },
+        });
+        const data = await res.json();
+        if (res.status === 401) { bfmLogout(); return; }
+        if (res.status === 403) { hide('loginBox'); hide('mainBox'); show('deniedBox'); return; }
+        if (!data.success) { alert(data.message || '조회에 실패했습니다.'); return; }
+        hide('loginBox'); hide('deniedBox'); show('mainBox');
+        renderMembers(data.members, data.total, data.page, data.limit);
+      } catch (e) { alert('서버 오류가 발생했습니다.'); }
+    }
+
+    function renderMembers(members, total, page, limit) {
+      document.getElementById('memberCount').textContent = 'BFM 추천 회원 ' + total + '명';
+      const statusLabel = { active: '활성', suspended: '정지', deleted: '삭제됨' };
+      const tbody = document.getElementById('memberTbody');
+      if (!members.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-8">BFM 추천 회원이 없습니다.</td></tr>';
+      } else {
+        tbody.innerHTML = members.map(function (m) {
+          return '<tr>'
+            + '<td>' + (m.name || '(이름 없음)') + '</td>'
+            + '<td class="text-gray-500">' + m.email + '</td>'
+            + '<td class="font-semibold text-blue-600">' + (m.credits ?? 0) + '</td>'
+            + '<td>' + (statusLabel[m.status] || m.status) + '</td>'
+            + '<td class="text-gray-500">' + (m.created_at ? m.created_at.slice(0, 10) : '-') + '</td>'
+            + '<td><button class="text-blue-600 underline text-xs btn" onclick="openPayments(\\'' + m.id + '\\', \\'' + (m.name || m.email).replace(/'/g, '') + '\\')">결제내역</button></td>'
+            + '</tr>';
+        }).join('');
+      }
+      const totalPages = Math.max(1, Math.ceil(total / limit));
+      const pagingEl = document.getElementById('memberPaging');
+      let html = '';
+      for (let p = 1; p <= totalPages; p++) {
+        html += '<button onclick="loadMembers(' + p + ')" class="px-3 py-1 rounded ' + (p === page ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 text-gray-600') + ' btn">' + p + '</button>';
+      }
+      pagingEl.innerHTML = totalPages > 1 ? html : '';
+    }
+
+    let paymentsMemberId = null;
+    let paymentsPage = 1;
+
+    async function openPayments(memberId, memberName) {
+      paymentsMemberId = memberId;
+      paymentsPage = 1;
+      document.getElementById('paymentsModalTitle').textContent = memberName + ' — 결제내역';
+      document.getElementById('paymentsModal').style.display = 'flex';
+      await loadPayments();
+    }
+
+    function closePaymentsModal() {
+      document.getElementById('paymentsModal').style.display = 'none';
+    }
+
+    async function loadPayments() {
+      try {
+        const res = await fetch('/api/bfm/members/' + paymentsMemberId + '/payments?page=' + paymentsPage + '&limit=10', {
+          headers: { 'X-Session-Token': getToken() },
+        });
+        const data = await res.json();
+        if (!data.success) { alert(data.message || '결제내역 조회에 실패했습니다.'); return; }
+        const statusLabel = { paid: '결제완료', pending: '대기', failed: '실패', canceled: '취소' };
+        const tbody = document.getElementById('paymentsTbody');
+        if (!data.payments.length) {
+          tbody.innerHTML = '';
+          show('paymentsEmpty');
+        } else {
+          hide('paymentsEmpty');
+          tbody.innerHTML = data.payments.map(function (p) {
+            return '<tr>'
+              + '<td class="text-gray-500">' + p.order_id + '</td>'
+              + '<td>' + (p.credits ?? '-') + '</td>'
+              + '<td>' + (p.amount != null ? Number(p.amount).toLocaleString() + (p.currency || '') : '-') + '</td>'
+              + '<td>' + (statusLabel[p.status] || p.status) + '</td>'
+              + '<td class="text-gray-500">' + (p.paid_at || p.created_at || '-').slice(0, 16).replace('T', ' ') + '</td>'
+              + '</tr>';
+          }).join('');
+        }
+      } catch (e) { alert('서버 오류가 발생했습니다.'); }
+    }
+
+    checkAuthAndLoad();
+  </script>
+</body>
+</html>`)
 })
 
 // ── /studio-b 경로: 메인 앱 그대로 서빙 ──
