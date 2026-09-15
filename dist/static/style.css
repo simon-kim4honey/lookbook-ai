@@ -1719,6 +1719,8 @@ footer {
   overflow: hidden;
   border: 1.5px solid transparent;
   background: var(--gapp-slot-bg, #F2F4F6);
+  background-size: 300% 300%;
+  animation: cslotGradientShift 10s ease infinite;
   backdrop-filter: var(--gapp-slot-blur, none);
   -webkit-backdrop-filter: var(--gapp-slot-blur, none);
   cursor: pointer;
@@ -1726,6 +1728,13 @@ footer {
   /* label 기본 스타일 초기화 */
   -webkit-tap-highlight-color: transparent;
   user-select: none;
+}
+@keyframes cslotGradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cslot { animation: none; }
 }
 .cslot:hover {
   border-color: var(--gapp-slot-hover-border, rgba(124,58,237,0.35));
