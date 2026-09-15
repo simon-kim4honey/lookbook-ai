@@ -3,6 +3,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
 import leadsApp from './leads'
 import bizLeadsApp from './bizleads'
+import contentDigestApp, { runDigestPipeline } from './content-digest'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
 // → 배포할 때마다 값이 바뀌어 브라우저가 새 파일로 인식 (캐시 자동 무효화)
@@ -90,6 +91,9 @@ app.route('/api/admin/leads', leadsApp)
 
 // 의류·패션 사업자 리드 조회 (구 Genspark 프로젝트 이관, 관리자 전용, X-Admin-Password 필요)
 app.route('/api/admin/bizleads', bizLeadsApp)
+
+// 패션 콘텐츠 다이제스트 — 주간 RSS 수집 → AI 요약 → 카톡채널 발행용 (관리자 전용)
+app.route('/api/admin/content-digest', contentDigestApp)
 
 // ────────────────────────────────────────────────────
 // Constants
@@ -7805,6 +7809,7 @@ app.get('/admin02', (c) => {
     <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
     <button class="tab-btn" onclick="switchTab('bizleads')"><i class="fas fa-building"></i> 사업자 리드</button>
     <button class="tab-btn" onclick="switchTab('ghostcut')"><i class="fas fa-tshirt"></i> 누끼컷 샘플</button>
+    <button class="tab-btn" onclick="switchTab('contentdigest')"><i class="fas fa-newspaper"></i> 콘텐츠 다이제스트</button>
   </div>
 
   <!-- ▼ 탭: 프롬프트 -->
@@ -8196,6 +8201,31 @@ app.get('/admin02', (c) => {
     </div>
   </div>
 
+  <div class="tab-panel" id="tabContentDigest">
+    <div class="leads-tabroot">
+      <div class="page-title">📰 패션 콘텐츠 다이제스트</div>
+      <div class="page-sub">매주 월요일 자동으로 패션 뉴스를 수집·요약합니다. 검토 후 카카오톡 채널 관리자센터에 수동으로 발행하세요 (자동 발송 아님).</div>
+
+      <div class="leads-card">
+        <div class="leads-row" style="justify-content:space-between;">
+          <div class="leads-hint">다음 자동 실행: 매주 월요일 오전 9시(KST)</div>
+          <button class="leads-btn small" onclick="digestGenerate()" id="digestGenBtn">지금 생성</button>
+        </div>
+      </div>
+
+      <div class="leads-row" style="align-items:flex-start;">
+        <div class="leads-card" style="flex:1;min-width:260px;max-width:320px;">
+          <h3>다이제스트 목록</h3>
+          <div id="digestList" style="max-height:520px;overflow-y:auto;"></div>
+        </div>
+
+        <div class="leads-card" style="flex:2;min-width:320px;" id="digestDetailCard">
+          <div class="leads-hint">왼쪽 목록에서 다이제스트를 선택하세요.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="biz-modal-overlay" id="bizModal" onclick="bizCloseModal(event)">
     <div class="biz-modal-box" onclick="event.stopPropagation()">
       <div class="biz-modal-head">
@@ -8233,7 +8263,7 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs','home','users','bizleads','ghostcut']
+    const names = ['prompt','models','bgs','home','users','bizleads','ghostcut','contentdigest']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
@@ -8243,12 +8273,14 @@ function switchTab(name) {
   document.getElementById('tabUsers').classList.toggle('active', name === 'users')
   document.getElementById('tabBizLeads').classList.toggle('active', name === 'bizleads')
   document.getElementById('tabGhostCut').classList.toggle('active', name === 'ghostcut')
+  document.getElementById('tabContentDigest').classList.toggle('active', name === 'contentdigest')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos(); loadGcLoadingImages() }
   if (name === 'users')  loadUsers()
   if (name === 'bizleads') bizInit()
   if (name === 'ghostcut') ghostCutInit()
+  if (name === 'contentdigest') digestInit()
 }
 
 // ══════════════════════════════════════════════
@@ -9197,6 +9229,115 @@ async function ghostCutDelete(code) {
   const d = await r.json()
   if (!d.success) { alert('삭제 실패'); return }
   ghostCutInit()
+}
+
+// ══════════════════════════════════════════════
+//  패션 콘텐츠 다이제스트
+// ══════════════════════════════════════════════
+let digestCurrentId = null
+
+function digestApi(path, opts) {
+  opts = opts || {}
+  opts.headers = Object.assign({ 'X-Admin-Password': adminPassword, 'Content-Type': 'application/json' }, opts.headers || {})
+  return fetch('/api/admin/content-digest' + path, opts).then((r) => r.json())
+}
+
+async function digestInit() {
+  await digestLoadList()
+}
+
+async function digestLoadList() {
+  const data = await digestApi('/list')
+  const list = document.getElementById('digestList')
+  if (!data.success || !data.digests.length) {
+    list.innerHTML = '<div class="leads-hint">아직 생성된 다이제스트가 없습니다. "지금 생성"을 눌러보세요.</div>'
+    return
+  }
+  const statusLabel = { draft: '초안', reviewed: '검토완료', sent: '발행완료' }
+  list.innerHTML = data.digests.map((d) => (
+    '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;' + (d.id === digestCurrentId ? 'border-color:#6c47ff' : '') + '" onclick="digestSelect(' + d.id + ')">' +
+      '<div style="font-weight:600;color:#e0e0f0;font-size:13px;">' + d.period + '</div>' +
+      '<div class="leads-hint">' + statusLabel[d.status] + ' · 기사 ' + d.article_count + '건</div>' +
+    '</div>'
+  )).join('')
+}
+
+async function digestGenerate() {
+  const btn = document.getElementById('digestGenBtn')
+  btn.disabled = true
+  btn.textContent = '생성 중... (최대 1분)'
+  const data = await digestApi('/generate', { method: 'POST' })
+  btn.disabled = false
+  btn.textContent = '지금 생성'
+  if (!data.success) { alert('생성 실패: ' + data.message); return }
+  await digestLoadList()
+  digestSelect(data.digestId)
+}
+
+async function digestSelect(id) {
+  digestCurrentId = id
+  await digestLoadList()
+  const data = await digestApi('/' + id)
+  const card = document.getElementById('digestDetailCard')
+  if (!data.success) { card.innerHTML = '<div class="leads-hint">불러오기 실패</div>'; return }
+  const d = data.digest
+  const statusLabel = { draft: '초안', reviewed: '검토완료', sent: '발행완료' }
+
+  card.innerHTML =
+    '<div class="leads-row" style="justify-content:space-between;">' +
+      '<h3 style="margin:0;">' + d.period + ' <span class="leads-hint">(' + statusLabel[d.status] + ')</span></h3>' +
+      '<div>' +
+        '<button class="leads-btn secondary small" onclick="digestMarkReviewed()">검토완료 표시</button> ' +
+        '<button class="leads-btn small" onclick="digestCopyKakaoText()">카톡 발행용 텍스트 복사</button>' +
+      '</div>' +
+    '</div>' +
+    '<textarea id="digestSummaryEdit" style="width:100%;min-height:80px;margin:10px 0;">' + (d.summary || '') + '</textarea>' +
+    '<button class="leads-btn secondary small" onclick="digestSaveSummary()">요약 저장</button>' +
+    '<div class="leads-hint" style="margin:10px 0 4px;">키워드: ' + (d.keywords || []).join(', ') + '</div>' +
+    '<div id="digestArticles" style="margin-top:12px;"></div>'
+
+  document.getElementById('digestArticles').innerHTML = data.articles.map((a) => (
+    '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;' + (a.excluded ? 'opacity:.4;' : '') + '">' +
+      '<div class="leads-row" style="justify-content:space-between;">' +
+        '<div><span class="leads-tag" style="background:#252540;">' + a.category + '</span> <b style="color:#e0e0f0;">' + a.title + '</b></div>' +
+        '<button class="leads-btn secondary small" onclick="digestToggleExclude(' + a.id + ',' + (a.excluded ? 0 : 1) + ')">' + (a.excluded ? '복원' : '제외') + '</button>' +
+      '</div>' +
+      '<div class="leads-hint" style="margin:4px 0;">' + (a.source || '') + ' · 중요도 ' + a.importance + '</div>' +
+      '<div style="font-size:13px;color:#c0c0d0;">' + a.summary + '</div>' +
+      (a.url ? '<a href="' + a.url + '" target="_blank" style="font-size:12px;color:#9b7cff;">원문 보기 →</a>' : '') +
+    '</div>'
+  )).join('') || '<div class="leads-hint">기사가 없습니다.</div>'
+}
+
+async function digestSetStatus(status) {
+  if (!digestCurrentId) return
+  await digestApi('/' + digestCurrentId, { method: 'PATCH', body: JSON.stringify({ status }) })
+  digestSelect(digestCurrentId)
+}
+function digestMarkReviewed() { digestSetStatus('reviewed') }
+
+async function digestSaveSummary() {
+  if (!digestCurrentId) return
+  const summary = document.getElementById('digestSummaryEdit').value
+  await digestApi('/' + digestCurrentId, { method: 'PATCH', body: JSON.stringify({ summary }) })
+  alert('저장되었습니다.')
+}
+
+async function digestToggleExclude(articleId, excluded) {
+  await digestApi('/' + digestCurrentId + '/articles/' + articleId, { method: 'PATCH', body: JSON.stringify({ excluded }) })
+  digestSelect(digestCurrentId)
+}
+
+async function digestCopyKakaoText() {
+  if (!digestCurrentId) return
+  const res = await fetch('/api/admin/content-digest/' + digestCurrentId + '/kakao-text', { headers: { 'X-Admin-Password': adminPassword } })
+  const text = await res.text()
+  try {
+    await navigator.clipboard.writeText(text)
+    alert('카톡 발행용 텍스트가 클립보드에 복사되었습니다. 카카오톡 채널 관리자센터에 붙여넣기 하세요.')
+  } catch {
+    prompt('아래 텍스트를 복사하세요:', text)
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -10303,4 +10444,14 @@ app.get('/payment/fail', (c) => {
 </html>`)
 })
 
-export default app
+export default {
+  fetch: app.fetch,
+  // 매주 월요일 자동 실행 (wrangler.jsonc의 triggers.crons 참고) — 패션 콘텐츠 다이제스트 자동 생성
+  scheduled: async (_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) => {
+    ctx.waitUntil(
+      runDigestPipeline(env as any).catch((e) => {
+        console.error('content-digest scheduled 실행 실패:', e)
+      })
+    )
+  },
+}
