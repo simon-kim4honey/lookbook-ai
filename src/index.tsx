@@ -2614,6 +2614,16 @@ app.patch('/api/admin/users/:id', adminAuth, async (c) => {
     const vals: any[]   = []
     if (body.status  !== undefined) { sets.push(`status = ?`);  vals.push(body.status) }
     if (body.role    !== undefined) { sets.push(`role = ?`);    vals.push(body.role) }
+    // 카카오/구글 등 소셜 가입 회원에게도 이메일/비밀번호 로그인을 추가로
+    // 지원하기 위해(예: BFM 관리자 대시보드는 이메일/비밀번호로만 로그인) —
+    // provider와 무관하게 password_hash를 직접 설정할 수 있게 한다.
+    if (body.set_password !== undefined) {
+      if (typeof body.set_password !== 'string' || body.set_password.length < 6) {
+        return c.json({ success: false, message: '비밀번호는 6자 이상이어야 합니다.' }, 400)
+      }
+      sets.push(`password_hash = ?`)
+      vals.push(await hashPassword(body.set_password))
+    }
 
     // 크레딧: add_credits(증감) 또는 credits(절대값 설정) 지원
     if (body.add_credits !== undefined) {
@@ -2700,6 +2710,33 @@ const bfmAdminAuth = async (c: any, next: any) => {
   if (user.role !== 'bfm_admin') return c.json({ success: false, message: 'BFM 관리자 권한이 없습니다.' }, 403)
   await next()
 }
+
+// POST /api/bfm/login — BFM 관리자 전용 로그인. 소셜(카카오/구글) 가입 회원도
+// 관리자가 /api/admin/users/:id에 set_password로 비밀번호를 설정해두면 이메일+
+// 비밀번호로 로그인할 수 있도록, 기존 /api/auth/login과 달리 provider='email'
+// 제한을 두지 않는다. 그 외 검증(활성 상태, password_hash 존재 여부, 비밀번호
+// 일치)은 동일 — 기존 /api/auth/login 자체는 건드리지 않고 별도 엔드포인트로
+// 분리해, 일반 소비자 로그인 동작에는 영향을 주지 않는다.
+app.post('/api/bfm/login', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const body: any = await c.req.json()
+    const email = (body.email || '').trim().toLowerCase()
+    const password = body.password || ''
+    if (!email || !password) return c.json({ success: false, message: '이메일과 비밀번호를 입력해주세요.' }, 400)
+    const user: any = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(email).first()
+    if (!user || user.status !== 'active' || !user.password_hash) {
+      return c.json({ success: false, message: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401)
+    }
+    const ok = await verifyPassword(password, user.password_hash)
+    if (!ok) return c.json({ success: false, message: '이메일 또는 비밀번호가 올바르지 않습니다.' }, 401)
+    if (user.role !== 'bfm_admin') return c.json({ success: false, message: 'BFM 관리자 권한이 없습니다.' }, 403)
+    const token = await createSession(db, user.id)
+    return c.json({ success: true, token, user: publicUser(user) })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
 
 // GET /api/bfm/members — 추천인이 'BFM회원'인 회원 목록 (이름/이메일/보유크레딧/상태/가입일)
 app.get('/api/bfm/members', bfmAdminAuth, async (c) => {
@@ -8600,6 +8637,9 @@ function renderUserTable(users) {
       ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="revoke_bfm" class="btn-sm btn-danger-sm" style="font-size:14.85px;padding:4px 10px;">BFM 해제</button>'
       : (!isAdmin ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="grant_bfm" class="btn-sm" style="font-size:14.85px;padding:4px 10px;background:#22C55E33;border:1px solid #22C55E66;color:#22C55E;">BFM 관리자 지정</button>' : '')
     var deleteBtn = (!isAdmin && !isBfmAdmin) ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||'') + '" data-email="' + escHtml(u.email||'') + '" data-action="delete" class="btn-sm btn-danger-sm" style="font-size:14.85px;padding:4px 10px;">삭제</button>' : ''
+    // 카카오/구글 등 소셜 가입 회원도 이메일/비밀번호로 로그인(예: BFM 관리자
+    // 대시보드)할 수 있도록, provider와 무관하게 비밀번호를 직접 설정하는 버튼
+    var pwBtn = '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="set_password" class="btn-sm" style="font-size:14.85px;padding:4px 10px;">비밀번호 설정</button>'
     var credits = (u.credits != null) ? u.credits : 0
     return '<tr style="border-bottom:1px solid #1e1e3a;">'
       + '<td style="padding:12px 16px;">'
@@ -8626,7 +8666,7 @@ function renderUserTable(users) {
       + '<td style="padding:12px 16px;text-align:center;">'
       +   '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
       +     '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="detail" class="btn-sm" style="font-size:14.85px;padding:4px 10px;">상세보기</button>'
-      +     statusBtn + bfmBtn + deleteBtn
+      +     statusBtn + bfmBtn + pwBtn + deleteBtn
       +   '</div>'
       + '</td>'
       + '</tr>'
@@ -8712,6 +8752,25 @@ async function setUserRole(id, role, label) {
     })
     const data = await res.json()
     if (data.success) { showAdminToast(label + ' 완료', 'ok'); loadUsers() }
+    else showAdminToast(data.message || '실패', 'err')
+  } catch(e) { showAdminToast('서버 오류', 'err') }
+}
+
+async function setPassword(id, name) {
+  // 카카오/구글 등 소셜 가입 회원에게도 이메일/비밀번호 로그인(예: BFM 관리자
+  // 대시보드는 이메일/비밀번호로만 로그인)을 지원하기 위해, provider와 무관하게
+  // 비밀번호를 직접 설정한다.
+  const val = prompt('"' + name + '"님의 새 비밀번호를 입력하세요 (6자 이상):')
+  if (val === null) return
+  if (val.length < 6) { showAdminToast('비밀번호는 6자 이상이어야 합니다', 'err'); return }
+  try {
+    const res = await fetch('/api/admin/users/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify({ set_password: val })
+    })
+    const data = await res.json()
+    if (data.success) showAdminToast('비밀번호 설정 완료', 'ok')
     else showAdminToast(data.message || '실패', 'err')
   } catch(e) { showAdminToast('서버 오류', 'err') }
 }
@@ -9845,6 +9904,7 @@ document.addEventListener('DOMContentLoaded', () => {
     else if (action === 'grant')   { grantCredits(uid, parseInt(btn.dataset.credits || '0')) }
     else if (action === 'grant_bfm')  { setUserRole(uid, 'bfm_admin', '"' + (btn.dataset.name || '') + '"님을 BFM 관리자로 지정') }
     else if (action === 'revoke_bfm') { setUserRole(uid, 'user', '"' + (btn.dataset.name || '') + '"님의 BFM 관리자 권한 해제') }
+    else if (action === 'set_password') { setPassword(uid, btn.dataset.name || '') }
     else if (action === 'detail')  { openUserDetail(uid, btn.dataset.name || '') }
   })
 
@@ -9955,7 +10015,7 @@ app.get('/bfm-admin', (c) => {
       hide('loginErr');
       if (!email || !password) { errEl.textContent = '이메일과 비밀번호를 입력해주세요.'; show('loginErr'); return; }
       try {
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch('/api/bfm/login', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }),
         });
