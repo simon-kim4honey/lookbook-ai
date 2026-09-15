@@ -75,7 +75,11 @@ async function fetchNewsFromRSS(keyword: string, maxItems: number): Promise<RawA
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'LookbookAI-ContentDigestBot/1.0' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
       signal: AbortSignal.timeout(12000), // 소스 하나가 느려도 전체 파이프라인이 무한 대기하지 않도록
     })
     if (!res.ok) return []
@@ -214,7 +218,11 @@ digest.get('/debug-rss', async (c) => {
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'LookbookAI-ContentDigestBot/1.0' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
       signal: AbortSignal.timeout(12000),
     })
     const text = await res.text()
