@@ -1,10 +1,13 @@
 // ────────────────────────────────────────────────────
 // 패션 콘텐츠 다이제스트 — 주간 패션 뉴스 자동 수집·요약
-// RSS(Google News) 수집 → Claude로 분류/요약 → 관리자 검토 →
+// 네이버 뉴스 검색 API 수집 → Claude로 분류/요약 → 관리자 검토 →
 // (현재는 수동으로) 카카오톡 채널에 발행
 //
-// Cloudflare Cron Trigger(scheduled 핸들러)에서 매주 자동 실행되거나,
-// 관리자가 /generate를 수동 호출해도 동일하게 동작한다.
+// (예전에는 Google News RSS를 썼으나, Cloudflare Workers의 공유 egress IP가
+// Google에 의해 자동화 요청으로 차단(HTTP 503)되어 네이버 뉴스 검색 API로 교체함)
+//
+// GitHub Actions 스케줄(.github/workflows/weekly-content-digest.yml)에서 매주 자동
+// 호출되거나, 관리자가 /generate를 수동 호출해도 동일하게 동작한다.
 // ────────────────────────────────────────────────────
 import { Hono } from 'hono'
 
@@ -12,6 +15,8 @@ type DigestBindings = {
   LOOKBOOK_DB: D1Database
   ADMIN_PASSWORD: string
   ANTHROPIC_API_KEY?: string
+  NAVER_CLIENT_ID?: string
+  NAVER_CLIENT_SECRET?: string
 }
 
 const digest = new Hono<{ Bindings: DigestBindings }>()
@@ -30,7 +35,8 @@ const adminAuth = async (c: any, next: any) => {
 digest.use('/*', adminAuth)
 
 // ────────────────────────────────────────────────────
-// RSS 수집 (Google News, 외부 라이브러리 없이 정규식 파싱)
+// 뉴스 수집 (네이버 뉴스 검색 API, JSON)
+// https://developers.naver.com/docs/serviceapi/search/news/news.md
 // ────────────────────────────────────────────────────
 const KEYWORDS = [
   '패션 트렌드', '패션 브랜드', 'K-패션', '패션 이커머스', '온라인 쇼핑몰 패션',
@@ -45,53 +51,43 @@ function decodeEntities(s: string): string {
     .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'")
 }
 
-function stripCdata(s: string): string {
-  const m = s.match(/<!\[CDATA\[([\s\S]*?)\]\]>/)
-  return decodeEntities((m ? m[1] : s).trim())
+// 네이버 검색 API는 검색어 일치 부분에 <b>...</b> 태그를 넣어서 응답한다.
+function stripNaverHighlight(s: string): string {
+  return decodeEntities(s.replace(/<\/?b>/g, '')).trim()
 }
 
-function parseRSSItems(xml: string): RawArticle[] {
-  const items: RawArticle[] = []
-  const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) || []
-  for (const block of itemBlocks) {
-    const title = (block.match(/<title>([\s\S]*?)<\/title>/) || [])[1] || ''
-    const link = (block.match(/<link>([\s\S]*?)<\/link>/) || [])[1] || ''
-    const pubDate = (block.match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1] || ''
-    const sourceMatch = block.match(/<source[^>]*>([\s\S]*?)<\/source>/)
-    let source = sourceMatch ? stripCdata(sourceMatch[1]) : ''
-    if (!source) {
-      const titleText = stripCdata(title)
-      const dashMatch = titleText.match(/[-–—]\s*([^-–—]+)$/)
-      source = dashMatch ? dashMatch[1].trim() : ''
-    }
-    items.push({ title: stripCdata(title), link: stripCdata(link), pubDate: pubDate.trim(), source })
-  }
-  return items
-}
-
-async function fetchNewsFromRSS(keyword: string, maxItems: number): Promise<RawArticle[]> {
-  // Google News RSS의 after:/before: 날짜 연산자는 결과를 0건으로 만들 만큼 불안정해서
-  // 쿼리에서 날짜 제한을 빼고, 대신 아래 collectArticles()에서 pubDate로 직접 필터링한다.
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`
+async function fetchNewsFromNaver(env: DigestBindings, keyword: string, maxItems: number): Promise<RawArticle[]> {
+  if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return []
+  const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(keyword)}&display=${maxItems}&sort=date`
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
+        'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET,
       },
       signal: AbortSignal.timeout(12000), // 소스 하나가 느려도 전체 파이프라인이 무한 대기하지 않도록
     })
     if (!res.ok) return []
-    const xml = await res.text()
-    return parseRSSItems(xml).slice(0, maxItems)
+    const data = await res.json<any>()
+    const items = Array.isArray(data?.items) ? data.items : []
+    return items.map((it: any) => {
+      const link = it.originallink || it.link || ''
+      let source = ''
+      try { source = link ? new URL(link).hostname.replace(/^www\./, '') : '' } catch {}
+      return {
+        title: stripNaverHighlight(it.title || ''),
+        link,
+        pubDate: it.pubDate || '',
+        source,
+      }
+    }).slice(0, maxItems)
   } catch {
     return []
   }
 }
 
-async function collectArticles(daysBack: number): Promise<RawArticle[]> {
-  const pools = await Promise.all(KEYWORDS.map((kw) => fetchNewsFromRSS(kw, 12)))
+async function collectArticles(env: DigestBindings, daysBack: number): Promise<RawArticle[]> {
+  const pools = await Promise.all(KEYWORDS.map((kw) => fetchNewsFromNaver(env, kw, 12)))
   const cutoff = Date.now() - daysBack * 24 * 60 * 60 * 1000
   const seen = new Set<string>()
   const merged: RawArticle[] = []
@@ -178,7 +174,7 @@ ${list}
 // 파이프라인 실행 (수동 트리거 / cron 공용)
 // ────────────────────────────────────────────────────
 export async function runDigestPipeline(env: DigestBindings): Promise<{ digestId: number; articleCount: number }> {
-  const articles = await collectArticles(7)
+  const articles = await collectArticles(env, 7)
   const { summary, keywords, items } = await classifyAndSummarize(env, articles)
 
   const now = new Date()
@@ -210,24 +206,24 @@ digest.post('/generate', async (c) => {
 })
 
 // ────────────────────────────────────────────────────
-// 진단용: RSS 요청이 실제로 어떻게 응답받는지 직접 확인
+// 진단용: 네이버 뉴스 검색 API 요청이 실제로 어떻게 응답받는지 직접 확인
 // (Cloudflare 로그 접근 없이도 원인 파악 가능하게)
 // ────────────────────────────────────────────────────
-digest.get('/debug-rss', async (c) => {
-  const rawUrl = c.req.query('url')
+digest.get('/debug-news', async (c) => {
   const keyword = c.req.query('kw') || KEYWORDS[0]
-  const url = rawUrl || `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`
+  if (!c.env.NAVER_CLIENT_ID || !c.env.NAVER_CLIENT_SECRET) {
+    return c.json({ success: false, keyword, error: 'NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다.' })
+  }
+  const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(keyword)}&display=10&sort=date`
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'X-Naver-Client-Id': c.env.NAVER_CLIENT_ID,
+        'X-Naver-Client-Secret': c.env.NAVER_CLIENT_SECRET,
       },
       signal: AbortSignal.timeout(12000),
     })
     const text = await res.text()
-    const items = parseRSSItems(text)
     return c.json({
       success: true,
       keyword,
@@ -236,8 +232,6 @@ digest.get('/debug-rss', async (c) => {
       contentType: res.headers.get('content-type'),
       bodyLength: text.length,
       bodyPreview: text.slice(0, 800),
-      parsedItemCount: items.length,
-      firstItems: items.slice(0, 3),
     })
   } catch (e: any) {
     return c.json({ success: false, keyword, url, error: String(e?.message || e) })
