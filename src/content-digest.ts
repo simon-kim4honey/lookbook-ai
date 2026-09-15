@@ -269,6 +269,7 @@ digest.get('/:id/kakao-text', async (c) => {
   articles.forEach((a: any, i: number) => {
     lines.push(`${i + 1}. [${a.category}] ${a.title}`)
     lines.push(a.summary)
+    if (a.url) lines.push(`🔗 ${a.url}`)
     lines.push('')
   })
   lines.push('👉 AI 룩북 무료 체험: https://www.aifashion.co.kr/?utm_source=kakao&utm_medium=channel&utm_campaign=weekly_digest')
