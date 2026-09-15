@@ -256,7 +256,7 @@ ${list}
     }),
     signal: AbortSignal.timeout(45000),
   })
-  if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status}`)
+  if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`)
   const data = await res.json<any>()
   const text = (data?.content?.[0]?.text || '{}').replace(/^```json\s*|```$/g, '').trim()
   const parsed = JSON.parse(text)
