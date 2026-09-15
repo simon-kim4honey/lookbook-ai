@@ -358,13 +358,15 @@ Country: ${country}`
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 500,
+      max_tokens: 2000, // 최신 모델은 기본적으로 확장 사고(thinking)를 함께 생성해서 여유 있게 잡아야 함
       messages: [{ role: 'user', content: prompt }],
     }),
   })
   if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status}`)
   const data = await res.json<any>()
-  const text = data?.content?.[0]?.text || '{}'
+  // content[0]이 항상 텍스트라고 가정하면 안 됨 — 최신 모델은 앞에 thinking 블록을 먼저 넣는다
+  const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
+  const text = textBlock?.text || '{}'
   const cleaned = text.replace(/^```json\s*|```$/g, '').trim()
   const parsed = JSON.parse(cleaned)
   return {
@@ -475,11 +477,13 @@ async function claudeDraft(env: LeadBindings, lang: 'ko' | 'en' | 'ja', brandNam
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 600, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
   })
   if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status}`)
   const data = await res.json<any>()
-  const text = (data?.content?.[0]?.text || '{}').replace(/^```json\s*|```$/g, '').trim()
+  // content[0]이 항상 텍스트라고 가정하면 안 됨 — 최신 모델은 앞에 thinking 블록을 먼저 넣는다
+  const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
+  const text = (textBlock?.text || '{}').replace(/^```json\s*|```$/g, '').trim()
   return JSON.parse(text) as { subject: string; body: string }
 }
 
