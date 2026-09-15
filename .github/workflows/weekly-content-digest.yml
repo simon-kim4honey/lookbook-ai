@@ -1,0 +1,22 @@
+name: 패션 콘텐츠 다이제스트 주간 자동 생성
+
+# Cloudflare Pages는 Cron Trigger를 지원하지 않아서(운영 배포 실패를 유발했던 원인),
+# 대신 GitHub Actions 스케줄로 운영 API를 호출해 매주 다이제스트를 생성한다.
+# 실행 결과는 /admin02 "콘텐츠 다이제스트" 탭에서 검토 후 카카오톡 채널에 수동 발행한다.
+
+on:
+  schedule:
+    # 매주 월요일 00:00 UTC = 한국시간(KST) 오전 9시
+    - cron: '0 0 * * 1'
+  workflow_dispatch: {} # 수동 실행 버튼 (테스트/즉시 생성용)
+
+jobs:
+  generate-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 콘텐츠 다이제스트 생성 API 호출
+        run: |
+          curl -sS -X POST "https://www.aifashion.co.kr/api/admin/content-digest/generate" \
+            -H "X-Admin-Password: ${{ secrets.EZLOOK_ADMIN_PASSWORD }}" \
+            --fail-with-body \
+            --max-time 90
