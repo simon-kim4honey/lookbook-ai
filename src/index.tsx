@@ -3,7 +3,7 @@ import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
 import leadsApp from './leads'
 import bizLeadsApp from './bizleads'
-import contentDigestApp, { runDigestPipeline } from './content-digest'
+import contentDigestApp from './content-digest'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
 // → 배포할 때마다 값이 바뀌어 브라우저가 새 파일로 인식 (캐시 자동 무효화)
@@ -10454,14 +10454,4 @@ app.get('/payment/fail', (c) => {
 </html>`)
 })
 
-export default {
-  fetch: app.fetch,
-  // 매주 월요일 자동 실행 (wrangler.jsonc의 triggers.crons 참고) — 패션 콘텐츠 다이제스트 자동 생성
-  scheduled: async (_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) => {
-    ctx.waitUntil(
-      runDigestPipeline(env as any).catch((e) => {
-        console.error('content-digest scheduled 실행 실패:', e)
-      })
-    )
-  },
-}
+export default app
