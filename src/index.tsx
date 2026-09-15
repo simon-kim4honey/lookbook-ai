@@ -9317,7 +9317,17 @@ async function digestSelect(id) {
     '<textarea id="digestSummaryEdit" style="width:100%;min-height:80px;margin:10px 0;">' + (d.summary || '') + '</textarea>' +
     '<button class="leads-btn secondary small" onclick="digestSaveSummary()">요약 저장</button>' +
     '<div class="leads-hint" style="margin:10px 0 4px;">키워드: ' + (d.keywords || []).join(', ') + '</div>' +
+    '<div id="digestTrends" style="margin-top:8px;"></div>' +
     '<div id="digestArticles" style="margin-top:12px;"></div>'
+
+  const trends = data.trends || []
+  const fmtChange = (pct) => (pct > 0 ? '📈 +' : pct < 0 ? '📉 ' : '➖ ') + pct + '%'
+  const trendRow = (t) => '<span class="leads-tag" style="background:#252540;margin:2px 6px 2px 0;display:inline-block;">' + t.label + ' ' + fmtChange(t.change_pct) + '</span>'
+  const searchTrends = trends.filter((t) => t.type === 'search_trend')
+  const shoppingInsight = trends.filter((t) => t.type === 'shopping_insight')
+  document.getElementById('digestTrends').innerHTML =
+    (searchTrends.length ? '<div class="leads-hint" style="margin-bottom:2px;">🔎 검색어트렌드 (전주 대비)</div><div style="margin-bottom:8px;">' + searchTrends.map(trendRow).join('') + '</div>' : '') +
+    (shoppingInsight.length ? '<div class="leads-hint" style="margin-bottom:2px;">🛍️ 쇼핑인사이트 (전주 대비)</div><div>' + shoppingInsight.map(trendRow).join('') + '</div>' : '')
 
   document.getElementById('digestArticles').innerHTML = data.articles.map((a) => (
     '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;' + (a.excluded ? 'opacity:.4;' : '') + '">' +
