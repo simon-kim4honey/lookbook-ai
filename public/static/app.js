@@ -3059,20 +3059,33 @@ function initSwipeStack(opts) {
       // 시작 직전에 현재 화면상 실제 위치/크기(rect)를 그대로 px 절대값(left/top/
       // width/height)으로 고정해 퍼센트·중첩 transform을 모두 제거한 뒤, 순수
       // translate+scale 하나만으로 목표 위치까지 이동시킨다.
+      //
+      // 주의: getBoundingClientRect()는 회전(rotate)까지 반영된 바운딩 박스라
+      // 실제 카드보다 부풀어 있다(피타고라스 확장) — 이 부풀려진 크기를 그대로
+      // "진짜 크기"로 써서 회전을 제거해버리면, 회전이 사라지는 순간 카드가
+      // 실제보다 커 보이며 비율이 어긋난 것처럼 한 프레임 깜빡였다(실측/영상
+      // 확인됨). rotate는 자기 중심을 기준으로 돌아가므로 중심 좌표는 회전과
+      // 무관하게 그대로다 — 그 중심점에, transform 영향을 받지 않는 실제
+      // 레이아웃 크기(offsetWidth/Height)에 현재 화면에 보이는 배율(0.94)을
+      // 곱한 "진짜 크기"를 결합해 정확한 시작 박스를 구한다.
       const areaRect = stackArea.getBoundingClientRect();
-      const restRect = incoming.getBoundingClientRect(); // 지금 peek 위치/크기(회전·중앙정렬 포함, 화면 좌표)
+      const rotatedRect = incoming.getBoundingClientRect(); // 중심점 계산에만 사용(회전 포함 AABB)
+      const centerX = rotatedRect.left + rotatedRect.width / 2;
+      const centerY = rotatedRect.top + rotatedRect.height / 2;
+      const trueWidth = incoming.offsetWidth * 0.94;   // .role-prev/next 기본 scale(0.94)과 동일한 시각 배율
+      const trueHeight = incoming.offsetHeight * 0.94;
 
       incoming.style.zIndex = '3'; // 나가는 카드(0)와 반대편 peek(1)보다 위에서 이동
       incoming.style.transition = 'none';
       incoming.style.transform = 'none';
-      incoming.style.top = (restRect.top - areaRect.top) + 'px';
-      incoming.style.left = (restRect.left - areaRect.left) + 'px';
+      incoming.style.top = (centerY - trueHeight / 2 - areaRect.top) + 'px';
+      incoming.style.left = (centerX - trueWidth / 2 - areaRect.left) + 'px';
       incoming.style.right = 'auto';
-      incoming.style.width = restRect.width + 'px';
-      incoming.style.height = restRect.height + 'px';
+      incoming.style.width = trueWidth + 'px';
+      incoming.style.height = trueHeight + 'px';
       void incoming.offsetWidth; // 강제 리플로우 — 위 px 고정 상태를 확정한 뒤 트랜지션이 걸리도록
 
-      const startRect = incoming.getBoundingClientRect(); // px로 고정된 실제 시작 rect(=restRect와 사실상 동일)
+      const startRect = incoming.getBoundingClientRect(); // px로 고정된 실제(회전 없는 진짜 크기) 시작 rect
       const endRect = stackEl.getBoundingClientRect();     // 도착해야 할 가운데 슬롯의 위치/크기
       const scaleX = endRect.width / startRect.width;
       const scaleY = endRect.height / startRect.height;
@@ -3092,26 +3105,26 @@ function initSwipeStack(opts) {
     // 눈에 띄지 않는다(incoming과 동일한 FLIP 원리).
     if (state.items.length > 2) {
       const farRole = direction > 0 ? 'next' : 'prev';
+      const farTiltDeg = direction > 0 ? 6 : -6; // .role-next/.role-prev의 resting rotate 값과 동일
       const farItem = state.items[wrapIndex(state.index + direction * 2)];
       const farCard = cardEl(farItem, farRole);
-      stackArea.appendChild(farCard);
-
-      const farAreaRect = stackArea.getBoundingClientRect();
-      const farRestRect = farCard.getBoundingClientRect(); // 방금 붙어서 이미 CSS 기본(peek 슬롯) 위치/크기
-      const farOutsideX = direction > 0 ? farAreaRect.width * 0.35 : -farAreaRect.width * 0.35;
+      // CSS의 .role-prev/.role-next가 top/left(또는 right)·width·aspect-ratio로
+      // 이미 정확한 최종 위치/크기를 잡아준다 — 여기서는 그 rest 상태의 transform
+      // (translateY(-50%) scale(0.94) rotate(deg)) 그대로에 "화면 밖으로 더 나간"
+      // 만큼의 translateX(px)만 앞에 끼워 넣고, 그 값만 0으로 줄이며 슬라이드
+      // 시킨다. 배율/회전각이 처음부터 끝까지 그대로 유지되므로(깜빡임·비율변화
+      // 없이) 이미 기울어진 채로 미끄러져 들어오는 것처럼 보인다.
+      const areaRect = stackArea.getBoundingClientRect();
+      const farOutsideX = direction > 0 ? areaRect.width * 0.35 : -areaRect.width * 0.35;
 
       farCard.style.transition = 'none';
-      farCard.style.transform = 'none';
-      farCard.style.top = (farRestRect.top - farAreaRect.top) + 'px';
-      farCard.style.left = (farRestRect.left - farAreaRect.left + farOutsideX) + 'px';
-      farCard.style.right = 'auto';
-      farCard.style.width = farRestRect.width + 'px';
-      farCard.style.height = farRestRect.height + 'px';
       farCard.style.opacity = '0';
+      farCard.style.transform = `translateY(-50%) translateX(${farOutsideX}px) scale(0.94) rotate(${farTiltDeg}deg)`;
+      stackArea.appendChild(farCard);
       void farCard.offsetWidth; // 강제 리플로우 — 오프셋 시작 상태를 확정한 뒤 트랜지션이 걸리도록
 
-      farCard.style.transition = `left ${ms}ms ${EASE}, opacity ${ms}ms ${EASE}`;
-      farCard.style.left = (farRestRect.left - farAreaRect.left) + 'px';
+      farCard.style.transition = `transform ${ms}ms ${EASE}, opacity ${ms}ms ${EASE}`;
+      farCard.style.transform = `translateY(-50%) scale(0.94) rotate(${farTiltDeg}deg)`;
       farCard.style.opacity = '0.78'; // role-prev/next 기본 불투명도와 동일
     }
     setTimeout(() => {
