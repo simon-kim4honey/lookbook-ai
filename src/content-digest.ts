@@ -62,7 +62,7 @@ function stripNaverHighlight(s: string): string {
 
 async function fetchNewsFromNaver(env: DigestBindings, keyword: string, maxItems: number): Promise<RawArticle[]> {
   if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return []
-  const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(keyword)}&display=${maxItems}&sort=date`
+  const url = `https://naverapihub.apigw.ntruss.com/search/v1/news?query=${encodeURIComponent(keyword)}&display=${maxItems}&sort=date`
   try {
     const res = await fetch(url, {
       headers: {
@@ -142,7 +142,7 @@ async function fetchSearchTrends(env: DigestBindings, keywords: string[]): Promi
   const results: TrendPoint[] = []
   for (const batch of batches) {
     try {
-      const res = await fetch('https://openapi.naver.com/v1/datalab/search', {
+      const res = await fetch('https://naverapihub.apigw.ntruss.com/search-trend/v1/search', {
         method: 'POST',
         headers: {
           'X-NCP-APIGW-API-KEY-ID': env.NAVER_CLIENT_ID,
@@ -184,7 +184,7 @@ async function fetchShoppingInsight(env: DigestBindings, keywords: string[]): Pr
   const out: TrendPoint[] = []
   for (const batch of batches) {
     try {
-      const res = await fetch('https://openapi.naver.com/v1/datalab/shopping/category/keywords', {
+      const res = await fetch('https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords', {
         method: 'POST',
         headers: {
           'X-NCP-APIGW-API-KEY-ID': env.NAVER_CLIENT_ID,
@@ -357,7 +357,7 @@ digest.get('/debug-news', async (c) => {
   if (!c.env.NAVER_CLIENT_ID || !c.env.NAVER_CLIENT_SECRET) {
     return c.json({ success: false, keyword, error: 'NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다.' })
   }
-  const url = `https://openapi.naver.com/v1/search/news.json?query=${encodeURIComponent(keyword)}&display=10&sort=date`
+  const url = `https://naverapihub.apigw.ntruss.com/search/v1/news?query=${encodeURIComponent(keyword)}&display=10&sort=date`
   try {
     const res = await fetch(url, {
       headers: {
@@ -394,7 +394,7 @@ digest.get('/debug-trends', async (c) => {
   }
   try {
     const [searchRes, shoppingRes] = await Promise.all([
-      fetch('https://openapi.naver.com/v1/datalab/search', {
+      fetch('https://naverapihub.apigw.ntruss.com/search-trend/v1/search', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -403,7 +403,7 @@ digest.get('/debug-trends', async (c) => {
         }),
         signal: AbortSignal.timeout(12000),
       }),
-      fetch('https://openapi.naver.com/v1/datalab/shopping/category/keywords', {
+      fetch('https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
