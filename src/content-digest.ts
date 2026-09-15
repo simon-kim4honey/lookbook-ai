@@ -66,8 +66,8 @@ async function fetchNewsFromNaver(env: DigestBindings, keyword: string, maxItems
   try {
     const res = await fetch(url, {
       headers: {
-        'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
-        'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET,
+        'X-NCP-APIGW-API-KEY-ID': env.NAVER_CLIENT_ID,
+        'X-NCP-APIGW-API-KEY': env.NAVER_CLIENT_SECRET,
       },
       signal: AbortSignal.timeout(12000), // 소스 하나가 느려도 전체 파이프라인이 무한 대기하지 않도록
     })
@@ -145,8 +145,8 @@ async function fetchSearchTrends(env: DigestBindings, keywords: string[]): Promi
       const res = await fetch('https://openapi.naver.com/v1/datalab/search', {
         method: 'POST',
         headers: {
-          'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
-          'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET,
+          'X-NCP-APIGW-API-KEY-ID': env.NAVER_CLIENT_ID,
+          'X-NCP-APIGW-API-KEY': env.NAVER_CLIENT_SECRET,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -187,8 +187,8 @@ async function fetchShoppingInsight(env: DigestBindings, keywords: string[]): Pr
       const res = await fetch('https://openapi.naver.com/v1/datalab/shopping/category/keywords', {
         method: 'POST',
         headers: {
-          'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
-          'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET,
+          'X-NCP-APIGW-API-KEY-ID': env.NAVER_CLIENT_ID,
+          'X-NCP-APIGW-API-KEY': env.NAVER_CLIENT_SECRET,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -361,8 +361,8 @@ digest.get('/debug-news', async (c) => {
   try {
     const res = await fetch(url, {
       headers: {
-        'X-Naver-Client-Id': c.env.NAVER_CLIENT_ID,
-        'X-Naver-Client-Secret': c.env.NAVER_CLIENT_SECRET,
+        'X-NCP-APIGW-API-KEY-ID': c.env.NAVER_CLIENT_ID,
+        'X-NCP-APIGW-API-KEY': c.env.NAVER_CLIENT_SECRET,
       },
       signal: AbortSignal.timeout(12000),
     })
@@ -388,8 +388,8 @@ digest.get('/debug-trends', async (c) => {
   }
   const { start, end } = trendDateRange()
   const authHeaders = {
-    'X-Naver-Client-Id': c.env.NAVER_CLIENT_ID,
-    'X-Naver-Client-Secret': c.env.NAVER_CLIENT_SECRET,
+    'X-NCP-APIGW-API-KEY-ID': c.env.NAVER_CLIENT_ID,
+    'X-NCP-APIGW-API-KEY': c.env.NAVER_CLIENT_SECRET,
     'Content-Type': 'application/json',
   }
   try {
