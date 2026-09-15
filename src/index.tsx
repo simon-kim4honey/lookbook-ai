@@ -8204,12 +8204,16 @@ app.get('/admin02', (c) => {
   <div class="tab-panel" id="tabContentDigest">
     <div class="leads-tabroot">
       <div class="page-title">📰 패션 콘텐츠 다이제스트</div>
-      <div class="page-sub">매주 월요일 자동으로 패션 뉴스를 수집·요약합니다. 검토 후 카카오톡 채널 관리자센터에 수동으로 발행하세요 (자동 발송 아님).</div>
+      <div class="page-sub">월(기사) · 수(검색어트렌드) · 금(쇼핑인사이트) 오전 9시(KST) 자동 생성됩니다. 검토 후 카카오톡 채널 관리자센터에 수동으로 발행하세요 (자동 발송 아님).</div>
 
       <div class="leads-card">
-        <div class="leads-row" style="justify-content:space-between;">
-          <div class="leads-hint">다음 자동 실행: 매주 월요일 오전 9시(KST)</div>
-          <button class="leads-btn small" onclick="digestGenerate()" id="digestGenBtn">지금 생성</button>
+        <div class="leads-row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div class="leads-hint">다음 자동 실행: 월 9시(기사) · 수 9시(검색어트렌드) · 금 9시(쇼핑인사이트)</div>
+          <div>
+            <button class="leads-btn small" onclick="digestGenerate('news')" id="digestGenBtnNews">기사 지금 생성</button>
+            <button class="leads-btn secondary small" onclick="digestGenerate('search_trend')" id="digestGenBtnSearchTrend">검색어트렌드 지금 생성</button>
+            <button class="leads-btn secondary small" onclick="digestGenerate('shopping_insight')" id="digestGenBtnShoppingInsight">쇼핑인사이트 지금 생성</button>
+          </div>
         </div>
       </div>
 
@@ -9274,26 +9278,30 @@ async function digestLoadList() {
     return
   }
   const statusLabel = { draft: '초안', reviewed: '검토완료', sent: '발행완료' }
+  const typeLabel = { news: '📰 기사', search_trend: '🔎 검색어트렌드', shopping_insight: '🛍️ 쇼핑인사이트' }
   list.innerHTML = data.digests.map((d) => (
     '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;' + (d.id === digestCurrentId ? 'border-color:#6c47ff' : '') + '" onclick="digestSelect(' + d.id + ')">' +
-      '<div style="font-weight:600;color:#e0e0f0;font-size:13px;">' + d.period + '</div>' +
-      '<div class="leads-hint">' + statusLabel[d.status] + ' · 기사 ' + d.article_count + '건</div>' +
+      '<div style="font-weight:600;color:#e0e0f0;font-size:13px;">' + (typeLabel[d.type] || '📰 기사') + ' · ' + d.period + '</div>' +
+      '<div class="leads-hint">' + statusLabel[d.status] + (d.type === 'news' || !d.type ? ' · 기사 ' + d.article_count + '건' : ' · 항목 ' + d.article_count + '개') + '</div>' +
     '</div>'
   )).join('')
 }
 
-async function digestGenerate() {
-  const btn = document.getElementById('digestGenBtn')
+const digestGenBtnIds = { news: 'digestGenBtnNews', search_trend: 'digestGenBtnSearchTrend', shopping_insight: 'digestGenBtnShoppingInsight' }
+const digestGenBtnLabels = { news: '기사 지금 생성', search_trend: '검색어트렌드 지금 생성', shopping_insight: '쇼핑인사이트 지금 생성' }
+
+async function digestGenerate(type) {
+  const btn = document.getElementById(digestGenBtnIds[type])
   btn.disabled = true
   btn.textContent = '생성 중... (최대 1분)'
   try {
-    const data = await digestApi('/generate', { method: 'POST' })
+    const data = await digestApi('/generate?type=' + type, { method: 'POST' })
     if (!data.success) { alert('생성 실패: ' + data.message); return }
     await digestLoadList()
     digestSelect(data.digestId)
   } finally {
     btn.disabled = false
-    btn.textContent = '지금 생성'
+    btn.textContent = digestGenBtnLabels[type]
   }
 }
 
@@ -9305,10 +9313,12 @@ async function digestSelect(id) {
   if (!data.success) { card.innerHTML = '<div class="leads-hint">불러오기 실패</div>'; return }
   const d = data.digest
   const statusLabel = { draft: '초안', reviewed: '검토완료', sent: '발행완료' }
+  const typeLabel = { news: '📰 기사', search_trend: '🔎 검색어트렌드', shopping_insight: '🛍️ 쇼핑인사이트' }
+  const type = d.type || 'news'
 
   card.innerHTML =
     '<div class="leads-row" style="justify-content:space-between;">' +
-      '<h3 style="margin:0;">' + d.period + ' <span class="leads-hint">(' + statusLabel[d.status] + ')</span></h3>' +
+      '<h3 style="margin:0;">' + (typeLabel[type] || '') + ' · ' + d.period + ' <span class="leads-hint">(' + statusLabel[d.status] + ')</span></h3>' +
       '<div>' +
         '<button class="leads-btn secondary small" onclick="digestMarkReviewed()">검토완료 표시</button> ' +
         '<button class="leads-btn small" onclick="digestCopyKakaoText()">카톡 발행용 텍스트 복사</button>' +
@@ -9316,30 +9326,29 @@ async function digestSelect(id) {
     '</div>' +
     '<textarea id="digestSummaryEdit" style="width:100%;min-height:80px;margin:10px 0;">' + (d.summary || '') + '</textarea>' +
     '<button class="leads-btn secondary small" onclick="digestSaveSummary()">요약 저장</button>' +
-    '<div class="leads-hint" style="margin:10px 0 4px;">키워드: ' + (d.keywords || []).join(', ') + '</div>' +
+    (type === 'news' ? '<div class="leads-hint" style="margin:10px 0 4px;">키워드: ' + (d.keywords || []).join(', ') + '</div>' : '') +
     '<div id="digestTrends" style="margin-top:8px;"></div>' +
     '<div id="digestArticles" style="margin-top:12px;"></div>'
 
-  const trends = data.trends || []
-  const fmtChange = (pct) => (pct > 0 ? '📈 +' : pct < 0 ? '📉 ' : '➖ ') + pct + '%'
-  const trendRow = (t) => '<span class="leads-tag" style="background:#252540;margin:2px 6px 2px 0;display:inline-block;">' + t.label + ' ' + fmtChange(t.change_pct) + '</span>'
-  const searchTrends = trends.filter((t) => t.type === 'search_trend')
-  const shoppingInsight = trends.filter((t) => t.type === 'shopping_insight')
-  document.getElementById('digestTrends').innerHTML =
-    (searchTrends.length ? '<div class="leads-hint" style="margin-bottom:2px;">🔎 검색어트렌드 (전주 대비)</div><div style="margin-bottom:8px;">' + searchTrends.map(trendRow).join('') + '</div>' : '') +
-    (shoppingInsight.length ? '<div class="leads-hint" style="margin-bottom:2px;">🛍️ 쇼핑인사이트 (전주 대비)</div><div>' + shoppingInsight.map(trendRow).join('') + '</div>' : '')
-
-  document.getElementById('digestArticles').innerHTML = data.articles.map((a) => (
-    '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;' + (a.excluded ? 'opacity:.4;' : '') + '">' +
-      '<div class="leads-row" style="justify-content:space-between;">' +
-        '<div><span class="leads-tag" style="background:#252540;">' + a.category + '</span> <b style="color:#e0e0f0;">' + a.title + '</b></div>' +
-        '<button class="leads-btn secondary small" onclick="digestToggleExclude(' + a.id + ',' + (a.excluded ? 0 : 1) + ')">' + (a.excluded ? '복원' : '제외') + '</button>' +
-      '</div>' +
-      '<div class="leads-hint" style="margin:4px 0;">' + (a.source || '') + ' · 중요도 ' + a.importance + '</div>' +
-      '<div style="font-size:13px;color:#c0c0d0;">' + a.summary + '</div>' +
-      (a.url ? '<a href="' + a.url + '" target="_blank" style="font-size:12px;color:#9b7cff;">원문 보기 →</a>' : '') +
-    '</div>'
-  )).join('') || '<div class="leads-hint">기사가 없습니다.</div>'
+  if (type === 'news') {
+    document.getElementById('digestArticles').innerHTML = data.articles.map((a) => (
+      '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;' + (a.excluded ? 'opacity:.4;' : '') + '">' +
+        '<div class="leads-row" style="justify-content:space-between;">' +
+          '<div><span class="leads-tag" style="background:#252540;">' + a.category + '</span> <b style="color:#e0e0f0;">' + a.title + '</b></div>' +
+          '<button class="leads-btn secondary small" onclick="digestToggleExclude(' + a.id + ',' + (a.excluded ? 0 : 1) + ')">' + (a.excluded ? '복원' : '제외') + '</button>' +
+        '</div>' +
+        '<div class="leads-hint" style="margin:4px 0;">' + (a.source || '') + ' · 중요도 ' + a.importance + '</div>' +
+        '<div style="font-size:13px;color:#c0c0d0;">' + a.summary + '</div>' +
+        (a.url ? '<a href="' + a.url + '" target="_blank" style="font-size:12px;color:#9b7cff;">원문 보기 →</a>' : '') +
+      '</div>'
+    )).join('') || '<div class="leads-hint">기사가 없습니다.</div>'
+  } else {
+    const trends = data.trends || []
+    const fmtChange = (pct) => (pct > 0 ? '📈 +' : pct < 0 ? '📉 ' : '➖ ') + pct + '%'
+    document.getElementById('digestTrends').innerHTML = trends.length
+      ? trends.map((t) => '<span class="leads-tag" style="background:#252540;margin:2px 6px 2px 0;display:inline-block;">' + t.label + ' ' + fmtChange(t.change_pct) + '</span>').join('')
+      : '<div class="leads-hint">데이터가 없습니다.</div>'
+  }
 }
 
 async function digestSetStatus(status) {
