@@ -76,7 +76,10 @@ async function fetchNewsFromRSS(keyword: string, maxItems: number, daysBack: num
   const q = `${keyword} after:${fmt(from)} before:${fmt(to)}`
   const url = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=ko&gl=KR&ceid=KR:ko`
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'LookbookAI-ContentDigestBot/1.0' } })
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'LookbookAI-ContentDigestBot/1.0' },
+      signal: AbortSignal.timeout(12000), // 소스 하나가 느려도 전체 파이프라인이 무한 대기하지 않도록
+    })
     if (!res.ok) return []
     const xml = await res.text()
     return parseRSSItems(xml).slice(0, maxItems)
@@ -141,6 +144,7 @@ ${list}
       max_tokens: 3000,
       messages: [{ role: 'user', content: prompt }],
     }),
+    signal: AbortSignal.timeout(45000),
   })
   if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status}`)
   const data = await res.json<any>()

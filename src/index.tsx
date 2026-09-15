@@ -9246,10 +9246,20 @@ async function ghostCutDelete(code) {
 // ══════════════════════════════════════════════
 let digestCurrentId = null
 
-function digestApi(path, opts) {
+async function digestApi(path, opts) {
   opts = opts || {}
   opts.headers = Object.assign({ 'X-Admin-Password': adminPassword, 'Content-Type': 'application/json' }, opts.headers || {})
-  return fetch('/api/admin/content-digest' + path, opts).then((r) => r.json())
+  let res
+  try {
+    res = await fetch('/api/admin/content-digest' + path, opts)
+  } catch (e) {
+    return { success: false, message: '네트워크 오류: ' + e.message }
+  }
+  try {
+    return await res.json()
+  } catch (e) {
+    return { success: false, message: 'HTTP ' + res.status + ' — 서버가 JSON이 아닌 응답을 반환했습니다 (타임아웃일 가능성이 있습니다).' }
+  }
 }
 
 async function digestInit() {
@@ -9276,12 +9286,15 @@ async function digestGenerate() {
   const btn = document.getElementById('digestGenBtn')
   btn.disabled = true
   btn.textContent = '생성 중... (최대 1분)'
-  const data = await digestApi('/generate', { method: 'POST' })
-  btn.disabled = false
-  btn.textContent = '지금 생성'
-  if (!data.success) { alert('생성 실패: ' + data.message); return }
-  await digestLoadList()
-  digestSelect(data.digestId)
+  try {
+    const data = await digestApi('/generate', { method: 'POST' })
+    if (!data.success) { alert('생성 실패: ' + data.message); return }
+    await digestLoadList()
+    digestSelect(data.digestId)
+  } finally {
+    btn.disabled = false
+    btn.textContent = '지금 생성'
+  }
 }
 
 async function digestSelect(id) {
