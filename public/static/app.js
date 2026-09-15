@@ -1294,7 +1294,7 @@ function oauthLogin(provider, btn) {
   const popup = window.open(
     `/api/auth/${provider}`,
     'oauth_popup',
-    'width=520,height=640,left=' + Math.round((screen.width - 520) / 2) + ',top=' + Math.round((screen.height - 640) / 2)
+    'width=364,height=640,left=' + Math.round((screen.width - 364) / 2) + ',top=' + Math.round((screen.height - 640) / 2)
   );
 
   function handleOAuthSuccess(data) {
