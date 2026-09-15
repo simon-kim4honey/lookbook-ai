@@ -118,16 +118,20 @@ async function collectArticles(env: DigestBindings, daysBack: number): Promise<R
 type TrendPoint = { label: string; changePct: number }
 
 function trendDateRange(): { start: string; end: string } {
+  // 네이버 데이터랩은 오늘이 포함된 "이번 주" 구간도 (아직 며칠 안 지났어도) 하나의 주간
+  // 버킷으로 돌려준다 — 그래서 항상 최근 3주 이상을 가져와서, 아직 안 끝난 마지막 구간은
+  // 버리고 그 앞의 "완전한 두 주"끼리 비교한다 (computeChangePct 참고).
   const end = new Date()
-  const start = new Date(end.getTime() - 14 * 24 * 60 * 60 * 1000)
+  const start = new Date(end.getTime() - 21 * 24 * 60 * 60 * 1000)
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
   return { start: fmt(start), end: fmt(end) }
 }
 
 function computeChangePct(points: Array<{ ratio: number }>): number | null {
-  if (!points || points.length < 2) return null
-  const prev = points[points.length - 2].ratio
-  const cur = points[points.length - 1].ratio
+  // 마지막 구간은 아직 끝나지 않은 이번 주(부분 데이터)라서 제외 — 그 앞의 완전한 두 주만 비교
+  if (!points || points.length < 3) return null
+  const prev = points[points.length - 3].ratio
+  const cur = points[points.length - 2].ratio
   if (!prev) return null
   return Math.round(((cur - prev) / prev) * 1000) / 10
 }
