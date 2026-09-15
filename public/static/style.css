@@ -1270,13 +1270,14 @@ footer {
   --gapp-glow-2: rgba(236,72,153,0.4);
   --gapp-nav-bg: rgba(23,24,29,0.97);   /* 하단 고정 내비게이션 바 배경(구 rgba(255,255,255,0.97)) */
   --gapp-accent: #A78BFA;          /* 강조 텍스트/아이콘 단색(그라데이션을 쓸 수 없는 곳), 로고 색과 통일 */
+  --gapp-step-active-color: #22C55E; /* 1/2/3 단계 표시줄의 활성 텍스트 — 보라색 대신 다크그린 */
   --gapp-scrim: rgba(15,15,20,0.62);    /* 블러 배경 위 가독성용 스크림 — 너무 어둡다는 피드백으로 0.9→0.62(약 30% 밝게) */
   --gapp-fallback-gradient: linear-gradient(135deg, #2B2C34, #202127); /* 이미지 로드 실패 시 카드 배경(구 파스텔 그라데이션) */
   --gapp-arrow-bg: rgba(23,24,29,0.55);       /* 카드 위 화살표 버튼 배경(구 흰색 반투명) */
   --gapp-arrow-border: rgba(255,255,255,0.18);
   --gapp-arrow-bg-hover: rgba(43,44,52,0.8);
-  --gapp-slot-bg: linear-gradient(135deg, #0A2A17 0%, #0E1E17 100%); /* 대기 중 슬롯 — 다크그린 혼합, 기존 대비 50% 더 어둡게 */
-  --gapp-slot-bg-hover: linear-gradient(135deg, #0D361D 0%, #12251C 100%); /* 호버 시 살짝 밝은 버전(마찬가지로 50% 어둡게) */
+  --gapp-slot-bg: linear-gradient(135deg, #0A2A17 0%, #0D1B2E 55%, #2B2C34 100%); /* 대기 중 슬롯 — 다크그린 + 다크블루 + 다크그레이 그라데이션 */
+  --gapp-slot-bg-hover: linear-gradient(135deg, #0D361D 0%, #11233A 55%, #34353D 100%); /* 호버 시 살짝 밝은 버전 */
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 다크그린이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22C55E;               /* 호버 시 밝은 그린 라인으로 강조 */
   --gapp-slot-blur: none;
@@ -1611,7 +1612,7 @@ footer {
   color: #fff;
 }
 .gstep-item.active .gstep-text {
-  color: var(--gapp-accent, #3182F6);
+  color: var(--gapp-step-active-color, #3182F6); /* 요청: 보라색 → 다크그린으로 변경 */
 }
 .gstep-sep {
   color: var(--gapp-border, #D1D6DB);
