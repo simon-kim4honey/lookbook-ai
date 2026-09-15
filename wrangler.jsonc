@@ -23,8 +23,5 @@
   ],
   "vars": {
     "GA4_MEASUREMENT_ID": "G-R2WKD5NZBX"
-  },
-  "triggers": {
-    "crons": ["0 0 * * 1"]
   }
 }
