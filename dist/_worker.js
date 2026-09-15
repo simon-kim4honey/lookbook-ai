@@ -134,7 +134,7 @@ ${t.map((e,t)=>`${t+1}. [${e.source||`출처미상`}] ${e.title}`).join(`
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`,r=await fetch(`https://api.anthropic.com/v1/messages`,{method:`POST`,headers:{"Content-Type":`application/json`,"x-api-key":e.ANTHROPIC_API_KEY,"anthropic-version":`2023-06-01`},body:JSON.stringify({model:`claude-sonnet-5`,max_tokens:3e3,messages:[{role:`user`,content:n}]})});if(!r.ok)throw Error(`Claude API 오류: HTTP ${r.status}`);let i=((await r.json())?.content?.[0]?.text||`{}`).replace(/^```json\s*|```$/g,``).trim(),a=JSON.parse(i),o=(a.items||[]).filter(e=>e.idx>=1&&e.idx<=t.length).map(e=>{let n=t[e.idx-1];return{category:St.includes(e.category)?e.category:`트렌드`,title:n.title,source:n.source||``,url:n.link,published_at:n.pubDate,summary:e.summary||``,importance:Math.max(1,Math.min(5,Number(e.importance)||3))}});return{summary:a.overallSummary||``,keywords:a.keywords||[],items:o}}async function wt(e){let{summary:t,keywords:n,items:r}=await Ct(e,await xt(7)),i=new Date,a=`${i.getFullYear()}년 ${i.getMonth()+1}월 ${Math.ceil(i.getDate()/7)}주차`,o=e.LOOKBOOK_DB,s=(await o.prepare(`INSERT INTO content_digests (period, status, summary, keywords) VALUES (?, 'draft', ?, ?)`).bind(a,t,JSON.stringify(n)).run()).meta.last_row_id;for(let e of r)await o.prepare(`INSERT INTO digest_articles (digest_id, category, title, source, url, published_at, summary, importance)
        VALUES (?,?,?,?,?,?,?,?)`).bind(s,e.category,e.title,e.source,e.url,e.published_at,e.summary,e.importance).run();return{digestId:s,articleCount:r.length}}V.post(`/generate`,async e=>{try{let t=await wt(e.env);return e.json({success:!0,...t})}catch(t){return e.json({success:!1,message:String(t?.message||t)},500)}}),V.get(`/list`,async e=>{let{results:t}=await e.env.LOOKBOOK_DB.prepare(`SELECT d.*, (SELECT COUNT(*) FROM digest_articles a WHERE a.digest_id = d.id AND a.excluded = 0) AS article_count
      FROM content_digests d ORDER BY d.generated_at DESC LIMIT 50`).all();return e.json({success:!0,digests:t})}),V.get(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? ORDER BY importance DESC, id ASC`).bind(t).all();return e.json({success:!0,digest:{...n,keywords:JSON.parse(n.keywords||`[]`)},articles:r})}),V.patch(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.req.json(),r=[],i=[];return n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),n.status!==void 0&&(r.push(`status = ?`),i.push(n.status),n.status===`reviewed`&&r.push(`reviewed_at = datetime('now')`),n.status===`sent`&&r.push(`sent_at = datetime('now')`)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE content_digests SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),V.patch(`/:id/articles/:articleId`,async e=>{let{articleId:t}=e.req.param(),n=await e.req.json(),r=[],i=[];return n.excluded!==void 0&&(r.push(`excluded = ?`),i.push(+!!n.excluded)),n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE digest_articles SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),V.get(`/:id/kakao-text`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? AND excluded = 0 ORDER BY importance DESC, id ASC LIMIT 5`).bind(t).all(),i=[`🧵 EZlook 패션 트렌드 위클리 — ${n.period}`,``,n.summary,``];return r.forEach((e,t)=>{i.push(`${t+1}. [${e.category}] ${e.title}`),i.push(e.summary),e.url&&i.push(`🔗 ${e.url}`),i.push(``)}),i.push(`👉 AI 룩북 무료 체험: https://www.aifashion.co.kr/?utm_source=kakao&utm_medium=channel&utm_campaign=weekly_digest`),e.text(i.join(`
-`))});var Tt=`mu2b0vl6`;function Et(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Dt=e=>e?`
+`))});var Tt=`mu2b4ai9`;function Et(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Dt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3726,6 +3726,11 @@ function filterUsers() {
   loadUsers()
 }
 
+// BFM 관리자로 지정 가능한 후보 이메일 — 이 목록 외 회원에게는 "BFM 관리자 지정"/
+// "비밀번호 설정" 메뉴를 표시하지 않는다(오클릭 방지 목적의 UI 노출 제한일 뿐,
+// 서버(adminAuth)는 공유 관리자 비밀번호를 아는 운영자에게만 열려있음)
+const BFM_ELIGIBLE_EMAILS = ['hhhhongggg@naver.com', 'kim4honey@gmail.com']
+
 function renderUserTable(users) {
   const tbody = document.getElementById('userTableBody')
   if (!users.length) {
@@ -3758,14 +3763,19 @@ function renderUserTable(users) {
     } else if (u.status === 'suspended') {
       statusBtn = '<button data-uid="' + uid + '" data-action="activate" class="btn-sm btn-primary-sm" style="font-size:14.85px;padding:4px 10px;">활성화</button>'
     }
-    // BFM 관리자 지정/해제 — 일반 관리자(admin)에게는 표시하지 않음(이미 전체 권한 보유)
+    // BFM 관리자 지정/해제 — 일반 관리자(admin)에게는 표시하지 않음(이미 전체 권한 보유).
+    // "지정"과 "비밀번호 설정" 메뉴는 실제 BFM 관리자 후보(BFM_ELIGIBLE_EMAILS)에게만
+    // 노출 — 나머지 회원 목록에서는 잘못 클릭할 여지를 없애기 위해 메뉴 자체를 숨긴다.
+    // 이미 bfm_admin으로 지정된 계정의 "해제" 버튼은 후보 목록과 무관하게 항상 표시.
+    var isBfmEligible = BFM_ELIGIBLE_EMAILS.indexOf(String(u.email||'').toLowerCase()) !== -1
     var bfmBtn = isBfmAdmin
       ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="revoke_bfm" class="btn-sm btn-danger-sm" style="font-size:14.85px;padding:4px 10px;">BFM 해제</button>'
-      : (!isAdmin ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="grant_bfm" class="btn-sm" style="font-size:14.85px;padding:4px 10px;background:#22C55E33;border:1px solid #22C55E66;color:#22C55E;">BFM 관리자 지정</button>' : '')
+      : (!isAdmin && isBfmEligible ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="grant_bfm" class="btn-sm" style="font-size:14.85px;padding:4px 10px;background:#22C55E33;border:1px solid #22C55E66;color:#22C55E;">BFM 관리자 지정</button>' : '')
     var deleteBtn = (!isAdmin && !isBfmAdmin) ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||'') + '" data-email="' + escHtml(u.email||'') + '" data-action="delete" class="btn-sm btn-danger-sm" style="font-size:14.85px;padding:4px 10px;">삭제</button>' : ''
     // 카카오/구글 등 소셜 가입 회원도 이메일/비밀번호로 로그인(예: BFM 관리자
-    // 대시보드)할 수 있도록, provider와 무관하게 비밀번호를 직접 설정하는 버튼
-    var pwBtn = '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="set_password" class="btn-sm" style="font-size:14.85px;padding:4px 10px;">비밀번호 설정</button>'
+    // 대시보드)할 수 있도록, provider와 무관하게 비밀번호를 직접 설정하는 버튼 —
+    // 마찬가지로 BFM 관리자 후보에게만 노출
+    var pwBtn = isBfmEligible ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="set_password" class="btn-sm" style="font-size:14.85px;padding:4px 10px;">비밀번호 설정</button>' : ''
     var credits = (u.credits != null) ? u.credits : 0
     return '<tr style="border-bottom:1px solid #1e1e3a;">'
       + '<td style="padding:12px 16px;">'
