@@ -1,22 +1,45 @@
 name: 패션 콘텐츠 다이제스트 주간 자동 생성
 
 # Cloudflare Pages는 Cron Trigger를 지원하지 않아서(운영 배포 실패를 유발했던 원인),
-# 대신 GitHub Actions 스케줄로 운영 API를 호출해 매주 다이제스트를 생성한다.
+# 대신 GitHub Actions 스케줄로 운영 API를 호출해 다이제스트를 생성한다.
+# 월(기사) / 수(검색어트렌드) / 금(쇼핑인사이트) — 요일마다 다른 내용을 생성한다.
 # 실행 결과는 /admin02 "콘텐츠 다이제스트" 탭에서 검토 후 카카오톡 채널에 수동 발행한다.
 
 on:
   schedule:
-    # 매주 월요일 00:00 UTC = 한국시간(KST) 오전 9시
-    - cron: '0 0 * * 1'
-  workflow_dispatch: {} # 수동 실행 버튼 (테스트/즉시 생성용)
+    # 00:00 UTC = 한국시간(KST) 오전 9시
+    - cron: '0 0 * * 1' # 월요일 — 기사
+    - cron: '0 0 * * 3' # 수요일 — 검색어트렌드
+    - cron: '0 0 * * 5' # 금요일 — 쇼핑인사이트
+  workflow_dispatch:
+    inputs:
+      type:
+        description: '생성할 다이제스트 종류'
+        required: true
+        default: news
+        type: choice
+        options: [news, search_trend, shopping_insight]
 
 jobs:
   generate-digest:
     runs-on: ubuntu-latest
     steps:
+      - name: 요일에 맞는 다이제스트 종류 결정
+        id: pick-type
+        run: |
+          if [ -n "${{ inputs.type }}" ]; then
+            echo "type=${{ inputs.type }}" >> "$GITHUB_OUTPUT"
+          else
+            case "$(date -u +%u)" in
+              1) echo "type=news" >> "$GITHUB_OUTPUT" ;;
+              3) echo "type=search_trend" >> "$GITHUB_OUTPUT" ;;
+              5) echo "type=shopping_insight" >> "$GITHUB_OUTPUT" ;;
+              *) echo "type=news" >> "$GITHUB_OUTPUT" ;;
+            esac
+          fi
       - name: 콘텐츠 다이제스트 생성 API 호출
         run: |
-          curl -sS -X POST "https://www.aifashion.co.kr/api/admin/content-digest/generate" \
+          curl -sS -X POST "https://www.aifashion.co.kr/api/admin/content-digest/generate?type=${{ steps.pick-type.outputs.type }}" \
             -H "X-Admin-Password: ${{ secrets.EZLOOK_ADMIN_PASSWORD }}" \
             --fail-with-body \
             --max-time 90
