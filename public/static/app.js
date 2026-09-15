@@ -3084,6 +3084,36 @@ function initSwipeStack(opts) {
       incoming.style.opacity = '1';
       syncBgBlur(incoming);
     }
+    // incoming이 peek 슬롯(prev/next 중 하나)을 비우고 중앙으로 빠져나가는 동안,
+    // 그 자리가 render()로 새 카드가 채워지기 전까지 잠깐 비어 보이는 문제 —
+    // 한 칸 더 바깥에 있던 카드를 화면 밖에서 미리 만들어 같은 시간(ms) 동안
+    // 그 peek 슬롯 자리까지 미끄러져 들어오게 한다. render()가 끝나고 진짜
+    // role-prev/next 카드로 교체될 때는 이미 같은 위치에 도착해 있어 교체가
+    // 눈에 띄지 않는다(incoming과 동일한 FLIP 원리).
+    if (state.items.length > 2) {
+      const farRole = direction > 0 ? 'next' : 'prev';
+      const farItem = state.items[wrapIndex(state.index + direction * 2)];
+      const farCard = cardEl(farItem, farRole);
+      stackArea.appendChild(farCard);
+
+      const farAreaRect = stackArea.getBoundingClientRect();
+      const farRestRect = farCard.getBoundingClientRect(); // 방금 붙어서 이미 CSS 기본(peek 슬롯) 위치/크기
+      const farOutsideX = direction > 0 ? farAreaRect.width * 0.35 : -farAreaRect.width * 0.35;
+
+      farCard.style.transition = 'none';
+      farCard.style.transform = 'none';
+      farCard.style.top = (farRestRect.top - farAreaRect.top) + 'px';
+      farCard.style.left = (farRestRect.left - farAreaRect.left + farOutsideX) + 'px';
+      farCard.style.right = 'auto';
+      farCard.style.width = farRestRect.width + 'px';
+      farCard.style.height = farRestRect.height + 'px';
+      farCard.style.opacity = '0';
+      void farCard.offsetWidth; // 강제 리플로우 — 오프셋 시작 상태를 확정한 뒤 트랜지션이 걸리도록
+
+      farCard.style.transition = `left ${ms}ms ${EASE}, opacity ${ms}ms ${EASE}`;
+      farCard.style.left = (farRestRect.left - farAreaRect.left) + 'px';
+      farCard.style.opacity = '0.78'; // role-prev/next 기본 불투명도와 동일
+    }
     setTimeout(() => {
       state.index = wrapIndex(state.index + direction);
       navigating = false;

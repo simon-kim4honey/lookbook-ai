@@ -1351,7 +1351,12 @@ footer {
 }
 .gapp-logo-ez,
 .gapp-logo-look {
-  background: var(--gapp-gradient, #A78BFA);
+  /* 슬롯/버튼과 동일한 방식(4색 팔레트 + 50% 타일 반복)으로 로고 글자색이
+     천천히 흐르도록 함 */
+  background: var(--gapp-slot-bg-hover, #A78BFA);
+  background-size: 50% 50%;
+  background-repeat: repeat;
+  animation: cslotGradientShift 10s ease infinite;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1748,7 +1753,7 @@ footer {
   50% { background-position: 100% 50%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cslot, .gslide-nav .step-nav-next { animation: none; }
+  .cslot, .gslide-nav .step-nav-next, .gapp-logo-ez, .gapp-logo-look { animation: none; }
 }
 .cslot:hover {
   border-color: var(--gapp-slot-hover-border, rgba(124,58,237,0.35));
