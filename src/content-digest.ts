@@ -386,6 +386,13 @@ digest.get('/debug-trends', async (c) => {
   if (!c.env.NAVER_CLIENT_ID || !c.env.NAVER_CLIENT_SECRET) {
     return c.json({ success: false, error: 'NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다.' })
   }
+  // 일시적 진단용: 시크릿 값에 눈에 안 보이는 공백/줄바꿈이 섞여있는지 확인 (Worker 안에서만 401나는 문제 원인 파악)
+  const envDebug = {
+    clientIdRaw: JSON.stringify(c.env.NAVER_CLIENT_ID),
+    clientIdLength: c.env.NAVER_CLIENT_ID.length,
+    clientSecretRaw: JSON.stringify(c.env.NAVER_CLIENT_SECRET),
+    clientSecretLength: c.env.NAVER_CLIENT_SECRET.length,
+  }
   const { start, end } = trendDateRange()
   const authHeaders = {
     'X-NCP-APIGW-API-KEY-ID': c.env.NAVER_CLIENT_ID,
@@ -417,11 +424,12 @@ digest.get('/debug-trends', async (c) => {
     const [searchText, shoppingText] = await Promise.all([searchRes.text(), shoppingRes.text()])
     return c.json({
       success: true,
+      envDebug,
       searchTrend: { httpStatus: searchRes.status, body: searchText.slice(0, 1500) },
       shoppingInsight: { httpStatus: shoppingRes.status, body: shoppingText.slice(0, 1500) },
     })
   } catch (e: any) {
-    return c.json({ success: false, error: String(e?.message || e) })
+    return c.json({ success: false, envDebug, error: String(e?.message || e) })
   }
 })
 
