@@ -255,14 +255,17 @@ ${list}
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 3000,
+      max_tokens: 8000, // 최신 모델은 기본적으로 확장 사고(thinking)를 함께 생성해서 여유 있게 잡아야 함
       messages: [{ role: 'user', content: prompt }],
     }),
     signal: AbortSignal.timeout(45000),
   })
   if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`)
   const data = await res.json<any>()
-  const text = (data?.content?.[0]?.text || '{}').replace(/^```json\s*|```$/g, '').trim()
+  // content[0]이 항상 텍스트라고 가정하면 안 됨 — 최신 모델은 앞에 thinking 블록을 먼저 넣고
+  // 그 뒤에 실제 답변(text 블록)을 넣는다. type이 'text'인 블록을 찾아야 함.
+  const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
+  const text = (textBlock?.text || '{}').replace(/^```json\s*|```$/g, '').trim()
   const parsed = JSON.parse(text)
 
   const items = (parsed.items || [])
