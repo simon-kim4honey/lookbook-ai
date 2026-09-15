@@ -105,6 +105,104 @@ async function collectArticles(env: DigestBindings, daysBack: number): Promise<R
 }
 
 // ────────────────────────────────────────────────────
+// 검색어트렌드 / 쇼핑인사이트 (네이버 데이터랩 API)
+// 최근 2주치를 주 단위로 조회해서 "직전 주 대비 이번 주" 변화율만 계산한다
+// (절대 검색량이 아니라 상대 비율(ratio)이라 절대 수치는 의미가 없음)
+// https://developers.naver.com/docs/serviceapi/datalab/search/search.md
+// https://developers.naver.com/docs/serviceapi/datalab/shopping/shopping.md
+// ────────────────────────────────────────────────────
+type TrendPoint = { label: string; changePct: number }
+
+function trendDateRange(): { start: string; end: string } {
+  const end = new Date()
+  const start = new Date(end.getTime() - 14 * 24 * 60 * 60 * 1000)
+  const fmt = (d: Date) => d.toISOString().slice(0, 10)
+  return { start: fmt(start), end: fmt(end) }
+}
+
+function computeChangePct(points: Array<{ ratio: number }>): number | null {
+  if (!points || points.length < 2) return null
+  const prev = points[points.length - 2].ratio
+  const cur = points[points.length - 1].ratio
+  if (!prev) return null
+  return Math.round(((cur - prev) / prev) * 1000) / 10
+}
+
+async function fetchSearchTrends(env: DigestBindings, keywords: string[]): Promise<TrendPoint[]> {
+  if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return []
+  const { start, end } = trendDateRange()
+  // 네이버 데이터랩 검색어트렌드 API는 요청당 keywordGroups 최대 5개까지만 허용
+  const batches: string[][] = []
+  for (let i = 0; i < keywords.length; i += 5) batches.push(keywords.slice(i, i + 5))
+
+  const results: TrendPoint[] = []
+  for (const batch of batches) {
+    try {
+      const res = await fetch('https://openapi.naver.com/v1/datalab/search', {
+        method: 'POST',
+        headers: {
+          'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
+          'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          startDate: start,
+          endDate: end,
+          timeUnit: 'week',
+          keywordGroups: batch.map((kw) => ({ groupName: kw, keywords: [kw] })),
+        }),
+        signal: AbortSignal.timeout(12000),
+      })
+      if (!res.ok) continue
+      const data = await res.json<any>()
+      for (const group of data?.results || []) {
+        const changePct = computeChangePct(group.data || [])
+        if (changePct !== null) results.push({ label: group.title, changePct })
+      }
+    } catch {
+      // 이 배치만 건너뛰고 나머지는 계속 시도
+    }
+  }
+  return results
+}
+
+// MVP: 패션의류 대분류 카테고리(네이버 데이터랩 공식 문서 예시 코드) 하나만 조회.
+// 세부 카테고리(여성의류/남성의류 등) 분석은 필요해지면 추가.
+const SHOPPING_CATEGORY = { name: '패션의류', code: '50000000' }
+
+async function fetchShoppingInsight(env: DigestBindings): Promise<TrendPoint[]> {
+  if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return []
+  const { start, end } = trendDateRange()
+  try {
+    const res = await fetch('https://openapi.naver.com/v1/datalab/shopping/categories', {
+      method: 'POST',
+      headers: {
+        'X-Naver-Client-Id': env.NAVER_CLIENT_ID,
+        'X-Naver-Client-Secret': env.NAVER_CLIENT_SECRET,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        startDate: start,
+        endDate: end,
+        timeUnit: 'week',
+        category: [{ name: SHOPPING_CATEGORY.name, param: [SHOPPING_CATEGORY.code] }],
+      }),
+      signal: AbortSignal.timeout(12000),
+    })
+    if (!res.ok) return []
+    const data = await res.json<any>()
+    const out: TrendPoint[] = []
+    for (const group of data?.results || []) {
+      const changePct = computeChangePct(group.data || [])
+      if (changePct !== null) out.push({ label: group.title, changePct })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+// ────────────────────────────────────────────────────
 // Claude로 분류 + 요약 (1회 호출)
 // ────────────────────────────────────────────────────
 const REPORT_CATEGORIES = ['트렌드', '브랜드', '유통', '시장', '글로벌']
@@ -175,7 +273,11 @@ ${list}
 // ────────────────────────────────────────────────────
 export async function runDigestPipeline(env: DigestBindings): Promise<{ digestId: number; articleCount: number }> {
   const articles = await collectArticles(env, 7)
-  const { summary, keywords, items } = await classifyAndSummarize(env, articles)
+  const [{ summary, keywords, items }, searchTrends, shoppingInsight] = await Promise.all([
+    classifyAndSummarize(env, articles),
+    fetchSearchTrends(env, KEYWORDS),
+    fetchShoppingInsight(env),
+  ])
 
   const now = new Date()
   const period = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${Math.ceil(now.getDate() / 7)}주차`
@@ -191,6 +293,12 @@ export async function runDigestPipeline(env: DigestBindings): Promise<{ digestId
       `INSERT INTO digest_articles (digest_id, category, title, source, url, published_at, summary, importance)
        VALUES (?,?,?,?,?,?,?,?)`
     ).bind(digestId, it.category, it.title, it.source, it.url, it.published_at, it.summary, it.importance).run()
+  }
+
+  for (const t of [...searchTrends.map((t) => ({ ...t, type: 'search_trend' })), ...shoppingInsight.map((t) => ({ ...t, type: 'shopping_insight' }))]) {
+    await db.prepare(
+      `INSERT INTO digest_trends (digest_id, type, label, change_pct) VALUES (?,?,?,?)`
+    ).bind(digestId, t.type, t.label, t.changePct).run()
   }
 
   return { digestId, articleCount: items.length }
@@ -238,6 +346,49 @@ digest.get('/debug-news', async (c) => {
   }
 })
 
+// 진단용: 검색어트렌드/쇼핑인사이트 데이터랩 API 원시 응답 직접 확인
+digest.get('/debug-trends', async (c) => {
+  if (!c.env.NAVER_CLIENT_ID || !c.env.NAVER_CLIENT_SECRET) {
+    return c.json({ success: false, error: 'NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다.' })
+  }
+  const { start, end } = trendDateRange()
+  const authHeaders = {
+    'X-Naver-Client-Id': c.env.NAVER_CLIENT_ID,
+    'X-Naver-Client-Secret': c.env.NAVER_CLIENT_SECRET,
+    'Content-Type': 'application/json',
+  }
+  try {
+    const [searchRes, shoppingRes] = await Promise.all([
+      fetch('https://openapi.naver.com/v1/datalab/search', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          startDate: start, endDate: end, timeUnit: 'week',
+          keywordGroups: KEYWORDS.slice(0, 5).map((kw) => ({ groupName: kw, keywords: [kw] })),
+        }),
+        signal: AbortSignal.timeout(12000),
+      }),
+      fetch('https://openapi.naver.com/v1/datalab/shopping/categories', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          startDate: start, endDate: end, timeUnit: 'week',
+          category: [{ name: SHOPPING_CATEGORY.name, param: [SHOPPING_CATEGORY.code] }],
+        }),
+        signal: AbortSignal.timeout(12000),
+      }),
+    ])
+    const [searchText, shoppingText] = await Promise.all([searchRes.text(), shoppingRes.text()])
+    return c.json({
+      success: true,
+      searchTrend: { httpStatus: searchRes.status, body: searchText.slice(0, 1500) },
+      shoppingInsight: { httpStatus: shoppingRes.status, body: shoppingText.slice(0, 1500) },
+    })
+  } catch (e: any) {
+    return c.json({ success: false, error: String(e?.message || e) })
+  }
+})
+
 // ────────────────────────────────────────────────────
 // 조회 / 검토 / 발행 표시
 // ────────────────────────────────────────────────────
@@ -256,7 +407,10 @@ digest.get('/:id', async (c) => {
   const { results: articles } = await c.env.LOOKBOOK_DB.prepare(
     `SELECT * FROM digest_articles WHERE digest_id = ? ORDER BY importance DESC, id ASC`
   ).bind(id).all()
-  return c.json({ success: true, digest: { ...d, keywords: JSON.parse(d.keywords || '[]') }, articles })
+  const { results: trends } = await c.env.LOOKBOOK_DB.prepare(
+    `SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY type, change_pct DESC`
+  ).bind(id).all()
+  return c.json({ success: true, digest: { ...d, keywords: JSON.parse(d.keywords || '[]') }, articles, trends })
 })
 
 digest.patch('/:id', async (c) => {
@@ -297,6 +451,11 @@ digest.get('/:id/kakao-text', async (c) => {
   const { results: articles } = await c.env.LOOKBOOK_DB.prepare(
     `SELECT * FROM digest_articles WHERE digest_id = ? AND excluded = 0 ORDER BY importance DESC, id ASC LIMIT 5`
   ).bind(id).all<any>()
+  const { results: trends } = await c.env.LOOKBOOK_DB.prepare(
+    `SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY type, change_pct DESC`
+  ).bind(id).all<any>()
+
+  const fmtChange = (pct: number) => `${pct > 0 ? '📈+' : pct < 0 ? '📉' : '➖'}${pct}%`
 
   const lines = [
     `🧵 EZlook 패션 트렌드 위클리 — ${d.period}`,
@@ -310,6 +469,20 @@ digest.get('/:id/kakao-text', async (c) => {
     if (a.url) lines.push(`🔗 ${a.url}`)
     lines.push('')
   })
+
+  const searchTrends = trends.filter((t: any) => t.type === 'search_trend').slice(0, 3)
+  if (searchTrends.length) {
+    lines.push('🔎 이번 주 검색어트렌드 (전주 대비)')
+    searchTrends.forEach((t: any) => lines.push(`- ${t.label} ${fmtChange(t.change_pct)}`))
+    lines.push('')
+  }
+  const shoppingInsight = trends.filter((t: any) => t.type === 'shopping_insight')
+  if (shoppingInsight.length) {
+    lines.push('🛍️ 쇼핑인사이트 (전주 대비)')
+    shoppingInsight.forEach((t: any) => lines.push(`- ${t.label} ${fmtChange(t.change_pct)}`))
+    lines.push('')
+  }
+
   lines.push('👉 AI 룩북 무료 체험: https://www.aifashion.co.kr/?utm_source=kakao&utm_medium=channel&utm_campaign=weekly_digest')
 
   return c.text(lines.join('\n'))
