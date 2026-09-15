@@ -214,8 +214,9 @@ digest.post('/generate', async (c) => {
 // (Cloudflare 로그 접근 없이도 원인 파악 가능하게)
 // ────────────────────────────────────────────────────
 digest.get('/debug-rss', async (c) => {
+  const rawUrl = c.req.query('url')
   const keyword = c.req.query('kw') || KEYWORDS[0]
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`
+  const url = rawUrl || `https://news.google.com/rss/search?q=${encodeURIComponent(keyword)}&hl=ko&gl=KR&ceid=KR:ko`
   try {
     const res = await fetch(url, {
       headers: {
