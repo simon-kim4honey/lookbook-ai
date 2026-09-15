@@ -2702,6 +2702,9 @@ app.delete('/api/admin/users/:id', adminAuth, async (c) => {
 // role='bfm_admin'은 /admin02(운영자 전체 관리자)에서 "BFM 관리자 지정"
 // 버튼으로만 부여할 수 있다.
 // ────────────────────────────────────────────────────
+// BFM회원 결제금액 중 BFM에 지급 예정인 수수료율 (20%)
+const BFM_COMMISSION_RATE = 0.2
+
 const bfmAdminAuth = async (c: any, next: any) => {
   const db = c.env.LOOKBOOK_DB
   const token = c.req.header('X-Session-Token') || ''
@@ -2746,10 +2749,19 @@ app.get('/api/bfm/members', bfmAdminAuth, async (c) => {
     const limit = Math.max(1, Math.min(50, parseInt(c.req.query('limit') || '20')))
     const offset = (page - 1) * limit
     const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM users WHERE referrer = 'BFM회원'`).first()
+    // total_paid: 결제완료(status='paid')된 금액 합계. BFM수익은 이 합계의 20% —
+    // BFM회원 추천으로 발생한 매출 중 BFM에 지급 예정인 금액(참고용 표시일 뿐,
+    // 실제 지급 처리는 이 화면에서 하지 않음).
     const members = await db.prepare(
-      `SELECT id, name, email, credits, status, created_at FROM users WHERE referrer = 'BFM회원' ORDER BY created_at DESC LIMIT ? OFFSET ?`
+      `SELECT u.id, u.name, u.email, u.credits, u.status, u.created_at,
+              COALESCE((SELECT SUM(amount) FROM payment_logs WHERE user_id = u.id AND status = 'paid'), 0) AS total_paid
+       FROM users u WHERE u.referrer = 'BFM회원' ORDER BY u.created_at DESC LIMIT ? OFFSET ?`
     ).bind(limit, offset).all()
-    return c.json({ success: true, members: members.results, total: total?.cnt || 0, page, limit })
+    const withRevenue = (members.results || []).map((m: any) => ({
+      ...m,
+      bfm_revenue: Math.round((m.total_paid || 0) * BFM_COMMISSION_RATE),
+    }))
+    return c.json({ success: true, members: withRevenue, total: total?.cnt || 0, page, limit })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -9978,7 +9990,7 @@ app.get('/bfm-admin', (c) => {
       <div class="card rounded-2xl overflow-hidden">
         <table>
           <thead>
-            <tr><th>이름</th><th>이메일</th><th>보유크레딧</th><th>상태</th><th>가입일</th><th></th></tr>
+            <tr><th>이름</th><th>이메일</th><th>보유크레딧</th><th>상태</th><th>가입일</th><th>총 결제금액</th><th>BFM수익(20%)</th><th></th></tr>
           </thead>
           <tbody id="memberTbody"></tbody>
         </table>
@@ -10060,7 +10072,7 @@ app.get('/bfm-admin', (c) => {
       const statusLabel = { active: '활성', suspended: '정지', deleted: '삭제됨' };
       const tbody = document.getElementById('memberTbody');
       if (!members.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-gray-400 py-8">BFM 추천 회원이 없습니다.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-400 py-8">BFM 추천 회원이 없습니다.</td></tr>';
       } else {
         tbody.innerHTML = members.map(function (m) {
           return '<tr>'
@@ -10069,6 +10081,8 @@ app.get('/bfm-admin', (c) => {
             + '<td class="font-semibold text-blue-600">' + (m.credits ?? 0) + '</td>'
             + '<td>' + (statusLabel[m.status] || m.status) + '</td>'
             + '<td class="text-gray-500">' + (m.created_at ? m.created_at.slice(0, 10) : '-') + '</td>'
+            + '<td>' + Number(m.total_paid || 0).toLocaleString() + '원</td>'
+            + '<td class="font-semibold text-green-600">' + Number(m.bfm_revenue || 0).toLocaleString() + '원</td>'
             + '<td><button class="text-blue-600 underline text-xs btn" onclick="openPayments(\\'' + m.id + '\\', \\'' + (m.name || m.email).replace(/'/g, '') + '\\')">결제내역</button></td>'
             + '</tr>';
         }).join('');
