@@ -385,6 +385,55 @@ digest.get('/debug-news', async (c) => {
   }
 })
 
+// 진단용: classifyAndSummarize()가 실제로 호출하는 Claude API의 원본 응답을 그대로 보여준다
+digest.get('/debug-classify', async (c) => {
+  if (!c.env.ANTHROPIC_API_KEY) {
+    return c.json({ success: false, error: 'ANTHROPIC_API_KEY가 설정되지 않았습니다.' })
+  }
+  const articles = await collectArticles(c.env, 7)
+  const list = articles.map((a, i) => `${i + 1}. [${a.source || '출처미상'}] ${a.title}`).join('\n')
+  const prompt = `당신은 국내 중소 패션 브랜드를 위한 패션 산업 뉴스 큐레이터입니다.
+아래는 최근 수집된 패션 관련 뉴스 제목 목록입니다. 이 중에서 국내 중소 패션 브랜드 운영자가 알아두면 좋을 기사를 최대 8개 선별하고, 카카오톡 채널 메시지로 보낼 수 있게 정리해주세요.
+
+규칙:
+- 카테고리는 반드시 "트렌드"|"브랜드"|"유통"|"시장"|"글로벌" 중 하나
+- 각 기사 summary는 2문장 이내, 실무자가 바로 이해할 수 있는 쉬운 표현
+- importance는 1~5 정수 (중소 브랜드 실무 관련성 기준)
+- overallSummary는 이번 주 전체를 아우르는 3~4문장 요약 (카톡 메시지 인트로용)
+- keywords는 이번 주 핵심 키워드 5~8개
+
+기사 목록:
+${list}
+
+원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이):
+{"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': c.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 3000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: AbortSignal.timeout(45000),
+    })
+    const rawText = await res.text()
+    return c.json({
+      success: true,
+      articleCount: articles.length,
+      httpStatus: res.status,
+      rawBodyPreview: rawText.slice(0, 2000),
+    })
+  } catch (e: any) {
+    return c.json({ success: false, articleCount: articles.length, error: String(e?.message || e) })
+  }
+})
+
 // 진단용: 실제 "기사 생성"이 쓰는 collectArticles() 경로를 그대로 돌려서
 // 키워드별로 몇 건 나왔고, 날짜 필터 전/후로 몇 건이 남는지 그대로 보여준다.
 digest.get('/debug-collect', async (c) => {
