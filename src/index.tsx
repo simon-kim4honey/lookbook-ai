@@ -8644,6 +8644,11 @@ function filterUsers() {
   loadUsers()
 }
 
+// BFM 관리자로 지정 가능한 후보 이메일 — 이 목록 외 회원에게는 "BFM 관리자 지정"/
+// "비밀번호 설정" 메뉴를 표시하지 않는다(오클릭 방지 목적의 UI 노출 제한일 뿐,
+// 서버(adminAuth)는 공유 관리자 비밀번호를 아는 운영자에게만 열려있음)
+const BFM_ELIGIBLE_EMAILS = ['hhhhongggg@naver.com', 'kim4honey@gmail.com']
+
 function renderUserTable(users) {
   const tbody = document.getElementById('userTableBody')
   if (!users.length) {
@@ -8676,14 +8681,19 @@ function renderUserTable(users) {
     } else if (u.status === 'suspended') {
       statusBtn = '<button data-uid="' + uid + '" data-action="activate" class="btn-sm btn-primary-sm" style="font-size:14.85px;padding:4px 10px;">활성화</button>'
     }
-    // BFM 관리자 지정/해제 — 일반 관리자(admin)에게는 표시하지 않음(이미 전체 권한 보유)
+    // BFM 관리자 지정/해제 — 일반 관리자(admin)에게는 표시하지 않음(이미 전체 권한 보유).
+    // "지정"과 "비밀번호 설정" 메뉴는 실제 BFM 관리자 후보(BFM_ELIGIBLE_EMAILS)에게만
+    // 노출 — 나머지 회원 목록에서는 잘못 클릭할 여지를 없애기 위해 메뉴 자체를 숨긴다.
+    // 이미 bfm_admin으로 지정된 계정의 "해제" 버튼은 후보 목록과 무관하게 항상 표시.
+    var isBfmEligible = BFM_ELIGIBLE_EMAILS.indexOf(String(u.email||'').toLowerCase()) !== -1
     var bfmBtn = isBfmAdmin
       ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="revoke_bfm" class="btn-sm btn-danger-sm" style="font-size:14.85px;padding:4px 10px;">BFM 해제</button>'
-      : (!isAdmin ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="grant_bfm" class="btn-sm" style="font-size:14.85px;padding:4px 10px;background:#22C55E33;border:1px solid #22C55E66;color:#22C55E;">BFM 관리자 지정</button>' : '')
+      : (!isAdmin && isBfmEligible ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="grant_bfm" class="btn-sm" style="font-size:14.85px;padding:4px 10px;background:#22C55E33;border:1px solid #22C55E66;color:#22C55E;">BFM 관리자 지정</button>' : '')
     var deleteBtn = (!isAdmin && !isBfmAdmin) ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||'') + '" data-email="' + escHtml(u.email||'') + '" data-action="delete" class="btn-sm btn-danger-sm" style="font-size:14.85px;padding:4px 10px;">삭제</button>' : ''
     // 카카오/구글 등 소셜 가입 회원도 이메일/비밀번호로 로그인(예: BFM 관리자
-    // 대시보드)할 수 있도록, provider와 무관하게 비밀번호를 직접 설정하는 버튼
-    var pwBtn = '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="set_password" class="btn-sm" style="font-size:14.85px;padding:4px 10px;">비밀번호 설정</button>'
+    // 대시보드)할 수 있도록, provider와 무관하게 비밀번호를 직접 설정하는 버튼 —
+    // 마찬가지로 BFM 관리자 후보에게만 노출
+    var pwBtn = isBfmEligible ? '<button data-uid="' + uid + '" data-name="' + escHtml(u.name||u.email||'') + '" data-action="set_password" class="btn-sm" style="font-size:14.85px;padding:4px 10px;">비밀번호 설정</button>' : ''
     var credits = (u.credits != null) ? u.credits : 0
     return '<tr style="border-bottom:1px solid #1e1e3a;">'
       + '<td style="padding:12px 16px;">'
