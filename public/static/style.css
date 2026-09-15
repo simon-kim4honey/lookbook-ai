@@ -1351,14 +1351,7 @@ footer {
 }
 .gapp-logo-ez,
 .gapp-logo-look {
-  /* 슬롯/버튼과 동일한 방식(4색 팔레트 + 가로 타일 반복)으로 로고 글자색이
-     천천히 흐르도록 함. 가로세로 모두(50% 50%)로 타일링하면 격자무늬처럼
-     여러 조각으로 쪼개져 보이므로, 세로는 박스 높이에 맞춰 한 장만(반복
-     없이) 채우고 가로로만 반복시켜 부드럽게 흐르는 느낌을 유지한다. */
-  background: var(--gapp-slot-bg-hover, #A78BFA);
-  background-size: 50% 100%;
-  background-repeat: repeat-x;
-  animation: cslotGradientShift 10s ease infinite;
+  background: var(--gapp-gradient, #A78BFA);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1759,7 +1752,7 @@ footer {
   50% { background-position: 100% 50%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cslot, .gslide-nav .step-nav-next, .gapp-logo-ez, .gapp-logo-look { animation: none; }
+  .cslot, .gslide-nav .step-nav-next { animation: none; }
 }
 .cslot:hover {
   border-color: var(--gapp-slot-hover-border, rgba(124,58,237,0.35));
