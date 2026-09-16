@@ -127,7 +127,6 @@ const I18N = {
         ? '상의/하의를 이미 업로드해서 전체는 사용할 수 없어요. 전체를 쓰려면 상의/하의를 먼저 삭제해주세요.'
         : '전체를 이미 업로드해서 상의/하의는 사용할 수 없어요. 상의/하의를 쓰려면 전체를 먼저 삭제해주세요.';
     },
-    slotLockedHint: (cat) => cat === 'DRESS' ? '상의/하의 업로드 시 사용 불가' : '전체 업로드 시 사용 불가',
     validatingClothing: '이미지 확인 중...',
     genAnalysisErr: '이미지 분석 오류입니다. 상품을 다시 업로드해주세요.',
     // 모델/배경
@@ -217,7 +216,6 @@ const I18N = {
         ? "You've already uploaded a top/bottom, so full outfit is unavailable. Remove the top/bottom first to use this slot."
         : "You've already uploaded a full outfit, so top/bottom are unavailable. Remove the full outfit first to use this slot.";
     },
-    slotLockedHint: (cat) => cat === 'DRESS' ? 'Unavailable while top/bottom is uploaded' : 'Unavailable while full outfit is uploaded',
     validatingClothing: 'Checking image...',
     genAnalysisErr: 'Image analysis error. Please re-upload your product photo.',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">No models registered</p><p style="font-size:12px;margin-top:4px">Please register models in the admin page</p>',
@@ -301,7 +299,6 @@ const I18N = {
         ? 'トップス/ボトムスを既にアップロードしているため、ワンピース/セットは使用できません。先にトップス/ボトムスを削除してください。'
         : 'ワンピース/セットを既にアップロードしているため、トップス/ボトムスは使用できません。先にワンピース/セットを削除してください。';
     },
-    slotLockedHint: (cat) => cat === 'DRESS' ? 'トップス/ボトムスアップロード時は使用不可' : 'ワンピース/セットアップロード時は使用不可',
     validatingClothing: '画像を確認中...',
     genAnalysisErr: '画像分析エラーです。商品画像を再アップロードしてください。',
     noModels: '<div style="font-size:40px;margin-bottom:12px">👤</div><p style="font-weight:700">モデルが登録されていません</p><p style="font-size:12px;margin-top:4px">管理ページでモデルを登録してください</p>',
@@ -2741,7 +2738,6 @@ function renderSlots() {
       body.innerHTML = `
         <span class="cslot-empty">
           <span class="cslot-plus cslot-lock-icon"><i class="fas fa-lock"></i></span>
-          <span class="cslot-hint">${t('slotLockedHint', cat)}</span>
         </span>`;
       if (removeBtn) removeBtn.classList.add('hidden');
       return;
