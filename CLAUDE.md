@@ -51,22 +51,34 @@ hasModel && hasBg` 분기)은 실제 AI 생성 결과물의 품질을 직접 좌
 
 ## 사용자 에러 자동 감지/유지보수 루틴
 
-`error_logs` D1 테이블(`migrations/0024_error_logs.sql`)에 클라이언트(브라우저
-`window.onerror`/`unhandledrejection` → `POST /api/errors/report`, 인증 없음)와
-서버(`/api/generation/start` 등 개별 catch 블록 + 전역 `app.onError`) 양쪽 에러가
-자동 기록된다. `/admin02`의 "에러 로그" 탭(`GET/PATCH /api/admin/errors*`, 헤더
-`X-Admin-Password`)에서 확인 가능하고, status는 `open → in_review(수정 PR 대기)
-→ resolved` 순으로 사람이 직접 바꾸거나 유지보수 세션이 PATCH로 바꾼다.
+`error_logs` D1 테이블(`migrations/0024_error_logs.sql`, `0025_error_logs_github_issue.sql`)에
+클라이언트(브라우저 `window.onerror`/`unhandledrejection` → `POST /api/errors/report`,
+인증 없음)와 서버(`/api/generation/start` 등 개별 catch 블록 + 전역 `app.onError`)
+양쪽 에러가 자동 기록된다. `/admin02`의 "에러 로그" 탭(`GET/PATCH /api/admin/errors*`,
+헤더 `X-Admin-Password`)에서 확인 가능하고, status는 `open → in_review(수정 PR 대기)
+→ resolved` 순으로 사람이 직접 바꾼다.
 
-별도의 **"EZlook 유지보수" 세션**이 매시간 Routine으로 깨어나(30분 주기를 시도했으나
-플랫폼 최소 간격이 1시간이라 조정됨) 스테이징 관리자
-API를 `X-Maint-Token`(전용 시크릿, `ADMIN_PASSWORD`와 분리)으로 조회해 `open` 에러를
-진단하고, 수정 브랜치+PR을 만든 뒤 해당 에러를 `in_review`로 바꾼다. **절대 스스로
-`main`에 배포하지 않는다** — 실제 배포는 항상 사람이 PR을 확인한 뒤 기존 승격
-절차(아래 배포 워크플로)를 따른다. `MAINT_API_TOKEN`은
-`wrangler secret put MAINT_API_TOKEN`으로 스테이징/운영 양쪽에 설정해야 하며(D1
-마이그레이션과 마찬가지로 샌드박스 세션은 직접 실행 불가), 값이 없으면 이 엔드포인트는
-`ADMIN_PASSWORD`만 허용한다.
+**중요 — 아키텍처가 한 번 바뀌었다:** 처음엔 별도의 "EZlook 유지보수" 세션이 매시간
+스테이징 관리자 API를 `X-Maint-Token`으로 직접 폴링하는 방식으로 설계했는데,
+그 세션이 실행되는 샌드박스 환경의 아웃바운드 네트워크 정책이 `*.pages.dev`
+같은 임의 사이트 접속 자체를 막고 있어서(계정 설정으로도 못 고침이 확인됨) 동작하지
+않았다. 그래서 **에러 발생 시 서버(Worker, 아웃바운드 제한 없음)가 직접 GitHub
+이슈를 생성**하고, 유지보수 세션은 GitHub 이슈만 확인하는 방식으로 전환했다
+(GitHub API 호출은 세션 쪽에서 별도 경로라 정상 동작 확인됨).
+
+- `logError()`가 에러를 기록할 때마다 `findOrCreateGithubIssue()`를 호출해
+  `GITHUB_TOKEN`(레포 Issues 권한 fine-grained PAT)으로 `auto-error` 라벨을 붙인
+  이슈를 생성하고, 생성된 URL을 `error_logs.github_issue_url`에 저장한다.
+  같은 message+route로 24시간 내 이미 만든 이슈가 있으면 재사용(도배 방지).
+  `GITHUB_TOKEN` 미설정 시 이슈 생성만 조용히 건너뛰고 D1 로깅은 계속된다.
+- **"EZlook 유지보수" 세션**이 매시간 Routine으로 깨어나(30분 주기를 시도했으나
+  플랫폼 최소 간격이 1시간이라 조정됨) `auto-error` 라벨이 붙은 열린 GitHub
+  이슈를 확인 → 진단 → 수정 브랜치+PR(→ `develop`)을 만들고 이슈에 코멘트로
+  PR 링크를 남긴다. **절대 스스로 `main`에 배포하거나 이슈를 직접 닫지 않는다**
+  — 실제 배포 확인 후 이슈를 닫는 것도 사람이 한다.
+- `MAINT_API_TOKEN`/`X-Maint-Token` 관련 코드(`errorsAuth`)는 남아있지만 더 이상
+  자동화에 필수는 아니다 — 나중에 네트워크 정책이 풀리면 재사용할 수 있어 그대로
+  둔 것뿐, 새로 설정할 필요는 없다.
 
 ## 배포 워크플로
 
