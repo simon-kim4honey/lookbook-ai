@@ -358,7 +358,9 @@ Country: ${country}`
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 2000, // 최신 모델은 기본적으로 확장 사고(thinking)를 함께 생성해서 여유 있게 잡아야 함
+      // Sonnet 5는 명시하지 않으면 기본으로 적응형 사고가 켜진 채 실행되어 토큰을 잡아먹는다
+      thinking: { type: 'disabled' },
+      max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
     }),
   })
@@ -477,7 +479,7 @@ async function claudeDraft(env: LeadBindings, lang: 'ko' | 'en' | 'ja', brandNam
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
+    body: JSON.stringify({ model: 'claude-sonnet-5', thinking: { type: 'disabled' }, max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
   })
   if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status}`)
   const data = await res.json<any>()

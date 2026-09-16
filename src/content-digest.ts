@@ -243,7 +243,7 @@ async function classifyAndSummarize(env: DigestBindings, articles: RawArticle[])
 기사 목록:
 ${list}
 
-원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이):
+원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -255,13 +255,21 @@ ${list}
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 8000, // 최신 모델은 기본적으로 확장 사고(thinking)를 함께 생성해서 여유 있게 잡아야 함
+      // Sonnet 5는 thinking을 명시하지 않으면 기본으로 적응형 사고(thinking)가 켜진 채
+      // 실행되어 max_tokens 예산을 상당 부분 잡아먹는다 — JSON 응답만 필요하므로 꺼둔다.
+      thinking: { type: 'disabled' },
+      // 주의: max_tokens를 너무 높게 잡으면 이 API 키의 사용량 등급 기준 요청당 상한을
+      // 넘겨서 HTTP 403 "forbidden"으로 거부당한다 (실측: 3000은 통과, 4096/8000은 거부됨).
+      max_tokens: 3000,
       messages: [{ role: 'user', content: prompt }],
     }),
     signal: AbortSignal.timeout(45000),
   })
   if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`)
   const data = await res.json<any>()
+  if (data?.stop_reason === 'max_tokens') {
+    throw new Error('Claude API 응답이 max_tokens 제한으로 중간에 잘렸습니다. max_tokens를 늘려야 합니다.')
+  }
   // content[0]이 항상 텍스트라고 가정하면 안 됨 — 최신 모델은 앞에 thinking 블록을 먼저 넣고
   // 그 뒤에 실제 답변(text 블록)을 넣는다. type이 'text'인 블록을 찾아야 함.
   const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
@@ -296,6 +304,31 @@ function currentPeriod(): string {
   return `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${Math.ceil(now.getDate() / 7)}주차`
 }
 
+// 오르내림 상위 품목을 뽑아 실무자가 바로 판단할 수 있는 한 문장 인사이트를 만든다
+// (Claude 호출 없이 결정론적으로 계산 — 검색어트렌드/쇼핑인사이트는 이미 숫자 자체가
+// 명확해서 별도 AI 해석 없이도 "무엇을 해야 하는지"가 나온다)
+function buildTrendInsight(type: 'search_trend' | 'shopping_insight', trends: TrendPoint[]): string {
+  const metricLabel = type === 'search_trend' ? '검색 관심도' : '구매 클릭'
+  if (!trends.length) return `이번 주 ${type === 'search_trend' ? '검색어트렌드' : '쇼핑인사이트'} 데이터를 가져오지 못했습니다.`
+
+  const sorted = [...trends].sort((a, b) => b.changePct - a.changePct)
+  const risers = sorted.filter((t) => t.changePct > 0)
+  const fallers = sorted.filter((t) => t.changePct < 0).slice(-2).reverse()
+
+  const fmt = (t: TrendPoint) => `${t.label}(${t.changePct > 0 ? '+' : ''}${t.changePct}%)`
+  const topRisers = risers.slice(0, 3).map(fmt).join(', ')
+  const topFallers = fallers.map(fmt).join(', ')
+
+  let insight = topRisers
+    ? `이번 주 ${metricLabel}는 ${topRisers}이 가장 크게 올랐습니다.`
+    : `이번 주 ${metricLabel}는 오른 품목이 없습니다.`
+  if (topFallers) insight += ` 반대로 ${topFallers}는 하락세입니다.`
+  insight += type === 'search_trend'
+    ? ' 오르는 품목 위주로 콘텐츠·마케팅 노출을 늘려보세요.'
+    : ' 클릭이 느는 품목은 재고·프로모션을 우선 챙길 타이밍입니다.'
+  return insight
+}
+
 // 월: 기사(news), 수: 검색어트렌드(search_trend), 금: 쇼핑인사이트(shopping_insight) —
 // 요일별로 서로 다른 내용의 다이제스트를 만든다 (하나로 합치면 카톡 메시지가 너무 길어짐)
 export async function runDigestPipeline(env: DigestBindings, type: DigestType = 'news'): Promise<{ digestId: number; articleCount: number }> {
@@ -307,10 +340,7 @@ export async function runDigestPipeline(env: DigestBindings, type: DigestType = 
       ? await fetchSearchTrends(env, ITEM_KEYWORDS)
       : await fetchShoppingInsight(env, ITEM_KEYWORDS)
 
-    const label = type === 'search_trend' ? '검색어트렌드' : '쇼핑인사이트'
-    const summary = trends.length
-      ? `이번 주 ${label} — 품목별 전주 대비 변화율입니다.`
-      : `이번 주 ${label} 데이터를 가져오지 못했습니다.`
+    const summary = buildTrendInsight(type, trends)
 
     const insertDigest = await db.prepare(
       `INSERT INTO content_digests (period, status, summary, keywords, type) VALUES (?, 'draft', ?, '[]', ?)`
@@ -386,6 +416,74 @@ digest.get('/debug-news', async (c) => {
   } catch (e: any) {
     return c.json({ success: false, keyword, url, error: String(e?.message || e) })
   }
+})
+
+// 진단용: classifyAndSummarize()가 실제로 호출하는 Claude API의 원본 응답을 그대로 보여준다
+digest.get('/debug-classify', async (c) => {
+  if (!c.env.ANTHROPIC_API_KEY) {
+    return c.json({ success: false, error: 'ANTHROPIC_API_KEY가 설정되지 않았습니다.' })
+  }
+  const articles = await collectArticles(c.env, 7)
+  const list = articles.map((a, i) => `${i + 1}. [${a.source || '출처미상'}] ${a.title}`).join('\n')
+  const prompt = `당신은 국내 중소 패션 브랜드를 위한 패션 산업 뉴스 큐레이터입니다.
+아래는 최근 수집된 패션 관련 뉴스 제목 목록입니다. 이 중에서 국내 중소 패션 브랜드 운영자가 알아두면 좋을 기사를 최대 8개 선별하고, 카카오톡 채널 메시지로 보낼 수 있게 정리해주세요.
+
+규칙:
+- 카테고리는 반드시 "트렌드"|"브랜드"|"유통"|"시장"|"글로벌" 중 하나
+- 각 기사 summary는 2문장 이내, 실무자가 바로 이해할 수 있는 쉬운 표현
+- importance는 1~5 정수 (중소 브랜드 실무 관련성 기준)
+- overallSummary는 이번 주 전체를 아우르는 3~4문장 요약 (카톡 메시지 인트로용)
+- keywords는 이번 주 핵심 키워드 5~8개
+
+기사 목록:
+${list}
+
+원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
+{"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': c.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        thinking: { type: 'disabled' },
+        max_tokens: 3000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: AbortSignal.timeout(45000),
+    })
+    const rawText = await res.text()
+    let usage = null
+    try { usage = JSON.parse(rawText)?.usage ?? null } catch {}
+    return c.json({
+      success: true,
+      articleCount: articles.length,
+      httpStatus: res.status,
+      usage,
+      rawBodyPreview: rawText.slice(0, 2000),
+    })
+  } catch (e: any) {
+    return c.json({ success: false, articleCount: articles.length, error: String(e?.message || e) })
+  }
+})
+
+// 진단용: 실제 "기사 생성"이 쓰는 collectArticles() 경로를 그대로 돌려서
+// 키워드별로 몇 건 나왔고, 날짜 필터 전/후로 몇 건이 남는지 그대로 보여준다.
+digest.get('/debug-collect', async (c) => {
+  const perKeyword = await Promise.all(
+    KEYWORDS.map(async (kw) => ({ keyword: kw, count: (await fetchNewsFromNaver(c.env, kw, 12)).length }))
+  )
+  const collected = await collectArticles(c.env, 7)
+  return c.json({
+    success: true,
+    perKeyword,
+    afterDedupeAndDateFilter: collected.length,
+    sample: collected.slice(0, 3),
+  })
 })
 
 // 진단용: 검색어트렌드/쇼핑인사이트 데이터랩 API 원시 응답 직접 확인
