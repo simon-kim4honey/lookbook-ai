@@ -1553,6 +1553,14 @@ footer {
   border-top: 1px solid var(--gapp-border, #E5E8EB);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  /* 모델선택 단계에서 "다음 단계" 버튼이 깜빡인다는 리포트 — 이 바로 안에
+     계속 움직이는 그라데이션 애니메이션(.step-nav-next의 cslotAurora)이
+     있는데, backdrop-filter를 쓰는 부모가 별도 GPU 레이어로 고정되어 있지
+     않으면 iOS Safari에서 내부 애니메이션이 리페인트될 때마다 블러 레이어가
+     같이 다시 계산되며 순간적으로 깜빡이는 게 잘 알려진 WebKit 버그다.
+     translateZ(0)로 이 요소를 독립된 컴포지팅 레이어로 승격시켜 분리한다. */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 /* nav 내부 컨테이너: 최대 480px, 이전/다음 버튼이 상단 슬롯 두 칸과 동일한 폭으로 맞춰짐 */
 .gslide-nav-inner {
@@ -1588,10 +1596,15 @@ footer {
   color: #fff !important;
   box-shadow: 0 4px 16px var(--gapp-glow, rgba(49,130,246,0.4)) !important;
   border-radius: 14px !important;
+  /* 버튼 자신도 별도 GPU 레이어로 승격 — 부모(.gslide-nav)의 backdrop-filter
+     블러 레이어와 이 버튼의 계속되는 배경 애니메이션이 서로 다른 레이어에서
+     독립적으로 처리되도록 분리한다(위 .gslide-nav 주석 참고). */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 .gslide-nav .step-nav-next:hover {
   filter: brightness(1.08);
-  transform: translateY(-1px);
+  transform: translateY(-1px) translateZ(0);
   box-shadow: 0 6px 20px var(--gapp-glow, rgba(49,130,246,0.5)) !important;
 }
 .gslide-nav .step-nav-next:disabled {
@@ -2946,7 +2959,7 @@ footer {
   box-shadow: 0 4px 12px rgba(49,130,246,0.3);
 }
 .step-nav-next:hover:not(:disabled) { background: var(--primary-light); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(49,130,246,0.4); }
-.step-nav-next:active:not(:disabled) { transform: scale(0.96) translateY(1px) !important; box-shadow: none !important; filter: brightness(0.9); }
+.step-nav-next:active:not(:disabled) { transform: scale(0.96) translateY(1px) translateZ(0) !important; box-shadow: none !important; filter: brightness(0.9); }
 .step-nav-next:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 /* Toast Notifications */
