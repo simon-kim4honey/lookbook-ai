@@ -58,7 +58,8 @@ hasModel && hasBg` 분기)은 실제 AI 생성 결과물의 품질을 직접 좌
 `X-Admin-Password`)에서 확인 가능하고, status는 `open → in_review(수정 PR 대기)
 → resolved` 순으로 사람이 직접 바꾸거나 유지보수 세션이 PATCH로 바꾼다.
 
-별도의 **"EZlook 유지보수" 세션**이 30분 주기 Routine으로 깨어나 스테이징 관리자
+별도의 **"EZlook 유지보수" 세션**이 매시간 Routine으로 깨어나(30분 주기를 시도했으나
+플랫폼 최소 간격이 1시간이라 조정됨) 스테이징 관리자
 API를 `X-Maint-Token`(전용 시크릿, `ADMIN_PASSWORD`와 분리)으로 조회해 `open` 에러를
 진단하고, 수정 브랜치+PR을 만든 뒤 해당 에러를 `in_review`로 바꾼다. **절대 스스로
 `main`에 배포하지 않는다** — 실제 배포는 항상 사람이 PR을 확인한 뒤 기존 승격
