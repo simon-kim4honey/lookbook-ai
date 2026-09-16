@@ -243,7 +243,7 @@ async function classifyAndSummarize(env: DigestBindings, articles: RawArticle[])
 기사 목록:
 ${list}
 
-원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이):
+원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -255,6 +255,9 @@ ${list}
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
+      // Sonnet 5는 thinking을 명시하지 않으면 기본으로 적응형 사고(thinking)가 켜진 채
+      // 실행되어 max_tokens 예산을 상당 부분 잡아먹는다 — JSON 응답만 필요하므로 꺼둔다.
+      thinking: { type: 'disabled' },
       // 주의: max_tokens를 너무 높게 잡으면 이 API 키의 사용량 등급 기준 요청당 상한을
       // 넘겨서 HTTP 403 "forbidden"으로 거부당한다 (실측: 3000은 통과, 4096/8000은 거부됨).
       max_tokens: 3000,
@@ -413,7 +416,7 @@ digest.get('/debug-classify', async (c) => {
 기사 목록:
 ${list}
 
-원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이):
+원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -425,16 +428,20 @@ ${list}
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
+        thinking: { type: 'disabled' },
         max_tokens: 3000,
         messages: [{ role: 'user', content: prompt }],
       }),
       signal: AbortSignal.timeout(45000),
     })
     const rawText = await res.text()
+    let usage = null
+    try { usage = JSON.parse(rawText)?.usage ?? null } catch {}
     return c.json({
       success: true,
       articleCount: articles.length,
       httpStatus: res.status,
+      usage,
       rawBodyPreview: rawText.slice(0, 2000),
     })
   } catch (e: any) {
