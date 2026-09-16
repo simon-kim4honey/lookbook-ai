@@ -255,10 +255,9 @@ ${list}
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      // 주의: max_tokens를 너무 높게 잡으면(예: 8000) 이 API 키의 사용량 등급 기준
-      // 요청당 상한을 넘겨서 HTTP 403 "forbidden"으로 거부당한다 (3000은 통과, 8000은 거부됨을
-      // 실측으로 확인). 4096은 여러 API에서 흔히 쓰는 안전한 상한이라 우선 이 값으로 둔다.
-      max_tokens: 4096,
+      // 주의: max_tokens를 너무 높게 잡으면 이 API 키의 사용량 등급 기준 요청당 상한을
+      // 넘겨서 HTTP 403 "forbidden"으로 거부당한다 (실측: 3000은 통과, 4096/8000은 거부됨).
+      max_tokens: 3000,
       messages: [{ role: 'user', content: prompt }],
     }),
     signal: AbortSignal.timeout(45000),
@@ -426,7 +425,7 @@ ${list}
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 4096,
+        max_tokens: 3000,
         messages: [{ role: 'user', content: prompt }],
       }),
       signal: AbortSignal.timeout(45000),
