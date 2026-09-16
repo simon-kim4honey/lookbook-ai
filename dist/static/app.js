@@ -2037,6 +2037,10 @@ function initGhostCutUI() {
   const body = document.querySelector('#step-1 .gslide-body');
   if (!body) return;
 
+  // 결과화면 하단 4버튼(.result-nav-btn)에 모델컷 "다음 단계" 버튼과 동일한
+  // 오로라 그라데이션을 입히기 위한 CSS 훅 — style.css의 body.mode-ghostcut 규칙 참고
+  document.body.classList.add('mode-ghostcut');
+
   // 원래 step-1의 이전/다음 단계 nav(.gslide-body와 형제 요소)는 모델컷 전용이라 숨김
   const originalNav = document.querySelector('#step-1 > .gslide-nav');
   if (originalNav) originalNav.style.display = 'none';
@@ -2045,11 +2049,11 @@ function initGhostCutUI() {
     <h2 class="gstep-title">누끼컷을 만들 상품 이미지 1장을 업로드하세요</h2>
     <p class="gstep-sub">상품(옷) 사진 한 장만 올리면 AI가 종류를 자동으로 인식해요</p>
     <input type="file" id="gcUploadInput" accept="image/*" style="display:none;" onchange="ghostCutHandleFile(this.files[0])" />
-    <label for="gcUploadInput" id="gcUploadDrop"
+    <label for="gcUploadInput" id="gcUploadDrop" class="gc-upload-drop"
       ondragover="event.preventDefault(); event.currentTarget.classList.add('drag')"
       ondragleave="event.currentTarget.classList.remove('drag')"
       ondrop="ghostCutHandleDrop(event)"
-      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px solid transparent;border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;background:var(--gapp-surface-2,#F2F4F6);margin-top:16px;">
+      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px solid transparent;border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;margin-top:16px;">
       <div id="gcUploadPreviewWrap" style="display:none;width:100%;max-width:220px;position:relative;">
         <img id="gcUploadPreview" style="width:100%;border-radius:12px;display:block;" />
         <button type="button" id="gcUploadRemoveBtn" onclick="event.preventDefault();event.stopPropagation();ghostCutRemoveImage();" style="position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:17.55px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
