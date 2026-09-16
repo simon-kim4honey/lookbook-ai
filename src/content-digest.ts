@@ -304,6 +304,31 @@ function currentPeriod(): string {
   return `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${Math.ceil(now.getDate() / 7)}주차`
 }
 
+// 오르내림 상위 품목을 뽑아 실무자가 바로 판단할 수 있는 한 문장 인사이트를 만든다
+// (Claude 호출 없이 결정론적으로 계산 — 검색어트렌드/쇼핑인사이트는 이미 숫자 자체가
+// 명확해서 별도 AI 해석 없이도 "무엇을 해야 하는지"가 나온다)
+function buildTrendInsight(type: 'search_trend' | 'shopping_insight', trends: TrendPoint[]): string {
+  const metricLabel = type === 'search_trend' ? '검색 관심도' : '구매 클릭'
+  if (!trends.length) return `이번 주 ${type === 'search_trend' ? '검색어트렌드' : '쇼핑인사이트'} 데이터를 가져오지 못했습니다.`
+
+  const sorted = [...trends].sort((a, b) => b.changePct - a.changePct)
+  const risers = sorted.filter((t) => t.changePct > 0)
+  const fallers = sorted.filter((t) => t.changePct < 0).slice(-2).reverse()
+
+  const fmt = (t: TrendPoint) => `${t.label}(${t.changePct > 0 ? '+' : ''}${t.changePct}%)`
+  const topRisers = risers.slice(0, 3).map(fmt).join(', ')
+  const topFallers = fallers.map(fmt).join(', ')
+
+  let insight = topRisers
+    ? `이번 주 ${metricLabel}는 ${topRisers}이 가장 크게 올랐습니다.`
+    : `이번 주 ${metricLabel}는 오른 품목이 없습니다.`
+  if (topFallers) insight += ` 반대로 ${topFallers}는 하락세입니다.`
+  insight += type === 'search_trend'
+    ? ' 오르는 품목 위주로 콘텐츠·마케팅 노출을 늘려보세요.'
+    : ' 클릭이 느는 품목은 재고·프로모션을 우선 챙길 타이밍입니다.'
+  return insight
+}
+
 // 월: 기사(news), 수: 검색어트렌드(search_trend), 금: 쇼핑인사이트(shopping_insight) —
 // 요일별로 서로 다른 내용의 다이제스트를 만든다 (하나로 합치면 카톡 메시지가 너무 길어짐)
 export async function runDigestPipeline(env: DigestBindings, type: DigestType = 'news'): Promise<{ digestId: number; articleCount: number }> {
@@ -315,10 +340,7 @@ export async function runDigestPipeline(env: DigestBindings, type: DigestType = 
       ? await fetchSearchTrends(env, ITEM_KEYWORDS)
       : await fetchShoppingInsight(env, ITEM_KEYWORDS)
 
-    const label = type === 'search_trend' ? '검색어트렌드' : '쇼핑인사이트'
-    const summary = trends.length
-      ? `이번 주 ${label} — 품목별 전주 대비 변화율입니다.`
-      : `이번 주 ${label} 데이터를 가져오지 못했습니다.`
+    const summary = buildTrendInsight(type, trends)
 
     const insertDigest = await db.prepare(
       `INSERT INTO content_digests (period, status, summary, keywords, type) VALUES (?, 'draft', ?, '[]', ?)`
