@@ -1276,19 +1276,40 @@ footer {
   --gapp-arrow-bg: rgba(23,24,29,0.55);       /* 카드 위 화살표 버튼 배경(구 흰색 반투명) */
   --gapp-arrow-border: rgba(255,255,255,0.18);
   --gapp-arrow-bg-hover: rgba(43,44,52,0.8);
-  /* 시작색=끝색으로 한 바퀴를 닫은 4색 그라데이션. background-size를 50%로 축소해
-     타일 2개가 항상 나란히 채워지도록 하고(.cslot 참고), background-position을
-     타일 폭만큼 애니메이션으로 밀어 색이 흐르게 한다 — 이전에는 background-size를
-     300%로 "확대"해서 위치만 옮겼는데, 그러면 매 순간 전체 그라데이션의 1/3만
-     보여서 양 끝(다크그린 0%, 다크그레이 100%)이 대부분의 구간에서 시야 밖으로
-     밀려나 "다크그린이 빠진 것처럼" 보이는 문제가 있었다. 타일을 "축소해서 반복"
-     시키면 항상 4색이 전부 보이면서 색 위치만 자리를 바꾸며 흐르는 효과가 난다. */
-  --gapp-slot-bg: linear-gradient(135deg, #0A2A17 0%, #2E0A14 25%, #0D1B2E 50%, #2B2C34 75%, #0A2A17 100%); /* 대기 중 슬롯 — 다크그린 + 다크레드 + 다크블루 + 다크그레이 그라데이션 */
-  --gapp-slot-bg-hover: linear-gradient(135deg, #0D361D 0%, #3D0F1C 25%, #11233A 50%, #34353D 75%, #0D361D 100%); /* 호버 시 살짝 밝은 버전 */
-  --gapp-slot-hover-tint: none; /* 배경 자체가 이미 다크그린이라 별도 틴트 오버레이는 불필요 */
-  --gapp-slot-hover-border: #22C55E;               /* 호버 시 밝은 그린 라인으로 강조 */
+  /* 오로라(aurora)처럼 불규칙하게 움직이는 배경 — 슬롯/"다음 단계" 버튼 공용.
+     선형 그라데이션 한 장을 타일링하는 방식(과거 시도, 대각선-가로타일 이음매
+     버그로 폐기)이 아니라, 가장자리가 투명하게 페이드되는 원형(radial) 블롭
+     3장을 겹쳐 각자 다른 좌표를 오가게 한다 — 블롭은 경계가 항상 투명이라
+     어떤 위치에 있어도 이음매가 생길 수 없고, 세 블롭이 서로 다른 좌표
+     시퀀스로 움직이므로 규칙적인 좌우 스크롤이 아니라 오로라 같은 유기적인
+     흐름으로 보인다. 색상은 참고 영상에서 실측 추출한 값. */
+  --gapp-aurora-1: #071B4A;        /* 딥 네이비 (바탕) */
+  --gapp-aurora-2: #0450A0;        /* 블루 */
+  --gapp-aurora-3: #0579B3;        /* 브라이트 블루 */
+  --gapp-aurora-4: #0DA8D6;        /* 시안 하이라이트 */
+  --gapp-aurora-1-hover: #0C2A6E;
+  --gapp-aurora-2-hover: #0864C4;
+  --gapp-aurora-3-hover: #1595CC;
+  --gapp-aurora-4-hover: #3FC4EA;
+  /* 블롭 반경(45%)을 background-size보다 충분히 작게, 불투명도도 0.85로 낮춰
+     겹치는 곳에서만 색이 섞이고 나머지는 바탕(딥 네이비)이 비치도록 함 —
+     처음 시도는 블롭이 상자 크기에 비해 너무 크고 불투명해서 슬롯 전체가
+     단색으로 꽉 찬 것처럼 보였다(오로라 특유의 "군데군데 번지는" 느낌이
+     안 남). */
+  --gapp-slot-bg:
+    radial-gradient(circle at 20% 30%, rgba(13,168,214,0.8) 0%, transparent 32%),
+    radial-gradient(circle at 75% 65%, rgba(5,121,179,0.8) 0%, transparent 35%),
+    radial-gradient(circle at 45% 85%, rgba(4,80,160,0.8) 0%, transparent 38%),
+    var(--gapp-aurora-1); /* 대기 중 슬롯 — 오로라 블루/시안 */
+  --gapp-slot-bg-hover:
+    radial-gradient(circle at 20% 30%, rgba(63,196,234,0.85) 0%, transparent 32%),
+    radial-gradient(circle at 75% 65%, rgba(21,149,204,0.85) 0%, transparent 35%),
+    radial-gradient(circle at 45% 85%, rgba(8,100,196,0.85) 0%, transparent 38%),
+    var(--gapp-aurora-1-hover); /* 호버 시 살짝 밝은 버전 */
+  --gapp-slot-hover-tint: none; /* 배경 자체가 이미 오로라 톤이라 별도 틴트 오버레이는 불필요 */
+  --gapp-slot-hover-border: #22D3EE;               /* 호버 시 밝은 시안 라인으로 강조 */
   --gapp-slot-blur: none;
-  --gapp-slot-disabled-bg: linear-gradient(135deg, #15161A 0%, #22232A 100%); /* 잠긴 슬롯 — 어두운 다크그레이 그라데이션 (기존보다 20% 더 어둡게) */
+  --gapp-slot-disabled-bg: linear-gradient(135deg, #0A0E1F 0%, #131A33 100%); /* 잠긴 슬롯 — 어둡고 채도 낮은 네이비(오로라 팔레트와 톤 통일, 잠김 표시로 정적 유지) */
   --gapp-slot-disabled-opacity: 1;
   --gapp-slot-lock-color: rgba(255,255,255,0.48);   /* 잠금 아이콘/문구 — 2D 픽토그램, 기존(60%)보다 20% 더 어둡게(48%) */
 
@@ -1482,13 +1503,11 @@ footer {
   color: var(--gapp-text, #191F28) !important;
 }
 .gslide-nav .step-nav-next {
-  /* 활성화됐을 때(클릭 가능 상태) 업로드 슬롯과 동일한 방식으로 그라데이션 색이
-     천천히 흐르도록 함 — 슬롯과 같은 4색 팔레트/타일 반복 기법 재사용.
-     가로세로 모두 타일링하면 격자무늬처럼 쪼개져 보이므로 가로로만 반복 */
+  /* 활성화됐을 때(클릭 가능 상태) 업로드 슬롯과 동일한 오로라 효과(원형 블롭
+     3장이 불규칙하게 움직이는 방식)를 그대로 재사용 */
   background: var(--gapp-slot-bg-hover, var(--gapp-gradient, #3182F6)) !important;
-  background-size: 50% 100% !important;
-  background-repeat: repeat-x !important;
-  animation: cslotGradientShift 10s ease infinite;
+  background-size: 130% 130%, 150% 150%, 170% 170%, 100% 100% !important;
+  animation: cslotAurora 16s ease-in-out infinite;
   border: none !important;
   color: #fff !important;
   box-shadow: 0 4px 16px var(--gapp-glow, rgba(49,130,246,0.4)) !important;
@@ -1733,12 +1752,8 @@ footer {
   overflow: hidden;
   border: 1.5px solid transparent;
   background: var(--gapp-slot-bg, #F2F4F6);
-  /* 가로세로(50% 50%) 모두 타일링하면 슬롯 안이 격자무늬로 여러 조각처럼
-     깨져 보인다 — 세로는 슬롯 높이에 맞춰 한 장만 채우고 가로로만 반복시켜
-     부드러운 색 흐름으로 보이게 한다 */
-  background-size: 50% 100%;
-  background-repeat: repeat-x;
-  animation: cslotGradientShift 10s ease infinite;
+  background-size: 130% 130%, 150% 150%, 170% 170%, 100% 100%;
+  animation: cslotAurora 16s ease-in-out infinite;
   backdrop-filter: var(--gapp-slot-blur, none);
   -webkit-backdrop-filter: var(--gapp-slot-blur, none);
   cursor: pointer;
@@ -1747,12 +1762,18 @@ footer {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
-@keyframes cslotGradientShift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+/* 블롭 3장(레이어 1~3)이 서로 다른 좌표 시퀀스로 움직여 오로라 같은 불규칙한
+   흐름을 만든다 — 4번째 레이어(바탕색)는 고정. 각 구간의 이동폭/방향이
+   서로 달라 단순 왕복이 아니라 유기적으로 흘러가는 느낌을 준다. */
+@keyframes cslotAurora {
+  0%   { background-position: 20% 30%, 75% 65%, 45% 85%, 0 0; }
+  22%  { background-position: 55% 10%, 25% 75%, 80% 45%, 0 0; }
+  48%  { background-position: 85% 55%, 55% 15%, 15% 70%, 0 0; }
+  74%  { background-position: 30% 80%, 70% 40%, 60% 20%, 0 0; }
+  100% { background-position: 20% 30%, 75% 65%, 45% 85%, 0 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cslot, .gslide-nav .step-nav-next { animation: none; }
+  .cslot, .gslide-nav .step-nav-next, .cslot--filled::after { animation: none; }
 }
 .cslot:hover {
   border-color: var(--gapp-slot-hover-border, rgba(124,58,237,0.35));
@@ -1762,14 +1783,41 @@ footer {
   border-color: var(--gapp-accent, #3182F6);
   background: var(--gapp-slot-bg-hover, #E8F3FF);
 }
-/* 이미지 채워진 슬롯: 테두리 solid + 포인트 컬러 */
+/* 이미지 채워진(선택된) 슬롯: 실선 테두리 대신, 슬롯 그라데이션과 같은
+   오로라 팔레트가 테두리를 따라 빙글빙글 도는 빛 효과를 준다. 실제 border는
+   투명하게 두고(레이아웃 두께 유지), ::after 가상요소가 padding-box만 남기고
+   나머지(content-box)를 mask로 도려낸 "링" 모양에 conic-gradient를 채워
+   넣는 방식 — @property로 등록한 각도(--cslot-border-angle)를 애니메이션시켜
+   테두리 모양은 고정한 채 빛(색)만 링을 따라 회전하는 것처럼 보이게 한다. */
 .cslot--filled {
   border-style: solid;
-  border-color: rgba(124,58,237,0.5);
+  border-color: transparent;
   cursor: default;
 }
+.cslot--filled::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 3px;
+  background: conic-gradient(from var(--cslot-border-angle, 0deg),
+    var(--gapp-aurora-4), var(--gapp-aurora-3), var(--gapp-aurora-2), var(--gapp-aurora-4));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  animation: cslotBorderSpin 4s linear infinite;
+  z-index: 1;
+}
+@property --cslot-border-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+@keyframes cslotBorderSpin {
+  to { --cslot-border-angle: 360deg; }
+}
 .cslot--filled:hover {
-  border-color: var(--gapp-slot-hover-border, rgba(124,58,237,0.6));
   background: var(--gapp-slot-hover-tint, none), var(--gapp-slot-bg, #F2F4F6);
 }
 /* 상의/하의 ↔ 전체 상호 배타: 반대쪽 그룹이 채워지면 비활성화 —
@@ -1779,10 +1827,10 @@ footer {
   opacity: var(--gapp-slot-disabled-opacity, 0.35);
   border-style: dashed;
   background: var(--gapp-slot-disabled-bg, transparent);
-  /* 잠긴 슬롯은 시작/끝 색이 다른 단순 2색 그라데이션이라, 활성 슬롯과 같은
-     50% 타일 반복을 쓰면 타일 경계에서 색이 뚝 끊기는 이음매가 생긴다.
-     잠긴 슬롯은 움직일 필요도 없으므로(비활성 상태를 정적으로 표현) 애니메이션을
-     끄고 원래처럼 확대(300%)해서 이음매 없이 한 번만 보여준다. */
+  /* 잠긴 슬롯은 활성 슬롯의 오로라 애니메이션(레이어 4장짜리 radial-gradient)과
+     무관한 단순 2색 선형 그라데이션이다. 잠긴 슬롯은 움직일 필요도 없으므로
+     (비활성 상태를 정적으로 표현) 애니메이션을 끄고 확대(300%)해서 한 번만
+     보여준다. */
   background-size: 300% 300%;
   background-repeat: no-repeat;
   animation: none;
