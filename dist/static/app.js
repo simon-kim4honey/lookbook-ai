@@ -2055,14 +2055,14 @@ function initGhostCutUI() {
       ondragover="event.preventDefault(); event.currentTarget.classList.add('drag')"
       ondragleave="event.currentTarget.classList.remove('drag')"
       ondrop="ghostCutHandleDrop(event)"
-      style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px solid transparent;border-radius:16px;padding:36px 20px;cursor:pointer;min-height:260px;margin-top:16px;">
-      <div id="gcUploadPreviewWrap" style="display:none;width:100%;max-width:220px;position:relative;">
-        <img id="gcUploadPreview" style="width:100%;border-radius:12px;display:block;" />
-        <button type="button" id="gcUploadRemoveBtn" onclick="event.preventDefault();event.stopPropagation();ghostCutRemoveImage();" style="position:absolute;top:-8px;right:-8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:17.55px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      style="position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;border:2px solid transparent;border-radius:16px;cursor:pointer;min-height:260px;margin-top:16px;">
+      <div id="gcUploadPreviewWrap" style="display:none;position:absolute;inset:0;">
+        <img id="gcUploadPreview" style="width:100%;height:100%;object-fit:cover;display:block;" />
+        <button type="button" id="gcUploadRemoveBtn" onclick="event.preventDefault();event.stopPropagation();ghostCutRemoveImage();" style="position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.75);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:17.55px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
           <i class="fas fa-times"></i>
         </button>
       </div>
-      <div id="gcUploadEmpty" style="text-align:center;color:var(--gapp-text-muted,#8B95A1);">
+      <div id="gcUploadEmpty" style="text-align:center;color:var(--gapp-text-muted,#8B95A1);padding:36px 20px;">
         <div style="font-size:14px;font-weight:600;color:var(--gapp-text-secondary,#333D4B);">탭하여 사진 선택</div>
         <div style="font-size:12px;margin-top:4px;">또는 파일을 여기로 드래그하세요</div>
       </div>
