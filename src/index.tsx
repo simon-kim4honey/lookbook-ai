@@ -23,6 +23,10 @@ type Bindings = {
   KAKAO_JS_KEY: string
   // 어드민
   ADMIN_PASSWORD: string
+  // 유지보수 세션(자동 에러 감지/수정 루틴)이 /api/admin/errors를 사람 비밀번호 없이
+  // 조회/갱신할 수 있도록 하는 전용 토큰 — ADMIN_PASSWORD와 분리해 별도로 회전 가능
+  // (wrangler secret put MAINT_API_TOKEN). 미설정 시 이 경로는 ADMIN_PASSWORD만 허용.
+  MAINT_API_TOKEN?: string
   // 토스페이먼츠 (결제위젯 v2). 반드시 "API 개별연동 키"를 사용할 것 — "주문서형·결제창형
   // 연동 키"는 TossPayments().payment().requestPayment() 방식에서 지원하지 않는다(토스가
   // 직접 에러로 알려줌: "API 개별 연동 키의 클라이언트 키로 SDK를 연동해주세요").
@@ -72,6 +76,22 @@ const app = new Hono<{ Bindings: Bindings }>()
 app.use('/api/*', cors())
 app.use('/static/*', serveStatic({ root: './public' }))
 
+// 전역 서버 에러 캐치 — 라우트 안에서 개별 try/catch로 이미 로깅하지 않은
+// 미처리 예외까지 어드민 "에러 로그" 탭에서 확인 가능하도록 한 곳에서 기록.
+// (개별 라우트가 자체 catch에서 이미 logError를 호출했다면 여기까지 오지 않음)
+app.onError(async (err, c) => {
+  console.error('[onError] 미처리 서버 에러:', err)
+  try {
+    await logError(c.env.LOOKBOOK_DB, {
+      source: 'server',
+      message: (err as any)?.message || String(err),
+      stack: (err as any)?.stack,
+      route: new URL(c.req.url).pathname,
+    })
+  } catch (_) {}
+  return c.json({ success: false, message: '서버 오류가 발생했습니다.' }, 500)
+})
+
 // studiob.aifashion.co.kr → www.aifashion.co.kr 전체 경로 리다이렉트
 // studiob 도메인은 더 이상 별도 서비스로 쓰지 않고, www 하나로 통합 (경로/쿼리 그대로 유지)
 // 진행 중인 API 요청(세션 유지 등)과 PG 웹훅/콜백(/payment/*)은 리다이렉트에서 제외 —
@@ -117,6 +137,117 @@ const adminAuth = async (c: any, next: any) => {
   }
   await next()
 }
+
+// 에러 로그 API 인증 — 사람 관리자(X-Admin-Password, 어드민 UI)와 유지보수 세션
+// (X-Maint-Token, 매시간 자동 폴링 루틴) 둘 중 하나만 맞으면 통과시킨다.
+// 두 자격을 분리한 이유: 어드민 비밀번호는 사람만 알아야 하는데, 자동화 루틴 프롬프트에
+// 저장되는 토큰은 유출 범위가 다르므로(계정 소유자의 Routine 저장소) 독립적으로 회전 가능해야 함.
+const errorsAuth = async (c: any, next: any) => {
+  const adminPassword = c.env.ADMIN_PASSWORD
+  const maintToken = c.env.MAINT_API_TOKEN
+  const givenAdmin = c.req.header('X-Admin-Password')
+  const givenMaint = c.req.header('X-Maint-Token')
+  if (!adminPassword) {
+    return c.json({ success: false, message: '서버 설정 오류: ADMIN_PASSWORD 환경변수가 설정되지 않았습니다.' }, 500)
+  }
+  const adminOk = givenAdmin === adminPassword
+  const maintOk = !!maintToken && givenMaint === maintToken
+  if (!adminOk && !maintOk) {
+    return c.json({ success: false, message: '인증 실패' }, 401)
+  }
+  await next()
+}
+
+// 서버 에러 기록 헬퍼 — 절대 요청 흐름을 막지 않도록 실패를 삼킨다(로깅 자체의
+// 실패가 실제 API 응답에 영향을 주면 안 됨). message/stack은 D1 컬럼 폭주 방지로 길이 제한.
+async function logError(
+  db: D1Database,
+  opts: { source: 'client' | 'server'; message: string; stack?: string; route?: string; extra?: any }
+) {
+  try {
+    const message = String(opts.message || '').slice(0, 2000)
+    const stack = opts.stack ? String(opts.stack).slice(0, 4000) : null
+    const route = opts.route ? String(opts.route).slice(0, 300) : null
+    const extra = opts.extra ? JSON.stringify(opts.extra).slice(0, 2000) : null
+    await db.prepare(
+      `INSERT INTO error_logs (source, message, stack, route, extra) VALUES (?, ?, ?, ?, ?)`
+    ).bind(opts.source, message, stack, route, extra).run()
+  } catch (e) {
+    console.error('[logError] 에러 기록 실패 (무시):', e)
+  }
+}
+
+// POST /api/errors/report — 클라이언트(브라우저) 미처리 에러 수집. 인증 없음(비로그인
+// 사용자도 겪을 수 있는 에러라 로그인 여부와 무관해야 함) — 대신 길이 제한으로 남용 방지.
+app.post('/api/errors/report', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}))
+    if (!body || !body.message) return c.json({ success: false }, 400)
+    await logError(c.env.LOOKBOOK_DB, {
+      source: 'client',
+      message: body.message,
+      stack: body.stack,
+      route: body.url,
+      extra: { userAgent: c.req.header('user-agent') || '' },
+    })
+    return c.json({ success: true })
+  } catch (e) {
+    return c.json({ success: false }, 500)
+  }
+})
+
+// GET /api/admin/errors — 에러 로그 목록 (어드민 UI + 유지보수 세션 자동 폴링 공용)
+app.get('/api/admin/errors', errorsAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const page = parseInt(c.req.query('page') || '1')
+    const limit = Math.min(parseInt(c.req.query('limit') || '30'), 100)
+    const status = c.req.query('status') || ''
+    const offset = (page - 1) * limit
+
+    let where = 'WHERE 1=1'
+    const params: any[] = []
+    if (status) { where += ` AND status = ?`; params.push(status) }
+
+    const total: any = await db.prepare(`SELECT COUNT(*) as cnt FROM error_logs ${where}`).bind(...params).first()
+    const counts: any = await db.prepare(
+      `SELECT status, COUNT(*) as cnt FROM error_logs GROUP BY status`
+    ).all()
+    const rows = await db.prepare(
+      `SELECT * FROM error_logs ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`
+    ).bind(...params, limit, offset).all()
+
+    const byStatus: Record<string, number> = { open: 0, in_review: 0, resolved: 0 }
+    for (const r of (counts.results || [])) byStatus[(r as any).status] = (r as any).cnt
+
+    return c.json({ success: true, errors: rows.results, total: total?.cnt || 0, page, limit, counts: byStatus })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// PATCH /api/admin/errors/:id — 상태 변경(open/in_review/resolved), 수정 PR 링크·메모 기록
+app.patch('/api/admin/errors/:id', errorsAuth, async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}))
+    const allowed = ['open', 'in_review', 'resolved']
+    if (body.status && !allowed.includes(body.status)) {
+      return c.json({ success: false, message: '잘못된 status 값입니다.' }, 400)
+    }
+    const sets: string[] = ['updated_at = datetime(\'now\')']
+    const params: any[] = []
+    if (body.status !== undefined)    { sets.push('status = ?');     params.push(body.status) }
+    if (body.fix_pr_url !== undefined){ sets.push('fix_pr_url = ?'); params.push(body.fix_pr_url) }
+    if (body.note !== undefined)      { sets.push('note = ?');       params.push(body.note) }
+    params.push(id)
+    await db.prepare(`UPDATE error_logs SET ${sets.join(', ')} WHERE id = ?`).bind(...params).run()
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
 
 // ────────────────────────────────────────────────────
 // Admin Prompt Store  (Cloudflare Workers 메모리 싱글톤)
@@ -4321,6 +4452,12 @@ app.post('/api/generation/start', async (c) => {
 
   } catch (err: any) {
     console.error('Generation start error:', err)
+    await logError(c.env.LOOKBOOK_DB, {
+      source: 'server',
+      message: err?.message || String(err),
+      stack: err?.stack,
+      route: '/api/generation/start',
+    })
     const fallbackJobId = 'fallback_' + Math.random().toString(36).substr(2, 9)
     return c.json({
       jobId: fallbackJobId,
@@ -7649,6 +7786,7 @@ app.get('/admin02', (c) => {
     .tab-btn{padding:14px 20px;font-size: 18.9px;font-weight:500;cursor:pointer;border:none;background:none;color:#8b8ba0;border-bottom:2px solid transparent;transition:all .2s;}
     .tab-btn.active{color:#5B9DF7;border-bottom-color:#3182F6;}
     .tab-btn:hover{color:#e0e0f0;}
+    .tab-badge{display:inline-block;margin-left:6px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px;vertical-align:2px;}
     .tab-panel{display:none;}
     .tab-panel.active{display:block;}
     /* 바디 */
@@ -7810,6 +7948,7 @@ app.get('/admin02', (c) => {
     <button class="tab-btn" onclick="switchTab('bizleads')"><i class="fas fa-building"></i> 사업자 리드</button>
     <button class="tab-btn" onclick="switchTab('ghostcut')"><i class="fas fa-tshirt"></i> 누끼컷 샘플</button>
     <button class="tab-btn" onclick="switchTab('contentdigest')"><i class="fas fa-newspaper"></i> 콘텐츠 다이제스트</button>
+    <button class="tab-btn" onclick="switchTab('errors')"><i class="fas fa-triangle-exclamation"></i> 에러 로그<span id="errorsBadge" class="tab-badge" style="display:none;"></span></button>
   </div>
 
   <!-- ▼ 탭: 프롬프트 -->
@@ -8230,6 +8369,69 @@ app.get('/admin02', (c) => {
     </div>
   </div>
 
+  <!-- ▼ 탭: 에러 로그 -->
+  <div class="tab-panel" id="tabErrors">
+    <div class="admin-body">
+      <div class="page-title">🚨 사용자 에러 로그</div>
+      <div class="page-sub">사용자 화면(클라이언트)과 생성 API(서버) 양쪽에서 발생한 에러를 자동 수집합니다. 매시간 유지보수 세션이 open 상태 항목을 진단해 수정 PR을 붙이면 in_review로 바뀝니다 — 배포는 사람이 PR을 확인한 뒤 직접 진행합니다.</div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px;">
+        <div class="section-card" style="padding:16px;text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#ef4444;" id="errStatOpen">-</div>
+          <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">미확인(open)</div>
+        </div>
+        <div class="section-card" style="padding:16px;text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#f59e0b;" id="errStatReview">-</div>
+          <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">수정PR 대기(in_review)</div>
+        </div>
+        <div class="section-card" style="padding:16px;text-align:center;">
+          <div style="font-size:24px;font-weight:800;color:#22c55e;" id="errStatResolved">-</div>
+          <div style="font-size:12px;color:#8b8ba0;margin-top:4px;">해결됨(resolved)</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+        <select id="errStatusFilter" class="form-input" style="width:180px;" onchange="loadErrors()">
+          <option value="open" selected>미확인만</option>
+          <option value="in_review">수정PR 대기만</option>
+          <option value="resolved">해결됨만</option>
+          <option value="">전체</option>
+        </select>
+        <button class="btn-sm btn-primary-sm" onclick="loadErrors()">🔄 새로고침</button>
+      </div>
+
+      <div class="section-card" style="padding:0;overflow:hidden;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="background:#0f0f1a;border-bottom:1px solid #2e2e50;">
+              <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">발생시각</th>
+              <th style="text-align:center;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">출처</th>
+              <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">경로/URL</th>
+              <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">메시지</th>
+              <th style="text-align:center;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">상태</th>
+              <th style="text-align:center;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">관리</th>
+            </tr>
+          </thead>
+          <tbody id="errorsTableBody">
+            <tr><td colspan="6" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">로딩 중...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="errorsPagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:16px;"></div>
+    </div>
+  </div>
+
+  <!-- 에러 상세 모달 -->
+  <div class="modal-overlay" id="errorDetailModal" style="z-index:5000;">
+    <div class="modal-box" style="max-width:640px;max-height:80vh;overflow-y:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;font-size:17px;">에러 상세</h3>
+        <button onclick="closeModal('errorDetailModal')" style="background:none;border:none;color:#8b8ba0;font-size:27px;cursor:pointer;">×</button>
+      </div>
+      <div id="errorDetailBody" style="font-size:13px;color:#c8c8dc;line-height:1.8;white-space:pre-wrap;word-break:break-all;"></div>
+    </div>
+  </div>
+
   <div class="biz-modal-overlay" id="bizModal" onclick="bizCloseModal(event)">
     <div class="biz-modal-box" onclick="event.stopPropagation()">
       <div class="biz-modal-head">
@@ -8267,7 +8469,7 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs','home','users','bizleads','ghostcut','contentdigest']
+    const names = ['prompt','models','bgs','home','users','bizleads','ghostcut','contentdigest','errors']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
@@ -8278,6 +8480,7 @@ function switchTab(name) {
   document.getElementById('tabBizLeads').classList.toggle('active', name === 'bizleads')
   document.getElementById('tabGhostCut').classList.toggle('active', name === 'ghostcut')
   document.getElementById('tabContentDigest').classList.toggle('active', name === 'contentdigest')
+  document.getElementById('tabErrors').classList.toggle('active', name === 'errors')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos(); loadGcLoadingImages() }
@@ -8285,7 +8488,122 @@ function switchTab(name) {
   if (name === 'bizleads') bizInit()
   if (name === 'ghostcut') ghostCutInit()
   if (name === 'contentdigest') digestInit()
+  if (name === 'errors') loadErrors()
 }
+
+// ══════════════════════════════════════════════
+// 에러 로그 (사용자 에러 자동 수집 + 유지보수 세션 자동 진단용)
+// ══════════════════════════════════════════════
+let errorsPage = 1
+const ERRORS_PER_PAGE = 20
+
+async function refreshErrorsBadge() {
+  try {
+    const res = await fetch('/api/admin/errors?status=open&limit=1', { headers: { 'X-Admin-Password': adminPassword } })
+    const data = await res.json()
+    const badge = document.getElementById('errorsBadge')
+    const openCount = data.success ? (data.counts?.open || 0) : 0
+    if (openCount > 0) { badge.textContent = openCount; badge.style.display = 'inline-block' }
+    else { badge.style.display = 'none' }
+  } catch (e) {}
+}
+
+async function loadErrors() {
+  const status = document.getElementById('errStatusFilter')?.value || ''
+  try {
+    const params = new URLSearchParams({ page: errorsPage, limit: ERRORS_PER_PAGE })
+    if (status) params.set('status', status)
+    const res = await fetch('/api/admin/errors?' + params.toString(), { headers: { 'X-Admin-Password': adminPassword } })
+    const data = await res.json()
+    if (!data.success) { renderErrorsTable([]); return }
+    document.getElementById('errStatOpen').textContent = data.counts?.open || 0
+    document.getElementById('errStatReview').textContent = data.counts?.in_review || 0
+    document.getElementById('errStatResolved').textContent = data.counts?.resolved || 0
+    renderErrorsTable(data.errors || [])
+    renderErrorsPagination(data.total || 0, data.page || 1, data.limit || ERRORS_PER_PAGE)
+    refreshErrorsBadge()
+  } catch (e) {
+    document.getElementById('errorsTableBody').innerHTML =
+      '<tr><td colspan="6" style="text-align:center;padding:40px;color:#ef4444;font-size:13px;">⚠️ 로딩 실패</td></tr>'
+  }
+}
+
+const ERR_STATUS_BADGE = {
+  open:      '<span style="font-size:11px;background:#ef444422;color:#ef4444;padding:2px 8px;border-radius:10px;border:1px solid #ef444444;">미확인</span>',
+  in_review: '<span style="font-size:11px;background:#f59e0b22;color:#f59e0b;padding:2px 8px;border-radius:10px;border:1px solid #f59e0b44;">수정PR 대기</span>',
+  resolved:  '<span style="font-size:11px;background:#22c55e22;color:#22c55e;padding:2px 8px;border-radius:10px;border:1px solid #22c55e44;">해결됨</span>',
+}
+const ERR_SOURCE_BADGE = {
+  client: '<span style="font-size:11px;background:#3a3a60;color:#e0e0f0;padding:2px 8px;border-radius:10px;">클라이언트</span>',
+  server: '<span style="font-size:11px;background:#5B9DF733;color:#5B9DF7;padding:2px 8px;border-radius:10px;">서버</span>',
+}
+
+let errorsCache = []
+function renderErrorsTable(errors) {
+  errorsCache = errors
+  const tbody = document.getElementById('errorsTableBody')
+  if (!errors.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">조건에 맞는 에러가 없습니다</td></tr>'
+    return
+  }
+  tbody.innerHTML = errors.map(function(e) {
+    var prLink = e.fix_pr_url ? ' · <a href="' + escHtml(e.fix_pr_url) + '" target="_blank" style="color:#5B9DF7;">PR</a>' : ''
+    var nextStatus = e.status === 'open' ? 'in_review' : (e.status === 'in_review' ? 'resolved' : 'open')
+    var nextLabel = e.status === 'open' ? '수정PR 대기로' : (e.status === 'in_review' ? '해결됨으로' : '미확인으로')
+    return '<tr style="border-bottom:1px solid #1e1e3a;">'
+      + '<td style="padding:12px 16px;font-size:12px;color:#8b8ba0;white-space:nowrap;">' + (e.created_at || '').replace('T',' ').slice(0,16) + '</td>'
+      + '<td style="padding:12px 16px;text-align:center;">' + (ERR_SOURCE_BADGE[e.source] || e.source) + '</td>'
+      + '<td style="padding:12px 16px;font-size:12px;color:#c8c8dc;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(e.route || '-') + '</td>'
+      + '<td style="padding:12px 16px;font-size:12px;color:#e0e0f0;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="showErrorDetail(' + e.id + ')">' + escHtml(e.message || '') + prLink + '</td>'
+      + '<td style="padding:12px 16px;text-align:center;">' + (ERR_STATUS_BADGE[e.status] || e.status) + '</td>'
+      + '<td style="padding:12px 16px;text-align:center;">'
+      +   '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
+      +     '<button class="btn-sm" style="font-size:12px;padding:4px 10px;" onclick="showErrorDetail(' + e.id + ')">상세</button>'
+      +     '<button class="btn-sm btn-primary-sm" style="font-size:12px;padding:4px 10px;" onclick="updateErrorStatus(' + e.id + ',\\'' + nextStatus + '\\')">' + nextLabel + '</button>'
+      +   '</div>'
+      + '</td>'
+      + '</tr>'
+  }).join('')
+}
+
+function showErrorDetail(id) {
+  const e = errorsCache.find(function(x) { return x.id === id })
+  if (!e) return
+  document.getElementById('errorDetailBody').innerHTML =
+    '<b>발생시각</b> ' + escHtml(e.created_at || '') + '<br/>'
+    + '<b>출처</b> ' + escHtml(e.source || '') + '<br/>'
+    + '<b>경로/URL</b> ' + escHtml(e.route || '-') + '<br/>'
+    + '<b>메시지</b> ' + escHtml(e.message || '') + '<br/>'
+    + (e.extra ? '<b>부가정보</b> ' + escHtml(e.extra) + '<br/>' : '')
+    + (e.fix_pr_url ? '<b>수정 PR</b> <a href="' + escHtml(e.fix_pr_url) + '" target="_blank" style="color:#5B9DF7;">' + escHtml(e.fix_pr_url) + '</a><br/>' : '')
+    + (e.note ? '<b>메모</b> ' + escHtml(e.note) + '<br/>' : '')
+    + '<br/><b>스택 트레이스</b><br/>' + escHtml(e.stack || '(없음)')
+  document.getElementById('errorDetailModal').classList.add('open')
+}
+
+async function updateErrorStatus(id, status) {
+  try {
+    const res = await fetch('/api/admin/errors/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Password': adminPassword },
+      body: JSON.stringify({ status: status }),
+    })
+    const data = await res.json()
+    if (data.success) { showAdminToast('상태 변경 완료', 'ok'); loadErrors() }
+    else { showAdminToast('변경 실패: ' + (data.message || ''), 'err') }
+  } catch (e) { showAdminToast('네트워크 오류', 'err') }
+}
+
+function renderErrorsPagination(total, page, limit) {
+  const wrap = document.getElementById('errorsPagination')
+  const totalPages = Math.max(1, Math.ceil(total / limit))
+  if (totalPages <= 1) { wrap.innerHTML = ''; return }
+  let html = '<button class="btn-sm" ' + (page <= 1 ? 'disabled' : '') + ' onclick="goErrorsPage(' + (page-1) + ')">‹</button>'
+  html += '<span style="font-size:12px;color:#8b8ba0;">' + page + ' / ' + totalPages + '</span>'
+  html += '<button class="btn-sm" ' + (page >= totalPages ? 'disabled' : '') + ' onclick="goErrorsPage(' + (page+1) + ')">›</button>'
+  wrap.innerHTML = html
+}
+function goErrorsPage(p) { errorsPage = p; loadErrors() }
 
 // ══════════════════════════════════════════════
 // 사업자 리드(구 Genspark "fashion-biz" 프로젝트 이관)
@@ -9069,6 +9387,7 @@ async function doLogin() {
       document.getElementById('loginOverlay').style.display = 'none'
       document.getElementById('adminMain').style.display = 'block'
       loadConfig()
+      refreshErrorsBadge()
     } else { err.textContent = '비밀번호가 올바르지 않습니다.' }
   } catch(e) { err.textContent = '서버 오류가 발생했습니다.' }
 }

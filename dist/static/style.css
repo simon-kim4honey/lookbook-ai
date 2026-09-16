@@ -1283,11 +1283,11 @@ footer {
      어떤 위치에 있어도 이음매가 생길 수 없고, 세 블롭이 서로 다른 좌표
      시퀀스로 움직이므로 규칙적인 좌우 스크롤이 아니라 오로라 같은 유기적인
      흐름으로 보인다. 색상은 참고 영상에서 실측 추출한 값. */
-  --gapp-aurora-1: #071B4A;        /* 딥 네이비 (바탕) */
+  --gapp-aurora-1: #051334;        /* 딥 네이비 (바탕) — 슬롯 전용, 요청에 따라 30% 더 어둡게 */
   --gapp-aurora-2: #0450A0;        /* 블루 */
   --gapp-aurora-3: #0579B3;        /* 브라이트 블루 */
   --gapp-aurora-4: #0DA8D6;        /* 시안 하이라이트 */
-  --gapp-aurora-1-hover: #0C2A6E;
+  --gapp-aurora-1-hover: #081D4D;
   --gapp-aurora-2-hover: #0864C4;
   --gapp-aurora-3-hover: #1595CC;
   --gapp-aurora-4-hover: #3FC4EA;
@@ -1297,16 +1297,20 @@ footer {
      처음 시도는 블롭이 상자 크기에 비해 너무 크고 불투명해서 슬롯 전체가
      단색으로 꽉 찬 것처럼 보였다(오로라 특유의 "군데군데 번지는" 느낌이
      안 남). */
+  /* 요청에 따라 슬롯 색상을 기존(최초 원본)보다 30% 더 어둡게(RGB 채널에 0.7 곱함) —
+     중간에 80%(0.2배)까지 어둡게 했다가 "너무 어둡다"는 피드백으로 30%로 되돌림.
+     로고/버튼/스텝 표시줄 등 다른 곳에서 쓰는 aurora-2/3/4 변수는 그대로
+     두고, 슬롯 전용 값만 어둡게 만들었다. */
   --gapp-slot-bg:
-    radial-gradient(circle at 20% 30%, rgba(13,168,214,0.8) 0%, transparent 32%),
-    radial-gradient(circle at 75% 65%, rgba(5,121,179,0.8) 0%, transparent 35%),
-    radial-gradient(circle at 45% 85%, rgba(4,80,160,0.8) 0%, transparent 38%),
-    var(--gapp-aurora-1); /* 대기 중 슬롯 — 오로라 블루/시안 */
+    radial-gradient(circle at 20% 30%, rgba(9,118,150,0.8) 0%, transparent 32%),
+    radial-gradient(circle at 75% 65%, rgba(4,85,125,0.8) 0%, transparent 35%),
+    radial-gradient(circle at 45% 85%, rgba(3,56,112,0.8) 0%, transparent 38%),
+    #051334; /* 대기 중 슬롯 — 오로라 블루/시안 (30% 더 어둡게) */
   --gapp-slot-bg-hover:
-    radial-gradient(circle at 20% 30%, rgba(63,196,234,0.85) 0%, transparent 32%),
-    radial-gradient(circle at 75% 65%, rgba(21,149,204,0.85) 0%, transparent 35%),
-    radial-gradient(circle at 45% 85%, rgba(8,100,196,0.85) 0%, transparent 38%),
-    var(--gapp-aurora-1-hover); /* 호버 시 살짝 밝은 버전 */
+    radial-gradient(circle at 20% 30%, rgba(44,137,164,0.85) 0%, transparent 32%),
+    radial-gradient(circle at 75% 65%, rgba(15,104,143,0.85) 0%, transparent 35%),
+    radial-gradient(circle at 45% 85%, rgba(6,70,137,0.85) 0%, transparent 38%),
+    #081D4D; /* 호버 시 살짝 밝은 버전 (마찬가지로 30% 더 어둡게) */
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 오로라 톤이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22D3EE;               /* 호버 시 밝은 시안 라인으로 강조 */
   --gapp-slot-blur: none;
@@ -1314,11 +1318,14 @@ footer {
      어두운 페이지 배경(거의 검정) 위에서는 opacity를 낮출수록 오히려
      바탕색에 더 섞여 들어가 밝기가 크게 달라지지 않거나 반대로 헷갈리는
      방향이 됐다. 대신 검은색 반투명 오버레이 레이어를 배경 맨 앞에 겹쳐서
-     "오버레이가 진할수록(숫자가 클수록) 더 어둡게" 되도록 함 — 80%는
-     검은 오버레이 자체의 불투명도. */
+     "오버레이가 진할수록(숫자가 클수록) 더 어둡게" 되도록 함.
+     처음엔 오버레이를 80%로 넣었는데, 활성 슬롯 자체가 이후 80% 더
+     어두워지면서(위 --gapp-slot-bg 참고) 거기에 80% 검은 오버레이까지
+     겹치니 잠긴 슬롯이 순수 검정처럼 보이는 문제가 생김 — 아래 네이비
+     그라데이션이 육안으로 구분되도록 오버레이를 35%로 낮췄다. */
   --gapp-slot-disabled-bg:
-    linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)),
-    linear-gradient(135deg, #0A0E1F 0%, #131A33 100%); /* 잠긴 슬롯 — 어둡고 채도 낮은 네이비 + 80% 검은 오버레이 */
+    linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)),
+    linear-gradient(135deg, #0A0E1F 0%, #131A33 100%); /* 잠긴 슬롯 — 어둡고 채도 낮은 네이비 + 35% 검은 오버레이 */
   --gapp-slot-disabled-opacity: 1; /* 어둡게 하는 역할은 위 오버레이가 담당 — 요소 opacity는 그대로 둬 아이콘/문구 자체 색상만 별도로 옅게 유지 */
   --gapp-slot-lock-color: rgba(255,255,255,0.48);   /* 잠금 아이콘/문구 — 2D 픽토그램, 기존(60%)보다 20% 더 어둡게(48%) */
 
