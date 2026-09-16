@@ -1360,7 +1360,9 @@ function oauthLogin(provider, btn) {
       clearInterval(checkClosed);
       window.removeEventListener('message', onMessage);
       _setAuthButtonsBusy(false);
-      showToast(t('loginFailed'), 'error');
+      // 서버가 실제 실패 사유를 함께 보내주는데 화면엔 일반 문구만 나와서 디버그가 안 됐음 —
+      // 실제 사유가 있으면 같이 보여준다.
+      showToast(e.data?.error ? (t('loginFailed') + ' (' + e.data.error + ')') : t('loginFailed'), 'error');
     }
   };
 
@@ -1397,7 +1399,7 @@ function checkOAuthRedirectResult() {
     const cleanUrl = window.location.pathname;
     window.history.replaceState({}, document.title, cleanUrl);
     localStorage.removeItem('oauth_redirect_pending');
-    showToast(t('loginFailed'), 'error');
+    showToast(oauthError !== 'cancelled' ? (t('loginFailed') + ' (' + oauthError + ')') : t('loginFailed'), 'error');
     return;
   }
 
