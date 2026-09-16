@@ -2089,9 +2089,6 @@ footer {
   font-size: 16px; /* 기존(22px)보다 더 작게 */
   color: var(--gapp-slot-lock-color, rgba(255,255,255,0.48));
 }
-.cslot--disabled .cslot-hint {
-  color: rgba(255,255,255,0.68);
-}
 .cslot-hint {
   display: block;
   font-size: 11px;
