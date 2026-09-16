@@ -20,6 +20,36 @@ function gaEvent(name, params) {
 }
 
 // ─────────────────────────────────────────────────────────
+// 사용자 에러 자동 수집 — 사용자가 겪은 에러를 우리가 실시간으로 알 방법이 없어서
+// "이상하다"는 리포트를 받고서야 뒤늦게 아는 문제를 줄이기 위함. 어드민 "에러 로그"
+// 탭 + 30분 주기 유지보수 세션 자동 진단의 원천 데이터. 실패해도 절대 사용자 흐름을
+// 막으면 안 되므로 fetch는 fire-and-forget(응답을 기다리지 않음).
+function reportClientError(message, stack, extra) {
+  try {
+    fetch('/api/errors/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: String(message || '').slice(0, 2000),
+        stack: stack ? String(stack).slice(0, 4000) : undefined,
+        url: location.href,
+        extra: extra,
+      }),
+    }).catch(() => {});
+  } catch (e) {}
+}
+window.addEventListener('error', function (e) {
+  reportClientError(e.message, e.error && e.error.stack);
+});
+window.addEventListener('unhandledrejection', function (e) {
+  var reason = e.reason;
+  reportClientError(
+    (reason && reason.message) || String(reason),
+    reason && reason.stack
+  );
+});
+
+// ─────────────────────────────────────────────────────────
 // UTM 파라미터 캡처 — 랜딩 시점에 저장해두었다가 가입 시점에 함께 전송(어트리뷰션)
 // 30일 이내 첫 방문 UTM을 우선 유지(last-touch가 아닌 first-touch 방식)
 // ─────────────────────────────────────────────────────────

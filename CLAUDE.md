@@ -49,6 +49,24 @@ hasModel && hasBg` 분기)은 실제 AI 생성 결과물의 품질을 직접 좌
    `scripts/verify-critical-prompts.mjs`의 `GUARDS`에 등록해서 다음 리팩터링이
    똑같은 방식으로 회귀하지 않도록 할 것.
 
+## 사용자 에러 자동 감지/유지보수 루틴
+
+`error_logs` D1 테이블(`migrations/0024_error_logs.sql`)에 클라이언트(브라우저
+`window.onerror`/`unhandledrejection` → `POST /api/errors/report`, 인증 없음)와
+서버(`/api/generation/start` 등 개별 catch 블록 + 전역 `app.onError`) 양쪽 에러가
+자동 기록된다. `/admin02`의 "에러 로그" 탭(`GET/PATCH /api/admin/errors*`, 헤더
+`X-Admin-Password`)에서 확인 가능하고, status는 `open → in_review(수정 PR 대기)
+→ resolved` 순으로 사람이 직접 바꾸거나 유지보수 세션이 PATCH로 바꾼다.
+
+별도의 **"EZlook 유지보수" 세션**이 30분 주기 Routine으로 깨어나 스테이징 관리자
+API를 `X-Maint-Token`(전용 시크릿, `ADMIN_PASSWORD`와 분리)으로 조회해 `open` 에러를
+진단하고, 수정 브랜치+PR을 만든 뒤 해당 에러를 `in_review`로 바꾼다. **절대 스스로
+`main`에 배포하지 않는다** — 실제 배포는 항상 사람이 PR을 확인한 뒤 기존 승격
+절차(아래 배포 워크플로)를 따른다. `MAINT_API_TOKEN`은
+`wrangler secret put MAINT_API_TOKEN`으로 스테이징/운영 양쪽에 설정해야 하며(D1
+마이그레이션과 마찬가지로 샌드박스 세션은 직접 실행 불가), 값이 없으면 이 엔드포인트는
+`ADMIN_PASSWORD`만 허용한다.
+
 ## 배포 워크플로
 
 - `claude/lookbook-ai-handoff-eqvygd` (핸드오프/개발) → `develop` (스테이징, Cloudflare
@@ -62,3 +80,10 @@ hasModel && hasBg` 분기)은 실제 AI 생성 결과물의 품질을 직접 좌
   (`npx wrangler d1 execute <db-name> --remote --file=migrations/...sql`) — 이 세션
   환경은 `wrangler`가 인증되어 있지 않아 직접 실행할 수 없으므로, 정확한 명령어를
   사용자에게 안내할 것.
+- **로컬 `wrangler pages dev` 실행 시 `--d1=`/`--kv=` 플래그를 직접 주지 말 것.**
+  `wrangler.jsonc`에 이미 바인딩이 선언되어 있는데 `--d1=LOOKBOOK_DB`처럼 이름만
+  넘기면, 실제 `database_id`를 무시하고 완전히 새 "가짜" 로컬 D1을 만들어버려서
+  기존 로컬 시드 데이터(회원 등)가 하나도 없는 빈 DB에 붙는다 — 에러 없이 조용히
+  다른 파일(`.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite`)을 쓰기
+  시작하므로 알아채기 어렵다. 그냥 `npx wrangler pages dev dist`(또는
+  `npm run preview`)만 실행해 `wrangler.jsonc`의 바인딩을 그대로 읽게 할 것.
