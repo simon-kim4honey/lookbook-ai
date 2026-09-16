@@ -1829,7 +1829,7 @@ footer {
   border: 1.5px solid transparent;
   background: var(--gapp-slot-bg, #F2F4F6);
   background-size: 130% 130%, 150% 150%, 170% 170%, 100% 100%;
-  animation: cslotAurora 16s ease-in-out infinite, cslotColorShift 20s ease-in-out infinite;
+  animation: cslotAurora 14.4s ease-in-out infinite, cslotColorShift 18s ease-in-out infinite;
   backdrop-filter: var(--gapp-slot-blur, none);
   -webkit-backdrop-filter: var(--gapp-slot-blur, none);
   cursor: pointer;
@@ -1899,21 +1899,25 @@ footer {
    보다 우선순위가 높아서, 이 규칙에 animation-name까지 지정해두면 슬롯이
    잠겼을 때(.cslot--disabled가 animation:none으로 끄려는 것)보다 이 ID
    규칙이 이겨버려 잠긴 상태에서도 계속 움직이는 버그가 생긴다. */
+/* 요청에 따라 움직임 역동성 10% 상승 — 위치/크기/색상 애니메이션 전부의
+   duration·delay를 ×0.9(10% 단축)해서 같은 경로를 10% 더 빠르게 돈다.
+   delay도 duration과 같은 비율로 줄여야 애니메이션 시작 시점의 위상(어느
+   구간에서 시작하는지)이 원래와 동일하게 유지된다. */
 #slot-TOP:not(.cslot--disabled) {
   animation-name: cslotAurora, cslotColorShift;
-  animation-duration: 14s, 21s;
-  animation-delay: -2s, -4s;
+  animation-duration: 12.6s, 18.9s;
+  animation-delay: -1.8s, -3.6s;
 }
 #slot-BOTTOM:not(.cslot--disabled) {
   animation-name: cslotAurora2, cslotColorShift;
-  animation-duration: 19s, 26s;
-  animation-delay: -9s, -11s;
+  animation-duration: 17.1s, 23.4s;
+  animation-delay: -8.1s, -9.9s;
   background: var(--gapp-slot-bg-2, var(--gapp-slot-bg, #F2F4F6));
 }
 #slot-DRESS:not(.cslot--disabled) {
   animation-name: cslotAurora3, cslotColorShift;
-  animation-duration: 23s, 17s;
-  animation-delay: -15s, -6s;
+  animation-duration: 20.7s, 15.3s;
+  animation-delay: -13.5s, -5.4s;
   background: var(--gapp-slot-bg-3, var(--gapp-slot-bg, #F2F4F6));
 }
 @media (prefers-reduced-motion: reduce) {
