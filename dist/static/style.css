@@ -1291,6 +1291,7 @@ footer {
   --gapp-aurora-2-hover: #0864C4;
   --gapp-aurora-3-hover: #1595CC;
   --gapp-aurora-4-hover: #3FC4EA;
+  --gapp-aurora-mid: #0565AA;      /* 블루(aurora-2)와 브라이트블루(aurora-3)의 중간값 — 1/2/3 단계 표시줄 전용 */
   /* 블롭 반경(45%)을 background-size보다 충분히 작게, 불투명도도 0.85로 낮춰
      겹치는 곳에서만 색이 섞이고 나머지는 바탕(딥 네이비)이 비치도록 함 —
      처음 시도는 블롭이 상자 크기에 비해 너무 크고 불투명해서 슬롯 전체가
@@ -1306,23 +1307,19 @@ footer {
     radial-gradient(circle at 75% 65%, rgba(21,149,204,0.85) 0%, transparent 35%),
     radial-gradient(circle at 45% 85%, rgba(8,100,196,0.85) 0%, transparent 38%),
     var(--gapp-aurora-1-hover); /* 호버 시 살짝 밝은 버전 */
-  /* "전체" 슬롯(#slot-DRESS) 전용 — 기존 오로라 색상보다 30% 더 어둡게(RGB
-     채널에 0.7 곱함) */
-  --gapp-slot-bg-dark:
-    radial-gradient(circle at 20% 30%, rgba(9,118,150,0.8) 0%, transparent 32%),
-    radial-gradient(circle at 75% 65%, rgba(4,85,125,0.8) 0%, transparent 35%),
-    radial-gradient(circle at 45% 85%, rgba(3,56,112,0.8) 0%, transparent 38%),
-    #051334;
-  --gapp-slot-bg-dark-hover:
-    radial-gradient(circle at 20% 30%, rgba(44,137,164,0.85) 0%, transparent 32%),
-    radial-gradient(circle at 75% 65%, rgba(15,104,143,0.85) 0%, transparent 35%),
-    radial-gradient(circle at 45% 85%, rgba(6,70,137,0.85) 0%, transparent 38%),
-    #081D4D;
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 오로라 톤이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22D3EE;               /* 호버 시 밝은 시안 라인으로 강조 */
   --gapp-slot-blur: none;
-  --gapp-slot-disabled-bg: linear-gradient(135deg, #0A0E1F 0%, #131A33 100%); /* 잠긴 슬롯 — 어둡고 채도 낮은 네이비(오로라 팔레트와 톤 통일, 잠김 표시로 정적 유지) */
-  --gapp-slot-disabled-opacity: 0.7; /* 자물쇠 들어간 비활성화 슬롯 전체 투명도 70% */
+  /* 잠긴 슬롯 어둡게 하기 — 이전에는 요소 자체의 opacity를 낮췄는데, 이미
+     어두운 페이지 배경(거의 검정) 위에서는 opacity를 낮출수록 오히려
+     바탕색에 더 섞여 들어가 밝기가 크게 달라지지 않거나 반대로 헷갈리는
+     방향이 됐다. 대신 검은색 반투명 오버레이 레이어를 배경 맨 앞에 겹쳐서
+     "오버레이가 진할수록(숫자가 클수록) 더 어둡게" 되도록 함 — 80%는
+     검은 오버레이 자체의 불투명도. */
+  --gapp-slot-disabled-bg:
+    linear-gradient(rgba(0,0,0,0.8), rgba(0,0,0,0.8)),
+    linear-gradient(135deg, #0A0E1F 0%, #131A33 100%); /* 잠긴 슬롯 — 어둡고 채도 낮은 네이비 + 80% 검은 오버레이 */
+  --gapp-slot-disabled-opacity: 1; /* 어둡게 하는 역할은 위 오버레이가 담당 — 요소 opacity는 그대로 둬 아이콘/문구 자체 색상만 별도로 옅게 유지 */
   --gapp-slot-lock-color: rgba(255,255,255,0.48);   /* 잠금 아이콘/문구 — 2D 픽토그램, 기존(60%)보다 20% 더 어둡게(48%) */
 
   /* 전역 토큰(:root)을 #gapp 안에서만 재정의 — CSS 커스텀 프로퍼티는 자손에게만
@@ -1396,10 +1393,21 @@ footer {
 
 /* 우측 상단 로그인 버튼 — 인라인 style의 --gapp-accent 대신 슬롯과 같은
    오로라 팔레트 색상 적용(이 버튼에만 한정 — 전역 --gapp-accent를 바꾸면
-   스피너/다른 강조 텍스트 등 무관한 곳까지 영향을 준다) */
+   스피너/다른 강조 텍스트 등 무관한 곳까지 영향을 준다). 테두리는 단색,
+   텍스트는 로고와 동일한 그라데이션(배경-클립) 처리 — 버튼 하나에서 border와
+   background(그라데이션 텍스트용)는 서로 다른 속성이라 함께 써도 충돌 없음. */
 #navLoginBtn {
   border-color: var(--gapp-aurora-4, #A78BFA) !important;
-  color: var(--gapp-aurora-4, #A78BFA) !important;
+  /* 배경을 완전히 투명하게 만든 뒤(shorthand) 그라데이션 이미지만 다시
+     채워야 한다 — background-clip:text가 배경색까지 함께 텍스트 모양으로
+     잘라버려서, 원래 있던 알약(pill) 채우기색과 같이 쓰면 텍스트 바깥
+     영역이 뻥 뚫려 보인다(투명 배경 + 테두리만 있는 스타일로 의도적으로
+     변경). */
+  background: transparent !important;
+  background-image: linear-gradient(90deg, var(--gapp-aurora-3, #0579B3), var(--gapp-aurora-4, #0DA8D6)) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
 }
 
 /* ── 슬라이드 컨테이너 ── */
@@ -1663,11 +1671,11 @@ footer {
   letter-spacing: 0.2px;
 }
 .gstep-item.active .gstep-circle {
-  background: linear-gradient(90deg, var(--gapp-aurora-3, #0579B3), var(--gapp-aurora-4, #0DA8D6)); /* 슬롯과 같은 오로라 팔레트 색상 */
+  background: var(--gapp-aurora-mid, #0565AA); /* 슬롯 그라데이션에 포함된 블루 중 중간값 */
   color: #fff;
 }
 .gstep-item.active .gstep-text {
-  color: var(--gapp-aurora-4, #0DA8D6); /* 슬롯과 같은 오로라 팔레트 색상 */
+  color: var(--gapp-aurora-mid, #0565AA); /* 슬롯 그라데이션에 포함된 블루 중 중간값 */
 }
 .gstep-sep {
   color: var(--gapp-border, #D1D6DB);
@@ -1712,7 +1720,7 @@ footer {
 }
 .gfilter-bar .filter-tag.active,
 .gfilter-bar .bg-cat.active {
-  background: var(--gapp-gradient, #3182F6) !important;
+  background: linear-gradient(90deg, var(--gapp-aurora-3, #0579B3), var(--gapp-aurora-4, #0DA8D6)) !important; /* 슬롯과 같은 오로라 팔레트 색상 */
   border-color: transparent !important;
   color: #fff !important;
 }
@@ -1794,19 +1802,43 @@ footer {
   74%  { background-position: 30% 80%, 70% 40%, 60% 20%, 0 0; }
   100% { background-position: 20% 30%, 75% 65%, 45% 85%, 0 0; }
 }
-/* 슬롯마다 서로 다른 속도/시작 지점으로 움직이게 해서 여러 칸이 똑같이
-   동시에 움직이는 것처럼 보이지 않게 한다 — 같은 키프레임(cslotAurora)을
-   재사용하되 animation-duration/-delay만 슬롯별로 다르게 준다("전체"
-   슬롯은 요청대로 배경도 30% 더 어둡게 별도 지정). */
-#slot-TOP    { animation-duration: 14s; animation-delay: -2s; }
-#slot-BOTTOM { animation-duration: 19s; animation-delay: -9s; }
-#slot-DRESS  {
-  background: var(--gapp-slot-bg-dark, var(--gapp-slot-bg));
+/* 슬롯 3개가 같은 키프레임을 시간차만 두고 재생하면(delay만 다름) 결국
+   "같은 모양을 시차만 두고 따라가는" 것으로 보여 실제로는 다르게 안
+   느껴진다는 피드백 — 슬롯마다 아예 다른 좌표 시퀀스(다른 키프레임)를
+   쓰도록 바꿨다. */
+@keyframes cslotAurora2 {
+  0%   { background-position: 70% 20%, 30% 80%, 60% 50%, 0 0; }
+  30%  { background-position: 25% 60%, 65% 25%, 20% 30%, 0 0; }
+  55%  { background-position: 80% 75%, 20% 55%, 75% 65%, 0 0; }
+  80%  { background-position: 40% 15%, 75% 70%, 35% 20%, 0 0; }
+  100% { background-position: 70% 20%, 30% 80%, 60% 50%, 0 0; }
+}
+@keyframes cslotAurora3 {
+  0%   { background-position: 50% 60%, 15% 25%, 80% 40%, 0 0; }
+  20%  { background-position: 20% 20%, 60% 70%, 30% 75%, 0 0; }
+  50%  { background-position: 75% 45%, 25% 15%, 55% 25%, 0 0; }
+  78%  { background-position: 35% 75%, 70% 35%, 15% 60%, 0 0; }
+  100% { background-position: 50% 60%, 15% 25%, 80% 40%, 0 0; }
+}
+/* 슬롯마다 다른 키프레임 + 다른 속도로 움직이게 해서 서로 다르게 보이도록
+   함. :not(.cslot--disabled)로 한정하는 이유 — ID 선택자는 클래스 선택자
+   보다 우선순위가 높아서, 이 규칙에 animation-name까지 지정해두면 슬롯이
+   잠겼을 때(.cslot--disabled가 animation:none으로 끄려는 것)보다 이 ID
+   규칙이 이겨버려 잠긴 상태에서도 계속 움직이는 버그가 생긴다. */
+#slot-TOP:not(.cslot--disabled) {
+  animation-name: cslotAurora;
+  animation-duration: 14s;
+  animation-delay: -2s;
+}
+#slot-BOTTOM:not(.cslot--disabled) {
+  animation-name: cslotAurora2;
+  animation-duration: 19s;
+  animation-delay: -9s;
+}
+#slot-DRESS:not(.cslot--disabled) {
+  animation-name: cslotAurora3;
   animation-duration: 23s;
   animation-delay: -15s;
-}
-#slot-DRESS:hover {
-  background: var(--gapp-slot-hover-tint, none), var(--gapp-slot-bg-dark-hover, var(--gapp-slot-bg-hover));
 }
 @media (prefers-reduced-motion: reduce) {
   .cslot, .gslide-nav .step-nav-next, .cslot--filled::after, .cslot:hover::after { animation: none; }
@@ -1867,9 +1899,9 @@ footer {
   border-style: dashed;
   background: var(--gapp-slot-disabled-bg, transparent);
   /* 잠긴 슬롯은 활성 슬롯의 오로라 애니메이션(레이어 4장짜리 radial-gradient)과
-     무관한 단순 2색 선형 그라데이션이다. 잠긴 슬롯은 움직일 필요도 없으므로
-     (비활성 상태를 정적으로 표현) 애니메이션을 끄고 확대(300%)해서 한 번만
-     보여준다. */
+     무관하게, 검은 오버레이 + 단순 2색 선형 그라데이션 2겹으로 구성된다.
+     잠긴 슬롯은 움직일 필요도 없으므로(비활성 상태를 정적으로 표현) 애니메이션을
+     끄고 확대(300%)해서 한 번만 보여준다. */
   background-size: 300% 300%;
   background-repeat: no-repeat;
   animation: none;
