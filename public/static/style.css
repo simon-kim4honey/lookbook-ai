@@ -1306,11 +1306,23 @@ footer {
     radial-gradient(circle at 75% 65%, rgba(21,149,204,0.85) 0%, transparent 35%),
     radial-gradient(circle at 45% 85%, rgba(8,100,196,0.85) 0%, transparent 38%),
     var(--gapp-aurora-1-hover); /* 호버 시 살짝 밝은 버전 */
+  /* "전체" 슬롯(#slot-DRESS) 전용 — 기존 오로라 색상보다 30% 더 어둡게(RGB
+     채널에 0.7 곱함) */
+  --gapp-slot-bg-dark:
+    radial-gradient(circle at 20% 30%, rgba(9,118,150,0.8) 0%, transparent 32%),
+    radial-gradient(circle at 75% 65%, rgba(4,85,125,0.8) 0%, transparent 35%),
+    radial-gradient(circle at 45% 85%, rgba(3,56,112,0.8) 0%, transparent 38%),
+    #051334;
+  --gapp-slot-bg-dark-hover:
+    radial-gradient(circle at 20% 30%, rgba(44,137,164,0.85) 0%, transparent 32%),
+    radial-gradient(circle at 75% 65%, rgba(15,104,143,0.85) 0%, transparent 35%),
+    radial-gradient(circle at 45% 85%, rgba(6,70,137,0.85) 0%, transparent 38%),
+    #081D4D;
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 오로라 톤이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22D3EE;               /* 호버 시 밝은 시안 라인으로 강조 */
   --gapp-slot-blur: none;
   --gapp-slot-disabled-bg: linear-gradient(135deg, #0A0E1F 0%, #131A33 100%); /* 잠긴 슬롯 — 어둡고 채도 낮은 네이비(오로라 팔레트와 톤 통일, 잠김 표시로 정적 유지) */
-  --gapp-slot-disabled-opacity: 1;
+  --gapp-slot-disabled-opacity: 0.7; /* 자물쇠 들어간 비활성화 슬롯 전체 투명도 70% */
   --gapp-slot-lock-color: rgba(255,255,255,0.48);   /* 잠금 아이콘/문구 — 2D 픽토그램, 기존(60%)보다 20% 더 어둡게(48%) */
 
   /* 전역 토큰(:root)을 #gapp 안에서만 재정의 — CSS 커스텀 프로퍼티는 자손에게만
@@ -1372,13 +1384,23 @@ footer {
 }
 .gapp-logo-ez,
 .gapp-logo-look {
-  background: var(--gapp-gradient, #A78BFA);
+  /* 슬롯과 같은 오로라 팔레트 색상 적용(움직임은 없음 — 로고는 정적으로
+     유지해달라는 이전 요청 반영) */
+  background: linear-gradient(90deg, var(--gapp-aurora-3, #0579B3), var(--gapp-aurora-4, #0DA8D6));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 .gapp-logo-ez { font-weight: 800; }
 .gapp-logo-look { font-weight: 300; }
+
+/* 우측 상단 로그인 버튼 — 인라인 style의 --gapp-accent 대신 슬롯과 같은
+   오로라 팔레트 색상 적용(이 버튼에만 한정 — 전역 --gapp-accent를 바꾸면
+   스피너/다른 강조 텍스트 등 무관한 곳까지 영향을 준다) */
+#navLoginBtn {
+  border-color: var(--gapp-aurora-4, #A78BFA) !important;
+  color: var(--gapp-aurora-4, #A78BFA) !important;
+}
 
 /* ── 슬라이드 컨테이너 ── */
 #gapp-slides {
@@ -1641,11 +1663,11 @@ footer {
   letter-spacing: 0.2px;
 }
 .gstep-item.active .gstep-circle {
-  background: var(--gapp-gradient, #3182F6);
+  background: linear-gradient(90deg, var(--gapp-aurora-3, #0579B3), var(--gapp-aurora-4, #0DA8D6)); /* 슬롯과 같은 오로라 팔레트 색상 */
   color: #fff;
 }
 .gstep-item.active .gstep-text {
-  color: var(--gapp-step-active-color, #3182F6); /* 요청: 보라색 → 다크그린으로 변경 */
+  color: var(--gapp-aurora-4, #0DA8D6); /* 슬롯과 같은 오로라 팔레트 색상 */
 }
 .gstep-sep {
   color: var(--gapp-border, #D1D6DB);
@@ -1772,34 +1794,51 @@ footer {
   74%  { background-position: 30% 80%, 70% 40%, 60% 20%, 0 0; }
   100% { background-position: 20% 30%, 75% 65%, 45% 85%, 0 0; }
 }
+/* 슬롯마다 서로 다른 속도/시작 지점으로 움직이게 해서 여러 칸이 똑같이
+   동시에 움직이는 것처럼 보이지 않게 한다 — 같은 키프레임(cslotAurora)을
+   재사용하되 animation-duration/-delay만 슬롯별로 다르게 준다("전체"
+   슬롯은 요청대로 배경도 30% 더 어둡게 별도 지정). */
+#slot-TOP    { animation-duration: 14s; animation-delay: -2s; }
+#slot-BOTTOM { animation-duration: 19s; animation-delay: -9s; }
+#slot-DRESS  {
+  background: var(--gapp-slot-bg-dark, var(--gapp-slot-bg));
+  animation-duration: 23s;
+  animation-delay: -15s;
+}
+#slot-DRESS:hover {
+  background: var(--gapp-slot-hover-tint, none), var(--gapp-slot-bg-dark-hover, var(--gapp-slot-bg-hover));
+}
 @media (prefers-reduced-motion: reduce) {
-  .cslot, .gslide-nav .step-nav-next, .cslot--filled::after { animation: none; }
+  .cslot, .gslide-nav .step-nav-next, .cslot--filled::after, .cslot:hover::after { animation: none; }
 }
 .cslot:hover {
-  border-color: var(--gapp-slot-hover-border, rgba(124,58,237,0.35));
+  border-color: transparent; /* 정적 단색 테두리 대신 아래 ::after의 회전 글로우 링을 씀 */
   background: var(--gapp-slot-hover-tint, none), var(--gapp-slot-bg-hover, #E8F3FF);
 }
 .cslot.drag-over {
   border-color: var(--gapp-accent, #3182F6);
   background: var(--gapp-slot-bg-hover, #E8F3FF);
 }
-/* 이미지 채워진(선택된) 슬롯: 실선 테두리 대신, 슬롯 그라데이션과 같은
-   오로라 팔레트가 테두리를 따라 빙글빙글 도는 빛 효과를 준다. 실제 border는
-   투명하게 두고(레이아웃 두께 유지), ::after 가상요소가 padding-box만 남기고
-   나머지(content-box)를 mask로 도려낸 "링" 모양에 conic-gradient를 채워
-   넣는 방식 — @property로 등록한 각도(--cslot-border-angle)를 애니메이션시켜
-   테두리 모양은 고정한 채 빛(색)만 링을 따라 회전하는 것처럼 보이게 한다. */
+/* 이미지 채워진(선택된) 슬롯과, 잠기지 않은 슬롯에 마우스를 올렸을 때: 실선
+   테두리 대신 슬롯 그라데이션과 같은 오로라 팔레트가 테두리를 따라 빙글빙글
+   도는 빛 효과를 준다. 실제 border는 투명하게 두고(레이아웃 두께 유지),
+   ::after 가상요소가 padding-box만 남기고 나머지(content-box)를 mask로
+   도려낸 "링" 모양에 conic-gradient를 채워 넣는 방식 — @property로 등록한
+   각도(--cslot-border-angle)를 애니메이션시켜 테두리 모양은 고정한 채
+   빛(색)만 링을 따라 회전하는 것처럼 보이게 한다. 두께(padding)는 호버 시
+   나타나던 기존 테두리 두께(1.5px)와 동일하게 맞춤(기존 3px는 너무 두꺼움). */
 .cslot--filled {
   border-style: solid;
   border-color: transparent;
   cursor: default;
 }
-.cslot--filled::after {
+.cslot--filled::after,
+.cslot:not(.cslot--filled):not(.cslot--disabled):hover::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 3px;
+  padding: 1.5px;
   background: conic-gradient(from var(--cslot-border-angle, 0deg),
     var(--gapp-aurora-4), var(--gapp-aurora-3), var(--gapp-aurora-2), var(--gapp-aurora-4));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
