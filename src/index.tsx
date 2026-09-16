@@ -26,7 +26,15 @@ type Bindings = {
   // 유지보수 세션(자동 에러 감지/수정 루틴)이 /api/admin/errors를 사람 비밀번호 없이
   // 조회/갱신할 수 있도록 하는 전용 토큰 — ADMIN_PASSWORD와 분리해 별도로 회전 가능
   // (wrangler secret put MAINT_API_TOKEN). 미설정 시 이 경로는 ADMIN_PASSWORD만 허용.
+  // 참고: 유지보수 세션의 샌드박스 환경이 *.pages.dev로의 아웃바운드 접속을 막고
+  // 있어 실제로는 이 토큰으로 직접 폴링하는 방식 대신 아래 GITHUB_TOKEN을 통한
+  // GitHub 이슈 방식으로 자동화가 동작한다 — 이 토큰은 당장 필수는 아님.
   MAINT_API_TOKEN?: string
+  // 에러 발생 시 GitHub 이슈를 자동 생성하기 위한 토큰(레포 Issues: Read/Write
+  // 권한의 fine-grained PAT). 유지보수 세션이 API 직접 폴링 대신 GitHub 이슈를
+  // 확인하는 방식으로 동작하므로 이 토큰이 있어야 자동 감지가 실질적으로 작동한다.
+  // 미설정 시 이슈 생성은 조용히 건너뛰고 D1 로깅만 수행(에러 자체는 계속 기록됨).
+  GITHUB_TOKEN?: string
   // 토스페이먼츠 (결제위젯 v2). 반드시 "API 개별연동 키"를 사용할 것 — "주문서형·결제창형
   // 연동 키"는 TossPayments().payment().requestPayment() 방식에서 지원하지 않는다(토스가
   // 직접 에러로 알려줌: "API 개별 연동 키의 클라이언트 키로 SDK를 연동해주세요").
@@ -82,7 +90,7 @@ app.use('/static/*', serveStatic({ root: './public' }))
 app.onError(async (err, c) => {
   console.error('[onError] 미처리 서버 에러:', err)
   try {
-    await logError(c.env.LOOKBOOK_DB, {
+    await logError(c.env, {
       source: 'server',
       message: (err as any)?.message || String(err),
       stack: (err as any)?.stack,
@@ -158,20 +166,79 @@ const errorsAuth = async (c: any, next: any) => {
   await next()
 }
 
+// GitHub 이슈 자동 생성 — 유지보수 세션의 샌드박스 환경이 *.pages.dev로의
+// 아웃바운드 접속을 막고 있어(egress 정책, 계정 설정으로도 못 바꿈이 확인됨)
+// 관리자 API를 직접 폴링하는 방식이 동작하지 않는다. 대신 Worker(아웃바운드 제한
+// 없음)가 에러 발생 시 직접 GitHub 이슈를 만들고, 유지보수 세션은 GitHub 이슈만
+// 확인하도록 우회 — GitHub API 호출은 세션 쪽에서 이미 정상 동작 확인됨.
+// 같은 message+route로 24시간 내 이미 만든 이슈가 있으면 새로 만들지 않고
+// 그 이슈 URL을 재사용한다(반복 에러가 이슈를 도배하지 않도록).
+const GITHUB_REPO = 'simon-kim4honey/lookbook-ai'
+async function findOrCreateGithubIssue(
+  db: D1Database,
+  githubToken: string | undefined,
+  opts: { message: string; route: string | null; stack: string | null; source: string }
+): Promise<string | null> {
+  if (!githubToken) return null
+  try {
+    const dup: any = await db.prepare(
+      `SELECT github_issue_url FROM error_logs
+       WHERE message = ? AND (route = ? OR (route IS NULL AND ? IS NULL))
+         AND github_issue_url IS NOT NULL
+         AND created_at > datetime('now', '-1 day')
+       ORDER BY created_at DESC LIMIT 1`
+    ).bind(opts.message, opts.route, opts.route).first()
+    if (dup?.github_issue_url) return dup.github_issue_url
+
+    const title = `[자동 에러] ${opts.route || '(경로 없음)'} — ${opts.message}`.slice(0, 250)
+    const body = [
+      `**출처**: ${opts.source}`,
+      `**경로/URL**: ${opts.route || '(없음)'}`,
+      `**메시지**: ${opts.message}`,
+      opts.stack ? `\n**스택 트레이스**\n\`\`\`\n${opts.stack.slice(0, 3000)}\n\`\`\`` : '',
+      '\n---\nlookbook-ai 서버가 자동 생성한 이슈입니다. 유지보수 세션이 이 이슈를 보고 진단 후 수정 PR을 연결하면 `in-review` 라벨이 붙습니다. 실제 배포 확인 후 이 이슈를 닫아주세요.',
+    ].join('\n')
+
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${githubToken}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'lookbook-ai-error-bot',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title, body, labels: ['auto-error'] }),
+    })
+    if (!res.ok) {
+      console.error('[findOrCreateGithubIssue] GitHub API 실패:', res.status, await res.text())
+      return null
+    }
+    const json: any = await res.json()
+    return json.html_url || null
+  } catch (e) {
+    console.error('[findOrCreateGithubIssue] 실패 (무시):', e)
+    return null
+  }
+}
+
 // 서버 에러 기록 헬퍼 — 절대 요청 흐름을 막지 않도록 실패를 삼킨다(로깅 자체의
 // 실패가 실제 API 응답에 영향을 주면 안 됨). message/stack은 D1 컬럼 폭주 방지로 길이 제한.
 async function logError(
-  db: D1Database,
+  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string },
   opts: { source: 'client' | 'server'; message: string; stack?: string; route?: string; extra?: any }
 ) {
   try {
+    const db = env.LOOKBOOK_DB
     const message = String(opts.message || '').slice(0, 2000)
     const stack = opts.stack ? String(opts.stack).slice(0, 4000) : null
     const route = opts.route ? String(opts.route).slice(0, 300) : null
     const extra = opts.extra ? JSON.stringify(opts.extra).slice(0, 2000) : null
+
+    const issueUrl = await findOrCreateGithubIssue(db, env.GITHUB_TOKEN, { message, route, stack, source: opts.source })
+
     await db.prepare(
-      `INSERT INTO error_logs (source, message, stack, route, extra) VALUES (?, ?, ?, ?, ?)`
-    ).bind(opts.source, message, stack, route, extra).run()
+      `INSERT INTO error_logs (source, message, stack, route, extra, github_issue_url) VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(opts.source, message, stack, route, extra, issueUrl).run()
   } catch (e) {
     console.error('[logError] 에러 기록 실패 (무시):', e)
   }
@@ -183,7 +250,7 @@ app.post('/api/errors/report', async (c) => {
   try {
     const body = await c.req.json().catch(() => ({}))
     if (!body || !body.message) return c.json({ success: false }, 400)
-    await logError(c.env.LOOKBOOK_DB, {
+    await logError(c.env, {
       source: 'client',
       message: body.message,
       stack: body.stack,
@@ -4453,7 +4520,7 @@ app.post('/api/generation/start', async (c) => {
 
   } catch (err: any) {
     console.error('Generation start error:', err)
-    await logError(c.env.LOOKBOOK_DB, {
+    await logError(c.env, {
       source: 'server',
       message: err?.message || String(err),
       stack: err?.stack,
@@ -8374,7 +8441,7 @@ app.get('/admin02', (c) => {
   <div class="tab-panel" id="tabErrors">
     <div class="admin-body">
       <div class="page-title">🚨 사용자 에러 로그</div>
-      <div class="page-sub">사용자 화면(클라이언트)과 생성 API(서버) 양쪽에서 발생한 에러를 자동 수집합니다. 매시간 유지보수 세션이 open 상태 항목을 진단해 수정 PR을 붙이면 in_review로 바뀝니다 — 배포는 사람이 PR을 확인한 뒤 직접 진행합니다.</div>
+      <div class="page-sub">사용자 화면(클라이언트)과 생성 API(서버) 양쪽에서 발생한 에러를 자동 수집하고, 새 에러마다 GitHub 이슈를 자동 생성합니다("이슈" 링크). 매시간 유지보수 세션이 그 이슈를 확인해 진단하고 수정 PR을 연결하면 이슈에 코멘트가 달립니다 — 배포는 사람이 PR을 확인한 뒤 직접 진행합니다.</div>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px;">
         <div class="section-card" style="padding:16px;text-align:center;">
@@ -8549,13 +8616,14 @@ function renderErrorsTable(errors) {
   }
   tbody.innerHTML = errors.map(function(e) {
     var prLink = e.fix_pr_url ? ' · <a href="' + escHtml(e.fix_pr_url) + '" target="_blank" style="color:#5B9DF7;">PR</a>' : ''
+    var issueLink = e.github_issue_url ? ' · <a href="' + escHtml(e.github_issue_url) + '" target="_blank" style="color:#8b8ba0;">이슈</a>' : ''
     var nextStatus = e.status === 'open' ? 'in_review' : (e.status === 'in_review' ? 'resolved' : 'open')
     var nextLabel = e.status === 'open' ? '수정PR 대기로' : (e.status === 'in_review' ? '해결됨으로' : '미확인으로')
     return '<tr style="border-bottom:1px solid #1e1e3a;">'
       + '<td style="padding:12px 16px;font-size:12px;color:#8b8ba0;white-space:nowrap;">' + (e.created_at || '').replace('T',' ').slice(0,16) + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">' + (ERR_SOURCE_BADGE[e.source] || e.source) + '</td>'
       + '<td style="padding:12px 16px;font-size:12px;color:#c8c8dc;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escHtml(e.route || '-') + '</td>'
-      + '<td style="padding:12px 16px;font-size:12px;color:#e0e0f0;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="showErrorDetail(' + e.id + ')">' + escHtml(e.message || '') + prLink + '</td>'
+      + '<td style="padding:12px 16px;font-size:12px;color:#e0e0f0;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="showErrorDetail(' + e.id + ')">' + escHtml(e.message || '') + prLink + issueLink + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">' + (ERR_STATUS_BADGE[e.status] || e.status) + '</td>'
       + '<td style="padding:12px 16px;text-align:center;">'
       +   '<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">'
@@ -8576,6 +8644,7 @@ function showErrorDetail(id) {
     + '<b>경로/URL</b> ' + escHtml(e.route || '-') + '<br/>'
     + '<b>메시지</b> ' + escHtml(e.message || '') + '<br/>'
     + (e.extra ? '<b>부가정보</b> ' + escHtml(e.extra) + '<br/>' : '')
+    + (e.github_issue_url ? '<b>GitHub 이슈</b> <a href="' + escHtml(e.github_issue_url) + '" target="_blank" style="color:#8b8ba0;">' + escHtml(e.github_issue_url) + '</a><br/>' : '')
     + (e.fix_pr_url ? '<b>수정 PR</b> <a href="' + escHtml(e.fix_pr_url) + '" target="_blank" style="color:#5B9DF7;">' + escHtml(e.fix_pr_url) + '</a><br/>' : '')
     + (e.note ? '<b>메모</b> ' + escHtml(e.note) + '<br/>' : '')
     + '<br/><b>스택 트레이스</b><br/>' + escHtml(e.stack || '(없음)')
