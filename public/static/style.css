@@ -1306,6 +1306,18 @@ footer {
     radial-gradient(circle at 75% 65%, rgba(21,149,204,0.85) 0%, transparent 35%),
     radial-gradient(circle at 45% 85%, rgba(8,100,196,0.85) 0%, transparent 38%),
     var(--gapp-aurora-1-hover); /* 호버 시 살짝 밝은 버전 */
+  /* "전체" 슬롯(#slot-DRESS) 전용 — 기존 오로라 색상보다 30% 더 어둡게(RGB
+     채널에 0.7 곱함) */
+  --gapp-slot-bg-dark:
+    radial-gradient(circle at 20% 30%, rgba(9,118,150,0.8) 0%, transparent 32%),
+    radial-gradient(circle at 75% 65%, rgba(4,85,125,0.8) 0%, transparent 35%),
+    radial-gradient(circle at 45% 85%, rgba(3,56,112,0.8) 0%, transparent 38%),
+    #051334;
+  --gapp-slot-bg-dark-hover:
+    radial-gradient(circle at 20% 30%, rgba(44,137,164,0.85) 0%, transparent 32%),
+    radial-gradient(circle at 75% 65%, rgba(15,104,143,0.85) 0%, transparent 35%),
+    radial-gradient(circle at 45% 85%, rgba(6,70,137,0.85) 0%, transparent 38%),
+    #081D4D;
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 오로라 톤이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22D3EE;               /* 호버 시 밝은 시안 라인으로 강조 */
   --gapp-slot-blur: none;
@@ -1771,6 +1783,20 @@ footer {
   48%  { background-position: 85% 55%, 55% 15%, 15% 70%, 0 0; }
   74%  { background-position: 30% 80%, 70% 40%, 60% 20%, 0 0; }
   100% { background-position: 20% 30%, 75% 65%, 45% 85%, 0 0; }
+}
+/* 슬롯마다 서로 다른 속도/시작 지점으로 움직이게 해서 여러 칸이 똑같이
+   동시에 움직이는 것처럼 보이지 않게 한다 — 같은 키프레임(cslotAurora)을
+   재사용하되 animation-duration/-delay만 슬롯별로 다르게 준다("전체"
+   슬롯은 요청대로 배경도 30% 더 어둡게 별도 지정). */
+#slot-TOP    { animation-duration: 14s; animation-delay: -2s; }
+#slot-BOTTOM { animation-duration: 19s; animation-delay: -9s; }
+#slot-DRESS  {
+  background: var(--gapp-slot-bg-dark, var(--gapp-slot-bg));
+  animation-duration: 23s;
+  animation-delay: -15s;
+}
+#slot-DRESS:hover {
+  background: var(--gapp-slot-hover-tint, none), var(--gapp-slot-bg-dark-hover, var(--gapp-slot-bg-hover));
 }
 @media (prefers-reduced-motion: reduce) {
   .cslot, .gslide-nav .step-nav-next, .cslot--filled::after { animation: none; }
