@@ -139,7 +139,7 @@ const adminAuth = async (c: any, next: any) => {
 }
 
 // 에러 로그 API 인증 — 사람 관리자(X-Admin-Password, 어드민 UI)와 유지보수 세션
-// (X-Maint-Token, 30분 주기 자동 폴링 루틴) 둘 중 하나만 맞으면 통과시킨다.
+// (X-Maint-Token, 매시간 자동 폴링 루틴) 둘 중 하나만 맞으면 통과시킨다.
 // 두 자격을 분리한 이유: 어드민 비밀번호는 사람만 알아야 하는데, 자동화 루틴 프롬프트에
 // 저장되는 토큰은 유출 범위가 다르므로(계정 소유자의 Routine 저장소) 독립적으로 회전 가능해야 함.
 const errorsAuth = async (c: any, next: any) => {
@@ -8374,7 +8374,7 @@ app.get('/admin02', (c) => {
   <div class="tab-panel" id="tabErrors">
     <div class="admin-body">
       <div class="page-title">🚨 사용자 에러 로그</div>
-      <div class="page-sub">사용자 화면(클라이언트)과 생성 API(서버) 양쪽에서 발생한 에러를 자동 수집합니다. 30분마다 유지보수 세션이 open 상태 항목을 진단해 수정 PR을 붙이면 in_review로 바뀝니다 — 배포는 사람이 PR을 확인한 뒤 직접 진행합니다.</div>
+      <div class="page-sub">사용자 화면(클라이언트)과 생성 API(서버) 양쪽에서 발생한 에러를 자동 수집합니다. 매시간 유지보수 세션이 open 상태 항목을 진단해 수정 PR을 붙이면 in_review로 바뀝니다 — 배포는 사람이 PR을 확인한 뒤 직접 진행합니다.</div>
 
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:20px;">
         <div class="section-card" style="padding:16px;text-align:center;">
