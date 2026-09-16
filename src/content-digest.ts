@@ -255,13 +255,19 @@ ${list}
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 8000, // 최신 모델은 기본적으로 확장 사고(thinking)를 함께 생성해서 여유 있게 잡아야 함
+      // 주의: max_tokens를 너무 높게 잡으면(예: 8000) 이 API 키의 사용량 등급 기준
+      // 요청당 상한을 넘겨서 HTTP 403 "forbidden"으로 거부당한다 (3000은 통과, 8000은 거부됨을
+      // 실측으로 확인). 4096은 여러 API에서 흔히 쓰는 안전한 상한이라 우선 이 값으로 둔다.
+      max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     }),
     signal: AbortSignal.timeout(45000),
   })
   if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`)
   const data = await res.json<any>()
+  if (data?.stop_reason === 'max_tokens') {
+    throw new Error('Claude API 응답이 max_tokens 제한으로 중간에 잘렸습니다. max_tokens를 늘려야 합니다.')
+  }
   // content[0]이 항상 텍스트라고 가정하면 안 됨 — 최신 모델은 앞에 thinking 블록을 먼저 넣고
   // 그 뒤에 실제 답변(text 블록)을 넣는다. type이 'text'인 블록을 찾아야 함.
   const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
@@ -420,7 +426,7 @@ ${list}
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
-        max_tokens: 3000,
+        max_tokens: 4096,
         messages: [{ role: 'user', content: prompt }],
       }),
       signal: AbortSignal.timeout(45000),
