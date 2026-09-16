@@ -1341,19 +1341,31 @@ footer {
   --gapp-slot-hover-tint: none; /* 배경 자체가 이미 오로라 톤이라 별도 틴트 오버레이는 불필요 */
   --gapp-slot-hover-border: #22D3EE;               /* 호버 시 밝은 시안 라인으로 강조 */
   --gapp-slot-blur: none;
-  /* 잠긴 슬롯 어둡게 하기 — 이전에는 요소 자체의 opacity를 낮췄는데, 이미
-     어두운 페이지 배경(거의 검정) 위에서는 opacity를 낮출수록 오히려
-     바탕색에 더 섞여 들어가 밝기가 크게 달라지지 않거나 반대로 헷갈리는
-     방향이 됐다. 대신 검은색 반투명 오버레이 레이어를 배경 맨 앞에 겹쳐서
-     "오버레이가 진할수록(숫자가 클수록) 더 어둡게" 되도록 함.
-     처음엔 오버레이를 80%로 넣었는데, 활성 슬롯 자체가 이후 80% 더
-     어두워지면서(위 --gapp-slot-bg 참고) 거기에 80% 검은 오버레이까지
-     겹치니 잠긴 슬롯이 순수 검정처럼 보이는 문제가 생김 — 아래 네이비
-     그라데이션이 육안으로 구분되도록 오버레이를 35%로 낮췄다. */
+  /* 잠긴 슬롯 어둡게 하기 — 이전엔 활성 슬롯 그라데이션과 무관한 별도의
+     네이비 그라데이션 + 검은 오버레이를 썼는데, 두 어둡게 하는 장치가
+     겹치면서 활성 슬롯이 어두워질 때마다 잠긴 슬롯이 거의 순수 검정으로
+     보이는 문제가 반복됐다. 요청에 따라 "활성 슬롯 색상에서 40% 더 어둡게"
+     (RGB 채널에 0.6 곱함)를 직접 계산해 넣는 방식으로 바꿔 — 활성 슬롯이
+     바뀌면 이 값도 그에 맞춰 재계산하면 되고, 두 메커니즘이 겹쳐 어두워지는
+     문제 자체가 구조적으로 없어진다. 슬롯마다 블롭 배치(at X% Y%)도
+     --gapp-slot-bg/-2/-3와 동일하게 맞춰 잠긴 상태에서도 "이 슬롯이었구나"
+     알아볼 수 있게 함. */
   --gapp-slot-disabled-bg:
-    linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)),
-    linear-gradient(135deg, #0A0E1F 0%, #131A33 100%); /* 잠긴 슬롯 — 어둡고 채도 낮은 네이비 + 35% 검은 오버레이 */
-  --gapp-slot-disabled-opacity: 1; /* 어둡게 하는 역할은 위 오버레이가 담당 — 요소 opacity는 그대로 둬 아이콘/문구 자체 색상만 별도로 옅게 유지 */
+    radial-gradient(circle at 20% 30%, rgba(5,71,90,0.8) 0%, transparent 32%),
+    radial-gradient(circle at 75% 65%, rgba(2,51,75,0.8) 0%, transparent 35%),
+    radial-gradient(circle at 45% 85%, rgba(2,34,67,0.8) 0%, transparent 38%),
+    #030B1F; /* 상의 — 활성 슬롯 대비 40% 더 어둡게 */
+  --gapp-slot-disabled-bg-2:
+    radial-gradient(circle at 75% 20%, rgba(5,71,90,0.8) 0%, transparent 32%),
+    radial-gradient(circle at 20% 75%, rgba(2,51,75,0.8) 0%, transparent 35%),
+    radial-gradient(circle at 50% 45%, rgba(2,34,67,0.8) 0%, transparent 38%),
+    #030B1F; /* 하의 */
+  --gapp-slot-disabled-bg-3:
+    radial-gradient(circle at 50% 80%, rgba(5,71,90,0.8) 0%, transparent 32%),
+    radial-gradient(circle at 15% 20%, rgba(2,51,75,0.8) 0%, transparent 35%),
+    radial-gradient(circle at 85% 55%, rgba(2,34,67,0.8) 0%, transparent 38%),
+    #030B1F; /* 전체 */
+  --gapp-slot-disabled-opacity: 1; /* 어둡게 하는 역할은 위 색상 자체가 담당 — 요소 opacity는 그대로 둬 아이콘/문구 자체 색상만 별도로 옅게 유지 */
   --gapp-slot-lock-color: rgba(255,255,255,0.48);   /* 잠금 아이콘/문구 — 2D 픽토그램, 기존(60%)보다 20% 더 어둡게(48%) */
 
   /* 전역 토큰(:root)을 #gapp 안에서만 재정의 — CSS 커스텀 프로퍼티는 자손에게만
@@ -1970,13 +1982,19 @@ footer {
   opacity: var(--gapp-slot-disabled-opacity, 0.35);
   border-style: dashed;
   background: var(--gapp-slot-disabled-bg, transparent);
-  /* 잠긴 슬롯은 활성 슬롯의 오로라 애니메이션(레이어 4장짜리 radial-gradient)과
-     무관하게, 검은 오버레이 + 단순 2색 선형 그라데이션 2겹으로 구성된다.
-     잠긴 슬롯은 움직일 필요도 없으므로(비활성 상태를 정적으로 표현) 애니메이션을
-     끄고 확대(300%)해서 한 번만 보여준다. */
-  background-size: 300% 300%;
+  /* 잠긴 슬롯은 활성 슬롯과 같은 블롭 레이어 구성(radial-gradient 3장 + 바탕색)을
+     쓰되 색상만 40% 어둡게 고정값으로 박아 넣은 것 — background-size도 활성
+     슬롯의 0% 키프레임 값과 맞춰 블롭 크기 감각이 어색하게 튀지 않게 한다.
+     잠긴 슬롯은 움직일 필요가 없으므로(비활성 상태를 정적으로 표현) 애니메이션만 끈다. */
+  background-size: 130% 130%, 150% 150%, 170% 170%, 100% 100%;
   background-repeat: no-repeat;
   animation: none;
+}
+#slot-BOTTOM.cslot--disabled {
+  background: var(--gapp-slot-disabled-bg-2, var(--gapp-slot-disabled-bg, transparent));
+}
+#slot-DRESS.cslot--disabled {
+  background: var(--gapp-slot-disabled-bg-3, var(--gapp-slot-disabled-bg, transparent));
 }
 .cslot--disabled:hover {
   border-color: var(--gapp-border, #E5E8EB);
