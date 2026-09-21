@@ -10,6 +10,7 @@
 // 호출되거나, 관리자가 /generate를 수동 호출해도 동일하게 동작한다.
 // ────────────────────────────────────────────────────
 import { Hono } from 'hono'
+import { logError } from './error-log'
 
 type DigestBindings = {
   LOOKBOOK_DB: D1Database
@@ -17,6 +18,7 @@ type DigestBindings = {
   ANTHROPIC_API_KEY?: string
   NAVER_CLIENT_ID?: string
   NAVER_CLIENT_SECRET?: string
+  GITHUB_TOKEN?: string
 }
 
 const digest = new Hono<{ Bindings: DigestBindings }>()
@@ -45,7 +47,18 @@ const KEYWORDS = [
 
 // 검색어트렌드/쇼핑인사이트는 뉴스용 주제어(KEYWORDS)와 달리 실제 검색/구매로 이어지는
 // 품목 단위 키워드를 써야 의미가 있다 (예: "패션 트렌드"는 검색량 자체가 낮아 트렌드 비교에 부적합)
-const ITEM_KEYWORDS = ['원피스', '니트', '코트', '청바지', '가디건', '맨투맨', '패딩', '블라우스']
+//
+// 계절 무관하게 고정 8개만 쓰면 한겨울에도 원피스/블라우스가 계속 섞여 나오는 등
+// 실무 체감과 어긋나서, 월 기준으로 계절 품목을 절반 정도 교체한다. 청바지/니트/가디건처럼
+// 사계절 걸쳐 꾸준히 검색되는 품목은 공통으로 유지.
+function seasonalItemKeywords(date: Date = new Date()): string[] {
+  const month = date.getMonth() + 1 // 1~12
+  const common = ['청바지', '니트', '가디건']
+  if (month >= 3 && month <= 5) return [...common, '원피스', '블라우스', '트렌치코트', '스커트', '자켓'] // 봄
+  if (month >= 6 && month <= 8) return [...common, '원피스', '반팔티', '린넨셔츠', '반바지', '샌들'] // 여름
+  if (month >= 9 && month <= 11) return [...common, '코트', '맨투맨', '자켓', '부츠', '원피스'] // 가을
+  return [...common, '패딩', '코트', '목도리', '맨투맨', '부츠'] // 겨울(12~2월)
+}
 
 type RawArticle = { title: string; link: string; pubDate: string; source: string }
 
@@ -60,6 +73,21 @@ function stripNaverHighlight(s: string): string {
   return decodeEntities(s.replace(/<\/?b>/g, '')).trim()
 }
 
+// 네이버 API HUB 무료 한도(뉴스 월 775,000건 공유 / 검색어트렌드·쇼핑인사이트 각 월
+// 50,000건) 근접 여부를 어드민에서 확인할 수 있도록 실제 호출마다 카운트를 쌓는다.
+// 카운팅 자체의 실패가 본 기능에 영향을 주면 안 되므로 항상 실패를 삼킨다.
+async function incrementNaverUsage(env: DigestBindings, apiType: 'news' | 'search_trend' | 'shopping_insight') {
+  try {
+    const yearMonth = new Date().toISOString().slice(0, 7)
+    await env.LOOKBOOK_DB.prepare(
+      `INSERT INTO naver_api_usage (year_month, api_type, call_count) VALUES (?, ?, 1)
+       ON CONFLICT(year_month, api_type) DO UPDATE SET call_count = call_count + 1`
+    ).bind(yearMonth, apiType).run()
+  } catch {
+    // 무시 — 사용량 집계 실패가 실제 API 호출 결과에 영향을 주면 안 됨
+  }
+}
+
 async function fetchNewsFromNaver(env: DigestBindings, keyword: string, maxItems: number): Promise<RawArticle[]> {
   if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return []
   const url = `https://naverapihub.apigw.ntruss.com/search/v1/news?query=${encodeURIComponent(keyword)}&display=${maxItems}&sort=date`
@@ -71,6 +99,7 @@ async function fetchNewsFromNaver(env: DigestBindings, keyword: string, maxItems
       },
       signal: AbortSignal.timeout(12000), // 소스 하나가 느려도 전체 파이프라인이 무한 대기하지 않도록
     })
+    await incrementNaverUsage(env, 'news')
     if (!res.ok) return []
     const data = await res.json<any>()
     const items = Array.isArray(data?.items) ? data.items : []
@@ -161,6 +190,7 @@ async function fetchSearchTrends(env: DigestBindings, keywords: string[]): Promi
         }),
         signal: AbortSignal.timeout(12000),
       })
+      await incrementNaverUsage(env, 'search_trend')
       if (!res.ok) continue
       const data = await res.json<any>()
       for (const group of data?.results || []) {
@@ -178,7 +208,7 @@ async function fetchSearchTrends(env: DigestBindings, keywords: string[]): Promi
 // 클릭 트렌드를 조회한다 (PDF의 "키워드별 클릭 인사이트" 활용 예시와 동일한 방식).
 const SHOPPING_CATEGORY = { name: '패션의류', code: '50000000' }
 
-async function fetchShoppingInsight(env: DigestBindings, keywords: string[]): Promise<TrendPoint[]> {
+async function fetchShoppingInsight(env: DigestBindings, keywords: string[], gender?: 'f' | 'm'): Promise<TrendPoint[]> {
   if (!env.NAVER_CLIENT_ID || !env.NAVER_CLIENT_SECRET) return []
   const { start, end } = trendDateRange()
   // 네이버 데이터랩 쇼핑인사이트 API도 요청당 keyword 최대 5개까지만 허용
@@ -188,6 +218,14 @@ async function fetchShoppingInsight(env: DigestBindings, keywords: string[]): Pr
   const out: TrendPoint[] = []
   for (const batch of batches) {
     try {
+      const body: any = {
+        startDate: start,
+        endDate: end,
+        timeUnit: 'week',
+        category: SHOPPING_CATEGORY.code,
+        keyword: batch.map((kw) => ({ name: kw, param: [kw] })),
+      }
+      if (gender) body.gender = gender
       const res = await fetch('https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords', {
         method: 'POST',
         headers: {
@@ -195,15 +233,10 @@ async function fetchShoppingInsight(env: DigestBindings, keywords: string[]): Pr
           'X-NCP-APIGW-API-KEY': env.NAVER_CLIENT_SECRET,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          startDate: start,
-          endDate: end,
-          timeUnit: 'week',
-          category: SHOPPING_CATEGORY.code,
-          keyword: batch.map((kw) => ({ name: kw, param: [kw] })),
-        }),
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(12000),
       })
+      await incrementNaverUsage(env, 'shopping_insight')
       if (!res.ok) continue
       const data = await res.json<any>()
       for (const group of data?.results || []) {
@@ -215,6 +248,19 @@ async function fetchShoppingInsight(env: DigestBindings, keywords: string[]): Pr
     }
   }
   return out
+}
+
+// 쇼핑인사이트에 성별 구분이 없다는 지적으로 추가 — 같은 품목 목록을 여성/남성으로
+// 나눠 조회해서 평균 증감률을 비교한다 (품목별 세부 비교까지는 API 호출이 너무
+// 늘어나서, 이번 주 전체적으로 어느 쪽이 더 견인했는지 정도의 요약만 제공).
+async function fetchShoppingInsightGenderSummary(env: DigestBindings, keywords: string[]): Promise<{ female: number; male: number } | null> {
+  const [femaleTrends, maleTrends] = await Promise.all([
+    fetchShoppingInsight(env, keywords, 'f'),
+    fetchShoppingInsight(env, keywords, 'm'),
+  ])
+  if (!femaleTrends.length || !maleTrends.length) return null
+  const avg = (arr: TrendPoint[]) => Math.round((arr.reduce((sum, t) => sum + t.changePct, 0) / arr.length) * 10) / 10
+  return { female: avg(femaleTrends), male: avg(maleTrends) }
 }
 
 // ────────────────────────────────────────────────────
@@ -307,26 +353,85 @@ function currentPeriod(): string {
 // 오르내림 상위 품목을 뽑아 실무자가 바로 판단할 수 있는 한 문장 인사이트를 만든다
 // (Claude 호출 없이 결정론적으로 계산 — 검색어트렌드/쇼핑인사이트는 이미 숫자 자체가
 // 명확해서 별도 AI 해석 없이도 "무엇을 해야 하는지"가 나온다)
-function buildTrendInsight(type: 'search_trend' | 'shopping_insight', trends: TrendPoint[]): string {
+function buildTrendInsight(type: 'search_trend' | 'shopping_insight', trends: TrendPoint[], genderSummary?: { female: number; male: number } | null): string {
   const metricLabel = type === 'search_trend' ? '검색 관심도' : '구매 클릭'
+  const actionTip = type === 'search_trend'
+    ? '오르는 품목 위주로 콘텐츠·마케팅 노출을 늘려보세요.'
+    : '클릭이 느는 품목은 재고·프로모션을 우선 챙길 타이밍입니다.'
+
+  // 쇼핑인사이트에 성별 구분이 없다는 지적으로 추가 — 두 성별 평균 증감률 차이가
+  // 뚜렷할 때만(5%p 이상) 한 문장 덧붙인다 (차이가 미미하면 굳이 언급하지 않음).
+  const genderNote = (() => {
+    if (!genderSummary) return ''
+    const diff = genderSummary.female - genderSummary.male
+    if (Math.abs(diff) < 5) return ''
+    const leader = diff > 0 ? '여성' : '남성'
+    return ` 성별로 보면 ${leader} 고객의 클릭 증가가 더 두드러졌습니다 (여성 ${genderSummary.female > 0 ? '+' : ''}${genderSummary.female}% / 남성 ${genderSummary.male > 0 ? '+' : ''}${genderSummary.male}%).`
+  })()
+
   if (!trends.length) return `이번 주 ${type === 'search_trend' ? '검색어트렌드' : '쇼핑인사이트'} 데이터를 가져오지 못했습니다.`
 
   const sorted = [...trends].sort((a, b) => b.changePct - a.changePct)
   const risers = sorted.filter((t) => t.changePct > 0)
   const fallers = sorted.filter((t) => t.changePct < 0).slice(-2).reverse()
-
   const fmt = (t: TrendPoint) => `${t.label}(${t.changePct > 0 ? '+' : ''}${t.changePct}%)`
-  const topRisers = risers.slice(0, 3).map(fmt).join(', ')
-  const topFallers = fallers.map(fmt).join(', ')
 
-  let insight = topRisers
-    ? `이번 주 ${metricLabel}는 ${topRisers}이 가장 크게 올랐습니다.`
-    : `이번 주 ${metricLabel}는 오른 품목이 없습니다.`
-  if (topFallers) insight += ` 반대로 ${topFallers}는 하락세입니다.`
-  insight += type === 'search_trend'
-    ? ' 오르는 품목 위주로 콘텐츠·마케팅 노출을 늘려보세요.'
-    : ' 클릭이 느는 품목은 재고·프로모션을 우선 챙길 타이밍입니다.'
-  return insight
+  // 매주 똑같은 "~이 올랐다/내렸다" 패턴만 반복하지 않도록, 그 주 데이터의 실제 모양
+  // (전원 상승/전원 하락/혼조/변화 미미/독주)에 따라 다른 문장 구조를 쓴다.
+  const top = sorted[0]
+  const second = sorted[1]
+  const allFlat = sorted.every((t) => Math.abs(t.changePct) < 5)
+  const allRising = fallers.length === 0 && risers.length === sorted.length
+  const allFalling = risers.length === 0 && fallers.length > 0
+
+  let base: string
+  if (allFlat) {
+    base = `이번 주 ${metricLabel}는 품목별로 큰 변화 없이 대체로 비슷한 수준을 유지했습니다 (전주 대비 ±5% 이내). ${actionTip}`
+  } else if (allRising) {
+    const list = risers.slice(0, 4).map(fmt).join(', ')
+    base = `이번 주는 ${list} 등 추적 품목 전반이 고르게 상승했습니다. ${actionTip}`
+  } else if (allFalling) {
+    const list = fallers.slice(0, 4).map(fmt).join(', ')
+    base = `이번 주는 ${list} 등 추적 품목 전반이 하락세입니다 — 계절 전환 등 일시적 요인일 수 있으니 다음 주 추이도 같이 확인해보세요.`
+  } else if (top && second && top.changePct > 0 && top.changePct > second.changePct * 2 && top.changePct >= 30) {
+    // 1위가 2위보다 2배 이상 튀는 "독주" 패턴이면 그 품목을 단독으로 강조
+    const rest = risers.slice(1, 3).map(fmt).join(', ')
+    base = `이번 주는 단연 ${fmt(top)}입니다 — 다른 품목보다 확실히 눈에 띄는 상승폭입니다.${rest ? ` (${rest}도 함께 올랐습니다)` : ''} ${actionTip}`
+  } else {
+    const topRisers = risers.slice(0, 3).map(fmt).join(', ')
+    const topFallers = fallers.map(fmt).join(', ')
+    base = topRisers
+      ? `이번 주 ${metricLabel}는 ${topRisers}이 가장 크게 올랐습니다.`
+      : `이번 주 ${metricLabel}는 오른 품목이 없습니다.`
+    if (topFallers) base += ` 반대로 ${topFallers}는 하락세입니다.`
+    base += ` ${actionTip}`
+  }
+
+  return base + genderNote
+}
+
+// 뉴스(월)와 검색어트렌드/쇼핑인사이트(수·금)가 요일별로 완전히 분리되어 생성되다
+// 보니 "왜 이 품목이 뜨는지" 설명이 서로 연결되지 않는다는 지적으로 추가 — 같은
+// 주차(period)의 월요일 뉴스 다이제스트 키워드와 이번 주 최고 상승 품목이 겹치면
+// 한 줄로 연결해준다. 겹치는 게 없으면 조용히 빈 문자열을 반환한다(억지로 연결 안 함).
+async function findNewsLinkNote(db: D1Database, period: string, trends: TrendPoint[]): Promise<string> {
+  if (!trends.length) return ''
+  try {
+    const newsDigest = await db.prepare(
+      `SELECT keywords FROM content_digests WHERE period = ? AND type = 'news' ORDER BY generated_at DESC LIMIT 1`
+    ).bind(period).first<any>()
+    if (!newsDigest) return ''
+    const newsKeywords: string[] = JSON.parse(newsDigest.keywords || '[]')
+    if (!newsKeywords.length) return ''
+
+    const top = [...trends].sort((a, b) => b.changePct - a.changePct)[0]
+    if (!top || top.changePct <= 0) return ''
+    const matched = newsKeywords.find((kw) => kw.includes(top.label) || top.label.includes(kw))
+    if (!matched) return ''
+    return `참고로 이번 주 뉴스에서도 "${matched}" 키워드가 다뤄졌습니다 — 관련 기사를 월요일 기사 다이제스트에서 확인해보세요.`
+  } catch {
+    return ''
+  }
 }
 
 // 월: 기사(news), 수: 검색어트렌드(search_trend), 금: 쇼핑인사이트(shopping_insight) —
@@ -336,11 +441,15 @@ export async function runDigestPipeline(env: DigestBindings, type: DigestType = 
   const period = currentPeriod()
 
   if (type === 'search_trend' || type === 'shopping_insight') {
+    const keywords = seasonalItemKeywords()
     const trends = type === 'search_trend'
-      ? await fetchSearchTrends(env, ITEM_KEYWORDS)
-      : await fetchShoppingInsight(env, ITEM_KEYWORDS)
+      ? await fetchSearchTrends(env, keywords)
+      : await fetchShoppingInsight(env, keywords)
+    const genderSummary = type === 'shopping_insight' ? await fetchShoppingInsightGenderSummary(env, keywords) : null
 
-    const summary = buildTrendInsight(type, trends)
+    let summary = buildTrendInsight(type, trends, genderSummary)
+    const newsLink = await findNewsLinkNote(db, period, trends)
+    if (newsLink) summary += ` ${newsLink}`
 
     const insertDigest = await db.prepare(
       `INSERT INTO content_digests (period, status, summary, keywords, type) VALUES (?, 'draft', ?, '[]', ?)`
@@ -379,8 +488,26 @@ digest.post('/generate', async (c) => {
   const type: DigestType = typeParam === 'search_trend' || typeParam === 'shopping_insight' ? typeParam : 'news'
   try {
     const result = await runDigestPipeline(c.env, type)
+    // 조용히 비어있는 다이제스트로 넘어가지 않도록 — 기사/트렌드가 0건이면 실패는
+    // 아니지만 뭔가 잘못됐을 가능성이 높다 (API 차단, 키워드 매칭 실패 등). 에러
+    // 로그에 기록해서 어드민 "에러 로그" 탭/GitHub 이슈로 드러나게 한다.
+    if (result.articleCount === 0) {
+      await logError(c.env, {
+        source: 'server',
+        message: `콘텐츠 다이제스트(${type}) 생성 결과 0건`,
+        route: '/api/admin/content-digest/generate',
+        extra: { type, digestId: result.digestId },
+      })
+    }
     return c.json({ success: true, ...result })
   } catch (e: any) {
+    await logError(c.env, {
+      source: 'server',
+      message: `콘텐츠 다이제스트(${type}) 생성 실패: ${String(e?.message || e)}`,
+      stack: e?.stack,
+      route: '/api/admin/content-digest/generate',
+      extra: { type },
+    })
     return c.json({ success: false, message: String(e?.message || e) }, 500)
   }
 })
@@ -504,7 +631,7 @@ digest.get('/debug-trends', async (c) => {
         headers: authHeaders,
         body: JSON.stringify({
           startDate: start, endDate: end, timeUnit: 'week',
-          keywordGroups: ITEM_KEYWORDS.slice(0, 5).map((kw) => ({ groupName: kw, keywords: [kw] })),
+          keywordGroups: seasonalItemKeywords().slice(0, 5).map((kw) => ({ groupName: kw, keywords: [kw] })),
         }),
         signal: AbortSignal.timeout(12000),
       }),
@@ -514,7 +641,7 @@ digest.get('/debug-trends', async (c) => {
         body: JSON.stringify({
           startDate: start, endDate: end, timeUnit: 'week',
           category: SHOPPING_CATEGORY.code,
-          keyword: ITEM_KEYWORDS.slice(0, 5).map((kw) => ({ name: kw, param: [kw] })),
+          keyword: seasonalItemKeywords().slice(0, 5).map((kw) => ({ name: kw, param: [kw] })),
         }),
         signal: AbortSignal.timeout(12000),
       }),
@@ -530,14 +657,39 @@ digest.get('/debug-trends', async (c) => {
   }
 })
 
+// 네이버 API HUB 이번 달 사용량 (무료 한도 근접 여부 확인용)
+const NAVER_MONTHLY_LIMITS: Record<string, number> = {
+  news: 775000, // NAVER 검색 카테고리 공유 한도
+  search_trend: 50000,
+  shopping_insight: 50000,
+}
+digest.get('/usage', async (c) => {
+  const yearMonth = new Date().toISOString().slice(0, 7)
+  const { results } = await c.env.LOOKBOOK_DB.prepare(
+    `SELECT api_type, call_count FROM naver_api_usage WHERE year_month = ?`
+  ).bind(yearMonth).all<any>()
+  const byType: Record<string, number> = { news: 0, search_trend: 0, shopping_insight: 0 }
+  for (const r of results) byType[r.api_type] = r.call_count
+  const usage = Object.keys(NAVER_MONTHLY_LIMITS).map((apiType) => ({
+    apiType,
+    count: byType[apiType] || 0,
+    limit: NAVER_MONTHLY_LIMITS[apiType],
+    pct: Math.round(((byType[apiType] || 0) / NAVER_MONTHLY_LIMITS[apiType]) * 1000) / 10,
+  }))
+  return c.json({ success: true, yearMonth, usage })
+})
+
 // ────────────────────────────────────────────────────
 // 조회 / 검토 / 발행 표시
 // ────────────────────────────────────────────────────
 digest.get('/list', async (c) => {
+  const type = c.req.query('type') // 'news' | 'search_trend' | 'shopping_insight' | 미지정(전체)
+  const where = type ? `WHERE d.type = ?` : ''
+  const binds = type ? [type] : []
   const { results } = await c.env.LOOKBOOK_DB.prepare(
     `SELECT d.*, (SELECT COUNT(*) FROM digest_articles a WHERE a.digest_id = d.id AND a.excluded = 0) AS article_count
-     FROM content_digests d ORDER BY d.generated_at DESC LIMIT 50`
-  ).all()
+     FROM content_digests d ${where} ORDER BY d.generated_at DESC LIMIT 50`
+  ).bind(...binds).all()
   return c.json({ success: true, digests: results })
 })
 
@@ -552,6 +704,14 @@ digest.get('/:id', async (c) => {
     `SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`
   ).bind(id).all()
   return c.json({ success: true, digest: { ...d, keywords: JSON.parse(d.keywords || '[]') }, articles, trends })
+})
+
+digest.delete('/:id', async (c) => {
+  const id = c.req.param('id')
+  await c.env.LOOKBOOK_DB.prepare(`DELETE FROM digest_articles WHERE digest_id = ?`).bind(id).run()
+  await c.env.LOOKBOOK_DB.prepare(`DELETE FROM digest_trends WHERE digest_id = ?`).bind(id).run()
+  await c.env.LOOKBOOK_DB.prepare(`DELETE FROM content_digests WHERE id = ?`).bind(id).run()
+  return c.json({ success: true })
 })
 
 digest.patch('/:id', async (c) => {
