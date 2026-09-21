@@ -2395,7 +2395,14 @@ app.get('/api/auth/kakao', (c) => {
   // 이렇게 추가했다가 전체 카카오 로그인이 막혔던 적이 있다. scope를 추가/변경할 때는
   // 반드시 콘솔의 동의항목 설정에서 해당 항목이 "선택 동의" 또는 "필수 동의" 상태인지
   // 먼저 확인할 것 (2026-09-16: plusfriends는 콘솔에서 "선택 동의" 확인 후 추가함).
-  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}&scope=plusfriends`
+  // ⚠️⚠️ scope 파라미터가 하나라도 있으면 카카오는 "그 목록에 있는 항목만" 요청한다 —
+  // scope를 비워두면 콘솔에 설정된 기본 동의항목(닉네임/이메일 등)이 자동으로 요청되지만,
+  // scope=plusfriends만 넣었던 2026-09-16 커밋 이후로는 닉네임/이메일이 더 이상
+  // 요청되지 않아 모든 신규 카카오 가입자가 이름 "카카오 사용자"로만 저장되는 회귀가
+  // 발생했다(사용자 리포트로 발견, 2026-09-21). scope를 쓸 땐 원래 받고 싶은 항목을
+  // 전부 나열해야 한다 — profile_nickname/account_email은 plusfriends 추가 전부터
+  // 문제없이 내려오던 항목이라 콘솔 승인 상태 그대로 다시 추가함.
+  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}&scope=profile_nickname,account_email,plusfriends`
   return c.redirect(url)
 })
 
@@ -2464,10 +2471,20 @@ app.get('/api/auth/kakao/callback', async (c) => {
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
         isNewUser = true
       }
-    } else if (kakaoPhone && user.phone_number !== kakaoPhone) {
-      // 기존 카카오 사용자가 이후 시점에 전화번호 동의항목을 승인한 경우, 재로그인 시 반영
-      await db.prepare(`UPDATE users SET phone_number = ? WHERE id = ?`).bind(kakaoPhone, user.id).run()
-      user.phone_number = kakaoPhone
+    } else {
+      // 기존 카카오 사용자가 이후 시점에 새 동의항목을 승인했거나(전화번호), 위 scope 회귀
+      // 버그로 "카카오 사용자" 플레이스홀더 이름/빈 프로필사진으로 저장됐던 경우 재로그인
+      // 시점에 최신 정보로 채워 넣는다. name은 이미 실제 닉네임으로 바뀐 사용자를 실수로
+      // 덮어쓰지 않도록 플레이스홀더인 경우에만 갱신한다.
+      const patchCols: string[] = []
+      const patchVals: any[] = []
+      if (kakaoPhone && user.phone_number !== kakaoPhone) { patchCols.push('phone_number = ?'); patchVals.push(kakaoPhone); user.phone_number = kakaoPhone }
+      if (user.name === '카카오 사용자' && kakaoName !== '카카오 사용자') { patchCols.push('name = ?'); patchVals.push(kakaoName); user.name = kakaoName }
+      if (!user.avatar_url && kakaoAvatar) { patchCols.push('avatar_url = ?'); patchVals.push(kakaoAvatar); user.avatar_url = kakaoAvatar }
+      if (patchCols.length) {
+        patchVals.push(user.id)
+        await db.prepare(`UPDATE users SET ${patchCols.join(', ')} WHERE id = ?`).bind(...patchVals).run()
+      }
     }
     if (!user || user.status !== 'active') throw new Error('계정이 정지 상태입니다.')
 
