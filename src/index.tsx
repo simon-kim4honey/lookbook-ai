@@ -7692,7 +7692,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
       </div>
       <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:var(--text-primary);">디테일컷 추가</h3>
       <p style="margin:0 0 18px;font-size:13px;color:#5c5c70;line-height:1.5;">생성된 이미지에서 디자인·디테일이 돋보이는 부위를 클로즈업한 이미지를 자동으로 만들어드려요. 생성은 무료 입니다.</p>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div id="detailCutCountGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <button class="result-nav-btn primary" onclick="startDetailCutGeneration(1)" style="min-height:65px;">
           <span class="rnb-main">1장 생성</span>
         </button>
