@@ -7570,7 +7570,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         </div>
         <div class="gslide-nav" id="step4Nav">
           <div class="result-nav-grid">
-            <button class="result-nav-btn primary" onclick="downloadWithCreditCheck(0)">
+            <button class="result-nav-btn primary" id="downloadActionBtn" onclick="downloadWithCreditCheck(0)">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운</span>
               <span class="rnb-sub" id="downloadActionSub"><s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90</span>

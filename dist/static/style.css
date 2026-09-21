@@ -1650,6 +1650,35 @@ footer {
 @media (prefers-reduced-motion: reduce) {
   .result-nav-btn { animation: none; }
 }
+/* 4버튼 각각 시작 위치/속도/움직임 경로를 전부 다르게 — 같은 키프레임을 시차만
+   두고 재생하면 결국 같은 모양을 따라가는 것으로 보이므로(슬롯 3개 때와 동일한
+   이유) 버튼마다 다른 키프레임 + 다른 duration/delay를 쓴다. 모델컷/누끼컷 결과
+   화면은 항상 이 6개 버튼 중 4개만 동시에 보이는데(모델컷: 다운로드/영상생성/
+   새프로젝트/재생성, 누끼컷: 다운로드/새프로젝트/디테일컷 추가/재생성), 역할이
+   겹치는 버튼끼리는(영상생성↔디테일컷 추가, 재생성↔누끼컷 재생성) 같은 패턴을
+   공유해도 두 버튼이 동시에 보일 일이 없어 문제없다. */
+.result-nav-grid #downloadActionBtn {
+  animation-name: cslotAurora;
+  animation-duration: 15s;
+  animation-delay: -2s;
+}
+.result-nav-grid #videoActionBtn,
+.result-nav-grid #detailCutBtn {
+  animation-name: cslotAurora2;
+  animation-duration: 19s;
+  animation-delay: -7s;
+}
+.result-nav-grid #newProjectBtnCard {
+  animation-name: cslotAurora3;
+  animation-duration: 13s;
+  animation-delay: -4s;
+}
+.result-nav-grid #regenBtnCard,
+.result-nav-grid #gcRegenBtn {
+  animation-name: cslotAurora4;
+  animation-duration: 21s;
+  animation-delay: -10s;
+}
 .result-nav-btn .rnb-badge {
   position: absolute;
   top: -7px;
@@ -1886,6 +1915,16 @@ footer {
   50%  { background-position: 75% 45%, 25% 15%, 55% 25%, 0 0; background-size: 125% 125%, 140% 140%, 195% 195%, 100% 100%; }
   78%  { background-position: 35% 75%, 70% 35%, 15% 60%, 0 0; background-size: 155% 155%, 175% 175%, 160% 160%, 100% 100%; }
   100% { background-position: 50% 60%, 15% 25%, 80% 40%, 0 0; background-size: 130% 130%, 150% 150%, 170% 170%, 100% 100%; }
+}
+/* 결과화면 4버튼용 4번째 좌표 시퀀스 — 슬롯 3개(cslotAurora/2/3)는 이미 서로 다른
+   경로를 쓰지만, 버튼은 4개가 동시에 화면에 떠 있어 하나가 더 필요하다. 정지 구간
+   타이밍(26/58/85%)도 기존 3개(22/48/74, 30/55/80, 20/50/78)와 겹치지 않게 잡았다. */
+@keyframes cslotAurora4 {
+  0%   { background-position: 40% 75%, 85% 30%, 15% 55%, 0 0; background-size: 140% 140%, 160% 160%, 175% 175%, 100% 100%; }
+  26%  { background-position: 75% 50%, 35% 20%, 60% 85%, 0 0; background-size: 160% 160%, 130% 130%, 150% 150%, 100% 100%; }
+  58%  { background-position: 15% 15%, 65% 80%, 85% 35%, 0 0; background-size: 125% 125%, 155% 155%, 190% 190%, 100% 100%; }
+  85%  { background-position: 60% 85%, 20% 45%, 40% 15%, 0 0; background-size: 150% 150%, 175% 175%, 160% 160%, 100% 100%; }
+  100% { background-position: 40% 75%, 85% 30%, 15% 55%, 0 0; background-size: 140% 140%, 160% 160%, 175% 175%, 100% 100%; }
 }
 /* 블롭 색상도 블루 계열 안에서 살짝 순환 — @property로 <color>를 등록해야
    브라우저가 두 색 사이를 자연스럽게 보간한다(등록 안 하면 각 키프레임에서
