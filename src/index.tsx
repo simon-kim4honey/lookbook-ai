@@ -4869,11 +4869,18 @@ app.post('/api/video/start', async (c) => {
 //   해석 금지" 문구가 색상/패턴만 언급할 뿐 "가공/워싱/디스트레싱 추가 금지"를
 //   명시하지 않아서 AI가 클로즈업을 "더 그럴듯하게" 만들려고 임의로 낡은 질감을
 //   더한 것으로 추정된다. 아래 프롬프트에 이 케이스를 구체적으로 명시해 금지.
+// 2026-09-21: 버튼 라벨을 "N장 생성" → "N분할 생성"으로 바꾸면서(사용자 요청), 각
+// 디테일컷이 "그냥 디테일 클로즈업"이 아니라 "이 상품을 사고 싶게 만드는 소구 포인트"를
+// 보여주는 것이라는 점을 프롬프트에도 명시적으로 반영했다. 문구를 "sales-appealing
+// detail(구매를 유도하는 디테일)" 프레이밍으로 다듬었을 뿐, 크롭/줌 전용이라는 제약
+// (verify-critical-prompts.mjs GUARDS)과 매 항목이 서로 다른 부위를 골라야 한다는
+// 구조는 그대로 유지했다 — 이 부분은 GUARDS에 등록된 고정 문구가 아니라 자유롭게
+// 다듬어도 되는 영역이다.
 const GHOSTCUT_DETAIL_FOCUS_HINTS = [
-  `Choose the MOST visually distinctive design detail area of the garment for this close-up — such as a button, zipper, collar, pocket, stitching pattern, fabric texture, trim, or hardware — whichever best showcases the product's craftsmanship and quality.`,
-  `Choose a DIFFERENT design detail area than a typical front-view close-up — such as a cuff, hem, seam, side panel, or secondary hardware/trim — to show another distinctive feature of the garment not obvious from the main product photo.`,
-  `Choose YET ANOTHER distinctive design detail area, different from the two most obvious focal points — such as a back panel, shoulder seam, fabric weave close-up, or a unique construction detail — to give a third unique perspective on the product's quality.`,
-  `Choose a FOURTH distinctive design detail area, different from the three focal points above — such as the waistband, closure/placket, inner lining edge, or another unique construction detail — to give a fourth unique perspective on the product's quality.`,
+  `Choose the single MOST sales-appealing design detail area of the garment for this close-up — the one detail a shopper would most want to see up close before deciding to buy, such as a button, zipper, collar, pocket, stitching pattern, fabric texture, trim, or hardware — whichever single area best demonstrates this product's craftsmanship, quality, and reason to purchase.`,
+  `Choose a SECOND sales-appealing detail area, different from the first — such as a cuff, hem, seam, side panel, or secondary hardware/trim — to highlight another distinctive selling point of the garment not obvious from the main product photo.`,
+  `Choose a THIRD sales-appealing detail area, different from the first two — such as a back panel, shoulder seam, fabric weave close-up, or a unique construction detail — to give a third compelling reason to buy.`,
+  `Choose a FOURTH sales-appealing detail area, different from the first three — such as the waistband, closure/placket, inner lining edge, or another unique construction detail — to give a fourth compelling reason to buy.`,
 ]
 
 app.post('/api/ghostcut/detail/start', async (c) => {
@@ -7675,13 +7682,13 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <span class="rnb-main">1장 생성</span>
         </button>
         <button class="result-nav-btn primary" onclick="startDetailCutGeneration(2)" style="min-height:65px;">
-          <span class="rnb-main">2장 생성</span>
+          <span class="rnb-main">2분할 생성</span>
         </button>
         <button class="result-nav-btn primary" onclick="startDetailCutGeneration(3)" style="min-height:65px;">
-          <span class="rnb-main">3장 생성</span>
+          <span class="rnb-main">3분할 생성</span>
         </button>
         <button class="result-nav-btn primary" onclick="startDetailCutGeneration(4)" style="min-height:65px;">
-          <span class="rnb-main">4장 생성</span>
+          <span class="rnb-main">4분할 생성</span>
         </button>
       </div>
     </div>
