@@ -4018,6 +4018,9 @@ function _updateDetailCutModalCta() {
   const cta = document.getElementById('detailCutDownloadFirstCta');
   if (cta) cta.style.display = _gcImageDownloaded ? 'none' : '';
   _setDetailCutModalError('');
+  // 모달은 openModal/closeModal이 DOM을 재생성하지 않고 그대로 재사용하므로, 이전에
+  // 생성 요청 중이었던 버튼의 스피너/비활성 상태가 남아있지 않도록 매번 열 때 리셋
+  _setDetailCutCountButtonsLoading(false);
 }
 
 // 다운로드 전에 1~4장 버튼을 눌러 서버가 403을 반환했을 때 모달을 닫지 않고 보여주는 안내 메시지.
@@ -4055,6 +4058,26 @@ function openDetailCutMenu() {
   openModal('detailCutModal');
 }
 
+// 1~4장 버튼 클릭 직후 서버가 응답할 때까지(장당 Atlas 제출 호출을 Promise.all로
+// 기다리므로 수 초 걸릴 수 있음) 모달 안에서는 아무 것도 바뀌지 않아 "눌러도 반응
+// 없다"는 리포트가 있었다 — _showDetailCutGeneratingView()가 띄우는 로딩화면은
+// z-index가 모달보다 낮아 모달에 가려 보이지 않기 때문. 요청이 나가는 즉시 클릭한
+// 버튼을 스피너로, 나머지는 비활성화로 바꿔 클릭이 실제로 접수됐음을 보여준다.
+function _setDetailCutCountButtonsLoading(loading, activeCount) {
+  const grid = document.getElementById('detailCutCountGrid');
+  if (!grid) return;
+  grid.querySelectorAll('button').forEach((btn, i) => {
+    btn.disabled = loading;
+    if (loading && (i + 1) === activeCount) {
+      btn.dataset.origHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="rnb-main"><i class="fas fa-spinner fa-spin"></i> 요청 중...</span>';
+    } else if (!loading && btn.dataset.origHtml) {
+      btn.innerHTML = btn.dataset.origHtml;
+      delete btn.dataset.origHtml;
+    }
+  });
+}
+
 async function startDetailCutGeneration(count) {
   const img = AppState.generatedImages[0];
   if (!img || !img.originalUrl) {
@@ -4071,6 +4094,7 @@ async function startDetailCutGeneration(count) {
   // 보여줘서, 사용자가 바로 위에 있는 "이미지 다운로드" CTA를 이어서 누를 수 있게 한다.
   _setDetailCutModalError('');
   _showDetailCutGeneratingView();
+  _setDetailCutCountButtonsLoading(true, count);
 
   try {
     const res = await fetch('/api/ghostcut/detail/start', {
@@ -4081,11 +4105,13 @@ async function startDetailCutGeneration(count) {
 
     if (res.status === 401) {
       _hideDetailCutGeneratingView();
+      _setDetailCutCountButtonsLoading(false);
       showToast(t('loginRequired'), 'error');
       return;
     }
     if (res.status === 403) {
       _hideDetailCutGeneratingView();
+      _setDetailCutCountButtonsLoading(false);
       _gcImageDownloaded = false; // 서버가 다운로드 이력을 못 찾음 — 클라이언트 상태를 동기화
       _updateDetailCutModalCta();
       const errData = await res.json().catch(() => ({}));
@@ -4094,12 +4120,14 @@ async function startDetailCutGeneration(count) {
     }
     if (!res.ok) {
       _hideDetailCutGeneratingView();
+      _setDetailCutCountButtonsLoading(false);
       const errData = await res.json().catch(() => ({}));
       showToast(errData.message || '디테일컷 생성 요청에 실패했습니다.', 'error');
       return;
     }
 
-    // 성공했을 때만 모달을 닫고 생성 로딩 화면으로 넘어간다
+    // 성공했을 때만 모달을 닫고 생성 로딩 화면으로 넘어간다 (버튼 상태는 모달이
+    // 닫히므로 되돌릴 필요 없음 — 다음에 모달을 다시 열 때는 서버 렌더 마크업 그대로)
     closeModal('detailCutModal');
     const data = await res.json();
     _startDetailCutFakeProgress();
@@ -4107,6 +4135,7 @@ async function startDetailCutGeneration(count) {
   } catch (err) {
     console.error('Detail cut start error:', err);
     _hideDetailCutGeneratingView();
+    _setDetailCutCountButtonsLoading(false);
     showToast('디테일컷 생성 요청 중 네트워크 오류가 발생했습니다.', 'error');
   }
 }
