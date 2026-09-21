@@ -4,6 +4,7 @@ import { cors } from 'hono/cors'
 import leadsApp from './leads'
 import bizLeadsApp from './bizleads'
 import contentDigestApp from './content-digest'
+import { logError } from './error-log'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
 // → 배포할 때마다 값이 바뀌어 브라우저가 새 파일로 인식 (캐시 자동 무효화)
@@ -166,83 +167,8 @@ const errorsAuth = async (c: any, next: any) => {
   await next()
 }
 
-// GitHub 이슈 자동 생성 — 유지보수 세션의 샌드박스 환경이 *.pages.dev로의
-// 아웃바운드 접속을 막고 있어(egress 정책, 계정 설정으로도 못 바꿈이 확인됨)
-// 관리자 API를 직접 폴링하는 방식이 동작하지 않는다. 대신 Worker(아웃바운드 제한
-// 없음)가 에러 발생 시 직접 GitHub 이슈를 만들고, 유지보수 세션은 GitHub 이슈만
-// 확인하도록 우회 — GitHub API 호출은 세션 쪽에서 이미 정상 동작 확인됨.
-// 같은 message+route로 24시간 내 이미 만든 이슈가 있으면 새로 만들지 않고
-// 그 이슈 URL을 재사용한다(반복 에러가 이슈를 도배하지 않도록).
-const GITHUB_REPO = 'simon-kim4honey/lookbook-ai'
-async function findOrCreateGithubIssue(
-  db: D1Database,
-  githubToken: string | undefined,
-  opts: { message: string; route: string | null; stack: string | null; source: string }
-): Promise<string | null> {
-  if (!githubToken) return null
-  try {
-    const dup: any = await db.prepare(
-      `SELECT github_issue_url FROM error_logs
-       WHERE message = ? AND (route = ? OR (route IS NULL AND ? IS NULL))
-         AND github_issue_url IS NOT NULL
-         AND created_at > datetime('now', '-1 day')
-       ORDER BY created_at DESC LIMIT 1`
-    ).bind(opts.message, opts.route, opts.route).first()
-    if (dup?.github_issue_url) return dup.github_issue_url
-
-    const title = `[자동 에러] ${opts.route || '(경로 없음)'} — ${opts.message}`.slice(0, 250)
-    const body = [
-      `**출처**: ${opts.source}`,
-      `**경로/URL**: ${opts.route || '(없음)'}`,
-      `**메시지**: ${opts.message}`,
-      opts.stack ? `\n**스택 트레이스**\n\`\`\`\n${opts.stack.slice(0, 3000)}\n\`\`\`` : '',
-      '\n---\nlookbook-ai 서버가 자동 생성한 이슈입니다. 유지보수 세션이 이 이슈를 보고 진단 후 수정 PR을 연결하면 `in-review` 라벨이 붙습니다. 실제 배포 확인 후 이 이슈를 닫아주세요.',
-    ].join('\n')
-
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/issues`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${githubToken}`,
-        'Accept': 'application/vnd.github+json',
-        'User-Agent': 'lookbook-ai-error-bot',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ title, body, labels: ['auto-error'] }),
-    })
-    if (!res.ok) {
-      console.error('[findOrCreateGithubIssue] GitHub API 실패:', res.status, await res.text())
-      return null
-    }
-    const json: any = await res.json()
-    return json.html_url || null
-  } catch (e) {
-    console.error('[findOrCreateGithubIssue] 실패 (무시):', e)
-    return null
-  }
-}
-
-// 서버 에러 기록 헬퍼 — 절대 요청 흐름을 막지 않도록 실패를 삼킨다(로깅 자체의
-// 실패가 실제 API 응답에 영향을 주면 안 됨). message/stack은 D1 컬럼 폭주 방지로 길이 제한.
-async function logError(
-  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string },
-  opts: { source: 'client' | 'server'; message: string; stack?: string; route?: string; extra?: any }
-) {
-  try {
-    const db = env.LOOKBOOK_DB
-    const message = String(opts.message || '').slice(0, 2000)
-    const stack = opts.stack ? String(opts.stack).slice(0, 4000) : null
-    const route = opts.route ? String(opts.route).slice(0, 300) : null
-    const extra = opts.extra ? JSON.stringify(opts.extra).slice(0, 2000) : null
-
-    const issueUrl = await findOrCreateGithubIssue(db, env.GITHUB_TOKEN, { message, route, stack, source: opts.source })
-
-    await db.prepare(
-      `INSERT INTO error_logs (source, message, stack, route, extra, github_issue_url) VALUES (?, ?, ?, ?, ?, ?)`
-    ).bind(opts.source, message, stack, route, extra, issueUrl).run()
-  } catch (e) {
-    console.error('[logError] 에러 기록 실패 (무시):', e)
-  }
-}
+// logError는 content-digest.ts 등 다른 라우트 모듈과 공유하기 위해
+// ./error-log.ts로 분리되어 있음 (index.tsx ↔ 라우트 모듈 순환 import 방지).
 
 // POST /api/errors/report — 클라이언트(브라우저) 미처리 에러 수집. 인증 없음(비로그인
 // 사용자도 겪을 수 있는 에러라 로그인 여부와 무관해야 함) — 대신 길이 제한으로 남용 방지.
@@ -8455,9 +8381,20 @@ app.get('/admin02', (c) => {
         </div>
       </div>
 
+      <div class="leads-card">
+        <div class="leads-hint" style="margin-bottom:8px;">이번 달 네이버 API 사용량</div>
+        <div id="digestUsage" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
+      </div>
+
       <div class="leads-row" style="align-items:flex-start;">
         <div class="leads-card" style="flex:1;min-width:260px;max-width:320px;">
           <h3>다이제스트 목록</h3>
+          <div class="leads-row" style="gap:4px;margin-bottom:8px;flex-wrap:wrap;">
+            <button class="leads-btn secondary small" onclick="digestFilterList('')" id="digestFilterAll">전체</button>
+            <button class="leads-btn secondary small" onclick="digestFilterList('news')" id="digestFilterNews">기사</button>
+            <button class="leads-btn secondary small" onclick="digestFilterList('search_trend')" id="digestFilterSearchTrend">검색트렌드</button>
+            <button class="leads-btn secondary small" onclick="digestFilterList('shopping_insight')" id="digestFilterShoppingInsight">쇼핑인사이트</button>
+          </div>
           <div id="digestList" style="max-height:520px;overflow-y:auto;"></div>
         </div>
 
@@ -9686,25 +9623,66 @@ async function digestApi(path, opts) {
   }
 }
 
+let digestListFilter = ''
+
 async function digestInit() {
   await digestLoadList()
+  await digestLoadUsage()
+}
+
+async function digestLoadUsage() {
+  const data = await digestApi('/usage')
+  const box = document.getElementById('digestUsage')
+  if (!data.success) { box.innerHTML = ''; return }
+  const label = { news: '뉴스 검색', search_trend: '검색어트렌드', shopping_insight: '쇼핑인사이트' }
+  box.innerHTML = data.usage.map((u) => {
+    const color = u.pct >= 80 ? '#ff6b6b' : (u.pct >= 50 ? '#ffb703' : '#6c47ff')
+    return (
+      '<div style="min-width:160px;">' +
+        '<div class="leads-hint" style="margin-bottom:2px;">' + label[u.apiType] + ' — ' + u.count.toLocaleString() + ' / ' + u.limit.toLocaleString() + ' (' + u.pct + '%)</div>' +
+        '<div style="background:#252540;border-radius:4px;height:6px;overflow:hidden;">' +
+          '<div style="background:' + color + ';width:' + Math.min(100, u.pct) + '%;height:100%;"></div>' +
+        '</div>' +
+      '</div>'
+    )
+  }).join('')
+}
+
+function digestFilterList(type) {
+  digestListFilter = type
+  const ids = { '': 'digestFilterAll', news: 'digestFilterNews', search_trend: 'digestFilterSearchTrend', shopping_insight: 'digestFilterShoppingInsight' }
+  Object.values(ids).forEach((id) => { document.getElementById(id).style.borderColor = ''; document.getElementById(id).style.color = '' })
+  document.getElementById(ids[type]).style.borderColor = '#6c47ff'
+  document.getElementById(ids[type]).style.color = '#fff'
+  digestLoadList()
 }
 
 async function digestLoadList() {
-  const data = await digestApi('/list')
+  const data = await digestApi('/list' + (digestListFilter ? '?type=' + digestListFilter : ''))
   const list = document.getElementById('digestList')
   if (!data.success || !data.digests.length) {
-    list.innerHTML = '<div class="leads-hint">아직 생성된 다이제스트가 없습니다. "지금 생성"을 눌러보세요.</div>'
+    list.innerHTML = '<div class="leads-hint">' + (digestListFilter ? '이 종류로 생성된 다이제스트가 없습니다.' : '아직 생성된 다이제스트가 없습니다. "지금 생성"을 눌러보세요.') + '</div>'
     return
   }
   const statusLabel = { draft: '초안', reviewed: '검토완료', sent: '발행완료' }
   const typeLabel = { news: '📰 기사', search_trend: '🔎 검색어트렌드', shopping_insight: '🛍️ 쇼핑인사이트' }
   list.innerHTML = data.digests.map((d) => (
-    '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;' + (d.id === digestCurrentId ? 'border-color:#6c47ff' : '') + '" onclick="digestSelect(' + d.id + ')">' +
-      '<div style="font-weight:600;color:#e0e0f0;font-size:13px;">' + (typeLabel[d.type] || '📰 기사') + ' · ' + d.period + '</div>' +
+    '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;position:relative;' + (d.id === digestCurrentId ? 'border-color:#6c47ff' : '') + '" onclick="digestSelect(' + d.id + ')">' +
+      '<button class="leads-btn secondary small" style="position:absolute;top:8px;right:8px;padding:2px 8px;" onclick="event.stopPropagation();digestDelete(' + d.id + ')">삭제</button>' +
+      '<div style="font-weight:600;color:#e0e0f0;font-size:13px;padding-right:40px;">' + (typeLabel[d.type] || '📰 기사') + ' · ' + d.period + '</div>' +
       '<div class="leads-hint">' + statusLabel[d.status] + (d.type === 'news' || !d.type ? ' · 기사 ' + d.article_count + '건' : ' · 항목 ' + d.article_count + '개') + '</div>' +
     '</div>'
   )).join('')
+}
+
+async function digestDelete(id) {
+  if (!confirm('이 다이제스트를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return
+  await digestApi('/' + id, { method: 'DELETE' })
+  if (digestCurrentId === id) {
+    digestCurrentId = null
+    document.getElementById('digestDetailCard').innerHTML = '<div class="leads-hint">왼쪽 목록에서 다이제스트를 선택하세요.</div>'
+  }
+  await digestLoadList()
 }
 
 const digestGenBtnIds = { news: 'digestGenBtnNews', search_trend: 'digestGenBtnSearchTrend', shopping_insight: 'digestGenBtnShoppingInsight' }
