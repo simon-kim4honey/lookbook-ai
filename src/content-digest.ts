@@ -582,7 +582,9 @@ ${list}
 
 원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`
-  try {
+  // 진단용 호출 하나를 실행하고 상태코드/헤더/바디를 그대로 반환 (재시도 없음 — 원인 파악이 목적).
+  const callClaude = async (body: any) => {
+    const started = Date.now()
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -591,24 +593,35 @@ ${list}
         'anthropic-version': '2023-06-01',
         'User-Agent': 'EZlook-ContentDigest/1.0 (+https://www.aifashion.co.kr)',
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        thinking: { type: 'disabled' },
-        max_tokens: 3000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(45000),
     })
     const rawText = await res.text()
     let usage = null
     try { usage = JSON.parse(rawText)?.usage ?? null } catch {}
-    return c.json({
-      success: true,
-      articleCount: articles.length,
+    // cf-ray가 있으면 이 응답이 Cloudflare를 거쳤다는 뜻 (Anthropic API도 Cloudflare 뒤에 있음).
+    // x-request-id/anthropic-ratelimit-* 등이 있으면 실제 Anthropic 애플리케이션 계층까지
+    // 도달했다는 뜻이고, 없으면 그 이전 엣지 단계에서 막혔을 가능성이 큼.
+    const headerKeys = ['cf-ray', 'server', 'via', 'x-request-id', 'anthropic-ratelimit-requests-remaining', 'anthropic-ratelimit-requests-limit', 'retry-after', 'date']
+    const headers: Record<string, string | null> = {}
+    for (const k of headerKeys) headers[k] = res.headers.get(k)
+    return {
       httpStatus: res.status,
+      tookMs: Date.now() - started,
+      headers,
       usage,
-      rawBodyPreview: rawText.slice(0, 2000),
-    })
+      rawBodyPreview: rawText.slice(0, 500),
+    }
+  }
+
+  try {
+    // 실제 다이제스트가 쓰는 큰 프롬프트와, 아주 작은 통제용(control) 프롬프트를 함께 호출해서
+    // 요청 크기/내용과 무관하게 막히는지(=계정·엣지 차원 차단) 아니면 큰 요청만 막히는지 구분한다.
+    const [real, control] = await Promise.all([
+      callClaude({ model: 'claude-sonnet-5', thinking: { type: 'disabled' }, max_tokens: 3000, messages: [{ role: 'user', content: prompt }] }),
+      callClaude({ model: 'claude-sonnet-5', thinking: { type: 'disabled' }, max_tokens: 16, messages: [{ role: 'user', content: 'hi' }] }),
+    ])
+    return c.json({ success: true, articleCount: articles.length, real, control })
   } catch (e: any) {
     return c.json({ success: false, articleCount: articles.length, error: String(e?.message || e) })
   }
