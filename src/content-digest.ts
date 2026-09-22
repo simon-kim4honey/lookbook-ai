@@ -292,26 +292,37 @@ ${list}
 원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-5',
-      // Sonnet 5는 thinking을 명시하지 않으면 기본으로 적응형 사고(thinking)가 켜진 채
-      // 실행되어 max_tokens 예산을 상당 부분 잡아먹는다 — JSON 응답만 필요하므로 꺼둔다.
-      thinking: { type: 'disabled' },
-      // 주의: max_tokens를 너무 높게 잡으면 이 API 키의 사용량 등급 기준 요청당 상한을
-      // 넘겨서 HTTP 403 "forbidden"으로 거부당한다 (실측: 3000은 통과, 4096/8000은 거부됨).
-      max_tokens: 3000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-    signal: AbortSignal.timeout(45000),
-  })
-  if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status} — ${(await res.text()).slice(0, 300)}`)
+  // 2026-09-21: max_tokens: 3000으로 고정해도 HTTP 403 forbidden("Request not allowed")이
+  // 간헐적으로 발생하는 게 실사용에서 확인됨 — 같은 요청을 바로 재시도하면 성공하는 경우가
+  // 많아, 고정 상한값 문제가 아니라 Cloudflare Workers 엣지가 요청마다 다른 리전으로
+  // 라우팅되며 일부만 걸리는 일시적 현상으로 추정됨. 최대 3회, 짧은 대기 후 재시도한다.
+  let res: Response | null = null
+  let lastErrorText = ''
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        // Sonnet 5는 thinking을 명시하지 않으면 기본으로 적응형 사고(thinking)가 켜진 채
+        // 실행되어 max_tokens 예산을 상당 부분 잡아먹는다 — JSON 응답만 필요하므로 꺼둔다.
+        thinking: { type: 'disabled' },
+        max_tokens: 3000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: AbortSignal.timeout(45000),
+    })
+    if (res.ok) break
+    lastErrorText = (await res.text()).slice(0, 300)
+    const retryable = res.status === 403 || res.status === 429 || res.status >= 500
+    if (!retryable || attempt === 3) break
+    await new Promise((r) => setTimeout(r, attempt * 800))
+  }
+  if (!res || !res.ok) throw new Error(`Claude API 오류: HTTP ${res?.status} — ${lastErrorText}`)
   const data = await res.json<any>()
   if (data?.stop_reason === 'max_tokens') {
     throw new Error('Claude API 응답이 max_tokens 제한으로 중간에 잘렸습니다. max_tokens를 늘려야 합니다.')
