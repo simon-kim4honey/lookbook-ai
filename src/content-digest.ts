@@ -305,6 +305,10 @@ ${list}
         'Content-Type': 'application/json',
         'x-api-key': env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
+        // Cloudflare Workers의 fetch 기본 User-Agent가 자동화 트래픽으로 분류돼 Anthropic
+        // 쪽 엣지에서 간헐적으로 차단되는 것으로 의심돼(Anthropic 콘솔 사용량/한도는 정상인데도
+        // HTTP 403 forbidden 발생) 표준 User-Agent를 명시해본다.
+        'User-Agent': 'EZlook-ContentDigest/1.0 (+https://www.aifashion.co.kr)',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
@@ -585,6 +589,7 @@ ${list}
         'Content-Type': 'application/json',
         'x-api-key': c.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
+        'User-Agent': 'EZlook-ContentDigest/1.0 (+https://www.aifashion.co.kr)',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',

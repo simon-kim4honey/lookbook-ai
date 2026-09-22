@@ -355,6 +355,7 @@ Country: ${country}`
       'Content-Type': 'application/json',
       'x-api-key': env.ANTHROPIC_API_KEY!,
       'anthropic-version': '2023-06-01',
+      'User-Agent': 'EZlook-ContentDigest/1.0 (+https://www.aifashion.co.kr)',
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
@@ -478,7 +479,7 @@ async function claudeDraft(env: LeadBindings, lang: 'ko' | 'en' | 'ja', brandNam
   const prompt = `Write a short, professional B2B cold-outreach email (under 150 words) in ${langName} from an AI fashion lookbook generation SaaS to a fashion brand called "${brandName}" (category: ${category || 'unknown'}, style: ${styleTags.join(', ') || 'unknown'}, target customer: ${targetCustomer || 'unknown'}). Tone: friendly, non-spammy, no exaggerated claims, easy opt-out line included. Return ONLY strict JSON: {"subject": string, "body": string}`
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
+    headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'User-Agent': 'EZlook-ContentDigest/1.0 (+https://www.aifashion.co.kr)' },
     body: JSON.stringify({ model: 'claude-sonnet-5', thinking: { type: 'disabled' }, max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
   })
   if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status}`)
