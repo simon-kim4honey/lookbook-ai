@@ -292,10 +292,14 @@ ${list}
 원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`
 
-  // 2026-09-21: max_tokens: 3000으로 고정해도 HTTP 403 forbidden("Request not allowed")이
-  // 간헐적으로 발생하는 게 실사용에서 확인됨 — 같은 요청을 바로 재시도하면 성공하는 경우가
-  // 많아, 고정 상한값 문제가 아니라 Cloudflare Workers 엣지가 요청마다 다른 리전으로
-  // 라우팅되며 일부만 걸리는 일시적 현상으로 추정됨. 최대 3회, 짧은 대기 후 재시도한다.
+  // 2026-09-22: HTTP 403 forbidden("Request not allowed")이 간헐적으로 발생 — /debug-classify로
+  // 응답 헤더까지 확인한 결과, x-request-id/anthropic-ratelimit-* 헤더가 전부 없고 응답이
+  // 15ms 만에 돌아오는 것으로 보아 Anthropic 애플리케이션 계층까지 가지도 못하고 Cloudflare
+  // 엣지에서 막히는 것으로 확인됨(Anthropic 콘솔의 사용량/한도/크레딧은 전부 정상 — 계정
+  // 문제 아님). Workers(Cloudflare)가 마찬가지로 Cloudflare 뒤에 있는 api.anthropic.com을
+  // 호출하는 "Orange-to-Orange" 트래픽이 Cloudflare 자체 보안 시스템에 걸리는 것으로 추정.
+  // 근본 해결(Anthropic 문의 또는 비-Cloudflare 중계 서버 경유)은 보류하고, 우선 재시도로
+  // 완화한다 — max_tokens 값 자체는 원인이 아니었음(작은 control 요청도 동일하게 차단됨).
   let res: Response | null = null
   let lastErrorText = ''
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -305,9 +309,7 @@ ${list}
         'Content-Type': 'application/json',
         'x-api-key': env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        // Cloudflare Workers의 fetch 기본 User-Agent가 자동화 트래픽으로 분류돼 Anthropic
-        // 쪽 엣지에서 간헐적으로 차단되는 것으로 의심돼(Anthropic 콘솔 사용량/한도는 정상인데도
-        // HTTP 403 forbidden 발생) 표준 User-Agent를 명시해본다.
+        // User-Agent를 명시해도 위 403 차단은 재현됨(원인 아닌 것으로 확인) — 무해하니 유지.
         'User-Agent': 'EZlook-ContentDigest/1.0 (+https://www.aifashion.co.kr)',
       },
       body: JSON.stringify({
