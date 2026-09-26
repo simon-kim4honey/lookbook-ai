@@ -2,123 +2,165 @@ import { appLogin } from '@apps-in-toss/web-framework'
 import { useEffect, useState } from 'react'
 import './App.css'
 
-// 기존 lookbook-ai(EZlook) Cloudflare Workers 백엔드를 그대로 재사용한다.
-// 운영 도메인 기본값이며, 스테이징에서 테스트할 때는 .env.local에
-// VITE_API_BASE_URL=https://<staging-pages-domain> 을 넣어 덮어쓴다.
+// 기존 lookbook-ai(EZlook) 사이트를 "이식"하는 방식.
+// 새로 UI를 만드는 대신, 운영 사이트의 실제 생성기 화면(HTML/CSS/JS)을 그대로 가져와서
+// 화면에 심는다 — 업로드 슬롯, 드래그앤드롭, 모델/배경 스와이프 카드, 생성 폴링 등
+// 기존 사용성을 100% 그대로 재사용하기 위함. 자세한 배경은 toss-app/README.md 참고.
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'https://www.aifashion.co.kr'
 
-type ShowcaseImage = { id: string; imageBase64: string }
-type ModelPreset = { id: number; name: string; gender: string; mood: string }
+declare global {
+  interface Window {
+    AppState?: { user: unknown; [key: string]: unknown }
+    initLocale?: () => Promise<void>
+    initPage?: () => void
+    updateUserUI?: () => void
+    closeModal?: (id: string) => void
+    showToast?: (message: string, type?: string) => void
+  }
+}
+
+type TokenResponse = {
+  success?: boolean
+  message?: string
+  user?: { name?: string; [key: string]: unknown }
+  token?: string
+}
 
 function App() {
-  const [showcase, setShowcase] = useState<ShowcaseImage[]>([])
-  const [models, setModels] = useState<ModelPreset[]>([])
-  const [loadError, setLoadError] = useState<string | null>(null)
-
-  const [loginNotice, setLoginNotice] = useState<string | null>(null)
-  const [loginError, setLoginError] = useState<string | null>(null)
-  const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
-    async function loadHomeData() {
+    let cancelled = false
+
+    async function transplant() {
       try {
-        const [showcaseRes, modelsRes] = await Promise.all([
-          fetch(`${API_BASE}/api/home/showcase`),
-          fetch(`${API_BASE}/api/presets/models`),
-        ])
-        const showcaseJson = await showcaseRes.json()
-        const modelsJson = await modelsRes.json()
-        setShowcase(showcaseJson.images ?? [])
-        setModels(modelsJson.models ?? [])
+        // 1) 앞으로 생기는 모든 상대경로 요청(app.js가 런타임에 만드는 이미지 src, fetch 등)이
+        //    운영 도메인으로 가도록 base href를 설정 — fetch를 몽키패치하는 것보다 안전하고
+        //    <img src="/api/proxy/...">처럼 fetch를 거치지 않는 리소스에도 동일하게 적용됨.
+        let base = document.querySelector('base')
+        if (!base) {
+          base = document.createElement('base')
+          document.head.prepend(base)
+        }
+        base.setAttribute('href', `${API_BASE}/`)
+
+        // 2) 운영 서버가 렌더링하는 생성기 페이지를 그대로 가져온다 (cors() 적용된 /api/* 경로).
+        const res = await fetch(`${API_BASE}/api/toss/generator-html`)
+        if (!res.ok) throw new Error(`generator-html fetch failed: ${res.status}`)
+        const html = await res.text()
+        if (cancelled) return
+
+        const doc = new DOMParser().parseFromString(html, 'text/html')
+
+        // 3) 원본이 쓰는 스타일시트를 그대로 로드 (style.css, 폰트, 아이콘 등 — 하드코딩 안 하고
+        //    원본 <head>에서 그대로 뽑아써서 나중에 원본이 바뀌어도 자동으로 따라감).
+        const stylesheetHrefs = Array.from(
+          doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'),
+        ).map((link) => new URL(link.getAttribute('href') || '', API_BASE).href)
+
+        for (const href of stylesheetHrefs) {
+          if (document.querySelector(`link[href="${href}"]`)) continue
+          const link = document.createElement('link')
+          link.rel = 'stylesheet'
+          link.href = href
+          document.head.appendChild(link)
+        }
+
+        // 4) body 내용을 그대로 삽입 (내부에 <script> 태그가 있어도 innerHTML로는 실행되지
+        //    않으므로 app.js는 아래에서 별도로 로드한다).
+        const container = document.getElementById('ezlook-transplant-root')
+        if (container) container.innerHTML = doc.body.innerHTML
+
+        // 5) app.js를 원본 <head>에 적힌 경로 그대로 로드.
+        const appJsSrcRaw = doc.querySelector<HTMLScriptElement>('script[src*="app.js"]')?.getAttribute('src')
+        const appJsSrc = new URL(appJsSrcRaw || '/static/app.js', API_BASE).href
+
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script')
+          script.src = appJsSrc
+          script.onload = () => resolve()
+          script.onerror = () => reject(new Error('app.js 로드 실패'))
+          document.body.appendChild(script)
+        })
+        if (cancelled) return
+
+        // 6) app.js는 DOMContentLoaded 시점에 초기화하도록 되어 있는데, 그 이벤트는 이미
+        //    지나간 뒤라 다시 발생하지 않는다 — 같은 초기화 함수를 직접 호출해준다.
+        await window.initLocale?.()
+        window.initPage?.()
+
+        // 7) 로그인 버튼을 토스 로그인으로 교체 (카카오/구글 모달 대신).
+        const loginBtn = document.getElementById('navLoginBtn')
+        if (loginBtn) {
+          loginBtn.textContent = '토스로 로그인'
+          loginBtn.onclick = () => {
+            handleTossLogin()
+          }
+        }
+
+        setStatus('ready')
       } catch (err) {
         console.error(err)
-        setLoadError('홈 데이터를 불러오지 못했어요.')
+        if (!cancelled) {
+          setErrorMessage(err instanceof Error ? err.message : String(err))
+          setStatus('error')
+        }
       }
     }
-    loadHomeData()
+
+    transplant()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  // appLogin()으로 인가 코드까지만 클라이언트에서 받는다. 이 코드를 AccessToken으로
-  // 교환하는 서버 엔드포인트(mTLS 인증서 필요)는 아직 준비되지 않았다 — 파트너센터에서
-  // mTLS 인증서/복호화 키를 발급받은 뒤 별도로 구현 예정.
+  // appLogin()으로 인가 코드를 받아 서버(/api/auth/toss)에 전달하고, 성공하면 기존
+  // 사이트(app.js)가 로그인 완료 시 하는 것과 동일한 절차로 세션을 반영한다
+  // (app.js의 handleOAuthSuccess()와 동일한 순서 — 전역 함수/상태를 그대로 재사용).
   const handleTossLogin = async () => {
-    setIsLoggingIn(true)
-    setLoginError(null)
-    setLoginNotice(null)
     try {
       const { authorizationCode, referrer } = await appLogin()
-      console.log('토스 로그인 인가 코드 수신', { referrer })
 
-      try {
-        const res = await fetch(`${API_BASE}/api/auth/toss`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ authorizationCode, referrer }),
-        })
-        if (!res.ok) throw new Error(`status=${res.status}`)
-        const data = await res.json()
-        setLoginNotice('토스 로그인에 성공했어요.')
-        console.log('토스 로그인 서버 응답', data)
-      } catch {
-        setLoginNotice(
-          '인가 코드는 정상적으로 받았어요.\n서버 토큰 교환 연동은 mTLS 인증서 발급 후 준비될 예정이에요.',
-        )
+      const res = await fetch(`${API_BASE}/api/auth/toss`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authorizationCode, referrer }),
+      })
+      const data: TokenResponse = await res.json()
+
+      if (!res.ok || !data.success || !data.token || !data.user) {
+        window.showToast?.(data.message || '토스 로그인에 실패했어요.', 'error')
+        return
       }
+
+      if (window.AppState) window.AppState.user = data.user
+      localStorage.setItem('lookbook_token', data.token)
+      localStorage.setItem('lookbook_user', JSON.stringify(data.user))
+      window.updateUserUI?.()
+      window.closeModal?.('loginModal')
+      window.showToast?.(`환영합니다, ${data.user.name}님`, 'success')
     } catch (err) {
       console.error(err)
-      setLoginError('토스 로그인에 실패했어요. 토스 앱 내부(WebView) 환경에서만 동작해요.')
-    } finally {
-      setIsLoggingIn(false)
+      window.showToast?.('토스 로그인에 실패했어요. 토스 앱 내부에서만 동작해요.', 'error')
     }
   }
 
   return (
-    <main className="app">
-      <header className="hero">
-        <h1>EZlook</h1>
-        <p>AI 모델 착장 이미지, 토스 앱에서 바로 만들어보세요.</p>
-      </header>
-
-      <section className="section">
-        <button
-          type="button"
-          className="login-button"
-          onClick={handleTossLogin}
-          disabled={isLoggingIn}
-        >
-          {isLoggingIn ? '로그인 처리 중...' : '토스로 로그인'}
-        </button>
-        {loginNotice != null ? <p className="notice">{loginNotice}</p> : null}
-        {loginError != null ? <p className="error-message">{loginError}</p> : null}
-      </section>
-
-      {loadError != null ? <p className="error-message">{loadError}</p> : null}
-
-      {showcase.length > 0 ? (
-        <section className="section">
-          <h2>쇼케이스</h2>
-          <div className="showcase-scroll">
-            {showcase.map((img) => (
-              <img key={img.id} src={img.imageBase64} alt="" />
-            ))}
-          </div>
-        </section>
+    <>
+      {status === 'loading' ? (
+        <div className="transplant-loading">
+          <p>불러오는 중...</p>
+        </div>
       ) : null}
-
-      {models.length > 0 ? (
-        <section className="section">
-          <h2>모델 프리셋</h2>
-          <div className="model-grid">
-            {models.slice(0, 6).map((m) => (
-              <div key={m.id} className="model-card">
-                <strong>{m.name}</strong>
-                <span>{m.gender} · {m.mood}</span>
-              </div>
-            ))}
-          </div>
-        </section>
+      {status === 'error' ? (
+        <div className="transplant-loading">
+          <p className="error-message">화면을 불러오지 못했어요.</p>
+          <p className="notice">{errorMessage}</p>
+        </div>
       ) : null}
-    </main>
+      <div id="ezlook-transplant-root" />
+    </>
   )
 }
 
