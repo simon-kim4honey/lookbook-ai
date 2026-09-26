@@ -7853,6 +7853,10 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 app.get('/', (c) => generatorPageHandler(c, 'model'))
 app.get('/generator', (c) => c.redirect('/', 301))
 app.get('/ghostcut', (c) => generatorPageHandler(c, 'ghostcut'))
+// 토스 인앱(toss-app) 클라이언트가 이 페이지 HTML을 크로스오리진으로 fetch해서 그대로
+// 이식(transplant)하는 용도 — /api/* 아래 두어 기존 cors() 미들웨어를 그대로 탄다.
+// generatorPageHandler 자체는 손대지 않고 재사용만 하므로 기존 화면/생성 로직에 영향 없음.
+app.get('/api/toss/generator-html', (c) => generatorPageHandler(c, 'model'))
 
 // ────────────────────────────────────────────────────
 // 도식화 만들기 (AI Technical Flat Sketch) — PC 전용
