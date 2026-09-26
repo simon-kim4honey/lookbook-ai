@@ -1,0 +1,23 @@
+:root {
+  --primary: #3182F6;
+  --primary-light: #5B9DF7;
+  --primary-bg: #E8F3FF;
+  --text: #191F28;
+  --text-secondary: #6B7684;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
+  color: var(--text);
+  background: #fff;
+}
+
+#root {
+  min-height: 100vh;
+}
