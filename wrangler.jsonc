@@ -21,6 +21,12 @@
       "preview_id": "6a5dcf373bfb43aea55c958a2b7e7886"
     }
   ],
+  "mtls_certificates": [
+    {
+      "binding": "APPS_IN_TOSS_MTLS",
+      "certificate_id": "a48f9cfb-8799-4145-bc3a-0bbb87d5167d"
+    }
+  ],
   "vars": {
     "GA4_MEASUREMENT_ID": "G-R2WKD5NZBX"
   }

@@ -1,0 +1,26 @@
+.transplant-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 8px;
+  padding: 20px;
+  text-align: center;
+}
+
+.transplant-loading p {
+  margin: 0;
+  color: var(--text-secondary, #6B7684);
+  font-size: 14px;
+}
+
+.transplant-loading .error-message {
+  color: #E5484D;
+  font-weight: 600;
+}
+
+.transplant-loading .notice {
+  font-size: 12px;
+  word-break: break-all;
+}

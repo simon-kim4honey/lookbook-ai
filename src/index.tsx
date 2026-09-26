@@ -134,6 +134,10 @@ const AIFASHION_BASE = 'https://www.aifashion.co.kr'
 // lookbook-ai와는 기술 스택이 완전히 달라(Next.js/NestJS/Postgres) 별도 배포 대상이며,
 // /techpack은 PC 화면에서 이 URL로 리다이렉트만 한다.
 const TECHPACK_APP_URL = 'https://ezlook-techpack-web.onrender.com'
+// 앱인토스(Apps in Toss) 로그인 API — TossPayments(c.env.TOSS_API_BASE, 별개 서비스)와 이름이
+// 겹치지 않도록 APPS_IN_TOSS_* 접두사 사용. 전 구간 mTLS 클라이언트 인증서 필수
+// (c.env.APPS_IN_TOSS_MTLS — wrangler.jsonc의 mtls_certificates 바인딩).
+const APPS_IN_TOSS_AUTH_BASE = 'https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2'
 // 어드민 인증 미들웨어 (상단 선언 필수 — 스토어/라우트보다 먼저 참조됨)
 const adminAuth = async (c: any, next: any) => {
   const authHeader = c.req.header('X-Admin-Password')
@@ -2633,6 +2637,128 @@ app.get('/api/auth/google/callback', async (c) => {
   } catch (err: any) {
     console.error('google callback error:', err)
     return errorResponse(err.message || '로그인 오류')
+  }
+})
+
+// ────────────────────────────────────────────────────
+// 토스 로그인 (Apps in Toss) — 클라이언트가 appLogin()으로 받은 authorizationCode를
+// AccessToken으로 교환하고, 사용자 정보를 조회해 기존 회원 시스템에 연결한다.
+// 참고: github.com/toss/apps-in-toss-examples의 toss-login/server 예제 코드 기준으로 구현.
+// ────────────────────────────────────────────────────
+
+// AES-256-GCM 복호화 — 토스 사용자 정보의 name/phone/email 등 개인정보 필드는
+// base64(IV(12B) + 암호문 + 태그(16B)) 형태로 암호화되어 내려온다.
+function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+async function decryptTossField(
+  encryptedBase64: string | null | undefined,
+  keyBase64: string,
+  aad: string,
+): Promise<string | null> {
+  if (!encryptedBase64) return null
+  try {
+    const decoded = base64ToBytes(encryptedBase64)
+    const iv = decoded.slice(0, 12)
+    const ciphertextWithTag = decoded.slice(12)
+    const key = await crypto.subtle.importKey('raw', base64ToBytes(keyBase64), 'AES-GCM', false, ['decrypt'])
+    const plainBuf = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(aad), tagLength: 128 },
+      key,
+      ciphertextWithTag,
+    )
+    return new TextDecoder().decode(plainBuf)
+  } catch (err) {
+    console.error('토스 사용자 정보 복호화 실패:', err)
+    return null
+  }
+}
+
+// POST /api/auth/toss — 인가 코드 → AccessToken 교환 → 사용자 정보 조회 → 세션 발급
+app.post('/api/auth/toss', async (c) => {
+  const mtls: any = (c.env as any)?.APPS_IN_TOSS_MTLS
+  if (!mtls) {
+    return c.json({ success: false, message: '토스 로그인이 아직 설정되지 않았습니다. (mTLS 인증서 바인딩 필요)' }, 503)
+  }
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const body: any = await c.req.json()
+    const { authorizationCode, referrer } = body
+    if (!authorizationCode) return c.json({ success: false, message: 'authorizationCode가 필요합니다.' }, 400)
+
+    // 1) 인가 코드 → AccessToken 교환 (mTLS 필수)
+    const tokenRes = await mtls.fetch(`${APPS_IN_TOSS_AUTH_BASE}/generate-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ authorizationCode, referrer: referrer || 'DEFAULT' }),
+    })
+    const tokenJson: any = await tokenRes.json().catch(() => null)
+    const accessToken = tokenJson?.success?.accessToken
+    if (!accessToken) {
+      console.error('토스 토큰 발급 실패:', tokenJson)
+      return c.json({ success: false, message: '토스 로그인 토큰 발급에 실패했습니다.' }, 502)
+    }
+
+    // 2) 사용자 정보 조회
+    const userRes = await mtls.fetch(`${APPS_IN_TOSS_AUTH_BASE}/login-me`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    })
+    const userJson: any = await userRes.json().catch(() => null)
+    const rawUser = userJson?.success
+    if (!rawUser?.userKey) {
+      console.error('토스 사용자 정보 조회 실패:', userJson)
+      return c.json({ success: false, message: '토스 사용자 정보 조회에 실패했습니다.' }, 502)
+    }
+
+    // 3) 개인정보 필드 복호화 — AAD_STRING/DECRYPTION_KEY_BASE64가 아직 설정 안 됐으면
+    //    이름/이메일 없이(placeholder) 로그인만 우선 되게 한다.
+    const decryptKey = (c.env as any).APPS_IN_TOSS_DECRYPTION_KEY_BASE64
+    const aad = (c.env as any).APPS_IN_TOSS_AAD_STRING
+    let name: string | null = null
+    let email: string | null = null
+    let phone: string | null = null
+    if (decryptKey && aad) {
+      ;[name, email, phone] = await Promise.all([
+        decryptTossField(rawUser.name, decryptKey, aad),
+        decryptTossField(rawUser.email, decryptKey, aad),
+        decryptTossField(rawUser.phone, decryptKey, aad),
+      ])
+    }
+
+    const providerId = String(rawUser.userKey)
+    const tossEmail = email || `toss_${providerId}@toss.local`
+    const tossName = name || '토스 사용자'
+
+    // 4) 기존 users 테이블에 upsert (카카오/구글 로그인과 동일 패턴)
+    let user: any = await db.prepare(`SELECT * FROM users WHERE provider = 'toss' AND provider_id = ?`).bind(providerId).first()
+    if (!user) {
+      user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(tossEmail).first()
+      if (user) {
+        await db.prepare(`UPDATE users SET provider_id = ?, phone_number = COALESCE(?, phone_number) WHERE id = ?`).bind(providerId, phone, user.id).run()
+      } else {
+        const id = genUserId()
+        await db.prepare(
+          `INSERT INTO users (id, email, name, provider, provider_id, phone_number, status, credits, role)
+           VALUES (?, ?, ?, 'toss', ?, ?, 'active', 200, 'user')`
+        ).bind(id, tossEmail, tossName, providerId, phone).run()
+        await db.prepare(
+          `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+           VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`
+        ).bind(id, `signup_${id}`).run()
+        user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
+      }
+    }
+    if (user.status !== 'active') return c.json({ success: false, message: '정지된 계정입니다.' }, 403)
+
+    const token = await createSession(db, user.id)
+    return c.json({ success: true, user: publicUser(user), token })
+  } catch (err: any) {
+    console.error('토스 로그인 오류:', err)
+    return c.json({ success: false, message: '서버 오류가 발생했습니다.' }, 500)
   }
 })
 
@@ -7727,6 +7853,10 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 app.get('/', (c) => generatorPageHandler(c, 'model'))
 app.get('/generator', (c) => c.redirect('/', 301))
 app.get('/ghostcut', (c) => generatorPageHandler(c, 'ghostcut'))
+// 토스 인앱(toss-app) 클라이언트가 이 페이지 HTML을 크로스오리진으로 fetch해서 그대로
+// 이식(transplant)하는 용도 — /api/* 아래 두어 기존 cors() 미들웨어를 그대로 탄다.
+// generatorPageHandler 자체는 손대지 않고 재사용만 하므로 기존 화면/생성 로직에 영향 없음.
+app.get('/api/toss/generator-html', (c) => generatorPageHandler(c, 'model'))
 
 // ────────────────────────────────────────────────────
 // 도식화 만들기 (AI Technical Flat Sketch) — PC 전용
