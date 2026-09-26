@@ -1,5 +1,5 @@
 import { appLogin } from '@apps-in-toss/web-framework'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import './App.css'
 
 // 기존 lookbook-ai(EZlook) 사이트를 "이식"하는 방식.
@@ -14,6 +14,7 @@ declare global {
     initLocale?: () => Promise<void>
     initPage?: () => void
     updateUserUI?: () => void
+    openModal?: (id: string) => void
     closeModal?: (id: string) => void
     showToast?: (message: string, type?: string) => void
   }
@@ -29,6 +30,9 @@ type TokenResponse = {
 function App() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  // window.openModal 안에서 최신 handleTossLogin을 부르기 위한 ref (아래에서 정의되지만
+  // effect는 최초 1회만 실행되므로 클로저가 아니라 ref로 최신 함수를 참조한다).
+  const handleTossLoginRef = useRef<() => Promise<void>>(async () => {})
 
   useEffect(() => {
     let cancelled = false
@@ -90,14 +94,26 @@ function App() {
         await window.initLocale?.()
         window.initPage?.()
 
-        // 7) 로그인 버튼을 토스 로그인으로 교체 (카카오/구글 모달 대신).
-        const loginBtn = document.getElementById('navLoginBtn')
-        if (loginBtn) {
-          loginBtn.textContent = '토스로 로그인'
-          loginBtn.onclick = () => {
-            handleTossLogin()
+        // 7) 로그인 모달(카카오/구글/이메일)을 여는 모든 경로를 토스 로그인으로 가로챈다.
+        //    #navLoginBtn 클릭뿐 아니라 "생성하기" 버튼 등 여러 곳에서 openModal('loginModal')을
+        //    직접 호출하기 때문에, 버튼 하나만 바꿔서는 다른 진입 경로를 못 막는다 — 전역
+        //    openModal 자체를 감싸서 'loginModal'일 때만 토스 로그인으로 라우팅한다.
+        const originalOpenModal = window.openModal
+        window.openModal = (id: string) => {
+          if (id === 'loginModal') {
+            handleTossLoginRef.current()
+            return
           }
+          originalOpenModal?.(id)
         }
+
+        const loginBtn = document.getElementById('navLoginBtn')
+        if (loginBtn) loginBtn.textContent = '토스로 로그인'
+
+        // 8) "카톡 문의" 메뉴는 토스 미니앱 맥락에 안 맞아서 문구만 교체 (원본 사이트는 그대로).
+        container?.querySelectorAll<HTMLAnchorElement>('a[href*="pf.kakao.com"]').forEach((a) => {
+          a.textContent = '문의하기'
+        })
 
         setStatus('ready')
       } catch (err) {
@@ -145,6 +161,7 @@ function App() {
       window.showToast?.('토스 로그인에 실패했어요. 토스 앱 내부에서만 동작해요.', 'error')
     }
   }
+  handleTossLoginRef.current = handleTossLogin
 
   return (
     <>
