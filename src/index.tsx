@@ -59,6 +59,14 @@ type Bindings = {
   // Preview 환경 변수로만 설정). /techpack 라우트 자체는 계속 접근 가능하다 —
   // 메뉴에서만 숨기는 것이라 직접 URL로는 테스트 가능.
   TECHPACK_MENU_VISIBLE?: string
+  // 이메일 가입 사용자용 "비밀번호 찾기" 메일 발송 (Resend — wrangler secret put
+  // RESEND_API_KEY). 미설정 시 재설정 메일 발송만 조용히 건너뜀(토큰 발급 자체는
+  // 계속 진행되므로 /api/auth/forgot-password 응답은 항상 "보냈어요"로 동일하게
+  // 유지됨 — 가입 이메일 존재 여부가 노출되지 않도록).
+  RESEND_API_KEY?: string
+  // 발신자 주소 — Resend에 도메인(aifashion.co.kr) 인증을 마쳐야 그 도메인으로 보낼 수
+  // 있음. 미설정 시 기본값(EZlook <noreply@aifashion.co.kr>) 사용.
+  RESEND_FROM_EMAIL?: string
 }
 
 // 도식화 만들기 메뉴 항목 노출 여부 — 위 TECHPACK_MENU_VISIBLE 참고.
@@ -2099,6 +2107,45 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   return hashHex === storedHash
 }
 
+// ── 헬퍼: 비밀번호 재설정 메일 발송(Resend) — RESEND_API_KEY 미설정 시 콘솔
+// 경고만 남기고 조용히 건너뜀. 실패해도 /api/auth/forgot-password 쪽 응답에는
+// 영향 주지 않는다(발송 성공 여부와 무관하게 항상 "보냈어요"로 응답 — 가입 이메일
+// 존재 여부가 외부에 노출되지 않도록).
+async function sendResetPasswordEmail(env: Bindings, to: string, resetUrl: string): Promise<void> {
+  const apiKey = env.RESEND_API_KEY
+  if (!apiKey) {
+    console.warn('RESEND_API_KEY 미설정 — 비밀번호 재설정 메일 발송 생략:', to)
+    return
+  }
+  const from = env.RESEND_FROM_EMAIL || 'EZlook <noreply@aifashion.co.kr>'
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: '[EZlook] 비밀번호 재설정 안내',
+        html: `
+          <div style="font-family:-apple-system,sans-serif;max-width:480px;margin:0 auto;padding:24px;">
+            <h2 style="color:#191F28;margin:0 0 12px;">비밀번호를 재설정해주세요</h2>
+            <p style="color:#4E5968;font-size:14px;line-height:1.6;">아래 버튼을 눌러 새 비밀번호를 설정해주세요. 이 링크는 <strong>30분간만</strong> 유효합니다.</p>
+            <a href="${resetUrl}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#3182F6;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">비밀번호 재설정하기</a>
+            <p style="color:#8B95A1;font-size:12px;line-height:1.6;">버튼이 눌리지 않으면 아래 링크를 복사해 브라우저에 붙여넣어 주세요.<br/>${resetUrl}</p>
+            <p style="color:#8B95A1;font-size:12px;">본인이 요청하지 않았다면 이 메일은 무시하셔도 됩니다.</p>
+          </div>
+        `,
+      }),
+    })
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '')
+      console.error('[Resend] 비밀번호 재설정 메일 발송 실패:', res.status, errText)
+    }
+  } catch (e: any) {
+    console.error('[Resend] 비밀번호 재설정 메일 발송 오류:', e.message)
+  }
+}
+
 // ── 헬퍼: 세션 토큰으로 사용자 조회 (미들웨어용)
 async function getUserFromToken(db: D1Database, token: string | null) {
   if (!token) return null
@@ -2261,6 +2308,134 @@ app.post('/api/auth/login', async (c) => {
     console.error('login error:', err)
     return c.json({ success: false, message: '서버 오류가 발생했습니다.' }, 500)
   }
+})
+
+// ────────────────────────────────────────────────────
+// POST /api/auth/forgot-password — 비밀번호 재설정 메일 요청
+// ────────────────────────────────────────────────────
+app.post('/api/auth/forgot-password', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const body: any = await c.req.json()
+    const email = String(body?.email || '').trim().toLowerCase()
+    if (!email) return c.json({ success: false, message: '이메일을 입력해주세요.' }, 400)
+
+    // 가입 이메일 존재 여부를 외부에 노출하지 않기 위해, 실제로 메일을 보냈는지와
+    // 무관하게 항상 동일한 성공 메시지로 응답한다(계정 존재 여부 추측 방지).
+    const u: any = await db.prepare(
+      `SELECT id, email FROM users WHERE email = ? AND provider = 'email' AND status = 'active'`
+    ).bind(email).first()
+    if (u) {
+      const token = genToken()
+      const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString()
+      await db.prepare(
+        `INSERT INTO password_resets (token, user_id, expires_at) VALUES (?, ?, ?)`
+      ).bind(token, u.id, expires).run()
+      const resetUrl = `${getOrigin(c)}/reset-password?token=${token}`
+      await sendResetPasswordEmail(c.env, u.email, resetUrl)
+    }
+    return c.json({ success: true, message: '입력하신 이메일로 재설정 링크를 보냈어요. 메일함(스팸함 포함)을 확인해주세요.' })
+  } catch (err: any) {
+    console.error('forgot-password error:', err)
+    return c.json({ success: false, message: '서버 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// POST /api/auth/reset-password — 재설정 토큰으로 새 비밀번호 설정
+// ────────────────────────────────────────────────────
+app.post('/api/auth/reset-password', async (c) => {
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const body: any = await c.req.json()
+    const { token, password } = body
+    if (!token || !password) return c.json({ success: false, message: '잘못된 요청입니다.' }, 400)
+    if (password.length < 8) return c.json({ success: false, message: '비밀번호는 8자 이상이어야 합니다.' }, 400)
+
+    const reset: any = await db.prepare(`SELECT * FROM password_resets WHERE token = ?`).bind(token).first()
+    if (!reset) return c.json({ success: false, message: '유효하지 않은 링크입니다. 다시 요청해주세요.' }, 400)
+    if (reset.used_at) return c.json({ success: false, message: '이미 사용된 링크입니다. 다시 요청해주세요.' }, 400)
+    if (new Date(reset.expires_at).getTime() < Date.now()) return c.json({ success: false, message: '만료된 링크입니다. 다시 요청해주세요.' }, 400)
+
+    const hash = await hashPassword(password)
+    await db.prepare(`UPDATE users SET password_hash = ? WHERE id = ?`).bind(hash, reset.user_id).run()
+    await db.prepare(`UPDATE password_resets SET used_at = datetime('now') WHERE token = ?`).bind(token).run()
+    // 비밀번호가 바뀌었으니 기존에 로그인돼 있던 세션(다른 기기 등)은 전부 끊는다 —
+    // 재설정 사유가 비밀번호 유출이었다면 탈취된 세션도 함께 무효화되도록.
+    await db.prepare(`DELETE FROM user_sessions WHERE user_id = ?`).bind(reset.user_id).run()
+
+    return c.json({ success: true })
+  } catch (err: any) {
+    console.error('reset-password error:', err)
+    return c.json({ success: false, message: '서버 오류가 발생했습니다.' }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// GET /reset-password — 비밀번호 재설정 메일의 링크가 가리키는 페이지
+// ────────────────────────────────────────────────────
+app.get('/reset-password', (c) => {
+  const token = c.req.query('token') || ''
+  return c.html(htmlShell('비밀번호 재설정', `
+  <div class="toast-container" id="toastContainer"></div>
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;">
+    <div class="modal-box" style="max-width:420px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+      <h2 style="margin:0 0 8px;font-size:20px;font-weight:800;color:var(--text-primary);">새 비밀번호 설정</h2>
+      <p style="margin:0 0 18px;font-size:13px;color:var(--text-muted);">새로 사용하실 비밀번호를 입력해주세요.</p>
+      <div id="resetError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="resetErrorText"></span></div>
+      <div id="resetFormBox">
+        <div class="form-group"><input type="password" class="form-input" id="resetPassword" placeholder="새 비밀번호 (8자 이상)" autocomplete="new-password" /></div>
+        <div class="form-group"><input type="password" class="form-input" id="resetPasswordConfirm" placeholder="새 비밀번호 확인" autocomplete="new-password" /></div>
+        <button type="button" class="btn btn-primary btn-full btn-lg" id="resetSubmitBtn" style="margin-top:4px;">비밀번호 변경</button>
+      </div>
+      <div id="resetSuccessBox" style="display:none;text-align:center;padding:12px 0;">
+        <div style="font-size:32px;margin-bottom:8px;">✅</div>
+        <p style="font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:16px;">비밀번호가 변경됐어요!</p>
+        <a href="/" class="btn btn-primary btn-full btn-lg">로그인하러 가기</a>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function() {
+    var TOKEN = ${JSON.stringify(token)};
+    var btn = document.getElementById('resetSubmitBtn');
+    function showErr(msg) {
+      document.getElementById('resetErrorText').textContent = msg;
+      // .auth-message의 기본 display는 CSS에서 none — 'flex'로 직접 켜야 보임
+      document.getElementById('resetError').style.display = 'flex';
+    }
+    if (!TOKEN) showErr('유효하지 않은 링크입니다. 비밀번호 찾기를 다시 요청해주세요.');
+    btn.addEventListener('click', async function() {
+      var pw = document.getElementById('resetPassword').value;
+      var pw2 = document.getElementById('resetPasswordConfirm').value;
+      document.getElementById('resetError').style.display = 'none';
+      if (!TOKEN) { showErr('유효하지 않은 링크입니다. 비밀번호 찾기를 다시 요청해주세요.'); return; }
+      if (pw.length < 8) { showErr('비밀번호는 8자 이상이어야 합니다.'); return; }
+      if (pw !== pw2) { showErr('비밀번호가 일치하지 않습니다.'); return; }
+      btn.disabled = true;
+      btn.textContent = '변경 중...';
+      try {
+        var res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: TOKEN, password: pw }),
+        });
+        var data = await res.json();
+        if (!data.success) {
+          showErr(data.message || '비밀번호 변경에 실패했습니다.');
+          btn.disabled = false; btn.textContent = '비밀번호 변경';
+          return;
+        }
+        document.getElementById('resetFormBox').style.display = 'none';
+        document.getElementById('resetSuccessBox').style.display = '';
+      } catch (e) {
+        showErr('네트워크 오류가 발생했습니다.');
+        btn.disabled = false; btn.textContent = '비밀번호 변경';
+      }
+    });
+  })();
+  </script>
+  `, '', '비밀번호 재설정', c.env.GA4_MEASUREMENT_ID))
 })
 
 // ────────────────────────────────────────────────────
@@ -5357,6 +5532,31 @@ app.post('/api/admin/auth', async (c) => {
 // ────────────────────────────────────────────────────
 const DEFAULT_DESCRIPTION = '의류 이미지 하나로 AI 온모델 피팅컷과 룩북 세트를 자동 생성하세요.'
 
+// loginModal이 두 페이지(마케팅 /about 페이지, 메인 생성기 셸)에 각각 따로 렌더링돼
+// 있어 "비밀번호 찾기" 모달도 양쪽에 똑같이 필요하다 — 하나의 함수로 공유해 두
+// 곳이 따로 수정되다 어긋나는 일이 없도록 함.
+const forgotPasswordModalHtml = () => `
+  <!-- 비밀번호 찾기 모달 -->
+  <div class="modal-overlay" id="forgotPasswordModal" style="z-index:10100;">
+    <div class="modal-box" style="max-width:420px;">
+      <button class="modal-close" onclick="closeModal('forgotPasswordModal')">×</button>
+      <h3 style="margin:0 0 8px;font-size:18px;font-weight:800;color:var(--text-primary);">비밀번호 찾기</h3>
+      <p style="margin:0 0 18px;font-size:13px;color:var(--text-muted);line-height:1.5;">가입하신 이메일로 비밀번호 재설정 링크를 보내드려요.</p>
+      <div id="forgotPasswordFormBox">
+        <div id="forgotPasswordError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="forgotPasswordErrorText"></span></div>
+        <div class="form-group">
+          <input type="email" class="form-input" id="forgotPasswordEmail" placeholder="가입한 이메일" autocomplete="email" />
+        </div>
+        <button type="button" class="btn btn-primary btn-full btn-lg" id="forgotPasswordBtn" onclick="handleForgotPassword()" style="margin-top:4px;">재설정 링크 보내기</button>
+      </div>
+      <div id="forgotPasswordSuccessBox" style="display:none;text-align:center;padding:12px 0;">
+        <div style="font-size:32px;margin-bottom:8px;">📩</div>
+        <p style="font-size:14px;color:var(--text-primary);font-weight:600;margin-bottom:4px;">이메일을 보냈어요!</p>
+        <p style="font-size:13px;color:var(--text-muted);line-height:1.5;">입력하신 이메일로 비밀번호 재설정 링크를 보내드렸어요. 메일함(스팸함 포함)을 확인해주세요. 링크는 30분간 유효합니다.</p>
+      </div>
+    </div>
+  </div>`
+
 const htmlShell = (title: string, bodyContent: string, extraHead: string = '', description: string = DEFAULT_DESCRIPTION, gaId?: string) => `<!DOCTYPE html>
 
 <html lang="ko">
@@ -6378,6 +6578,9 @@ app.get('/about', (c) => {
             <input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" />
           </div>
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;" data-i18n="nav-login">로그인</button>
+          <p style="text-align:center;margin:10px 0 0;">
+            <a href="javascript:void(0)" onclick="closeModal('loginModal');openForgotPasswordModal()" style="font-size:12.5px;color:var(--text-muted);text-decoration:underline;">비밀번호를 잊으셨나요?</a>
+          </p>
         </form>
       </div>
 
@@ -6429,6 +6632,7 @@ app.get('/about', (c) => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:16px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
+  ${forgotPasswordModalHtml()}
   `, homeExtraHead, homeDescription, c.env.GA4_MEASUREMENT_ID))
 })
 
@@ -7882,6 +8086,9 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <div class="form-group"><input type="email" class="form-input" id="loginEmail" placeholder="이메일" autocomplete="email" /></div>
           <div class="form-group"><input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" /></div>
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;" data-i18n="nav-login">로그인</button>
+          <p style="text-align:center;margin:10px 0 0;">
+            <a href="javascript:void(0)" onclick="closeModal('loginModal');openForgotPasswordModal()" style="font-size:12.5px;color:var(--text-muted);text-decoration:underline;">비밀번호를 잊으셨나요?</a>
+          </p>
         </form>
       </div>
             <div id="authFormSignup" style="display:none;">
@@ -7922,6 +8129,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
       <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);text-decoration:underline;">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);text-decoration:underline;">개인정보처리방침</a>에 동의합니다.</p>
     </div>
   </div>
+  ${forgotPasswordModalHtml()}
   `, modeScript, generatorDescription, c.env.GA4_MEASUREMENT_ID))
 }
 app.get('/', (c) => generatorPageHandler(c, 'model'))
