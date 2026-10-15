@@ -1653,6 +1653,64 @@ async function handleSignup(e) {
   }
 }
 
+// loginModal처럼 openModal/closeModal이 DOM을 재사용(재생성 안 함)하므로, 이전에
+// "보냈어요" 성공 화면이 떠 있던 채로 다시 열리지 않도록 매번 입력폼 상태로 리셋.
+function openForgotPasswordModal() {
+  const formBox = document.getElementById('forgotPasswordFormBox');
+  const successBox = document.getElementById('forgotPasswordSuccessBox');
+  const emailEl = document.getElementById('forgotPasswordEmail');
+  if (formBox) formBox.style.display = '';
+  if (successBox) successBox.style.display = 'none';
+  if (emailEl) emailEl.value = '';
+  clearAuthError('forgotPasswordError');
+  openModal('forgotPasswordModal');
+}
+
+// forgotPasswordModal의 "재설정 링크 보내기" 버튼 — 로그인 폼의 handleLogin과
+// 달리 <form> submit이 아니라 버튼 onclick으로 직접 호출됨(모달 자체가 폼 하나뿐).
+async function handleForgotPassword() {
+  const emailEl = document.getElementById('forgotPasswordEmail');
+  const email   = emailEl ? emailEl.value.trim() : '';
+  const btn     = document.getElementById('forgotPasswordBtn');
+
+  if (!email) {
+    showAuthError('forgotPasswordError', 'forgotPasswordErrorText', '이메일을 입력해주세요.');
+    if (emailEl) emailEl.focus();
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showAuthError('forgotPasswordError', 'forgotPasswordErrorText', '올바른 이메일 주소를 입력해주세요.');
+    if (emailEl) emailEl.focus();
+    return;
+  }
+
+  clearAuthError('forgotPasswordError');
+  const originalHtml = btn.innerHTML;
+  btn.innerHTML = '<span class="btn-spinner"></span> 전송 중...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('forgotPasswordFormBox').style.display = 'none';
+      document.getElementById('forgotPasswordSuccessBox').style.display = '';
+    } else {
+      showAuthError('forgotPasswordError', 'forgotPasswordErrorText', data.message || '요청에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      btn.innerHTML = originalHtml;
+      btn.disabled = false;
+    }
+  } catch (err) {
+    showAuthError('forgotPasswordError', 'forgotPasswordErrorText', '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    btn.innerHTML = originalHtml;
+    btn.disabled = false;
+  }
+}
+
 /** 로그아웃 */
 async function handleLogout() {
   // 드롭다운 먼저 닫기
