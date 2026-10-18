@@ -42,6 +42,17 @@ type Bindings = {
   TOSS_CLIENT_KEY: string
   TOSS_SECRET_KEY: string
   TOSS_API_BASE: string
+  // 나이스페이먼츠 — 2026-09-09에 토스(v2)로 전환하며 코드를 걷어냈다가, 토스 심사가
+  // 끝날 때까지 국내 실제 결제를 임시로 되돌리기 위해 2026-10-18에 복원함(ACTIVE_KR_PG
+  // 참고). 가맹점 계약 자체는 계속 유지되고 있던 상태.
+  NICEPAY_CLIENT_ID?: string
+  NICEPAY_SECRET_KEY?: string
+  NICEPAY_API_BASE?: string
+  // 국내(KR) 실제 결제 PG 토글 — 'nicepay' | 'toss'(기본값). 토스 심사 중에는
+  // 'nicepay'로 설정해 실제 결제창을 나이스페이로 돌리고, 심사 통과 후 이 값만
+  // 지우거나 'toss'로 바꾸면 코드 변경/재배포 없이 토스로 복귀한다. 토스 결제
+  // 엔드포인트(/payment/toss/*)는 이 값과 무관하게 항상 살아있다.
+  ACTIVE_KR_PG?: string
   // Atlas Cloud AI (이미지 생성 전용)
   ATLAS_API_KEY: string
   // OpenAI (이미지 분류/라벨링 전용 — gpt-4o-mini, AtlasCloud엔 없는 모델)
@@ -2001,15 +2012,22 @@ app.get('/api/projects', (c) => {
   return c.json({ projects: sampleProjects })
 })
 
+// 국내(KR) 실제 결제 PG 토글 — 자세한 설명은 Bindings.ACTIVE_KR_PG 주석 참고.
+// 미설정/'nicepay' 아닌 값이면 전부 'toss'로 수렴(안전한 기본값 = 현재 동작 유지).
+function activeKrPg(env: Bindings): 'toss' | 'nicepay' {
+  return env.ACTIVE_KR_PG === 'nicepay' ? 'nicepay' : 'toss'
+}
+
 // ── 국가 기반 locale/통화/PG/공유채널 통합 감지 ──────────────
 // Workers for Platform dispatch 환경에서는 c.req.raw.cf가 전달되지 않으므로
 // Cloudflare가 모든 요청에 주입하는 CF-IPCountry 헤더를 우선 사용.
-// 국내(한국)는 토스페이먼츠, 해외는 전부 Stripe로 이원화 — 글로벌 로컬라이제이션 기획 참고.
-function resolveLocaleProfile(country: string) {
+// 국내(한국)는 토스페이먼츠(또는 심사 중엔 나이스페이 — activeKrPg 참고), 해외는
+// 전부 Stripe로 이원화 — 글로벌 로컬라이제이션 기획 참고.
+function resolveLocaleProfile(country: string, env: Bindings) {
   const cc = (country || '').toUpperCase()
   // 국가를 판별할 수 없는 경우(CF-IPCountry 헤더 누락 등)에는 서비스 기본 시장인
   // 한국어로 대체한다 — 감지 실패를 곧바로 영어로 떨어뜨리지 않는다.
-  if (cc === 'KR' || !cc) return { locale: 'ko', currency: 'KRW', pg: 'toss', messenger: 'kakao' }
+  if (cc === 'KR' || !cc) return { locale: 'ko', currency: 'KRW', pg: activeKrPg(env), messenger: 'kakao' }
   if (cc === 'JP') return { locale: 'ja', currency: 'JPY', pg: 'stripe', messenger: 'line' }
   // 그 외 국가(미국 포함) — 서비스 대상 해외 시장은 en/USD/Stripe로 수렴
   return { locale: 'en', currency: 'USD', pg: 'stripe', messenger: 'web-share' }
@@ -2033,11 +2051,11 @@ app.get('/api/locale', async (c) => {
        WHERE s.token = ? AND s.expires_at > datetime('now')`
     ).bind(sessionToken).first() as any
     if (sess?.locale) {
-      return c.json({ country: sess.country || country, locale: sess.locale, currency: sess.currency || 'USD', pg: sess.locale === 'ko' ? 'toss' : 'stripe', messenger: sess.locale === 'ko' ? 'kakao' : (sess.locale === 'ja' ? 'line' : 'web-share') })
+      return c.json({ country: sess.country || country, locale: sess.locale, currency: sess.currency || 'USD', pg: sess.locale === 'ko' ? activeKrPg(c.env) : 'stripe', messenger: sess.locale === 'ko' ? 'kakao' : (sess.locale === 'ja' ? 'line' : 'web-share') })
     }
   }
 
-  const profile = resolveLocaleProfile(country)
+  const profile = resolveLocaleProfile(country, c.env)
   return c.json({ country, ...profile })
 })
 
@@ -3598,6 +3616,10 @@ app.post('/api/payments/prepare', async (c) => {
     const discountRate = REFERRER_DISCOUNT_RATE[sess.referrer] || 0
     const chargeAmount = discountRate > 0 ? Math.round(pkg.amount * (1 - discountRate)) : pkg.amount
 
+    // 토스 심사 중 임시로 나이스페이로 되돌릴 수 있는 토글 — activeKrPg() 참고.
+    // 클라이언트는 이 pg 값을 보고 토스/나이스페이 SDK 중 어느 쪽을 띄울지 분기한다.
+    const pg = activeKrPg(c.env)
+
     // ── M-7: 중복 orderId 방지 ─────────────────────────────
     // 동일 유저가 5분 이내 동일 패키지로 pending 레코드를 이미 생성했으면
     // 새 orderId를 발급하지 않고 기존 것을 재사용 (결제창 중복 호출 방어)
@@ -3608,18 +3630,21 @@ app.post('/api/payments/prepare', async (c) => {
        ORDER BY created_at DESC LIMIT 1`
     ).bind(sess.user_id, chargeAmount).first() as any
 
+    const basePrepareResponse = {
+      success: true,
+      amount: chargeAmount,
+      credits: pkg.credits,
+      orderName: pkg.label,
+      customerName: sess.name,
+      customerEmail: sess.email,
+      userId: sess.user_id,
+      pg,
+      clientKey: pg === 'toss' ? (c.env.TOSS_CLIENT_KEY || '') : '',
+      clientId: pg === 'nicepay' ? (c.env.NICEPAY_CLIENT_ID || '') : '',
+    }
+
     if (existing?.order_id) {
-      return c.json({
-        success: true,
-        orderId: existing.order_id,
-        amount: chargeAmount,
-        credits: pkg.credits,
-        orderName: pkg.label,
-        customerName: sess.name,
-        customerEmail: sess.email,
-        userId: sess.user_id,
-        clientKey: c.env.TOSS_CLIENT_KEY || '',
-      })
+      return c.json({ ...basePrepareResponse, orderId: existing.order_id })
     }
     // ─────────────────────────────────────────────────────────
 
@@ -3631,24 +3656,21 @@ app.post('/api/payments/prepare', async (c) => {
 
     await db.prepare(
       `INSERT INTO payment_logs (user_id, order_id, amount, credits, status, pg_provider, currency)
-       VALUES (?, ?, ?, ?, 'pending', 'toss', 'KRW')`
-    ).bind(sess.user_id, orderId, chargeAmount, pkg.credits).run()
+       VALUES (?, ?, ?, ?, 'pending', ?, 'KRW')`
+    ).bind(sess.user_id, orderId, chargeAmount, pkg.credits, pg).run()
 
-    return c.json({
-      success: true,
-      orderId,
-      amount: chargeAmount,
-      credits: pkg.credits,
-      orderName: pkg.label,
-      customerName: sess.name,
-      customerEmail: sess.email,
-      userId: sess.user_id,
-      clientKey: c.env.TOSS_CLIENT_KEY || '',
-    })
+    return c.json({ ...basePrepareResponse, orderId })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
 })
+
+// SHA-256 hex 다이제스트 (나이스페이먼츠 서명 검증/생성용)
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
 
 // HMAC-SHA256 hex 다이제스트 (Stripe 웹훅 서명 검증용)
 async function hmacSha256Hex(secret: string, message: string): Promise<string> {
@@ -3985,6 +4007,193 @@ app.post('/payment/toss/webhook', async (c) => {
     return ackOk()
   } catch (err: any) {
     console.error('payment/toss/webhook error:', err)
+    return ackOk()
+  }
+})
+
+// ────────────────────────────────────────────────────
+// 나이스페이먼츠 결제 API — 2026-09-09 토스(v2) 전환 시 제거했다가, 토스 심사
+// 완료 전까지 ACTIVE_KR_PG='nicepay'로 임시 되돌릴 수 있도록 2026-10-18 복원.
+// activeKrPg()가 'toss'를 가리키는 동안은 /api/payments/prepare가 나이스페이
+// clientId를 내려주지 않아 클라이언트가 이 경로를 아예 타지 않는다 — 두 PG
+// 엔드포인트가 동시에 존재해도 서로 간섭하지 않는다.
+// ────────────────────────────────────────────────────
+
+// POST /payment/return — 나이스페이먼츠 returnUrl (결제창이 브라우저를 통해 이 주소로 직접 POST)
+// 서버 승인 모델: 여기서 위변조 서명 검증 후 승인 API를 호출해야 실제 결제(승인)가 완료됨
+app.post('/payment/return', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const body = await c.req.parseBody()
+    const authResultCode = String(body.authResultCode || '')
+    const authResultMsg  = String(body.authResultMsg || '')
+    const tid       = String(body.tid || '')
+    const clientId  = String(body.clientId || '')
+    const orderId   = String(body.orderId || '')
+    const amount    = String(body.amount || '')
+    const authToken = String(body.authToken || '')
+    const signature = String(body.signature || '')
+
+    if (authResultCode !== '0000') {
+      return c.redirect(`/payment/fail?message=${encodeURIComponent(authResultMsg || '결제 인증에 실패했습니다.')}&code=${encodeURIComponent(authResultCode)}`, 302)
+    }
+
+    const secretKey = c.env.NICEPAY_SECRET_KEY || ''
+
+    // 위변조 검증: signature === hex(sha256(authToken + clientId + amount + SecretKey))
+    const expectedSig = await sha256Hex(authToken + clientId + amount + secretKey)
+    if (expectedSig !== signature) {
+      console.error('나이스페이먼츠 서명 불일치 — 위변조 의심:', orderId)
+      return c.redirect(`/payment/fail?message=${encodeURIComponent('결제 검증에 실패했습니다.')}`, 302)
+    }
+
+    // payment_logs pending 레코드 조회 + 금액 검증
+    const log = await db.prepare(
+      `SELECT id, user_id, amount, credits, status FROM payment_logs
+       WHERE order_id = ? AND status = 'pending'`
+    ).bind(orderId).first() as any
+    if (!log) {
+      return c.redirect(`/payment/fail?message=${encodeURIComponent('결제 정보를 찾을 수 없거나 이미 처리되었습니다.')}`, 302)
+    }
+    if (Number(amount) !== Number(log.amount)) {
+      return c.redirect(`/payment/fail?message=${encodeURIComponent('결제 금액이 일치하지 않습니다.')}`, 302)
+    }
+
+    // 승인 API 호출 — 여기서 호출해야 실제 결제가 확정됨
+    const apiBase = c.env.NICEPAY_API_BASE || 'https://sandbox-api.nicepay.co.kr'
+    const ediDate = new Date().toISOString()
+    const signData = await sha256Hex(tid + amount + ediDate + secretKey)
+    const authHeader = 'Basic ' + btoa(`${clientId}:${secretKey}`)
+
+    const approveResp = await fetch(`${apiBase}/v1/payments/${tid}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ amount: Number(amount), ediDate, signData }),
+    })
+    const approveData = await approveResp.json() as any
+
+    if (!approveResp.ok || approveData.resultCode !== '0000') {
+      // 승인 실패 → payment_logs failed 업데이트
+      await db.prepare(
+        `UPDATE payment_logs
+         SET status='failed', pg_raw=?, paid_at=datetime('now')
+         WHERE order_id=?`
+      ).bind(JSON.stringify(approveData), orderId).run()
+      return c.redirect(`/payment/fail?message=${encodeURIComponent(approveData.resultMsg || '결제 승인 실패')}&code=${encodeURIComponent(approveData.resultCode || '')}`, 302)
+    }
+
+    // payment_logs paid 업데이트
+    await db.prepare(
+      `UPDATE payment_logs
+       SET status='paid', payment_key=?, pg_method=?, pg_raw=?, paid_at=datetime('now')
+       WHERE order_id=?`
+    ).bind(
+      approveData.tid,
+      approveData.payMethod || '',
+      JSON.stringify(approveData),
+      orderId
+    ).run()
+
+    // users.credits 증가
+    const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(log.user_id).first() as any
+    const prevBal = userRow?.credits ?? 0
+    const newBal  = prevBal + Number(log.credits)
+    await db.prepare(
+      `UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`
+    ).bind(newBal, log.user_id).run()
+
+    // credit_logs grant 기록
+    await db.prepare(
+      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+       VALUES (?, 'grant', ?, ?, 'payment', ?)`
+    ).bind(log.user_id, log.credits, newBal, orderId).run()
+
+    return c.redirect(`/payment/success?orderId=${encodeURIComponent(orderId)}`, 302)
+  } catch (err: any) {
+    console.error('payment/return error:', err)
+    return c.redirect(`/payment/fail?message=${encodeURIComponent('결제 처리 중 오류가 발생했습니다.')}`, 302)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// POST /payment/webhook — 나이스페이먼츠 결제 상태 변경 통보 (URL 통보)
+// 관리자가 나이스페이 콘솔 등에서 카드결제를 취소하면 이 웹훅으로 통보됨.
+// 정책: 지급된 크레딧 중 아직 남아있는 만큼만 회수 (min(지급크레딧, 현재잔액)), 0 미만으로는 내려가지 않음.
+// 나이스페이 스펙상 정상 수신 시 반드시 200 + 본문 "OK"(text/html)로 응답해야 함 —
+// 서명 불일치/처리 중 에러가 나도 재시도 폭주를 막기 위해 항상 200 OK로 응답하고 상세는 로그로만 남김.
+// ────────────────────────────────────────────────────
+app.post('/payment/webhook', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  const ackOk = () => c.text('OK', 200, { 'Content-Type': 'text/html;charset=utf-8' })
+
+  try {
+    // 나이스페이는 웹훅 요청을 application/json으로 보냄 (폼 데이터 아님)
+    const rawText = await c.req.text()
+    let body: any = {}
+    try { body = JSON.parse(rawText) } catch {
+      // 만약을 대비한 폴백 — 혹시 폼 인코딩으로 오는 경우도 처리
+      body = Object.fromEntries(new URLSearchParams(rawText))
+    }
+    const tid       = String(body.tid || '')
+    const orderId   = String(body.orderId || '')
+    const amount    = String(body.amount || '')
+    const ediDate   = String(body.ediDate || '')
+    const signature = String(body.signature || '')
+    const status    = String(body.status || '')
+    const resultCode = String(body.resultCode || '')
+
+    const secretKey = c.env.NICEPAY_SECRET_KEY || ''
+
+    // 서명 검증: signature === hex(sha256(tid + amount + ediDate + SecretKey))
+    const expectedSig = await sha256Hex(tid + amount + ediDate + secretKey)
+    if (!tid || expectedSig !== signature) {
+      console.error('나이스페이 웹훅 서명 불일치 — 위변조 의심:', orderId, tid)
+      return ackOk()
+    }
+
+    // 취소/부분취소 상태가 아니면 무시 (결제 완료 통보 등은 /payment/return에서 이미 처리됨)
+    const isCanceled = ['canceled', 'cancelled', 'partialCancelled', 'PARTIAL_CANCELED'].includes(status)
+      || resultCode === '2001'
+    if (!isCanceled) {
+      return ackOk()
+    }
+
+    const log = await db.prepare(
+      `SELECT id, user_id, credits, status FROM payment_logs WHERE order_id = ? OR payment_key = ?`
+    ).bind(orderId, tid).first() as any
+
+    if (!log) {
+      console.error('나이스페이 웹훅: 결제 내역을 찾을 수 없음:', orderId, tid)
+      return ackOk()
+    }
+    if (log.status === 'canceled') {
+      // 이미 처리된 취소 건에 대한 중복 통보 — 그대로 확인 응답만
+      return ackOk()
+    }
+
+    const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(log.user_id).first() as any
+    const currentBalance = userRow?.credits ?? 0
+    const originallyGranted = Number(log.credits) || 0
+    const revokeAmount = Math.min(originallyGranted, currentBalance)
+    const newBalance = Math.max(0, currentBalance - revokeAmount)
+
+    if (revokeAmount > 0) {
+      await db.prepare(`UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`).bind(newBalance, log.user_id).run()
+      await db.prepare(
+        `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+         VALUES (?, 'revoke', ?, ?, 'payment_cancel', ?)`
+      ).bind(log.user_id, -revokeAmount, newBalance, orderId).run()
+    }
+
+    await db.prepare(`UPDATE payment_logs SET status='canceled' WHERE id=?`).bind(log.id).run()
+
+    console.log(`나이스페이 웹훅: 결제취소 처리 완료 — orderId=${orderId}, 회수 크레딧=${revokeAmount}`)
+    return ackOk()
+  } catch (err: any) {
+    console.error('payment/webhook error:', err)
     return ackOk()
   }
 })
