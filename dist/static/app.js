@@ -5141,7 +5141,7 @@ async function startPayment() {
   const sessionToken = localStorage.getItem('lookbook_token') || '';
   if (!sessionToken) { showToast(t('loginRequired'), 'error'); return; }
 
-  // 한국(토스) 외 시장은 Stripe Checkout으로 분기
+  // 한국 외 시장은 Stripe Checkout으로 분기
   if (_pg === 'stripe') { return startStripePayment(); }
 
   const cta = document.getElementById('chargeCta');
@@ -5155,30 +5155,14 @@ async function startPayment() {
     });
     const data = await res.json();
     if (!data.success) throw new Error(data.error || '결제 준비 실패');
-    if (!data.clientKey) throw new Error('결제 설정 오류 (TOSS_CLIENT_KEY 미설정)');
 
-    if (!window.TossPayments) await loadTossSDK();
-
-    // 토스페이먼츠 서버 승인 모델: 결제창 인증 완료 후 브라우저가 successUrl로 리다이렉트되고,
-    // 그 라우트(/payment/toss/success)에서 서버가 승인(confirm) API를 호출해 결제를 확정한다.
-    const tossPayments = TossPayments(data.clientKey);
-    const payment = tossPayments.payment({ customerKey: data.userId || 'ANONYMOUS' });
-
-    const paymentParams = {
-      method: 'CARD',
-      amount: { currency: 'KRW', value: data.amount },
-      orderId: data.orderId,
-      orderName: data.orderName,
-      customerName: data.customerName,
-      successUrl: location.origin + '/payment/toss/success',
-      failUrl: location.origin + '/payment/toss/fail',
-    };
-    // 카카오 로그인 등 이메일 미동의 계정은 내부용 가짜 이메일(@kakao.local)이 저장되어
-    // 있는데, 이걸 그대로 보내면 인증 단계에서 거부될 수 있어 실제 이메일일 때만 전달
-    if (data.customerEmail && !data.customerEmail.endsWith('@kakao.local')) {
-      paymentParams.customerEmail = data.customerEmail;
+    // 국내 결제는 서버가 활성화한 PG(토스/나이스페이)로 분기 — 토스 심사 중 서버
+    // ACTIVE_KR_PG 환경변수로 나이스페이에 임시로 되돌릴 수 있게 양쪽 다 남겨둠
+    if (data.pg === 'nicepay') {
+      await startNicepayPayment(data, cta);
+    } else {
+      await startTossPayment(data, cta);
     }
-    await payment.requestPayment(paymentParams);
   } catch (e) {
     if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
     // 사용자가 결제창을 직접 닫은 경우(USER_CANCEL)는 에러 토스트를 띄우지 않는다
@@ -5188,6 +5172,33 @@ async function startPayment() {
   }
 }
 
+async function startTossPayment(data, cta) {
+  if (!data.clientKey) throw new Error('결제 설정 오류 (TOSS_CLIENT_KEY 미설정)');
+
+  if (!window.TossPayments) await loadTossSDK();
+
+  // 토스페이먼츠 서버 승인 모델: 결제창 인증 완료 후 브라우저가 successUrl로 리다이렉트되고,
+  // 그 라우트(/payment/toss/success)에서 서버가 승인(confirm) API를 호출해 결제를 확정한다.
+  const tossPayments = TossPayments(data.clientKey);
+  const payment = tossPayments.payment({ customerKey: data.userId || 'ANONYMOUS' });
+
+  const paymentParams = {
+    method: 'CARD',
+    amount: { currency: 'KRW', value: data.amount },
+    orderId: data.orderId,
+    orderName: data.orderName,
+    customerName: data.customerName,
+    successUrl: location.origin + '/payment/toss/success',
+    failUrl: location.origin + '/payment/toss/fail',
+  };
+  // 카카오 로그인 등 이메일 미동의 계정은 내부용 가짜 이메일(@kakao.local)이 저장되어
+  // 있는데, 이걸 그대로 보내면 인증 단계에서 거부될 수 있어 실제 이메일일 때만 전달
+  if (data.customerEmail && !data.customerEmail.endsWith('@kakao.local')) {
+    paymentParams.customerEmail = data.customerEmail;
+  }
+  await payment.requestPayment(paymentParams);
+}
+
 function loadTossSDK() {
   return new Promise((resolve, reject) => {
     if (window.TossPayments) { resolve(); return; }
@@ -5195,6 +5206,47 @@ function loadTossSDK() {
     s.src = 'https://js.tosspayments.com/v2/standard';
     s.onload = resolve;
     s.onerror = () => reject(new Error('토스페이먼츠 SDK 로드 실패'));
+    document.head.appendChild(s);
+  });
+}
+
+// 나이스페이먼츠 결제 — 2026-09-09 토스(v2) 전환 시 제거했다가, 토스 심사 완료 전까지
+// 서버가 ACTIVE_KR_PG='nicepay'일 때만 타는 경로로 2026-10-18 복원
+async function startNicepayPayment(data, cta) {
+  if (!data.clientId) throw new Error('결제 설정 오류 (NICEPAY_CLIENT_ID 미설정)');
+
+  if (!window.AUTHNICE) await loadNicepaySDK();
+
+  // 나이스페이먼츠 서버 승인 모델: 결제창 인증 완료 후 우리 서버(/payment/return)로
+  // 결제창이 직접 POST → 서버에서 승인 API 호출까지 끝난 뒤 결과 페이지로 리다이렉트됨
+  const payReq = {
+    clientId: data.clientId,
+    method: 'card',
+    orderId: data.orderId,
+    amount: data.amount,
+    goodsName: data.orderName,
+    buyerName: data.customerName,
+    returnUrl: location.origin + '/payment/return',
+    fnError: function (result) {
+      if (cta) { cta.style.opacity = '1'; cta.style.pointerEvents = 'auto'; }
+      showToast(t('payFail', (result && result.errorMsg) || ''), 'error');
+    },
+  };
+  // 카카오 로그인 등 이메일 미동의 계정은 내부용 가짜 이메일(@kakao.local)이 저장되어
+  // 있는데, 이걸 그대로 보내면 나이스페이 인증 단계에서 거부됨(U116) — 실제 이메일일 때만 전달
+  if (data.customerEmail && !data.customerEmail.endsWith('@kakao.local')) {
+    payReq.buyerEmail = data.customerEmail;
+  }
+  AUTHNICE.requestPay(payReq);
+}
+
+function loadNicepaySDK() {
+  return new Promise((resolve, reject) => {
+    if (window.AUTHNICE) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://pay.nicepay.co.kr/v1/js/';
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('나이스페이먼츠 SDK 로드 실패'));
     document.head.appendChild(s);
   });
 }
