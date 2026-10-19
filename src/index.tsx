@@ -2499,6 +2499,9 @@ app.get('/trend-weekly', (c) => {
     .tw-cta-outline { background: transparent; color: #0DA8D6; border: 1px solid #0579B3; }
     .tw-slot { border-radius: 16px; background: linear-gradient(135deg, #051334 0%, #0450A0 60%, #0579B3 100%); border: 1px solid #2C2D35; }
     .tw-card { border: 1px solid #2C2D35; border-radius: 14px; background: #17181D; }
+    .tw-toggle { display: inline-flex; background: #202127; border-radius: 999px; padding: 4px; margin-bottom: 14px; }
+    .tw-toggle-opt { border: none; background: transparent; color: #82828E; font-size: 15px; font-weight: 700; padding: 9px 18px; border-radius: 999px; cursor: pointer; }
+    .tw-toggle-opt.active { background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; }
   </style>
 
   <div class="tw-wrap">
@@ -2554,6 +2557,15 @@ app.get('/trend-weekly', (c) => {
         <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()">1개월 무료로 시작하기</button>
       </div>
 
+      <!-- 무료체험 종료: 구독 유도(팝업) -->
+      <div id="twExpired" style="display:none;margin-top:16px;">
+        <div class="tw-card" style="padding:22px;text-align:center;">
+          <p style="font-size:16px;font-weight:700;color:#F2F2F5;margin:0 0 8px;">무료체험이 끝났어요</p>
+          <p style="font-size:14px;color:#82828E;margin:0 0 16px;line-height:1.6;">계속 받아보시려면 구독해주세요.</p>
+          <button class="tw-cta" style="width:auto;padding:10px 22px;border-radius:24px;display:inline-block;" onclick="openModal('twSubscribeModal')">구독하기</button>
+        </div>
+      </div>
+
       <!-- 구독/체험 중: 콘텐츠 + 구독관리 -->
       <div id="twMain" style="display:none;margin-top:16px;">
         <div id="twBanner" class="tw-slot" style="display:none;padding:12px 16px;margin-bottom:16px;font-size:14.5px;line-height:1.5;color:#F2F2F5;"></div>
@@ -2574,6 +2586,20 @@ app.get('/trend-weekly', (c) => {
           <button style="color:#82828E;background:none;border:none;text-decoration:underline;cursor:pointer;font-size:14px;" onclick="twCancel()">구독 자동갱신 해지</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 무료체험 종료 시 뜨는 구독 유도 팝업 -->
+  <div class="modal-overlay" id="twSubscribeModal">
+    <div class="modal-box" style="background:#17181D;border:1px solid #2C2D35;max-width:380px;padding:28px 24px;">
+      <button class="modal-close" onclick="closeModal('twSubscribeModal')" style="background:#202127;color:#82828E;">×</button>
+      <h3 style="font-size:17px;font-weight:700;color:#F2F2F5;margin:0 0 8px;">무료체험이 끝났어요</h3>
+      <p style="font-size:14px;color:#B7B7C2;margin:0 0 18px;line-height:1.6;">계속 받아보시려면 구독해주세요. 보유 크레딧에서 바로 차감돼요.</p>
+      <div class="tw-toggle" id="twModalPlanToggle">
+        <button type="button" class="tw-toggle-opt active" data-plan="monthly" onclick="twSelectModalPlan('monthly')">월 구독</button>
+        <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectModalPlan('annual')">연 구독 · 20%↓</button>
+      </div>
+      <button class="tw-cta" id="twModalSubscribeBtn" onclick="twSubscribeFromModal()">50크레딧으로 구독하기</button>
     </div>
   </div>
 
@@ -2636,7 +2662,12 @@ app.get('/trend-weekly', (c) => {
         hide('twLoading');
 
         if (!status.subscribed) {
-          show('twIntro');
+          if (status.status === 'expired') {
+            show('twExpired');
+            openModal('twSubscribeModal');
+          } else {
+            show('twIntro');
+          }
           return;
         }
 
@@ -2683,6 +2714,28 @@ app.get('/trend-weekly', (c) => {
       } catch (e) {
         showToast('네트워크 오류가 발생했습니다.', 'error');
         btn.disabled = false; btn.textContent = '1개월 무료로 시작하기';
+      }
+    };
+
+    var twModalPlan = 'monthly';
+    window.twSelectModalPlan = function(plan) {
+      twModalPlan = plan;
+      var opts = document.querySelectorAll('#twModalPlanToggle .tw-toggle-opt');
+      for (var i = 0; i < opts.length; i++) opts[i].classList.toggle('active', opts[i].getAttribute('data-plan') === plan);
+      var btn = document.getElementById('twModalSubscribeBtn');
+      btn.textContent = plan === 'annual' ? '480크레딧으로 구독하기 · 20%↓' : '50크레딧으로 구독하기';
+    };
+
+    window.twSubscribeFromModal = async function() {
+      try {
+        var res = await fetch('/api/trend/subscribe', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ plan: twModalPlan }) });
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '구독에 실패했습니다.', 'error'); return; }
+        showToast('구독이 시작됐어요!', 'success');
+        closeModal('twSubscribeModal');
+        hide('twExpired'); show('twLoading'); await twLoad();
+      } catch (e) {
+        showToast('네트워크 오류가 발생했습니다.', 'error');
       }
     };
 
