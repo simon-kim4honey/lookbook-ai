@@ -2474,13 +2474,13 @@ app.get('/trend-weekly', (c) => {
       </div>
 
       <!-- 미구독: 소개 + 무료체험 -->
-      <div id="twIntro" style="display:none;margin-top:16px;">
-        <div class="tw-slot" style="padding:20px 22px;margin-bottom:20px;">
-          <p style="font-size:16px;font-weight:700;color:#F2F2F5;margin:0 0 10px;">지금 무료로 주간 트렌드 분석을 받아보세요.</p>
-          <p style="font-size:14.5px;color:#DCE6F2;margin:0 0 8px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요.</p>
-          <p style="font-size:14.5px;color:#DCE6F2;margin:0;line-height:1.6;">1개월 무료체험 후에는 자동으로 결제되지 않아요. 계속 받아보려면 체험이 끝나기 전에 직접 구독해주세요.</p>
-        </div>
-        <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()">1개월 무료로 시작하기</button>
+      <div id="twIntro" style="display:none;margin-top:12px;">
+        <p style="font-size:14px;font-weight:600;color:#82828E;margin:0 0 6px;">EZlook 회원이라면 누구나</p>
+        <h2 style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 2px;">주간 트렌드 분석</h2>
+        <p style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 16px;">1개월 무료!</p>
+        <p style="font-size:13px;color:#82828E;margin:0 0 4px;">이용 기간 : 체험 시작일로부터 1개월 · 자동결제 없음</p>
+        <p style="font-size:14px;color:#B7B7C2;margin:0 0 24px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요.</p>
+        <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()" style="font-size:17px;padding:16px 20px;">무료 가입하기 ›</button>
       </div>
 
       <!-- 무료체험 종료: 구독 유도(팝업) -->
@@ -2634,12 +2634,12 @@ app.get('/trend-weekly', (c) => {
       try {
         var res = await fetch('/api/trend/trial/start', { method: 'POST', headers: authHeaders() });
         var data = await res.json();
-        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '1개월 무료로 시작하기'; return; }
+        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '무료 가입하기 ›'; return; }
         showToast('무료체험이 시작됐어요!', 'success');
         hide('twIntro'); show('twLoading'); await twLoad();
       } catch (e) {
         showToast('네트워크 오류가 발생했습니다.', 'error');
-        btn.disabled = false; btn.textContent = '1개월 무료로 시작하기';
+        btn.disabled = false; btn.textContent = '무료 가입하기 ›';
       }
     };
 
