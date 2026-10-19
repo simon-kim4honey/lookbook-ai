@@ -157,7 +157,7 @@ ${t.map((e,t)=>`${t+1}. [${e.source||`출처미상`}] ${e.title}`).join(`
 원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`,r=async t=>{let n=Date.now(),r=await fetch(`https://api.anthropic.com/v1/messages`,{method:`POST`,headers:{"Content-Type":`application/json`,"x-api-key":e.env.ANTHROPIC_API_KEY,"anthropic-version":`2023-06-01`,"User-Agent":`EZlook-ContentDigest/1.0 (+https://www.aifashion.co.kr)`},body:JSON.stringify(t),signal:AbortSignal.timeout(45e3)}),i=await r.text(),a=null;try{a=JSON.parse(i)?.usage??null}catch{}let o=[`cf-ray`,`server`,`via`,`x-request-id`,`anthropic-ratelimit-requests-remaining`,`anthropic-ratelimit-requests-limit`,`retry-after`,`date`],s={};for(let e of o)s[e]=r.headers.get(e);return{httpStatus:r.status,tookMs:Date.now()-n,headers:s,usage:a,rawBodyPreview:i.slice(0,500)}};try{let[i,a]=await Promise.all([r({model:`claude-sonnet-5`,thinking:{type:`disabled`},max_tokens:3e3,messages:[{role:`user`,content:n}]}),r({model:`claude-sonnet-5`,thinking:{type:`disabled`},max_tokens:16,messages:[{role:`user`,content:`hi`}]})]);return e.json({success:!0,articleCount:t.length,real:i,control:a})}catch(n){return e.json({success:!1,articleCount:t.length,error:String(n?.message||n)})}}),B.get(`/debug-collect`,async e=>{let t=await Promise.all(bt.map(async t=>({keyword:t,count:(await Tt(e.env,t,12)).length}))),n=await Et(e.env,7);return e.json({success:!0,perKeyword:t,afterDedupeAndDateFilter:n.length,sample:n.slice(0,3)})}),B.get(`/debug-trends`,async e=>{if(!e.env.NAVER_CLIENT_ID||!e.env.NAVER_CLIENT_SECRET)return e.json({success:!1,error:`NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다.`});let{start:t,end:n}=Dt(),r={"X-NCP-APIGW-API-KEY-ID":e.env.NAVER_CLIENT_ID,"X-NCP-APIGW-API-KEY":e.env.NAVER_CLIENT_SECRET,"Content-Type":`application/json`};try{let[i,a]=await Promise.all([fetch(`https://naverapihub.apigw.ntruss.com/search-trend/v1/search`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,keywordGroups:xt().slice(0,5).map(e=>({groupName:e,keywords:[e]}))}),signal:AbortSignal.timeout(12e3)}),fetch(`https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,category:At.code,keyword:xt().slice(0,5).map(e=>({name:e,param:[e]}))}),signal:AbortSignal.timeout(12e3)})]),[o,s]=await Promise.all([i.text(),a.text()]);return e.json({success:!0,searchTrend:{httpStatus:i.status,body:o.slice(0,1500)},shoppingInsight:{httpStatus:a.status,body:s.slice(0,1500)}})}catch(t){return e.json({success:!1,error:String(t?.message||t)})}});var zt={news:775e3,search_trend:5e4,shopping_insight:5e4};B.get(`/usage`,async e=>{let t=new Date().toISOString().slice(0,7),{results:n}=await e.env.LOOKBOOK_DB.prepare(`SELECT api_type, call_count FROM naver_api_usage WHERE year_month = ?`).bind(t).all(),r={news:0,search_trend:0,shopping_insight:0};for(let e of n)r[e.api_type]=e.call_count;let i=Object.keys(zt).map(e=>({apiType:e,count:r[e]||0,limit:zt[e],pct:Math.round((r[e]||0)/zt[e]*1e3)/10}));return e.json({success:!0,yearMonth:t,usage:i})}),B.get(`/list`,async e=>{let t=e.req.query(`type`),n=t?`WHERE d.type = ?`:``,r=t?[t]:[],{results:i}=await e.env.LOOKBOOK_DB.prepare(`SELECT d.*, (SELECT COUNT(*) FROM digest_articles a WHERE a.digest_id = d.id AND a.excluded = 0) AS article_count
      FROM content_digests d ${n} ORDER BY d.generated_at DESC LIMIT 50`).bind(...r).all();return e.json({success:!0,digests:i})}),B.get(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? ORDER BY importance DESC, id ASC`).bind(t).all(),{results:i}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all();return e.json({success:!0,digest:{...n,keywords:JSON.parse(n.keywords||`[]`)},articles:r,trends:i})}),B.delete(`/:id`,async e=>{let t=e.req.param(`id`);return await e.env.LOOKBOOK_DB.prepare(`DELETE FROM digest_articles WHERE digest_id = ?`).bind(t).run(),await e.env.LOOKBOOK_DB.prepare(`DELETE FROM digest_trends WHERE digest_id = ?`).bind(t).run(),await e.env.LOOKBOOK_DB.prepare(`DELETE FROM content_digests WHERE id = ?`).bind(t).run(),e.json({success:!0})}),B.patch(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.req.json(),r=[],i=[];return n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),n.status!==void 0&&(r.push(`status = ?`),i.push(n.status),n.status===`reviewed`&&r.push(`reviewed_at = datetime('now')`),n.status===`sent`&&r.push(`sent_at = datetime('now')`)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE content_digests SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),B.patch(`/:id/articles/:articleId`,async e=>{let{articleId:t}=e.req.param(),n=await e.req.json(),r=[],i=[];return n.excluded!==void 0&&(r.push(`excluded = ?`),i.push(+!!n.excluded)),n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE digest_articles SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),B.get(`/:id/kakao-text`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let r=n.type===`search_trend`||n.type===`shopping_insight`?n.type:`news`,i=e=>`${e>0?`📈+`:e<0?`📉`:`➖`}${e}%`,a=[];if(r===`news`){let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? AND excluded = 0 ORDER BY importance DESC, id ASC LIMIT 5`).bind(t).all();a.push(`🧵 EZlook 패션 트렌드 위클리 — ${n.period}`,``,n.summary,``),r.forEach((e,t)=>{a.push(`${t+1}. [${e.category}] ${e.title}`),a.push(e.summary),e.url&&a.push(`🔗 ${e.url}`),a.push(``)})}else{let{results:o}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all(),s=r===`search_trend`?`🔎 EZlook 검색어트렌드 위클리`:`🛍️ EZlook 쇼핑인사이트 위클리`;a.push(`${s} — ${n.period}`,``,n.summary,``),o.forEach(e=>a.push(`- ${e.label} ${i(e.change_pct)}`)),a.push(``)}return a.push(`👉 AI 룩북 무료 체험: https://www.aifashion.co.kr/?utm_source=kakao&utm_medium=channel&utm_campaign=weekly_digest`),e.text(a.join(`
-`))});var Bt=`mvft4hwh`;function Vt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Ht=e=>e?`
+`))});var Bt=`mvfvzdua`;function Vt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Ht=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -288,8 +288,33 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
   </style>
 
   <div class="tw-wrap">
-    <div class="tw-header">
-      <a href="/" class="tw-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+    <div class="tw-header" style="display:flex;align-items:center;justify-content:space-between;max-width:480px;margin:0 auto;">
+      <a href="/" class="tw-logo" style="max-width:none;margin:0;"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <div style="display:flex;align-items:center;gap:8px;position:relative;">
+        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:14px;padding:6px 14px;background:#202127;border:1px solid #0579B3;border-radius:20px;color:#0DA8D6;cursor:pointer;font-weight:600;">로그인</button>
+        <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
+          <span id="navUserCredits" style="display:none;"></span>
+          <span id="navUserName" style="display:none;"></span>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#166534,#1E3A8A);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;cursor:pointer;user-select:none;">?</div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#17181D;border:1px solid #2C2D35;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.4);z-index:10001;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #2C2D35;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#F2F2F5;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:#82828E;margin-bottom:6px;"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#0DA8D6;"></div>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:linear-gradient(135deg,#166534,#1E3A8A);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+              </div>
+            </a>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:#2C2D35;margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="tw-inner">
       <div style="display:flex;align-items:center;gap:12px;margin:12px 0 10px;">
@@ -306,13 +331,22 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       </div>
 
       <!-- 미구독: 소개 + 무료체험 -->
-      <div id="twIntro" style="display:none;margin-top:16px;">
-        <div class="tw-slot" style="padding:20px 22px;margin-bottom:20px;">
-          <p style="font-size:16px;font-weight:700;color:#F2F2F5;margin:0 0 10px;">지금 무료로 주간 트렌드 분석을 받아보세요.</p>
-          <p style="font-size:14.5px;color:#DCE6F2;margin:0 0 8px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요.</p>
-          <p style="font-size:14.5px;color:#DCE6F2;margin:0;line-height:1.6;">1개월 무료체험 후에는 자동으로 결제되지 않아요. 계속 받아보려면 체험이 끝나기 전에 직접 구독해주세요.</p>
+      <div id="twIntro" style="display:none;margin-top:12px;">
+        <p style="font-size:14px;font-weight:600;color:#82828E;margin:0 0 6px;">EZlook 회원이라면 누구나</p>
+        <h2 style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 2px;">주간 트렌드 분석</h2>
+        <p style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 16px;">1개월 무료!</p>
+        <p style="font-size:13px;color:#82828E;margin:0 0 4px;">이용 기간 : 체험 시작일로부터 1개월 · 자동결제 없음</p>
+        <p style="font-size:14px;color:#B7B7C2;margin:0 0 24px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요.</p>
+        <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()" style="font-size:17px;padding:16px 20px;">무료 가입하기 ›</button>
+      </div>
+
+      <!-- 무료체험 종료: 구독 유도(팝업) -->
+      <div id="twExpired" style="display:none;margin-top:16px;">
+        <div class="tw-card" style="padding:22px;text-align:center;">
+          <p style="font-size:16px;font-weight:700;color:#F2F2F5;margin:0 0 8px;">무료체험이 끝났어요</p>
+          <p style="font-size:14px;color:#82828E;margin:0 0 16px;line-height:1.6;">계속 받아보시려면 구독해주세요.</p>
+          <button class="tw-cta" style="width:auto;padding:10px 22px;border-radius:24px;display:inline-block;" onclick="openModal('twSubscribeModal')">구독하기</button>
         </div>
-        <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()">1개월 무료로 시작하기</button>
       </div>
 
       <!-- 구독/체험 중: 콘텐츠 + 구독관리 -->
@@ -331,16 +365,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           <div id="twPhoneSaved" style="display:none;font-size:14px;color:#0DA8D6;margin-top:8px;">등록된 번호로 발송돼요.</div>
         </div>
 
-        <div id="twSubscribeBox" style="display:none;margin-top:18px;">
-          <h3 style="font-size:15px;font-weight:700;color:#F2F2F5;margin:0 0 4px;">구독하기</h3>
-          <p style="font-size:13px;color:#82828E;margin:0 0 12px;">무료체험 중에는 0원이에요 — 체험이 끝나기 전에 미리 구독을 선택해두면 자동으로 이어져요.</p>
-          <div class="tw-toggle" id="twPlanToggle">
-            <button type="button" class="tw-toggle-opt active" data-plan="monthly" onclick="twSelectPlan('monthly')">월 구독</button>
-            <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectPlan('annual')">연 구독 · 20%↓</button>
-          </div>
-          <button class="tw-cta" id="twSubscribeBtn" onclick="twSubscribeSelected()">50크레딧으로 구독하기</button>
-        </div>
-
         <div id="twManageBox" style="display:none;margin-top:18px;text-align:center;">
           <button style="color:#82828E;background:none;border:none;text-decoration:underline;cursor:pointer;font-size:14px;" onclick="twCancel()">구독 자동갱신 해지</button>
         </div>
@@ -348,10 +372,23 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     </div>
   </div>
 
+  <!-- 무료체험 종료 시 뜨는 구독 유도 팝업 -->
+  <div class="modal-overlay" id="twSubscribeModal">
+    <div class="modal-box" style="background:#17181D;border:1px solid #2C2D35;max-width:380px;padding:28px 24px;">
+      <button class="modal-close" onclick="closeModal('twSubscribeModal')" style="background:#202127;color:#82828E;">×</button>
+      <h3 style="font-size:17px;font-weight:700;color:#F2F2F5;margin:0 0 8px;">무료체험이 끝났어요</h3>
+      <p style="font-size:14px;color:#B7B7C2;margin:0 0 18px;line-height:1.6;">계속 받아보시려면 구독해주세요. 보유 크레딧에서 바로 차감돼요.</p>
+      <div class="tw-toggle" id="twModalPlanToggle">
+        <button type="button" class="tw-toggle-opt active" data-plan="monthly" onclick="twSelectModalPlan('monthly')">월 구독</button>
+        <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectModalPlan('annual')">연 구독 · 20%↓</button>
+      </div>
+      <button class="tw-cta" id="twModalSubscribeBtn" onclick="twSubscribeFromModal()">50크레딧으로 구독하기</button>
+    </div>
+  </div>
+
   <script>
   (function() {
     var TOKEN = localStorage.getItem('lookbook_token') || '';
-    var twPlan = 'monthly';
 
     function authHeaders() { return { 'X-Session-Token': TOKEN, 'Content-Type': 'application/json' }; }
     function show(id) { document.getElementById(id).style.display = ''; }
@@ -408,7 +445,12 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         hide('twLoading');
 
         if (!status.subscribed) {
-          show('twIntro');
+          if (status.status === 'expired') {
+            show('twExpired');
+            openModal('twSubscribeModal');
+          } else {
+            show('twIntro');
+          }
           return;
         }
 
@@ -421,9 +463,8 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         var banner = document.getElementById('twBanner');
         if (status.status === 'trial') {
           banner.className = 'tw-slot'; banner.style.color = '#F2F2F5';
-          banner.textContent = '무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요. 계속 받아보시려면 아래에서 구독해주세요.';
+          banner.textContent = '무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요.';
           show('twBanner');
-          show('twSubscribeBox');
         } else if (status.status === 'active') {
           banner.className = 'tw-slot'; banner.style.color = '#F2F2F5';
           banner.textContent = (status.plan === 'annual' ? '연간' : '월간') + ' 구독 중 — 다음 결제(크레딧 차감)일 ' + fmtDate(status.nextBillingAt);
@@ -450,36 +491,36 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       try {
         var res = await fetch('/api/trend/trial/start', { method: 'POST', headers: authHeaders() });
         var data = await res.json();
-        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '1개월 무료로 시작하기'; return; }
+        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '무료 가입하기 ›'; return; }
         showToast('무료체험이 시작됐어요!', 'success');
         hide('twIntro'); show('twLoading'); await twLoad();
       } catch (e) {
         showToast('네트워크 오류가 발생했습니다.', 'error');
-        btn.disabled = false; btn.textContent = '1개월 무료로 시작하기';
+        btn.disabled = false; btn.textContent = '무료 가입하기 ›';
       }
     };
 
-    window.twSelectPlan = function(plan) {
-      twPlan = plan;
-      var opts = document.querySelectorAll('#twPlanToggle .tw-toggle-opt');
+    var twModalPlan = 'monthly';
+    window.twSelectModalPlan = function(plan) {
+      twModalPlan = plan;
+      var opts = document.querySelectorAll('#twModalPlanToggle .tw-toggle-opt');
       for (var i = 0; i < opts.length; i++) opts[i].classList.toggle('active', opts[i].getAttribute('data-plan') === plan);
-      var btn = document.getElementById('twSubscribeBtn');
+      var btn = document.getElementById('twModalSubscribeBtn');
       btn.textContent = plan === 'annual' ? '480크레딧으로 구독하기 · 20%↓' : '50크레딧으로 구독하기';
     };
 
-    window.twSubscribeSelected = function() { twSubscribe(twPlan); };
-
-    async function twSubscribe(plan) {
+    window.twSubscribeFromModal = async function() {
       try {
-        var res = await fetch('/api/trend/subscribe', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ plan: plan }) });
+        var res = await fetch('/api/trend/subscribe', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ plan: twModalPlan }) });
         var data = await res.json();
         if (!data.success) { showToast(data.message || '구독에 실패했습니다.', 'error'); return; }
         showToast('구독이 시작됐어요!', 'success');
-        await twLoad();
+        closeModal('twSubscribeModal');
+        hide('twExpired'); show('twLoading'); await twLoad();
       } catch (e) {
         showToast('네트워크 오류가 발생했습니다.', 'error');
       }
-    }
+    };
 
     window.twCancel = async function() {
       if (!confirm('자동갱신을 해지할까요? 이미 결제된 기간까지는 계속 이용하실 수 있어요.')) return;

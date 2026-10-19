@@ -2431,8 +2431,33 @@ app.get('/trend-weekly', (c) => {
   </style>
 
   <div class="tw-wrap">
-    <div class="tw-header">
-      <a href="/" class="tw-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+    <div class="tw-header" style="display:flex;align-items:center;justify-content:space-between;max-width:480px;margin:0 auto;">
+      <a href="/" class="tw-logo" style="max-width:none;margin:0;"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <div style="display:flex;align-items:center;gap:8px;position:relative;">
+        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:14px;padding:6px 14px;background:#202127;border:1px solid #0579B3;border-radius:20px;color:#0DA8D6;cursor:pointer;font-weight:600;">로그인</button>
+        <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
+          <span id="navUserCredits" style="display:none;"></span>
+          <span id="navUserName" style="display:none;"></span>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#166534,#1E3A8A);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;cursor:pointer;user-select:none;">?</div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#17181D;border:1px solid #2C2D35;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.4);z-index:10001;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #2C2D35;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#F2F2F5;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:#82828E;margin-bottom:6px;"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#0DA8D6;"></div>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:linear-gradient(135deg,#166534,#1E3A8A);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+              </div>
+            </a>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:#2C2D35;margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="tw-inner">
       <div style="display:flex;align-items:center;gap:12px;margin:12px 0 10px;">
@@ -2449,13 +2474,22 @@ app.get('/trend-weekly', (c) => {
       </div>
 
       <!-- 미구독: 소개 + 무료체험 -->
-      <div id="twIntro" style="display:none;margin-top:16px;">
-        <div class="tw-slot" style="padding:20px 22px;margin-bottom:20px;">
-          <p style="font-size:16px;font-weight:700;color:#F2F2F5;margin:0 0 10px;">지금 무료로 주간 트렌드 분석을 받아보세요.</p>
-          <p style="font-size:14.5px;color:#DCE6F2;margin:0 0 8px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요.</p>
-          <p style="font-size:14.5px;color:#DCE6F2;margin:0;line-height:1.6;">1개월 무료체험 후에는 자동으로 결제되지 않아요. 계속 받아보려면 체험이 끝나기 전에 직접 구독해주세요.</p>
+      <div id="twIntro" style="display:none;margin-top:12px;">
+        <p style="font-size:14px;font-weight:600;color:#82828E;margin:0 0 6px;">EZlook 회원이라면 누구나</p>
+        <h2 style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 2px;">주간 트렌드 분석</h2>
+        <p style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 16px;">1개월 무료!</p>
+        <p style="font-size:13px;color:#82828E;margin:0 0 4px;">이용 기간 : 체험 시작일로부터 1개월 · 자동결제 없음</p>
+        <p style="font-size:14px;color:#B7B7C2;margin:0 0 24px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요.</p>
+        <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()" style="font-size:17px;padding:16px 20px;">무료 가입하기 ›</button>
+      </div>
+
+      <!-- 무료체험 종료: 구독 유도(팝업) -->
+      <div id="twExpired" style="display:none;margin-top:16px;">
+        <div class="tw-card" style="padding:22px;text-align:center;">
+          <p style="font-size:16px;font-weight:700;color:#F2F2F5;margin:0 0 8px;">무료체험이 끝났어요</p>
+          <p style="font-size:14px;color:#82828E;margin:0 0 16px;line-height:1.6;">계속 받아보시려면 구독해주세요.</p>
+          <button class="tw-cta" style="width:auto;padding:10px 22px;border-radius:24px;display:inline-block;" onclick="openModal('twSubscribeModal')">구독하기</button>
         </div>
-        <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()">1개월 무료로 시작하기</button>
       </div>
 
       <!-- 구독/체험 중: 콘텐츠 + 구독관리 -->
@@ -2474,16 +2508,6 @@ app.get('/trend-weekly', (c) => {
           <div id="twPhoneSaved" style="display:none;font-size:14px;color:#0DA8D6;margin-top:8px;">등록된 번호로 발송돼요.</div>
         </div>
 
-        <div id="twSubscribeBox" style="display:none;margin-top:18px;">
-          <h3 style="font-size:15px;font-weight:700;color:#F2F2F5;margin:0 0 4px;">구독하기</h3>
-          <p style="font-size:13px;color:#82828E;margin:0 0 12px;">무료체험 중에는 0원이에요 — 체험이 끝나기 전에 미리 구독을 선택해두면 자동으로 이어져요.</p>
-          <div class="tw-toggle" id="twPlanToggle">
-            <button type="button" class="tw-toggle-opt active" data-plan="monthly" onclick="twSelectPlan('monthly')">월 구독</button>
-            <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectPlan('annual')">연 구독 · 20%↓</button>
-          </div>
-          <button class="tw-cta" id="twSubscribeBtn" onclick="twSubscribeSelected()">50크레딧으로 구독하기</button>
-        </div>
-
         <div id="twManageBox" style="display:none;margin-top:18px;text-align:center;">
           <button style="color:#82828E;background:none;border:none;text-decoration:underline;cursor:pointer;font-size:14px;" onclick="twCancel()">구독 자동갱신 해지</button>
         </div>
@@ -2491,10 +2515,23 @@ app.get('/trend-weekly', (c) => {
     </div>
   </div>
 
+  <!-- 무료체험 종료 시 뜨는 구독 유도 팝업 -->
+  <div class="modal-overlay" id="twSubscribeModal">
+    <div class="modal-box" style="background:#17181D;border:1px solid #2C2D35;max-width:380px;padding:28px 24px;">
+      <button class="modal-close" onclick="closeModal('twSubscribeModal')" style="background:#202127;color:#82828E;">×</button>
+      <h3 style="font-size:17px;font-weight:700;color:#F2F2F5;margin:0 0 8px;">무료체험이 끝났어요</h3>
+      <p style="font-size:14px;color:#B7B7C2;margin:0 0 18px;line-height:1.6;">계속 받아보시려면 구독해주세요. 보유 크레딧에서 바로 차감돼요.</p>
+      <div class="tw-toggle" id="twModalPlanToggle">
+        <button type="button" class="tw-toggle-opt active" data-plan="monthly" onclick="twSelectModalPlan('monthly')">월 구독</button>
+        <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectModalPlan('annual')">연 구독 · 20%↓</button>
+      </div>
+      <button class="tw-cta" id="twModalSubscribeBtn" onclick="twSubscribeFromModal()">50크레딧으로 구독하기</button>
+    </div>
+  </div>
+
   <script>
   (function() {
     var TOKEN = localStorage.getItem('lookbook_token') || '';
-    var twPlan = 'monthly';
 
     function authHeaders() { return { 'X-Session-Token': TOKEN, 'Content-Type': 'application/json' }; }
     function show(id) { document.getElementById(id).style.display = ''; }
@@ -2551,7 +2588,12 @@ app.get('/trend-weekly', (c) => {
         hide('twLoading');
 
         if (!status.subscribed) {
-          show('twIntro');
+          if (status.status === 'expired') {
+            show('twExpired');
+            openModal('twSubscribeModal');
+          } else {
+            show('twIntro');
+          }
           return;
         }
 
@@ -2564,9 +2606,8 @@ app.get('/trend-weekly', (c) => {
         var banner = document.getElementById('twBanner');
         if (status.status === 'trial') {
           banner.className = 'tw-slot'; banner.style.color = '#F2F2F5';
-          banner.textContent = '무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요. 계속 받아보시려면 아래에서 구독해주세요.';
+          banner.textContent = '무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요.';
           show('twBanner');
-          show('twSubscribeBox');
         } else if (status.status === 'active') {
           banner.className = 'tw-slot'; banner.style.color = '#F2F2F5';
           banner.textContent = (status.plan === 'annual' ? '연간' : '월간') + ' 구독 중 — 다음 결제(크레딧 차감)일 ' + fmtDate(status.nextBillingAt);
@@ -2593,36 +2634,36 @@ app.get('/trend-weekly', (c) => {
       try {
         var res = await fetch('/api/trend/trial/start', { method: 'POST', headers: authHeaders() });
         var data = await res.json();
-        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '1개월 무료로 시작하기'; return; }
+        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '무료 가입하기 ›'; return; }
         showToast('무료체험이 시작됐어요!', 'success');
         hide('twIntro'); show('twLoading'); await twLoad();
       } catch (e) {
         showToast('네트워크 오류가 발생했습니다.', 'error');
-        btn.disabled = false; btn.textContent = '1개월 무료로 시작하기';
+        btn.disabled = false; btn.textContent = '무료 가입하기 ›';
       }
     };
 
-    window.twSelectPlan = function(plan) {
-      twPlan = plan;
-      var opts = document.querySelectorAll('#twPlanToggle .tw-toggle-opt');
+    var twModalPlan = 'monthly';
+    window.twSelectModalPlan = function(plan) {
+      twModalPlan = plan;
+      var opts = document.querySelectorAll('#twModalPlanToggle .tw-toggle-opt');
       for (var i = 0; i < opts.length; i++) opts[i].classList.toggle('active', opts[i].getAttribute('data-plan') === plan);
-      var btn = document.getElementById('twSubscribeBtn');
+      var btn = document.getElementById('twModalSubscribeBtn');
       btn.textContent = plan === 'annual' ? '480크레딧으로 구독하기 · 20%↓' : '50크레딧으로 구독하기';
     };
 
-    window.twSubscribeSelected = function() { twSubscribe(twPlan); };
-
-    async function twSubscribe(plan) {
+    window.twSubscribeFromModal = async function() {
       try {
-        var res = await fetch('/api/trend/subscribe', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ plan: plan }) });
+        var res = await fetch('/api/trend/subscribe', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ plan: twModalPlan }) });
         var data = await res.json();
         if (!data.success) { showToast(data.message || '구독에 실패했습니다.', 'error'); return; }
         showToast('구독이 시작됐어요!', 'success');
-        await twLoad();
+        closeModal('twSubscribeModal');
+        hide('twExpired'); show('twLoading'); await twLoad();
       } catch (e) {
         showToast('네트워크 오류가 발생했습니다.', 'error');
       }
-    }
+    };
 
     window.twCancel = async function() {
       if (!confirm('자동갱신을 해지할까요? 이미 결제된 기간까지는 계속 이용하실 수 있어요.')) return;
