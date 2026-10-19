@@ -78,6 +78,22 @@ type Bindings = {
   // 발신자 주소 — Resend에 도메인(aifashion.co.kr) 인증을 마쳐야 그 도메인으로 보낼 수
   // 있음. 미설정 시 기본값(EZlook <noreply@aifashion.co.kr>) 사용.
   RESEND_FROM_EMAIL?: string
+  // 주간 트렌드 분석 — 네이버 데이터랩(검색어트렌드/쇼핑인사이트) 오픈API. 같은
+  // Client ID/Secret으로 두 API 모두 쓸 수 있으나, 네이버 개발자센터에서 앱에
+  // "데이터랩(검색어트렌드)"/"데이터랩(쇼핑인사이트)" 사용 API가 각각 추가(승인)
+  // 돼 있어야 함 — 미설정/미승인 시 해당 콘텐츠 생성만 에러로 건너뜀.
+  NAVER_CLIENT_ID?: string
+  NAVER_CLIENT_SECRET?: string
+  // 주간 트렌드 분석 카카오 알림톡 발송 — 솔라피(solapi.com). 미설정 시 카톡 발송
+  // 버튼이 에러를 반환하고 조용히 건너뛰지 않음(어드민이 명시적으로 누르는 동작이라
+  // 실패를 바로 보여줘야 함).
+  SOLAPI_API_KEY?: string
+  SOLAPI_API_SECRET?: string
+  SOLAPI_PF_ID?: string          // 발신프로필 키
+  SOLAPI_TEMPLATE_ID?: string    // 승인된 알림톡 템플릿 코드
+  // 알림톡 실패 시 대체문자(SMS) 발신번호 — 미설정이면 대체문자 자체를 끄고(disableSms)
+  // 알림톡 실패를 그대로 실패로 기록한다(문자 비용 방지 + 별도 발신번호 사전등록 불필요).
+  SOLAPI_SENDER_PHONE?: string
 }
 
 // 도식화 만들기 메뉴 항목 노출 여부 — 위 TECHPACK_MENU_VISIBLE 참고.
@@ -2463,6 +2479,238 @@ app.get('/reset-password', (c) => {
 })
 
 // ────────────────────────────────────────────────────
+// GET /trend-weekly — 주간 트렌드 분석 (구독형 패션 콘텐츠 다이제스트)
+// 콘텐츠 생성/검토는 어드민(/admin02 콘텐츠 다이제스트 탭)에서, 여기선 구독자
+// 전용 열람 + 구독 신청/해지 + 카톡 알림 수신 전화번호 등록만 다룬다.
+// ────────────────────────────────────────────────────
+app.get('/trend-weekly', (c) => {
+  return c.html(htmlShell('주간 트렌드 분석', `
+  <div class="toast-container" id="toastContainer"></div>
+  <div style="max-width:640px;margin:0 auto;padding:20px 16px 80px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+      <a href="/" style="width:36px;height:36px;border-radius:50%;background:#F2F4F6;display:flex;align-items:center;justify-content:center;color:#4E5968;font-size:20px;text-decoration:none;flex-shrink:0;">‹</a>
+      <h1 style="font-size:19px;font-weight:800;color:var(--text-primary);margin:0;">📊 주간 트렌드 분석</h1>
+    </div>
+
+    <div id="twLoading" style="text-align:center;padding:60px 0;color:var(--text-muted);font-size:13px;">불러오는 중...</div>
+
+    <!-- 로그인 필요 -->
+    <div id="twNeedLogin" style="display:none;text-align:center;padding:60px 20px;">
+      <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px;">로그인 후 이용할 수 있어요.</p>
+      <a href="/" class="btn btn-primary btn-lg">홈에서 로그인하기</a>
+    </div>
+
+    <!-- 미구독: 소개 + 무료체험 -->
+    <div id="twIntro" style="display:none;">
+      <div style="background:linear-gradient(135deg,#eef4ff,#e6f0ff);border:1px solid #cfe0ff;border-radius:16px;padding:20px;margin-bottom:20px;">
+        <p style="font-size:15px;font-weight:700;color:#1b4bd1;margin:0 0 6px;">지금 무료로 주간 트렌드 분석을 받아보세요.</p>
+        <p style="font-size:13px;color:#4E5968;margin:0;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 자동으로 모아서 정리해드려요. 1주일 무료체험 후 자동 결제되지 않고, 직접 구독 버튼을 눌러야 시작돼요.</p>
+      </div>
+      <button class="btn btn-primary btn-full btn-lg" id="twTrialBtn" onclick="twStartTrial()">1주일 무료로 시작하기</button>
+
+      <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border-color,#E5E8EB);">
+        <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 10px;">구독 요금</h3>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;border:1px solid var(--border-color,#E5E8EB);border-radius:12px;padding:14px;">
+            <div style="font-size:12px;color:var(--text-muted);">월 구독</div>
+            <div style="font-size:17px;font-weight:800;color:var(--text-primary);margin:4px 0;">50 크레딧<span style="font-size:12px;font-weight:500;color:var(--text-muted);"> /월</span></div>
+            <div style="font-size:11px;color:#8B95A1;text-decoration:line-through;">정가 100크레딧</div>
+          </div>
+          <div style="flex:1;border:1px solid var(--border-color,#E5E8EB);border-radius:12px;padding:14px;position:relative;">
+            <div style="position:absolute;top:-9px;right:10px;background:#22C55E;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;">연 20% 추가할인</div>
+            <div style="font-size:12px;color:var(--text-muted);">연 구독</div>
+            <div style="font-size:17px;font-weight:800;color:var(--text-primary);margin:4px 0;">480 크레딧<span style="font-size:12px;font-weight:500;color:var(--text-muted);"> /년</span></div>
+            <div style="font-size:11px;color:#8B95A1;">월 환산 40크레딧</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 구독/체험 중: 콘텐츠 + 구독관리 -->
+    <div id="twMain" style="display:none;">
+      <div id="twBanner" style="display:none;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;"></div>
+
+      <div id="twDigests"></div>
+
+      <div style="margin-top:28px;padding:16px;border:1px solid var(--border-color,#E5E8EB);border-radius:14px;">
+        <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 10px;">💬 카카오톡으로 받아보기</h3>
+        <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">전화번호를 등록하면 새 다이제스트가 발행될 때 카톡으로 요약과 링크를 보내드려요.</p>
+        <div style="display:flex;gap:8px;">
+          <input type="tel" class="form-input" id="twPhoneInput" placeholder="010-0000-0000" style="flex:1;" />
+          <button class="btn btn-primary" id="twPhoneBtn" onclick="twSavePhone()">등록</button>
+        </div>
+        <div id="twPhoneSaved" style="display:none;font-size:12px;color:#22C55E;margin-top:8px;">✅ 등록된 번호로 발송돼요.</div>
+      </div>
+
+      <div id="twSubscribeBox" style="display:none;margin-top:20px;padding:16px;border:1px solid var(--border-color,#E5E8EB);border-radius:14px;">
+        <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 10px;">구독하기</h3>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" style="flex:1;font-size:13px;padding:10px 6px;" onclick="twSubscribe('monthly')">월 50크레딧</button>
+          <button class="btn btn-primary" style="flex:1;font-size:13px;padding:10px 6px;" onclick="twSubscribe('annual')">연 480크레딧<br/><span style="font-size:11px;font-weight:500;">(20%↓)</span></button>
+        </div>
+      </div>
+
+      <div id="twManageBox" style="display:none;margin-top:16px;text-align:center;">
+        <button class="btn-sm" style="color:#8B95A1;background:none;border:none;text-decoration:underline;cursor:pointer;font-size:12px;" onclick="twCancel()">구독 자동갱신 해지</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function() {
+    var TOKEN = localStorage.getItem('lookbook_token') || '';
+
+    function authHeaders() { return { 'X-Session-Token': TOKEN, 'Content-Type': 'application/json' }; }
+    function show(id) { document.getElementById(id).style.display = ''; }
+    function hide(id) { document.getElementById(id).style.display = 'none'; }
+    function fmtDate(iso) {
+      if (!iso) return '';
+      var d = new Date(iso);
+      return d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
+    }
+
+    function renderDigests(digests) {
+      var box = document.getElementById('twDigests');
+      if (!digests || !digests.length) {
+        box.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;padding:40px 0;">아직 발행된 다이제스트가 없어요. 곧 찾아올게요!</p>';
+        return;
+      }
+      var typeLabel = { news: '🧵 패션 뉴스', search_trend: '🔎 검색어트렌드', shopping_insight: '🛍️ 쇼핑인사이트' };
+      box.innerHTML = digests.map(function(d) {
+        var body = '';
+        if (d.type === 'news') {
+          body = (d.articles || []).map(function(a) {
+            return '<div style="padding:10px 0;border-top:1px solid var(--border-color,#E5E8EB);">' +
+              '<div style="font-size:11px;color:#3182F6;font-weight:700;margin-bottom:2px;">[' + a.category + ']</div>' +
+              '<div style="font-size:13.5px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">' + a.title + '</div>' +
+              '<div style="font-size:12.5px;color:var(--text-muted);line-height:1.5;">' + a.summary + '</div>' +
+              (a.url ? '<a href="' + a.url + '" target="_blank" style="font-size:11.5px;color:#8B95A1;">원문 보기 ›</a>' : '') +
+              '</div>';
+          }).join('');
+        } else {
+          body = (d.trends || []).map(function(t) {
+            var pct = t.change_pct;
+            var color = pct > 0 ? '#ef4444' : pct < 0 ? '#3182F6' : '#8B95A1';
+            var sign = pct > 0 ? '+' : '';
+            return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border-color,#E5E8EB);font-size:13px;">' +
+              '<span style="color:var(--text-primary);">' + t.label + '</span>' +
+              '<span style="color:' + color + ';font-weight:700;">' + sign + pct + '%</span></div>';
+          }).join('');
+        }
+        return '<div style="margin-bottom:20px;padding:16px;border:1px solid var(--border-color,#E5E8EB);border-radius:14px;">' +
+          '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:2px;">' + (typeLabel[d.type] || d.type) + '</div>' +
+          '<div style="font-size:11px;color:#8B95A1;margin-bottom:8px;">' + (d.period || '') + '</div>' +
+          '<div style="font-size:13px;color:var(--text-primary);line-height:1.6;margin-bottom:4px;">' + (d.summary || '') + '</div>' +
+          body +
+          '</div>';
+      }).join('');
+    }
+
+    async function twLoad() {
+      if (!TOKEN) { hide('twLoading'); show('twNeedLogin'); return; }
+      try {
+        var statusRes = await fetch('/api/trend/status', { headers: authHeaders() });
+        if (statusRes.status === 401) { hide('twLoading'); show('twNeedLogin'); return; }
+        var status = await statusRes.json();
+        hide('twLoading');
+
+        if (!status.subscribed) {
+          show('twIntro');
+          return;
+        }
+
+        show('twMain');
+        if (status.kakaoPhone) {
+          document.getElementById('twPhoneInput').value = status.kakaoPhone;
+          show('twPhoneSaved');
+        }
+
+        var banner = document.getElementById('twBanner');
+        if (status.status === 'trial') {
+          banner.style.background = '#FFF7E0'; banner.style.color = '#7a5b00';
+          banner.textContent = '🎁 무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요. 계속 받아보시려면 아래에서 구독해주세요.';
+          show('twBanner');
+          show('twSubscribeBox');
+        } else if (status.status === 'active') {
+          banner.style.background = '#E6F4EA'; banner.style.color = '#1a7a3a';
+          banner.textContent = '✅ ' + (status.plan === 'annual' ? '연간' : '월간') + ' 구독 중 — 다음 결제(크레딧 차감)일 ' + fmtDate(status.nextBillingAt);
+          show('twBanner');
+          show('twManageBox');
+        } else if (status.status === 'canceled') {
+          banner.style.background = '#F2F4F6'; banner.style.color = '#4E5968';
+          banner.textContent = '해지 예약됨 — ' + fmtDate(status.nextBillingAt) + '까지는 계속 보실 수 있어요.';
+          show('twBanner');
+        }
+
+        var digestsRes = await fetch('/api/trend/digests', { headers: authHeaders() });
+        var digestsData = await digestsRes.json();
+        renderDigests(digestsData.digests || []);
+      } catch (e) {
+        hide('twLoading');
+        showToast('불러오는 중 오류가 발생했습니다.', 'error');
+      }
+    }
+
+    window.twStartTrial = async function() {
+      var btn = document.getElementById('twTrialBtn');
+      btn.disabled = true; btn.textContent = '시작하는 중...';
+      try {
+        var res = await fetch('/api/trend/trial/start', { method: 'POST', headers: authHeaders() });
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '1주일 무료로 시작하기'; return; }
+        showToast('무료체험이 시작됐어요!', 'success');
+        hide('twIntro'); show('twLoading'); await twLoad();
+      } catch (e) {
+        showToast('네트워크 오류가 발생했습니다.', 'error');
+        btn.disabled = false; btn.textContent = '1주일 무료로 시작하기';
+      }
+    };
+
+    window.twSubscribe = async function(plan) {
+      try {
+        var res = await fetch('/api/trend/subscribe', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ plan: plan }) });
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '구독에 실패했습니다.', 'error'); return; }
+        showToast('구독이 시작됐어요!', 'success');
+        await twLoad();
+      } catch (e) {
+        showToast('네트워크 오류가 발생했습니다.', 'error');
+      }
+    };
+
+    window.twCancel = async function() {
+      if (!confirm('자동갱신을 해지할까요? 이미 결제된 기간까지는 계속 이용하실 수 있어요.')) return;
+      try {
+        var res = await fetch('/api/trend/cancel', { method: 'POST', headers: authHeaders() });
+        var data = await res.json();
+        if (!data.success) { showToast('처리에 실패했습니다.', 'error'); return; }
+        showToast('자동갱신이 해지됐어요.', 'success');
+        await twLoad();
+      } catch (e) {
+        showToast('네트워크 오류가 발생했습니다.', 'error');
+      }
+    };
+
+    window.twSavePhone = async function() {
+      var phone = document.getElementById('twPhoneInput').value;
+      try {
+        var res = await fetch('/api/trend/kakao-phone', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ phone: phone }) });
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '등록에 실패했습니다.', 'error'); return; }
+        showToast('카톡 수신 번호가 등록됐어요.', 'success');
+        show('twPhoneSaved');
+      } catch (e) {
+        showToast('네트워크 오류가 발생했습니다.', 'error');
+      }
+    };
+
+    twLoad();
+  })();
+  </script>
+  `, '', '매주 AI가 모아주는 패션 뉴스·검색어트렌드·쇼핑인사이트', c.env.GA4_MEASUREMENT_ID))
+})
+
+// ────────────────────────────────────────────────────
 // GET /api/auth/me — 세션 확인 (토큰 → 사용자 정보)
 // ────────────────────────────────────────────────────
 app.get('/api/auth/me', async (c) => {
@@ -3698,6 +3946,53 @@ async function hmacSha256Hex(secret: string, message: string): Promise<string> {
 }
 
 // ────────────────────────────────────────────────────
+// 솔라피(solapi.com) 카카오 알림톡 발송 — 주간 트렌드 분석 구독자에게 다이제스트
+// 요약+링크를 보내는 용도. 인증 방식은 솔라피 API Key 인증(HMAC-SHA256):
+// Authorization: HMAC-SHA256 apiKey=..., date=..., salt=..., signature=HMAC(date+salt, apiSecret)
+// 서버 시간 기준 ±15분 밖이거나 같은 서명을 재사용하면 거부되므로 매 호출마다 새로 생성.
+// ────────────────────────────────────────────────────
+async function solapiAuthHeader(apiKey: string, apiSecret: string): Promise<string> {
+  const date = new Date().toISOString()
+  const salt = crypto.randomUUID().replace(/-/g, '')
+  const signature = await hmacSha256Hex(apiSecret, date + salt)
+  return `HMAC-SHA256 apiKey=${apiKey}, date=${date}, salt=${salt}, signature=${signature}`
+}
+
+async function sendSolapiAlimtalk(env: Bindings, to: string, variables: Record<string, string>): Promise<{ success: boolean; error?: string }> {
+  if (!env.SOLAPI_API_KEY || !env.SOLAPI_API_SECRET || !env.SOLAPI_PF_ID || !env.SOLAPI_TEMPLATE_ID) {
+    return { success: false, error: '솔라피 환경변수가 설정되지 않았습니다.' }
+  }
+  try {
+    const authHeader = await solapiAuthHeader(env.SOLAPI_API_KEY, env.SOLAPI_API_SECRET)
+    const hasSender = !!env.SOLAPI_SENDER_PHONE
+    const res = await fetch('https://api.solapi.com/messages/v4/send', {
+      method: 'POST',
+      headers: { 'Authorization': authHeader, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: {
+          to: to.replace(/[^0-9]/g, ''),
+          from: env.SOLAPI_SENDER_PHONE || '',
+          kakaoOptions: {
+            pfId: env.SOLAPI_PF_ID,
+            templateId: env.SOLAPI_TEMPLATE_ID,
+            variables,
+            // 발신번호(대체문자용)를 등록해둔 경우에만 알림톡 실패 시 SMS로 자동 대체 —
+            // 미등록 상태로 disableSms:false를 보내면 솔라피가 거부할 수 있어 안전하게 분기.
+            disableSms: !hasSender,
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(15000),
+    })
+    const data = await res.json<any>().catch(() => ({}))
+    if (!res.ok) return { success: false, error: data?.errorMessage || data?.message || `HTTP ${res.status}` }
+    return { success: true }
+  } catch (err: any) {
+    return { success: false, error: String(err?.message || err) }
+  }
+}
+
+// ────────────────────────────────────────────────────
 // Stripe 결제 API — 해외(한국 제외) 시장 전용, 토스페이먼츠와 별개 파이프라인
 // Stripe Checkout(호스팅 결제 페이지)을 사용 — 결제 UI 자체를 우리가 만들 필요 없음
 // ────────────────────────────────────────────────────
@@ -4322,6 +4617,278 @@ app.get('/api/payments/history', async (c) => {
     ).bind(sess.user_id).all()
 
     return c.json({ success: true, logs: logs.results || [] })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
+// 주간 트렌드 분석 — 크레딧 기반 구독(현금 정기결제 아님, PG 무관)
+// 콘텐츠(기사/검색어트렌드/쇼핑인사이트) 자체는 /api/admin/content-digest에서
+// 생성·검토하며, 여기서는 "누가 구독 중인지"와 열람 권한만 다룬다.
+// ────────────────────────────────────────────────────
+const TREND_MONTHLY_CREDITS = 50       // 정가 100 대비 50% 할인
+const TREND_ANNUAL_CREDITS = 480       // 월 50 × 12 × 0.8(연간 추가 20% 할인), 연 1회 차감
+const TREND_TRIAL_DAYS = 7
+
+async function requireTrendSession(db: D1Database, token: string): Promise<any> {
+  if (!token) return null
+  return await db.prepare(
+    `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+  ).bind(token).first() as any
+}
+
+// 체험 만료·정기 차감일 도래 여부를 접속 시점에 그때그때 처리(lazy billing) —
+// 별도 크론 없이 /api/trend/* 호출 시마다 자연스럽게 최신 상태로 맞춰진다.
+// 방문이 뜸했던 기간 동안 여러 번 차감일이 지났다면 그만큼 반복 차감한다(실제
+// 정기구독과 동일하게 — 건너뛰지 않음). 크레딧이 모자라면 그 시점에서 만료 처리.
+async function processTrendBillingIfDue(db: D1Database, sub: any): Promise<any> {
+  const now = Date.now()
+
+  if (sub.status === 'trial' && sub.trial_ends_at && Date.parse(sub.trial_ends_at) <= now) {
+    await db.prepare(`UPDATE trend_subscriptions SET status='expired', updated_at=datetime('now') WHERE user_id=?`).bind(sub.user_id).run()
+    sub.status = 'expired'
+    return sub
+  }
+  if (sub.status === 'canceled' && sub.next_billing_at && Date.parse(sub.next_billing_at) <= now) {
+    await db.prepare(`UPDATE trend_subscriptions SET status='expired', updated_at=datetime('now') WHERE user_id=?`).bind(sub.user_id).run()
+    sub.status = 'expired'
+    return sub
+  }
+  if (sub.status !== 'active' || !sub.next_billing_at) return sub
+
+  const cost = sub.plan === 'annual' ? TREND_ANNUAL_CREDITS : TREND_MONTHLY_CREDITS
+  let next = new Date(sub.next_billing_at)
+  while (next.getTime() <= now) {
+    const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(sub.user_id).first() as any
+    const balance = userRow?.credits ?? 0
+    if (balance < cost) {
+      await db.prepare(`UPDATE trend_subscriptions SET status='expired', updated_at=datetime('now') WHERE user_id=?`).bind(sub.user_id).run()
+      sub.status = 'expired'
+      return sub
+    }
+    const newBal = balance - cost
+    await db.prepare(`UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`).bind(newBal, sub.user_id).run()
+    await db.prepare(
+      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id) VALUES (?, 'deduct', ?, ?, 'trend_subscription', ?)`
+    ).bind(sub.user_id, -cost, newBal, `trend_${sub.plan}_${next.toISOString().slice(0, 10)}`).run()
+    if (sub.plan === 'annual') next.setFullYear(next.getFullYear() + 1)
+    else next.setMonth(next.getMonth() + 1)
+  }
+  await db.prepare(`UPDATE trend_subscriptions SET next_billing_at=?, updated_at=datetime('now') WHERE user_id=?`).bind(next.toISOString(), sub.user_id).run()
+  sub.next_billing_at = next.toISOString()
+  return sub
+}
+
+// 'canceled'여도 이미 차감한 기간이 남아있으면(next_billing_at 전) 계속 열람 가능 —
+// 돈(크레딧) 낸 기간만큼은 서비스 제공, 그 이후엔 자동 갱신 없이 자연 만료.
+function trendHasAccess(sub: any): boolean {
+  if (!sub) return false
+  if (sub.status === 'trial' || sub.status === 'active') return true
+  if (sub.status === 'canceled' && sub.next_billing_at && Date.parse(sub.next_billing_at) > Date.now()) return true
+  return false
+}
+
+// GET /api/trend/status — 구독 상태 조회(접속 시점에 체험만료/정기차감 lazy 처리)
+app.get('/api/trend/status', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sess = await requireTrendSession(db, c.req.header('X-Session-Token') || '')
+    if (!sess) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    let sub = await db.prepare(`SELECT * FROM trend_subscriptions WHERE user_id = ?`).bind(sess.user_id).first() as any
+    if (sub) sub = await processTrendBillingIfDue(db, sub)
+
+    return c.json({
+      success: true,
+      subscribed: trendHasAccess(sub),
+      status: sub?.status || 'none',
+      plan: sub?.plan || null,
+      trialEndsAt: sub?.trial_ends_at || null,
+      nextBillingAt: sub?.next_billing_at || null,
+      kakaoPhone: sub?.kakao_phone || null,
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// POST /api/trend/trial/start — 1주일 무료체험 시작(계정당 1회 — 이미 trend_subscriptions
+// 행이 있으면 체험을 이미 썼거나 구독 중이라는 뜻이라 재시작 불가)
+app.post('/api/trend/trial/start', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sess = await requireTrendSession(db, c.req.header('X-Session-Token') || '')
+    if (!sess) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const existing = await db.prepare(`SELECT user_id FROM trend_subscriptions WHERE user_id = ?`).bind(sess.user_id).first()
+    if (existing) return c.json({ success: false, message: '이미 무료체험을 이용했거나 구독 중입니다.' }, 409)
+
+    const trialEndsAt = new Date(Date.now() + TREND_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
+    await db.prepare(
+      `INSERT INTO trend_subscriptions (user_id, status, trial_ends_at) VALUES (?, 'trial', ?)`
+    ).bind(sess.user_id, trialEndsAt).run()
+
+    return c.json({ success: true, trialEndsAt })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// POST /api/trend/subscribe — 월/연 구독 시작(크레딧 즉시 차감 — PG 무관, 보유 크레딧으로만 결제)
+app.post('/api/trend/subscribe', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sess = await requireTrendSession(db, c.req.header('X-Session-Token') || '')
+    if (!sess) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const body: any = await c.req.json().catch(() => ({}))
+    const plan = body?.plan === 'annual' ? 'annual' : body?.plan === 'monthly' ? 'monthly' : null
+    if (!plan) return c.json({ success: false, message: 'plan은 monthly 또는 annual 이어야 합니다.' }, 400)
+
+    const cost = plan === 'annual' ? TREND_ANNUAL_CREDITS : TREND_MONTHLY_CREDITS
+    const userRow = await db.prepare(`SELECT credits FROM users WHERE id=?`).bind(sess.user_id).first() as any
+    const balance = userRow?.credits ?? 0
+    if (balance < cost) return c.json({ success: false, message: `크레딧이 부족합니다. (필요: ${cost}, 보유: ${balance})` }, 400)
+
+    const newBal = balance - cost
+    const next = new Date()
+    if (plan === 'annual') next.setFullYear(next.getFullYear() + 1)
+    else next.setMonth(next.getMonth() + 1)
+
+    await db.prepare(`UPDATE users SET credits=?, updated_at=datetime('now') WHERE id=?`).bind(newBal, sess.user_id).run()
+    await db.prepare(
+      `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id) VALUES (?, 'deduct', ?, ?, 'trend_subscription', ?)`
+    ).bind(sess.user_id, -cost, newBal, `trend_${plan}_${new Date().toISOString().slice(0, 10)}`).run()
+
+    const existing = await db.prepare(`SELECT user_id FROM trend_subscriptions WHERE user_id = ?`).bind(sess.user_id).first()
+    if (existing) {
+      await db.prepare(
+        `UPDATE trend_subscriptions SET status='active', plan=?, trial_ends_at=NULL, next_billing_at=?, updated_at=datetime('now') WHERE user_id=?`
+      ).bind(plan, next.toISOString(), sess.user_id).run()
+    } else {
+      await db.prepare(
+        `INSERT INTO trend_subscriptions (user_id, status, plan, next_billing_at) VALUES (?, 'active', ?, ?)`
+      ).bind(sess.user_id, plan, next.toISOString()).run()
+    }
+
+    return c.json({ success: true, plan, nextBillingAt: next.toISOString(), creditsRemaining: newBal })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// POST /api/trend/cancel — 자동 갱신 해지(이미 차감한 기간이 끝날 때까지는 계속 열람 가능)
+app.post('/api/trend/cancel', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sess = await requireTrendSession(db, c.req.header('X-Session-Token') || '')
+    if (!sess) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    await db.prepare(
+      `UPDATE trend_subscriptions SET status='canceled', updated_at=datetime('now') WHERE user_id=? AND status='active'`
+    ).bind(sess.user_id).run()
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// POST /api/trend/kakao-phone — 알림톡 수신 전화번호 등록/변경(구독 중이어야 함)
+app.post('/api/trend/kakao-phone', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sess = await requireTrendSession(db, c.req.header('X-Session-Token') || '')
+    if (!sess) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    const body: any = await c.req.json().catch(() => ({}))
+    const phone = String(body?.phone || '').replace(/[^0-9]/g, '')
+    if (!/^01[0-9]{8,9}$/.test(phone)) return c.json({ success: false, message: '올바른 휴대폰 번호를 입력해주세요.' }, 400)
+
+    let sub = await db.prepare(`SELECT * FROM trend_subscriptions WHERE user_id = ?`).bind(sess.user_id).first() as any
+    if (sub) sub = await processTrendBillingIfDue(db, sub)
+    if (!trendHasAccess(sub)) return c.json({ success: false, message: '구독 중이 아닙니다.' }, 400)
+
+    await db.prepare(`UPDATE trend_subscriptions SET kakao_phone=?, updated_at=datetime('now') WHERE user_id=?`).bind(phone, sess.user_id).run()
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /api/trend/digests — 최신 발행(검토완료 이상) 다이제스트 3종(기사/검색어트렌드/쇼핑인사이트)
+app.get('/api/trend/digests', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sess = await requireTrendSession(db, c.req.header('X-Session-Token') || '')
+    if (!sess) return c.json({ error: '로그인이 필요합니다.' }, 401)
+
+    let sub = await db.prepare(`SELECT * FROM trend_subscriptions WHERE user_id = ?`).bind(sess.user_id).first() as any
+    if (sub) sub = await processTrendBillingIfDue(db, sub)
+    if (!trendHasAccess(sub)) return c.json({ success: false, message: '구독이 필요합니다.' }, 403)
+
+    const types = ['news', 'search_trend', 'shopping_insight']
+    const digests: any[] = []
+    for (const type of types) {
+      const d = await db.prepare(
+        `SELECT * FROM content_digests WHERE type = ? AND status IN ('reviewed','sent') ORDER BY generated_at DESC LIMIT 1`
+      ).bind(type).first() as any
+      if (!d) continue
+      if (type === 'news') {
+        const { results: articles } = await db.prepare(
+          `SELECT category, title, source, url, summary, importance FROM digest_articles WHERE digest_id = ? AND excluded = 0 ORDER BY importance DESC, id ASC`
+        ).bind(d.id).all()
+        digests.push({ type, period: d.period, summary: d.summary, articles })
+      } else {
+        const { results: trends } = await db.prepare(
+          `SELECT label, change_pct FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`
+        ).bind(d.id).all()
+        digests.push({ type, period: d.period, summary: d.summary, trends })
+      }
+    }
+    return c.json({ success: true, digests })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// POST /api/admin/trend/kakao-broadcast/:digestId — 검토완료된 다이제스트를 구독자 전원에게
+// 솔라피 알림톡으로 일괄 발송(관리자가 명시적으로 누르는 동작 — 자동 발송 아님).
+// 같은 다이제스트를 같은 사용자에게 중복 발송하지 않도록 trend_kakao_sends로 멱등 처리.
+app.post('/api/admin/trend/kakao-broadcast/:digestId', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const digestId = c.req.param('digestId')
+    const digest = await db.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(digestId).first() as any
+    if (!digest) return c.json({ success: false, message: '다이제스트를 찾을 수 없습니다.' }, 404)
+    if (digest.status !== 'reviewed' && digest.status !== 'sent') {
+      return c.json({ success: false, message: '검토완료 상태의 다이제스트만 발송할 수 있습니다.' }, 400)
+    }
+    if (!c.env.SOLAPI_API_KEY || !c.env.SOLAPI_API_SECRET || !c.env.SOLAPI_PF_ID || !c.env.SOLAPI_TEMPLATE_ID) {
+      return c.json({ success: false, message: '솔라피 환경변수(SOLAPI_API_KEY 등)가 설정되지 않았습니다.' }, 500)
+    }
+
+    const { results: subs } = await db.prepare(
+      `SELECT user_id, kakao_phone FROM trend_subscriptions
+       WHERE kakao_phone IS NOT NULL
+         AND (status IN ('trial','active') OR (status='canceled' AND next_billing_at > datetime('now')))`
+    ).all() as any
+
+    const summary = String(digest.summary || '').slice(0, 300)
+    const link = `${getOrigin(c)}/trend-weekly`
+
+    let sent = 0, failed = 0, skipped = 0
+    for (const sub of subs) {
+      const already = await db.prepare(`SELECT id FROM trend_kakao_sends WHERE digest_id=? AND user_id=?`).bind(digest.id, sub.user_id).first()
+      if (already) { skipped++; continue }
+      const result = await sendSolapiAlimtalk(c.env, sub.kakao_phone, { '#{요약}': summary, '#{링크}': link })
+      await db.prepare(
+        `INSERT INTO trend_kakao_sends (digest_id, user_id, phone, status, error) VALUES (?,?,?,?,?)`
+      ).bind(digest.id, sub.user_id, sub.kakao_phone, result.success ? 'sent' : 'failed', result.error || null).run()
+      if (result.success) sent++; else failed++
+    }
+
+    return c.json({ success: true, sent, failed, skipped, total: subs.length })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
@@ -6456,6 +7023,7 @@ app.get('/about', (c) => {
             ${isTechpackMenuVisible(c) ? `<a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>` : ''}
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="/trend-weekly" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">주간 트렌드 분석</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
@@ -7122,6 +7690,12 @@ app.get('/dashboard', (c) => {
         <span class="db-menu-arrow">›</span>
       </a>
 
+      <!-- 주간 트렌드 분석 -->
+      <a href="/trend-weekly" class="db-menu-item">
+        <span class="db-menu-label">주간 트렌드 분석</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
       <!-- 서비스소개 -->
       <a href="https://www.aifashion.co.kr/about" class="db-menu-item">
         <span class="db-menu-label">서비스소개</span>
@@ -7174,6 +7748,7 @@ app.get('/dashboard', (c) => {
               <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
               ${isTechpackMenuVisible(c) ? `<a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>` : ''}
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
+              <a href="/trend-weekly" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">주간 트렌드 분석</a>
               <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
               <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
               <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
@@ -7926,6 +8501,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             ${isTechpackMenuVisible(c) ? `<a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">도식화 만들기</a>` : ''}
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="/trend-weekly" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">주간 트렌드 분석</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:var(--gapp-border,#E5E8EB);margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
@@ -10303,7 +10879,10 @@ async function digestSelect(id) {
       '<h3 style="margin:0;">' + (typeLabel[type] || '') + ' · ' + d.period + ' <span class="leads-hint">(' + statusLabel[d.status] + ')</span></h3>' +
       '<div>' +
         '<button class="leads-btn secondary small" onclick="digestMarkReviewed()">검토완료 표시</button> ' +
-        '<button class="leads-btn small" onclick="digestCopyKakaoText()">카톡 발행용 텍스트 복사</button>' +
+        '<button class="leads-btn small" onclick="digestCopyKakaoText()">카톡 발행용 텍스트 복사</button> ' +
+        (d.status === 'reviewed' || d.status === 'sent'
+          ? '<button class="leads-btn small" onclick="digestKakaoBroadcast()">구독자 전원에게 알림톡 발송</button>'
+          : '') +
       '</div>' +
     '</div>' +
     '<textarea id="digestSummaryEdit" style="width:100%;min-height:80px;margin:10px 0;">' + (d.summary || '') + '</textarea>' +
@@ -10361,6 +10940,24 @@ async function digestCopyKakaoText() {
     alert('카톡 발행용 텍스트가 클립보드에 복사되었습니다. 카카오톡 채널 관리자센터에 붙여넣기 하세요.')
   } catch {
     prompt('아래 텍스트를 복사하세요:', text)
+  }
+}
+
+// 주간 트렌드 분석 구독자(카톡 수신 전화번호 등록자) 전원에게 솔라피 알림톡으로 일괄 발송.
+// /api/admin/content-digest(이 파일 상단 content-digest.ts 서브앱)와는 별개로, 구독/발송
+// 로직은 index.tsx의 /api/admin/trend/*에 있다 — adminPassword 헤더 규칙은 동일.
+async function digestKakaoBroadcast() {
+  if (!digestCurrentId) return
+  if (!confirm('주간 트렌드 분석 구독자 전원에게 알림톡을 발송할까요? (같은 다이제스트는 중복 발송되지 않습니다)')) return
+  try {
+    const res = await fetch('/api/admin/trend/kakao-broadcast/' + digestCurrentId, {
+      method: 'POST', headers: { 'X-Admin-Password': adminPassword },
+    })
+    const data = await res.json()
+    if (!data.success) { alert(data.message || '발송에 실패했습니다.'); return }
+    alert('발송 완료 — 성공 ' + data.sent + '건, 실패 ' + data.failed + '건, 중복건너뜀 ' + data.skipped + '건 (대상 ' + data.total + '명)')
+  } catch (e) {
+    alert('네트워크 오류가 발생했습니다.')
   }
 }
 
