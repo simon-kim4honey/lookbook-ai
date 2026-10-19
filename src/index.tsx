@@ -78,6 +78,19 @@ type Bindings = {
   // 발신자 주소 — Resend에 도메인(aifashion.co.kr) 인증을 마쳐야 그 도메인으로 보낼 수
   // 있음. 미설정 시 기본값(EZlook <noreply@aifashion.co.kr>) 사용.
   RESEND_FROM_EMAIL?: string
+  // 주간 트렌드 분석 — 네이버 데이터랩(검색어트렌드/쇼핑인사이트) 오픈API. 같은
+  // Client ID/Secret으로 두 API 모두 쓸 수 있으나, 네이버 개발자센터에서 앱에
+  // "데이터랩(검색어트렌드)"/"데이터랩(쇼핑인사이트)" 사용 API가 각각 추가(승인)
+  // 돼 있어야 함 — 미설정/미승인 시 해당 콘텐츠 생성만 에러로 건너뜀.
+  NAVER_CLIENT_ID?: string
+  NAVER_CLIENT_SECRET?: string
+  // 주간 트렌드 분석 카카오 알림톡 발송 — 솔라피(solapi.com). 미설정 시 카톡 발송
+  // 버튼이 에러를 반환하고 조용히 건너뛰지 않음(어드민이 명시적으로 누르는 동작이라
+  // 실패를 바로 보여줘야 함).
+  SOLAPI_API_KEY?: string
+  SOLAPI_API_SECRET?: string
+  SOLAPI_PF_ID?: string          // 발신프로필 키
+  SOLAPI_TEMPLATE_ID?: string    // 승인된 알림톡 템플릿 코드
 }
 
 // 도식화 만들기 메뉴 항목 노출 여부 — 위 TECHPACK_MENU_VISIBLE 참고.
