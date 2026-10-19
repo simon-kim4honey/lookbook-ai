@@ -149,7 +149,7 @@ ${t.map((e,t)=>`${t+1}. [${e.source||`출처미상`}] ${e.title}`).join(`
 원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`;try{let r=await fetch(`https://api.anthropic.com/v1/messages`,{method:`POST`,headers:{"Content-Type":`application/json`,"x-api-key":e.env.ANTHROPIC_API_KEY,"anthropic-version":`2023-06-01`},body:JSON.stringify({model:`claude-sonnet-5`,thinking:{type:`disabled`},max_tokens:3e3,messages:[{role:`user`,content:n}]}),signal:AbortSignal.timeout(45e3)}),i=await r.text(),a=null;try{a=JSON.parse(i)?.usage??null}catch{}return e.json({success:!0,articleCount:t.length,httpStatus:r.status,usage:a,rawBodyPreview:i.slice(0,2e3)})}catch(n){return e.json({success:!1,articleCount:t.length,error:String(n?.message||n)})}}),V.get(`/debug-collect`,async e=>{let t=await Promise.all(gt.map(async t=>({keyword:t,count:(await bt(e.env,t,12)).length}))),n=await xt(e.env,7);return e.json({success:!0,perKeyword:t,afterDedupeAndDateFilter:n.length,sample:n.slice(0,3)})}),V.get(`/debug-trends`,async e=>{if(!e.env.NAVER_CLIENT_ID||!e.env.NAVER_CLIENT_SECRET)return e.json({success:!1,error:`NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다.`});let{start:t,end:n}=St(),r={"X-NCP-APIGW-API-KEY-ID":e.env.NAVER_CLIENT_ID,"X-NCP-APIGW-API-KEY":e.env.NAVER_CLIENT_SECRET,"Content-Type":`application/json`};try{let[i,a]=await Promise.all([fetch(`https://naverapihub.apigw.ntruss.com/search-trend/v1/search`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,keywordGroups:_t.slice(0,5).map(e=>({groupName:e,keywords:[e]}))}),signal:AbortSignal.timeout(12e3)}),fetch(`https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,category:Tt.code,keyword:_t.slice(0,5).map(e=>({name:e,param:[e]}))}),signal:AbortSignal.timeout(12e3)})]),[o,s]=await Promise.all([i.text(),a.text()]);return e.json({success:!0,searchTrend:{httpStatus:i.status,body:o.slice(0,1500)},shoppingInsight:{httpStatus:a.status,body:s.slice(0,1500)}})}catch(t){return e.json({success:!1,error:String(t?.message||t)})}}),V.get(`/list`,async e=>{let{results:t}=await e.env.LOOKBOOK_DB.prepare(`SELECT d.*, (SELECT COUNT(*) FROM digest_articles a WHERE a.digest_id = d.id AND a.excluded = 0) AS article_count
      FROM content_digests d ORDER BY d.generated_at DESC LIMIT 50`).all();return e.json({success:!0,digests:t})}),V.get(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? ORDER BY importance DESC, id ASC`).bind(t).all(),{results:i}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all();return e.json({success:!0,digest:{...n,keywords:JSON.parse(n.keywords||`[]`)},articles:r,trends:i})}),V.patch(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.req.json(),r=[],i=[];return n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),n.status!==void 0&&(r.push(`status = ?`),i.push(n.status),n.status===`reviewed`&&r.push(`reviewed_at = datetime('now')`),n.status===`sent`&&r.push(`sent_at = datetime('now')`)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE content_digests SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),V.patch(`/:id/articles/:articleId`,async e=>{let{articleId:t}=e.req.param(),n=await e.req.json(),r=[],i=[];return n.excluded!==void 0&&(r.push(`excluded = ?`),i.push(+!!n.excluded)),n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE digest_articles SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),V.get(`/:id/kakao-text`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let r=n.type===`search_trend`||n.type===`shopping_insight`?n.type:`news`,i=e=>`${e>0?`📈+`:e<0?`📉`:`➖`}${e}%`,a=[];if(r===`news`){let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? AND excluded = 0 ORDER BY importance DESC, id ASC LIMIT 5`).bind(t).all();a.push(`🧵 EZlook 패션 트렌드 위클리 — ${n.period}`,``,n.summary,``),r.forEach((e,t)=>{a.push(`${t+1}. [${e.category}] ${e.title}`),a.push(e.summary),e.url&&a.push(`🔗 ${e.url}`),a.push(``)})}else{let{results:o}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all(),s=r===`search_trend`?`🔎 EZlook 검색어트렌드 위클리`:`🛍️ EZlook 쇼핑인사이트 위클리`;a.push(`${s} — ${n.period}`,``,n.summary,``),o.forEach(e=>a.push(`- ${e.label} ${i(e.change_pct)}`)),a.push(``)}return a.push(`👉 AI 룩북 무료 체험: https://www.aifashion.co.kr/?utm_source=kakao&utm_medium=channel&utm_campaign=weekly_digest`),e.text(a.join(`
-`))});var Mt=`mvfvxaxb`;function Nt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Pt=e=>e?`
+`))});var Mt=`mvfwfosw`;function Nt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Pt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -284,6 +284,9 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .tw-toggle { display: inline-flex; background: #202127; border-radius: 999px; padding: 4px; margin-bottom: 14px; }
     .tw-toggle-opt { border: none; background: transparent; color: #82828E; font-size: 15px; font-weight: 700; padding: 9px 18px; border-radius: 999px; cursor: pointer; }
     .tw-toggle-opt.active { background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; }
+    .tw-cardrow { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 4px; }
+    .tw-cardrow::-webkit-scrollbar { display: none; }
+    .tw-swipecard { flex: 0 0 85%; scroll-snap-align: center; border: 1px solid #2C2D35; border-radius: 16px; background: #17181D; padding: 20px; min-height: 180px; box-sizing: border-box; }
   </style>
 
   <div class="tw-wrap">
@@ -398,6 +401,56 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       return d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
     }
 
+    // 기사 다이제스트 — "통합 요약" 카드 1장 + 기사 1건당 카드 1장
+    function newsCards(d) {
+      var cards = '<div class="tw-swipecard">' +
+        '<div style="font-size:12px;color:#82828E;margin-bottom:8px;">' + (d.period || '') + ' · 전체 요약</div>' +
+        '<div style="font-size:16px;font-weight:700;color:#F2F2F5;line-height:1.6;">' + (d.summary || '') + '</div>' +
+        '</div>';
+      (d.articles || []).forEach(function(a) {
+        cards += '<div class="tw-swipecard">' +
+          '<div style="font-size:12px;color:#0DA8D6;font-weight:700;margin-bottom:8px;">' + a.category + '</div>' +
+          '<div style="font-size:17px;font-weight:700;color:#F2F2F5;line-height:1.4;margin-bottom:12px;">' + a.title + '</div>' +
+          '<div style="font-size:14px;color:#B7B7C2;line-height:1.6;margin-bottom:14px;">' + a.summary + '</div>' +
+          (a.url ? '<a href="' + a.url + '" target="_blank" style="font-size:13px;color:#82828E;">원문 보기 ›</a>' : '') +
+          '</div>';
+      });
+      return cards;
+    }
+
+    // 트렌드 다이제스트(검색어트렌드/쇼핑인사이트) — "통합 트렌드 분석" 카드 1장 +
+    // 세부 항목(키워드)당 카드 1장
+    function trendCards(d) {
+      var cards = '<div class="tw-swipecard">' +
+        '<div style="font-size:12px;color:#82828E;margin-bottom:8px;">' + (d.period || '') + ' · 통합 트렌드 분석</div>' +
+        '<div style="font-size:16px;font-weight:700;color:#F2F2F5;line-height:1.6;">' + (d.summary || '') + '</div>' +
+        '</div>';
+      (d.trends || []).forEach(function(t) {
+        var pct = t.change_pct;
+        var color = pct > 0 ? '#F87171' : pct < 0 ? '#0DA8D6' : '#82828E';
+        var sign = pct > 0 ? '+' : '';
+        cards += '<div class="tw-swipecard" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">' +
+          '<div style="font-size:16px;color:#B7B7C2;margin-bottom:12px;">' + t.label + '</div>' +
+          '<div style="font-size:36px;font-weight:800;color:' + color + ';">' + sign + pct + '%</div>' +
+          '</div>';
+      });
+      return cards;
+    }
+
+    // 카드 행(가로 스와이프)의 스크롤 위치를 읽어 점 인디케이터를 갱신
+    function bindCardRow(row, dotsId) {
+      var dots = document.getElementById(dotsId);
+      if (!dots) return;
+      row.addEventListener('scroll', function() {
+        var card = row.children[0];
+        if (!card) return;
+        var step = card.offsetWidth + 10; // gap과 동일
+        var idx = Math.round(row.scrollLeft / step);
+        var dotEls = dots.children;
+        for (var i = 0; i < dotEls.length; i++) dotEls[i].style.opacity = (i === idx) ? '1' : '.3';
+      });
+    }
+
     function renderDigests(digests) {
       var box = document.getElementById('twDigests');
       if (!digests || !digests.length) {
@@ -405,34 +458,21 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         return;
       }
       var typeLabel = { news: '패션 뉴스', search_trend: '검색어트렌드', shopping_insight: '쇼핑인사이트' };
-      box.innerHTML = digests.map(function(d) {
-        var body = '';
-        if (d.type === 'news') {
-          body = (d.articles || []).map(function(a) {
-            return '<div style="padding:12px 0;border-top:1px solid #2C2D35;">' +
-              '<div style="font-size:13px;color:#0DA8D6;font-weight:700;margin-bottom:3px;">' + a.category + '</div>' +
-              '<div style="font-size:15.5px;font-weight:600;color:#F2F2F5;margin-bottom:5px;">' + a.title + '</div>' +
-              '<div style="font-size:14px;color:#B7B7C2;line-height:1.5;">' + a.summary + '</div>' +
-              (a.url ? '<a href="' + a.url + '" target="_blank" style="font-size:13px;color:#82828E;">원문 보기 ›</a>' : '') +
-              '</div>';
-          }).join('');
-        } else {
-          body = (d.trends || []).map(function(t) {
-            var pct = t.change_pct;
-            var color = pct > 0 ? '#F87171' : pct < 0 ? '#0DA8D6' : '#82828E';
-            var sign = pct > 0 ? '+' : '';
-            return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid #2C2D35;font-size:15px;">' +
-              '<span style="color:#F2F2F5;">' + t.label + '</span>' +
-              '<span style="color:' + color + ';font-weight:700;">' + sign + pct + '%</span></div>';
-          }).join('');
-        }
-        return '<div class="tw-card" style="margin-bottom:16px;padding:18px;">' +
-          '<div style="font-size:15px;font-weight:700;color:#F2F2F5;margin-bottom:3px;">' + (typeLabel[d.type] || d.type) + '</div>' +
-          '<div style="font-size:13px;color:#82828E;margin-bottom:9px;">' + (d.period || '') + '</div>' +
-          '<div style="font-size:15px;color:#F2F2F5;line-height:1.6;margin-bottom:4px;">' + (d.summary || '') + '</div>' +
-          body +
+      box.innerHTML = digests.map(function(d, i) {
+        var cardsHtml = d.type === 'news' ? newsCards(d) : trendCards(d);
+        var count = d.type === 'news' ? (d.articles || []).length + 1 : (d.trends || []).length + 1;
+        var dots = '';
+        for (var k = 0; k < count; k++) dots += '<span style="width:6px;height:6px;border-radius:50%;background:#0DA8D6;opacity:' + (k === 0 ? '1' : '.3') + ';"></span>';
+        return '<div style="margin-bottom:28px;">' +
+          '<div style="font-size:15px;font-weight:700;color:#F2F2F5;margin-bottom:10px;">' + (typeLabel[d.type] || d.type) + '</div>' +
+          '<div class="tw-cardrow" id="twRow' + i + '">' + cardsHtml + '</div>' +
+          '<div id="twDots' + i + '" style="display:flex;gap:5px;justify-content:center;margin-top:10px;">' + dots + '</div>' +
           '</div>';
       }).join('');
+      digests.forEach(function(d, i) {
+        var row = document.getElementById('twRow' + i);
+        if (row) bindCardRow(row, 'twDots' + i);
+      });
     }
 
     async function twLoad() {
