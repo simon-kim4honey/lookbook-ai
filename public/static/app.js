@@ -81,6 +81,51 @@ function getStoredUtm() {
 }
 
 // ─────────────────────────────────────────────────────────
+// 어필리에이트 링크 캡처 — "?ref=bfm" 같은 링크로 들어오면 UTM과 동일한 방식(first-touch,
+// 30일 유지)으로 저장해두었다가 가입 시점에 서버로 전달한다. 코드 → 추천인 표시값
+// 매핑은 서버(REFERRER_LINK_CODES, src/index.tsx)와 반드시 동일하게 유지할 것.
+// ─────────────────────────────────────────────────────────
+const AFFILIATE_LINK_CODES = { bfm: 'BFM회원' };
+
+(function captureAffiliateRef() {
+  try {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (!ref || !AFFILIATE_LINK_CODES[ref]) return;
+    const existing = JSON.parse(localStorage.getItem('lookbook_ref') || 'null');
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    if (existing && Date.now() - (existing.ts || 0) < THIRTY_DAYS) return; // 기존 어트리뷰션 유지
+    localStorage.setItem('lookbook_ref', JSON.stringify({ ref, ts: Date.now() }));
+  } catch (e) {}
+})();
+
+// 저장된 어필리에이트 코드를 그대로 돌려줌 (카카오/구글 OAuth URL에 ?ref=<code>로 그대로 실어보낼 용도)
+function getStoredRefCode() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('lookbook_ref') || 'null');
+    return raw && AFFILIATE_LINK_CODES[raw.ref] ? raw.ref : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 이메일 가입 폼에 채워 넣을 추천인 표시값(예: 'BFM회원')
+function getStoredAffiliateReferrer() {
+  const code = getStoredRefCode();
+  return code ? AFFILIATE_LINK_CODES[code] : null;
+}
+
+// 어필리에이트 링크로 들어온 경우, 가입 모달의 추천인 드롭다운을 미리 선택해둔다(투명성 목적 —
+// 실제 전송값은 handleSignup()에서 getStoredAffiliateReferrer()로 다시 강제 고정됨).
+(function prefillAffiliateReferrerSelect() {
+  try {
+    const referrer = getStoredAffiliateReferrer();
+    if (!referrer) return;
+    const el = document.getElementById('signupReferrer');
+    if (el) el.value = referrer;
+  } catch (e) {}
+})();
+
+// ─────────────────────────────────────────────────────────
 // i18n — 다국어 번역 테이블
 // ─────────────────────────────────────────────────────────
 const I18N = {
@@ -1313,13 +1358,15 @@ function oauthLogin(provider, btn) {
       delete pending.genState;
       try { localStorage.setItem('oauth_redirect_pending', JSON.stringify(pending)); } catch (e2) {}
     }
-    window.location.href = `/api/auth/${provider}?mode=redirect`;
+    const refCode = getStoredRefCode();
+    window.location.href = `/api/auth/${provider}?mode=redirect` + (refCode ? `&ref=${refCode}` : '');
     return;
   }
 
   // ── PC: 팝업 방식 유지 ──
+  const refCode = getStoredRefCode();
   const popup = window.open(
-    `/api/auth/${provider}`,
+    `/api/auth/${provider}` + (refCode ? `?ref=${refCode}` : ''),
     'oauth_popup',
     'width=364,height=640,left=' + Math.round((screen.width - 364) / 2) + ',top=' + Math.round((screen.height - 640) / 2)
   );
@@ -1574,7 +1621,8 @@ async function handleSignup(e) {
   const name            = nameEl     ? nameEl.value.trim()     : '';
   const email           = emailEl    ? emailEl.value.trim()    : '';
   const password        = passwordEl ? passwordEl.value        : '';
-  const referrer         = referrerEl ? referrerEl.value        : '';
+  // 어필리에이트 링크(?ref=bfm)로 들어온 경우 드롭다운 선택과 무관하게 자동으로 고정
+  const referrer         = getStoredAffiliateReferrer() || (referrerEl ? referrerEl.value : '');
   const agreePrivacy    = agreePrivacyEl  ? agreePrivacyEl.checked  : false;
   const agreeMarketing  = agreeMarketingEl? agreeMarketingEl.checked : false;
   const btn             = document.getElementById('signupBtn');
