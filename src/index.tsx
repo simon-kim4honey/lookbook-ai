@@ -2188,6 +2188,12 @@ const REFERRER_OPTIONS = ['BFM회원', '코오롱 FnC', '한섬'] as const
 const REFERRER_SIGNUP_BONUS_CREDITS = 500 // BFM 추천 시 가입 크레딧 (일반 200 대신 500 지급)
 const REFERRER_DISCOUNT_RATE: Record<string, number> = { 'BFM회원': 0.2 } // 유료 결제 시 20% 할인
 
+// 어필리에이트 링크 코드 → 추천인 표시값 매핑. "aifashion.co.kr/?ref=bfm"로 들어와서
+// 가입하면 드롭다운을 직접 선택하지 않아도 서버가 자동으로 referrer를 지정한다
+// (이메일 가입은 /api/auth/signup의 referrer 파라미터로, 카카오/구글은 OAuth state
+// 파라미터로 코드가 전달된다 — 각 핸들러 참고).
+const REFERRER_LINK_CODES: Record<string, string> = { bfm: 'BFM회원' }
+
 // POST /api/auth/signup — 이메일 회원가입
 // ────────────────────────────────────────────────────
 app.post('/api/auth/signup', async (c) => {
@@ -2519,6 +2525,8 @@ function getOrigin(c: any): string {
 app.get('/api/auth/kakao', (c) => {
   const origin = getOrigin(c)
   const mode = c.req.query('mode') || 'popup'  // popup | redirect
+  // 어필리에이트 링크(?ref=bfm)로 들어와 카카오로 가입하는 경우를 위해 state에 함께 실어보냄
+  const refCode = c.req.query('ref') || ''
   // ✅ redirect_uri는 mode 없이 고정 (카카오 콘솔 등록값과 정확히 일치)
   const redirectUri = `${origin}/api/auth/kakao/callback`
   const clientId = c.env.KAKAO_CLIENT_ID || ''
@@ -2526,7 +2534,8 @@ app.get('/api/auth/kakao', (c) => {
     if (mode === 'redirect') return c.redirect(`/?oauth_error=kakao_no_key`)
     return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다.'},'*');window.close();</script>`)
   }
-  // mode는 state 파라미터로 전달 (redirect_uri 변경 없이 mode 구분)
+  // mode는 state 파라미터로 전달 (redirect_uri 변경 없이 mode 구분). ref가 있으면 "mode:ref" 형태로 합쳐 보냄.
+  const state = refCode ? `${mode}:${refCode}` : mode
   // ⚠️ scope에 카카오 개발자 콘솔에서 설정/승인되지 않은 동의항목을 넣으면 카카오가
   // KOE205("설정하지 않은 동의 항목")로 전체 로그인을 차단한다 — 실제로 phone_number를
   // 이렇게 추가했다가 전체 카카오 로그인이 막혔던 적이 있다. scope를 추가/변경할 때는
@@ -2539,7 +2548,7 @@ app.get('/api/auth/kakao', (c) => {
   // 발생했다(사용자 리포트로 발견, 2026-09-21). scope를 쓸 땐 원래 받고 싶은 항목을
   // 전부 나열해야 한다 — profile_nickname/account_email은 plusfriends 추가 전부터
   // 문제없이 내려오던 항목이라 콘솔 승인 상태 그대로 다시 추가함.
-  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${mode}&scope=profile_nickname,account_email,plusfriends`
+  const url = `https://kauth.kakao.com/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${encodeURIComponent(state)}&scope=profile_nickname,account_email,plusfriends`
   return c.redirect(url)
 })
 
@@ -2551,8 +2560,9 @@ app.get('/api/auth/kakao/callback', async (c) => {
   const origin = getOrigin(c)
   const code = c.req.query('code')
   const error = c.req.query('error')
-  // ✅ mode는 state 파라미터에서 읽음 (redirect_uri에 포함하지 않음)
-  const mode = c.req.query('state') || 'popup'  // popup | redirect
+  // ✅ mode는 state 파라미터에서 읽음 (redirect_uri에 포함하지 않음). "mode:ref" 형태면 ref도 분리.
+  const [mode, linkRefCode] = String(c.req.query('state') || 'popup').split(':')
+  const linkReferrer = REFERRER_LINK_CODES[linkRefCode] || null
 
   function errorResponse(msg: string) {
     if (mode === 'redirect') {
@@ -2600,11 +2610,12 @@ app.get('/api/auth/kakao/callback', async (c) => {
         await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ?, phone_number = COALESCE(?, phone_number) WHERE id = ?`).bind(providerId, kakaoAvatar, kakaoPhone, user.id).run()
       } else {
         const id = genUserId()
-        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, phone_number, status, credits, role) VALUES (?, ?, ?, 'kakao', ?, ?, ?, 'active', 200, 'user')`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar, kakaoPhone).run()
+        const initialCredits = linkReferrer === 'BFM회원' ? REFERRER_SIGNUP_BONUS_CREDITS : 200
+        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, phone_number, status, credits, role, referrer) VALUES (?, ?, ?, 'kakao', ?, ?, ?, 'active', ?, 'user', ?)`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar, kakaoPhone, initialCredits, linkReferrer).run()
         await db.prepare(
           `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-           VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`
-        ).bind(id, `signup_${id}`).run()
+           VALUES (?, 'grant', ?, ?, 'signup_bonus', ?)`
+        ).bind(id, initialCredits, initialCredits, `signup_${id}`).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
         isNewUser = true
       }
@@ -2691,6 +2702,8 @@ app.get('/api/auth/kakao/callback', async (c) => {
 app.get('/api/auth/google', (c) => {
   const origin = getOrigin(c)
   const mode = c.req.query('mode') || 'popup'
+  // 어필리에이트 링크(?ref=bfm)로 들어와 구글로 가입하는 경우를 위해 state에 함께 실어보냄
+  const refCode = c.req.query('ref') || ''
   // ✅ redirect_uri는 mode 없이 고정 (구글 콘솔 등록값과 정확히 일치)
   const redirectUri = `${origin}/api/auth/google/callback`
   const clientId = c.env.GOOGLE_CLIENT_ID || ''
@@ -2698,12 +2711,12 @@ app.get('/api/auth/google', (c) => {
     if (mode === 'redirect') return c.redirect(`/?oauth_error=google_no_key`)
     return c.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'google',error:'구글 클라이언트 ID가 설정되지 않았습니다.'},'*');window.close();</script>`)
   }
-  // mode는 state 파라미터로 전달 (redirect_uri 변경 없이 mode 구분)
+  // mode는 state 파라미터로 전달 (redirect_uri 변경 없이 mode 구분). ref가 있으면 "mode:ref" 형태로 합쳐 보냄.
   const params = new URLSearchParams({
     client_id: clientId, redirect_uri: redirectUri,
     response_type: 'code', scope: 'openid email profile',
     access_type: 'offline', prompt: 'select_account',
-    state: mode,
+    state: refCode ? `${mode}:${refCode}` : mode,
   })
   return c.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`)
 })
@@ -2716,8 +2729,9 @@ app.get('/api/auth/google/callback', async (c) => {
   const origin = getOrigin(c)
   const code = c.req.query('code')
   const error = c.req.query('error')
-  // ✅ mode는 state 파라미터에서 읽음 (redirect_uri에 포함하지 않음)
-  const mode = c.req.query('state') || 'popup'
+  // ✅ mode는 state 파라미터에서 읽음 (redirect_uri에 포함하지 않음). "mode:ref" 형태면 ref도 분리.
+  const [mode, linkRefCode] = String(c.req.query('state') || 'popup').split(':')
+  const linkReferrer = REFERRER_LINK_CODES[linkRefCode] || null
 
   function errorResponse(msg: string) {
     if (mode === 'redirect') {
@@ -2762,11 +2776,12 @@ app.get('/api/auth/google/callback', async (c) => {
         await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(providerId, googleAvatar, user.id).run()
       } else {
         const id = genUserId()
-        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role) VALUES (?, ?, ?, 'google', ?, ?, 'active', 200, 'user')`).bind(id, googleEmail, googleName, providerId, googleAvatar).run()
+        const initialCredits = linkReferrer === 'BFM회원' ? REFERRER_SIGNUP_BONUS_CREDITS : 200
+        await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role, referrer) VALUES (?, ?, ?, 'google', ?, ?, 'active', ?, 'user', ?)`).bind(id, googleEmail, googleName, providerId, googleAvatar, initialCredits, linkReferrer).run()
         await db.prepare(
           `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-           VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`
-        ).bind(id, `signup_${id}`).run()
+           VALUES (?, 'grant', ?, ?, 'signup_bonus', ?)`
+        ).bind(id, initialCredits, initialCredits, `signup_${id}`).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
         isNewUser = true
       }
@@ -11111,6 +11126,14 @@ app.get('/bfm-admin', (c) => {
     </div>
 
     <div id="mainBox" hidden>
+      <div class="card rounded-2xl p-5 mb-4">
+        <h2 class="font-semibold text-gray-900 mb-1 text-sm"><i class="fas fa-link mr-1 text-green-600"></i>어필리에이트 가입 링크</h2>
+        <p class="text-xs text-gray-500 mb-3">이 링크로 들어와서 가입한 사용자는 추천인 선택 없이도 자동으로 "BFM회원"으로 등록되어, 아래 목록 및 결제 수수료 산출에 포함됩니다.</p>
+        <div class="flex gap-2">
+          <input id="affiliateLinkInput" readonly class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700" onclick="this.select()">
+          <button onclick="copyAffiliateLink()" class="bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-2 text-sm font-semibold btn whitespace-nowrap">복사</button>
+        </div>
+      </div>
       <div class="flex items-center justify-between mb-3">
         <span class="text-sm text-gray-500" id="memberCount"></span>
         <button onclick="bfmLogout()" class="text-xs text-gray-400 underline btn">로그아웃</button>
@@ -11171,6 +11194,16 @@ app.get('/bfm-admin', (c) => {
       hide('mainBox'); hide('deniedBox'); show('loginBox');
     }
 
+    function copyAffiliateLink() {
+      const input = document.getElementById('affiliateLinkInput');
+      input.select();
+      navigator.clipboard?.writeText(input.value).then(() => {
+        alert('링크를 복사했습니다.');
+      }).catch(() => {
+        document.execCommand('copy');
+      });
+    }
+
     let memberPage = 1;
     const MEMBER_LIMIT = 20;
 
@@ -11191,6 +11224,7 @@ app.get('/bfm-admin', (c) => {
         if (res.status === 403) { hide('loginBox'); hide('mainBox'); show('deniedBox'); return; }
         if (!data.success) { alert(data.message || '조회에 실패했습니다.'); return; }
         hide('loginBox'); hide('deniedBox'); show('mainBox');
+        document.getElementById('affiliateLinkInput').value = location.origin + '/?ref=bfm';
         renderMembers(data.members, data.total, data.page, data.limit);
       } catch (e) { alert('서버 오류가 발생했습니다.'); }
     }
