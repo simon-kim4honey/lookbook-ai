@@ -149,7 +149,7 @@ ${t.map((e,t)=>`${t+1}. [${e.source||`출처미상`}] ${e.title}`).join(`
 원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`;try{let r=await fetch(`https://api.anthropic.com/v1/messages`,{method:`POST`,headers:{"Content-Type":`application/json`,"x-api-key":e.env.ANTHROPIC_API_KEY,"anthropic-version":`2023-06-01`},body:JSON.stringify({model:`claude-sonnet-5`,thinking:{type:`disabled`},max_tokens:3e3,messages:[{role:`user`,content:n}]}),signal:AbortSignal.timeout(45e3)}),i=await r.text(),a=null;try{a=JSON.parse(i)?.usage??null}catch{}return e.json({success:!0,articleCount:t.length,httpStatus:r.status,usage:a,rawBodyPreview:i.slice(0,2e3)})}catch(n){return e.json({success:!1,articleCount:t.length,error:String(n?.message||n)})}}),V.get(`/debug-collect`,async e=>{let t=await Promise.all(gt.map(async t=>({keyword:t,count:(await bt(e.env,t,12)).length}))),n=await xt(e.env,7);return e.json({success:!0,perKeyword:t,afterDedupeAndDateFilter:n.length,sample:n.slice(0,3)})}),V.get(`/debug-trends`,async e=>{if(!e.env.NAVER_CLIENT_ID||!e.env.NAVER_CLIENT_SECRET)return e.json({success:!1,error:`NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다.`});let{start:t,end:n}=St(),r={"X-NCP-APIGW-API-KEY-ID":e.env.NAVER_CLIENT_ID,"X-NCP-APIGW-API-KEY":e.env.NAVER_CLIENT_SECRET,"Content-Type":`application/json`};try{let[i,a]=await Promise.all([fetch(`https://naverapihub.apigw.ntruss.com/search-trend/v1/search`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,keywordGroups:_t.slice(0,5).map(e=>({groupName:e,keywords:[e]}))}),signal:AbortSignal.timeout(12e3)}),fetch(`https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,category:Tt.code,keyword:_t.slice(0,5).map(e=>({name:e,param:[e]}))}),signal:AbortSignal.timeout(12e3)})]),[o,s]=await Promise.all([i.text(),a.text()]);return e.json({success:!0,searchTrend:{httpStatus:i.status,body:o.slice(0,1500)},shoppingInsight:{httpStatus:a.status,body:s.slice(0,1500)}})}catch(t){return e.json({success:!1,error:String(t?.message||t)})}}),V.get(`/list`,async e=>{let{results:t}=await e.env.LOOKBOOK_DB.prepare(`SELECT d.*, (SELECT COUNT(*) FROM digest_articles a WHERE a.digest_id = d.id AND a.excluded = 0) AS article_count
      FROM content_digests d ORDER BY d.generated_at DESC LIMIT 50`).all();return e.json({success:!0,digests:t})}),V.get(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? ORDER BY importance DESC, id ASC`).bind(t).all(),{results:i}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all();return e.json({success:!0,digest:{...n,keywords:JSON.parse(n.keywords||`[]`)},articles:r,trends:i})}),V.patch(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.req.json(),r=[],i=[];return n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),n.status!==void 0&&(r.push(`status = ?`),i.push(n.status),n.status===`reviewed`&&r.push(`reviewed_at = datetime('now')`),n.status===`sent`&&r.push(`sent_at = datetime('now')`)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE content_digests SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),V.patch(`/:id/articles/:articleId`,async e=>{let{articleId:t}=e.req.param(),n=await e.req.json(),r=[],i=[];return n.excluded!==void 0&&(r.push(`excluded = ?`),i.push(+!!n.excluded)),n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE digest_articles SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),V.get(`/:id/kakao-text`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let r=n.type===`search_trend`||n.type===`shopping_insight`?n.type:`news`,i=e=>`${e>0?`📈+`:e<0?`📉`:`➖`}${e}%`,a=[];if(r===`news`){let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? AND excluded = 0 ORDER BY importance DESC, id ASC LIMIT 5`).bind(t).all();a.push(`🧵 EZlook 패션 트렌드 위클리 — ${n.period}`,``,n.summary,``),r.forEach((e,t)=>{a.push(`${t+1}. [${e.category}] ${e.title}`),a.push(e.summary),e.url&&a.push(`🔗 ${e.url}`),a.push(``)})}else{let{results:o}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all(),s=r===`search_trend`?`🔎 EZlook 검색어트렌드 위클리`:`🛍️ EZlook 쇼핑인사이트 위클리`;a.push(`${s} — ${n.period}`,``,n.summary,``),o.forEach(e=>a.push(`- ${e.label} ${i(e.change_pct)}`)),a.push(``)}return a.push(`👉 AI 룩북 무료 체험: https://www.aifashion.co.kr/?utm_source=kakao&utm_medium=channel&utm_campaign=weekly_digest`),e.text(a.join(`
-`))});var Mt=`mvfvdo29`;function Nt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Pt=e=>e?`
+`))});var Mt=`mvfvxaxb`;function Nt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Pt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -330,13 +330,13 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       </div>
 
       <!-- 미구독: 소개 + 무료체험 -->
-      <div id="twIntro" style="display:none;margin-top:16px;">
-        <div class="tw-slot" style="padding:20px 22px;margin-bottom:20px;">
-          <p style="font-size:16px;font-weight:700;color:#F2F2F5;margin:0 0 10px;">지금 무료로 주간 트렌드 분석을 받아보세요.</p>
-          <p style="font-size:14.5px;color:#DCE6F2;margin:0 0 8px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요.</p>
-          <p style="font-size:14.5px;color:#DCE6F2;margin:0;line-height:1.6;">1개월 무료체험 후에는 자동으로 결제되지 않아요. 계속 받아보려면 체험이 끝나기 전에 직접 구독해주세요.</p>
-        </div>
-        <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()">1개월 무료로 시작하기</button>
+      <div id="twIntro" style="display:none;margin-top:12px;">
+        <p style="font-size:14px;font-weight:600;color:#82828E;margin:0 0 6px;">EZlook 회원이라면 누구나</p>
+        <h2 style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 2px;">주간 트렌드 분석</h2>
+        <p style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 16px;">1개월 무료!</p>
+        <p style="font-size:13px;color:#82828E;margin:0 0 4px;">이용 기간 : 체험 시작일로부터 1개월 · 자동결제 없음</p>
+        <p style="font-size:14px;color:#B7B7C2;margin:0 0 24px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요.</p>
+        <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()" style="font-size:17px;padding:16px 20px;">무료 가입하기 ›</button>
       </div>
 
       <!-- 무료체험 종료: 구독 유도(팝업) -->
@@ -490,12 +490,12 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       try {
         var res = await fetch('/api/trend/trial/start', { method: 'POST', headers: authHeaders() });
         var data = await res.json();
-        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '1개월 무료로 시작하기'; return; }
+        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '무료 가입하기 ›'; return; }
         showToast('무료체험이 시작됐어요!', 'success');
         hide('twIntro'); show('twLoading'); await twLoad();
       } catch (e) {
         showToast('네트워크 오류가 발생했습니다.', 'error');
-        btn.disabled = false; btn.textContent = '1개월 무료로 시작하기';
+        btn.disabled = false; btn.textContent = '무료 가입하기 ›';
       }
     };
 
