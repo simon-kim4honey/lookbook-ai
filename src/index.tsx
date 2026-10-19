@@ -2482,72 +2482,92 @@ app.get('/reset-password', (c) => {
 app.get('/trend-weekly', (c) => {
   return c.html(htmlShell('주간 트렌드 분석', `
   <div class="toast-container" id="toastContainer"></div>
-  <div style="max-width:640px;margin:0 auto;padding:20px 16px 80px;">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
-      <a href="/" style="width:36px;height:36px;border-radius:50%;background:#F2F4F6;display:flex;align-items:center;justify-content:center;color:#4E5968;font-size:20px;text-decoration:none;flex-shrink:0;">‹</a>
-      <h1 style="font-size:19px;font-weight:800;color:var(--text-primary);margin:0;">📊 주간 트렌드 분석</h1>
-    </div>
 
-    <div id="twLoading" style="text-align:center;padding:60px 0;color:var(--text-muted);font-size:13px;">불러오는 중...</div>
+  <style>
+    body { background: #FFFFFF; }
+    .tw-wrap { min-height: 100vh; padding: 48px 16px 80px; background: #FFFFFF; }
+    .tw-inner { max-width: 480px; margin: 0 auto; }
+    .tw-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 32px; text-decoration: none; }
+    .tw-logo-icon { width: 36px; height: 36px; background: #3182F6; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: #fff; }
+    .tw-logo-text { font-size: 18px; font-weight: 800; color: #191F28; }
+    .tw-back { width: 36px; height: 36px; border: none; background: #F2F4F6; border-radius: 50%; color: #4E5968; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; }
+    .tw-cta { display: block; width: 100%; padding: 13px 20px; background: #3182F6; color: #fff; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; }
+    .tw-cta:disabled { opacity: .55; cursor: not-allowed; }
+    .tw-cta-outline { background: #fff; color: #3182F6; border: 1px solid #3182F6; }
+  </style>
 
-    <!-- 로그인 필요 -->
-    <div id="twNeedLogin" style="display:none;text-align:center;padding:60px 20px;">
-      <p style="font-size:14px;color:var(--text-muted);margin-bottom:16px;">로그인 후 이용할 수 있어요.</p>
-      <a href="/" class="btn btn-primary btn-lg">홈에서 로그인하기</a>
-    </div>
+  <div class="tw-wrap">
+    <div class="tw-inner">
+      <a href="/" class="tw-logo">
+        <div class="tw-logo-icon">EZ</div>
+        <span class="tw-logo-text">EZlook</span>
+      </a>
 
-    <!-- 미구독: 소개 + 무료체험 -->
-    <div id="twIntro" style="display:none;">
-      <div style="background:linear-gradient(135deg,#eef4ff,#e6f0ff);border:1px solid #cfe0ff;border-radius:16px;padding:20px;margin-bottom:20px;">
-        <p style="font-size:15px;font-weight:700;color:#1b4bd1;margin:0 0 6px;">지금 무료로 주간 트렌드 분석을 받아보세요.</p>
-        <p style="font-size:13px;color:#4E5968;margin:0;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 자동으로 모아서 정리해드려요. 1개월 무료체험 후 자동 결제되지 않고, 직접 구독 버튼을 눌러야 시작돼요.</p>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+        <a href="/" class="tw-back">‹</a>
+        <h1 style="font-size:18px;font-weight:700;color:#191F28;margin:0;">주간 트렌드 분석</h1>
       </div>
-      <button class="btn btn-primary btn-full btn-lg" id="twTrialBtn" onclick="twStartTrial()">1개월 무료로 시작하기</button>
 
-      <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border-color,#E5E8EB);">
-        <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 10px;">구독 요금</h3>
-        <div style="display:flex;gap:10px;">
-          <div style="flex:1;border:1px solid var(--border-color,#E5E8EB);border-radius:12px;padding:14px;">
-            <div style="font-size:12px;color:var(--text-muted);">월 구독</div>
-            <div style="font-size:17px;font-weight:800;color:var(--text-primary);margin:4px 0;">50 크레딧<span style="font-size:12px;font-weight:500;color:var(--text-muted);"> /월</span></div>
-            <div style="font-size:11px;color:#8B95A1;text-decoration:line-through;">정가 100크레딧</div>
+      <div id="twLoading" style="text-align:center;padding:60px 0;color:#8B95A1;font-size:13px;">불러오는 중...</div>
+
+      <!-- 로그인 필요 -->
+      <div id="twNeedLogin" style="display:none;text-align:center;padding:60px 20px;">
+        <p style="font-size:14px;color:#4E5968;margin-bottom:16px;">로그인 후 이용할 수 있어요.</p>
+        <a href="/" class="tw-cta" style="display:inline-block;width:auto;padding:9px 20px;border-radius:24px;">홈에서 로그인하기</a>
+      </div>
+
+      <!-- 미구독: 소개 + 무료체험 -->
+      <div id="twIntro" style="display:none;margin-top:16px;">
+        <div style="background:#E8F3FF;border:1px solid rgba(49,130,246,0.2);border-radius:16px;padding:18px 20px;margin-bottom:20px;">
+          <p style="font-size:14px;font-weight:700;color:#191F28;margin:0 0 6px;">지금 무료로 주간 트렌드 분석을 받아보세요.</p>
+          <p style="font-size:12.5px;color:#4E5968;margin:0;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요. 1개월 무료체험 후 자동 결제되지 않고, 직접 구독해야 시작돼요.</p>
+        </div>
+        <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()">1개월 무료로 시작하기</button>
+
+        <div style="margin-top:28px;padding-top:20px;border-top:1px solid #E5E8EB;">
+          <h3 style="font-size:13px;font-weight:700;color:#191F28;margin:0 0 10px;">구독 요금</h3>
+          <div style="display:flex;gap:10px;">
+            <div style="flex:1;border:1px solid #E5E8EB;border-radius:12px;padding:14px;">
+              <div style="font-size:12px;color:#8B95A1;">월 구독</div>
+              <div style="font-size:16px;font-weight:800;color:#191F28;margin:4px 0;">50 크레딧<span style="font-size:12px;font-weight:500;color:#8B95A1;"> /월</span></div>
+              <div style="font-size:11px;color:#8B95A1;text-decoration:line-through;">정가 100크레딧</div>
+            </div>
+            <div style="flex:1;border:1px solid #E5E8EB;border-radius:12px;padding:14px;">
+              <div style="font-size:12px;color:#8B95A1;">연 구독<span style="margin-left:6px;color:#3182F6;font-weight:700;">20% 추가할인</span></div>
+              <div style="font-size:16px;font-weight:800;color:#191F28;margin:4px 0;">480 크레딧<span style="font-size:12px;font-weight:500;color:#8B95A1;"> /년</span></div>
+              <div style="font-size:11px;color:#8B95A1;">월 환산 40크레딧</div>
+            </div>
           </div>
-          <div style="flex:1;border:1px solid var(--border-color,#E5E8EB);border-radius:12px;padding:14px;position:relative;">
-            <div style="position:absolute;top:-9px;right:10px;background:#22C55E;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;">연 20% 추가할인</div>
-            <div style="font-size:12px;color:var(--text-muted);">연 구독</div>
-            <div style="font-size:17px;font-weight:800;color:var(--text-primary);margin:4px 0;">480 크레딧<span style="font-size:12px;font-weight:500;color:var(--text-muted);"> /년</span></div>
-            <div style="font-size:11px;color:#8B95A1;">월 환산 40크레딧</div>
+        </div>
+      </div>
+
+      <!-- 구독/체험 중: 콘텐츠 + 구독관리 -->
+      <div id="twMain" style="display:none;margin-top:16px;">
+        <div id="twBanner" style="display:none;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;line-height:1.5;"></div>
+
+        <div id="twDigests"></div>
+
+        <div style="margin-top:28px;background:#F2F4F6;border:1px solid #E5E8EB;border-radius:14px;padding:16px;">
+          <h3 style="font-size:13px;font-weight:700;color:#191F28;margin:0 0 10px;">카카오톡으로 받아보기</h3>
+          <p style="font-size:12px;color:#4E5968;margin:0 0 10px;">전화번호를 등록하면 새 다이제스트가 발행될 때 카톡으로 요약과 링크를 보내드려요.</p>
+          <div style="display:flex;gap:8px;">
+            <input type="tel" class="form-input" id="twPhoneInput" placeholder="010-0000-0000" style="flex:1;" />
+            <button class="tw-cta" id="twPhoneBtn" style="width:auto;padding:9px 18px;border-radius:24px;" onclick="twSavePhone()">등록</button>
+          </div>
+          <div id="twPhoneSaved" style="display:none;font-size:12px;color:#3182F6;margin-top:8px;">등록된 번호로 발송돼요.</div>
+        </div>
+
+        <div id="twSubscribeBox" style="display:none;margin-top:16px;">
+          <h3 style="font-size:13px;font-weight:700;color:#191F28;margin:0 0 10px;">구독하기</h3>
+          <div style="display:flex;gap:8px;">
+            <button class="tw-cta tw-cta-outline" style="flex:1;" onclick="twSubscribe('monthly')">월 50크레딧</button>
+            <button class="tw-cta" style="flex:1;" onclick="twSubscribe('annual')">연 480크레딧</button>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- 구독/체험 중: 콘텐츠 + 구독관리 -->
-    <div id="twMain" style="display:none;">
-      <div id="twBanner" style="display:none;border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:13px;"></div>
-
-      <div id="twDigests"></div>
-
-      <div style="margin-top:28px;padding:16px;border:1px solid var(--border-color,#E5E8EB);border-radius:14px;">
-        <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 10px;">💬 카카오톡으로 받아보기</h3>
-        <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">전화번호를 등록하면 새 다이제스트가 발행될 때 카톡으로 요약과 링크를 보내드려요.</p>
-        <div style="display:flex;gap:8px;">
-          <input type="tel" class="form-input" id="twPhoneInput" placeholder="010-0000-0000" style="flex:1;" />
-          <button class="btn btn-primary" id="twPhoneBtn" onclick="twSavePhone()">등록</button>
+        <div id="twManageBox" style="display:none;margin-top:16px;text-align:center;">
+          <button style="color:#8B95A1;background:none;border:none;text-decoration:underline;cursor:pointer;font-size:12px;" onclick="twCancel()">구독 자동갱신 해지</button>
         </div>
-        <div id="twPhoneSaved" style="display:none;font-size:12px;color:#22C55E;margin-top:8px;">✅ 등록된 번호로 발송돼요.</div>
-      </div>
-
-      <div id="twSubscribeBox" style="display:none;margin-top:20px;padding:16px;border:1px solid var(--border-color,#E5E8EB);border-radius:14px;">
-        <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 10px;">구독하기</h3>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-secondary" style="flex:1;font-size:13px;padding:10px 6px;" onclick="twSubscribe('monthly')">월 50크레딧</button>
-          <button class="btn btn-primary" style="flex:1;font-size:13px;padding:10px 6px;" onclick="twSubscribe('annual')">연 480크레딧<br/><span style="font-size:11px;font-weight:500;">(20%↓)</span></button>
-        </div>
-      </div>
-
-      <div id="twManageBox" style="display:none;margin-top:16px;text-align:center;">
-        <button class="btn-sm" style="color:#8B95A1;background:none;border:none;text-decoration:underline;cursor:pointer;font-size:12px;" onclick="twCancel()">구독 자동갱신 해지</button>
       </div>
     </div>
   </div>
@@ -2568,18 +2588,18 @@ app.get('/trend-weekly', (c) => {
     function renderDigests(digests) {
       var box = document.getElementById('twDigests');
       if (!digests || !digests.length) {
-        box.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;padding:40px 0;">아직 발행된 다이제스트가 없어요. 곧 찾아올게요!</p>';
+        box.innerHTML = '<p style="text-align:center;color:#8B95A1;font-size:13px;padding:40px 0;">아직 발행된 다이제스트가 없어요. 곧 찾아올게요.</p>';
         return;
       }
-      var typeLabel = { news: '🧵 패션 뉴스', search_trend: '🔎 검색어트렌드', shopping_insight: '🛍️ 쇼핑인사이트' };
+      var typeLabel = { news: '패션 뉴스', search_trend: '검색어트렌드', shopping_insight: '쇼핑인사이트' };
       box.innerHTML = digests.map(function(d) {
         var body = '';
         if (d.type === 'news') {
           body = (d.articles || []).map(function(a) {
-            return '<div style="padding:10px 0;border-top:1px solid var(--border-color,#E5E8EB);">' +
-              '<div style="font-size:11px;color:#3182F6;font-weight:700;margin-bottom:2px;">[' + a.category + ']</div>' +
-              '<div style="font-size:13.5px;font-weight:600;color:var(--text-primary);margin-bottom:4px;">' + a.title + '</div>' +
-              '<div style="font-size:12.5px;color:var(--text-muted);line-height:1.5;">' + a.summary + '</div>' +
+            return '<div style="padding:10px 0;border-top:1px solid #E5E8EB;">' +
+              '<div style="font-size:11px;color:#3182F6;font-weight:700;margin-bottom:2px;">' + a.category + '</div>' +
+              '<div style="font-size:13.5px;font-weight:600;color:#191F28;margin-bottom:4px;">' + a.title + '</div>' +
+              '<div style="font-size:12.5px;color:#4E5968;line-height:1.5;">' + a.summary + '</div>' +
               (a.url ? '<a href="' + a.url + '" target="_blank" style="font-size:11.5px;color:#8B95A1;">원문 보기 ›</a>' : '') +
               '</div>';
           }).join('');
@@ -2588,15 +2608,15 @@ app.get('/trend-weekly', (c) => {
             var pct = t.change_pct;
             var color = pct > 0 ? '#ef4444' : pct < 0 ? '#3182F6' : '#8B95A1';
             var sign = pct > 0 ? '+' : '';
-            return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border-color,#E5E8EB);font-size:13px;">' +
-              '<span style="color:var(--text-primary);">' + t.label + '</span>' +
+            return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #E5E8EB;font-size:13px;">' +
+              '<span style="color:#191F28;">' + t.label + '</span>' +
               '<span style="color:' + color + ';font-weight:700;">' + sign + pct + '%</span></div>';
           }).join('');
         }
-        return '<div style="margin-bottom:20px;padding:16px;border:1px solid var(--border-color,#E5E8EB);border-radius:14px;">' +
-          '<div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:2px;">' + (typeLabel[d.type] || d.type) + '</div>' +
+        return '<div style="margin-bottom:16px;border:1px solid #E5E8EB;border-radius:14px;padding:16px;">' +
+          '<div style="font-size:13px;font-weight:700;color:#191F28;margin-bottom:2px;">' + (typeLabel[d.type] || d.type) + '</div>' +
           '<div style="font-size:11px;color:#8B95A1;margin-bottom:8px;">' + (d.period || '') + '</div>' +
-          '<div style="font-size:13px;color:var(--text-primary);line-height:1.6;margin-bottom:4px;">' + (d.summary || '') + '</div>' +
+          '<div style="font-size:13px;color:#191F28;line-height:1.6;margin-bottom:4px;">' + (d.summary || '') + '</div>' +
           body +
           '</div>';
       }).join('');
@@ -2623,13 +2643,13 @@ app.get('/trend-weekly', (c) => {
 
         var banner = document.getElementById('twBanner');
         if (status.status === 'trial') {
-          banner.style.background = '#FFF7E0'; banner.style.color = '#7a5b00';
-          banner.textContent = '🎁 무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요. 계속 받아보시려면 아래에서 구독해주세요.';
+          banner.style.background = '#E8F3FF'; banner.style.color = '#1b4bd1';
+          banner.textContent = '무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요. 계속 받아보시려면 아래에서 구독해주세요.';
           show('twBanner');
           show('twSubscribeBox');
         } else if (status.status === 'active') {
-          banner.style.background = '#E6F4EA'; banner.style.color = '#1a7a3a';
-          banner.textContent = '✅ ' + (status.plan === 'annual' ? '연간' : '월간') + ' 구독 중 — 다음 결제(크레딧 차감)일 ' + fmtDate(status.nextBillingAt);
+          banner.style.background = '#E8F3FF'; banner.style.color = '#1b4bd1';
+          banner.textContent = (status.plan === 'annual' ? '연간' : '월간') + ' 구독 중 — 다음 결제(크레딧 차감)일 ' + fmtDate(status.nextBillingAt);
           show('twBanner');
           show('twManageBox');
         } else if (status.status === 'canceled') {
