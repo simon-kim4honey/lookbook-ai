@@ -2425,9 +2425,6 @@ app.get('/trend-weekly', (c) => {
     .tw-cta-outline { background: transparent; color: #0DA8D6; border: 1px solid #0579B3; }
     .tw-slot { border-radius: 16px; background: linear-gradient(135deg, #051334 0%, #0450A0 60%, #0579B3 100%); border: 1px solid #2C2D35; }
     .tw-card { border: 1px solid #2C2D35; border-radius: 14px; background: #17181D; }
-    .tw-toggle { display: inline-flex; background: #202127; border-radius: 999px; padding: 4px; margin-bottom: 14px; }
-    .tw-toggle-opt { border: none; background: transparent; color: #82828E; font-size: 15px; font-weight: 700; padding: 9px 18px; border-radius: 999px; cursor: pointer; }
-    .tw-toggle-opt.active { background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; }
   </style>
 
   <div class="tw-wrap">
@@ -2474,16 +2471,6 @@ app.get('/trend-weekly', (c) => {
           <div id="twPhoneSaved" style="display:none;font-size:14px;color:#0DA8D6;margin-top:8px;">등록된 번호로 발송돼요.</div>
         </div>
 
-        <div id="twSubscribeBox" style="display:none;margin-top:18px;">
-          <h3 style="font-size:15px;font-weight:700;color:#F2F2F5;margin:0 0 4px;">구독하기</h3>
-          <p style="font-size:13px;color:#82828E;margin:0 0 12px;">무료체험 중에는 0원이에요 — 체험이 끝나기 전에 미리 구독을 선택해두면 자동으로 이어져요.</p>
-          <div class="tw-toggle" id="twPlanToggle">
-            <button type="button" class="tw-toggle-opt active" data-plan="monthly" onclick="twSelectPlan('monthly')">월 구독</button>
-            <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectPlan('annual')">연 구독 · 20%↓</button>
-          </div>
-          <button class="tw-cta" id="twSubscribeBtn" onclick="twSubscribeSelected()">50크레딧으로 구독하기</button>
-        </div>
-
         <div id="twManageBox" style="display:none;margin-top:18px;text-align:center;">
           <button style="color:#82828E;background:none;border:none;text-decoration:underline;cursor:pointer;font-size:14px;" onclick="twCancel()">구독 자동갱신 해지</button>
         </div>
@@ -2494,7 +2481,6 @@ app.get('/trend-weekly', (c) => {
   <script>
   (function() {
     var TOKEN = localStorage.getItem('lookbook_token') || '';
-    var twPlan = 'monthly';
 
     function authHeaders() { return { 'X-Session-Token': TOKEN, 'Content-Type': 'application/json' }; }
     function show(id) { document.getElementById(id).style.display = ''; }
@@ -2564,9 +2550,8 @@ app.get('/trend-weekly', (c) => {
         var banner = document.getElementById('twBanner');
         if (status.status === 'trial') {
           banner.className = 'tw-slot'; banner.style.color = '#F2F2F5';
-          banner.textContent = '무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요. 계속 받아보시려면 아래에서 구독해주세요.';
+          banner.textContent = '무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요.';
           show('twBanner');
-          show('twSubscribeBox');
         } else if (status.status === 'active') {
           banner.className = 'tw-slot'; banner.style.color = '#F2F2F5';
           banner.textContent = (status.plan === 'annual' ? '연간' : '월간') + ' 구독 중 — 다음 결제(크레딧 차감)일 ' + fmtDate(status.nextBillingAt);
@@ -2601,28 +2586,6 @@ app.get('/trend-weekly', (c) => {
         btn.disabled = false; btn.textContent = '1개월 무료로 시작하기';
       }
     };
-
-    window.twSelectPlan = function(plan) {
-      twPlan = plan;
-      var opts = document.querySelectorAll('#twPlanToggle .tw-toggle-opt');
-      for (var i = 0; i < opts.length; i++) opts[i].classList.toggle('active', opts[i].getAttribute('data-plan') === plan);
-      var btn = document.getElementById('twSubscribeBtn');
-      btn.textContent = plan === 'annual' ? '480크레딧으로 구독하기 · 20%↓' : '50크레딧으로 구독하기';
-    };
-
-    window.twSubscribeSelected = function() { twSubscribe(twPlan); };
-
-    async function twSubscribe(plan) {
-      try {
-        var res = await fetch('/api/trend/subscribe', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ plan: plan }) });
-        var data = await res.json();
-        if (!data.success) { showToast(data.message || '구독에 실패했습니다.', 'error'); return; }
-        showToast('구독이 시작됐어요!', 'success');
-        await twLoad();
-      } catch (e) {
-        showToast('네트워크 오류가 발생했습니다.', 'error');
-      }
-    }
 
     window.twCancel = async function() {
       if (!confirm('자동갱신을 해지할까요? 이미 결제된 기간까지는 계속 이용하실 수 있어요.')) return;
