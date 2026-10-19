@@ -2489,9 +2489,10 @@ app.get('/trend-weekly', (c) => {
 
   <style>
     body { background: #0A0A0D; }
-    .tw-wrap { min-height: 100vh; padding: 80px 16px 80px; background: #0A0A0D; }
-    .tw-inner { max-width: 480px; margin: 0 auto; }
-    .tw-logo { display: flex; align-items: center; gap: 8px; margin-bottom: 40px; text-decoration: none; font-size: 23px; letter-spacing: -0.3px; }
+    .tw-wrap { min-height: 100vh; padding: 0 0 80px; background: #0A0A0D; }
+    .tw-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
+    .tw-header { position: sticky; top: 0; z-index: 10; background: #0A0A0D; padding: 16px; }
+    .tw-logo { display: flex; align-items: center; gap: 8px; max-width: 480px; margin: 0 auto; text-decoration: none; font-size: 23px; letter-spacing: -0.3px; }
     .tw-back { width: 40px; height: 40px; border: none; background: #202127; border-radius: 50%; color: #B7B7C2; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; }
     .tw-cta { display: block; width: 100%; padding: 15px 20px; background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; }
     .tw-cta:disabled { opacity: .55; cursor: not-allowed; }
@@ -2504,10 +2505,11 @@ app.get('/trend-weekly', (c) => {
   </style>
 
   <div class="tw-wrap">
-    <div class="tw-inner">
+    <div class="tw-header">
       <a href="/" class="tw-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
-
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+    </div>
+    <div class="tw-inner">
+      <div style="display:flex;align-items:center;gap:12px;margin:12px 0 10px;">
         <a href="/" class="tw-back">‹</a>
         <h1 style="font-size:21px;font-weight:700;color:#F2F2F5;margin:0;">주간 트렌드 분석</h1>
       </div>
