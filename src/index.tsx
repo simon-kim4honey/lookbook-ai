@@ -2498,8 +2498,33 @@ app.get('/trend-weekly', (c) => {
   </style>
 
   <div class="tw-wrap">
-    <div class="tw-header">
-      <a href="/" class="tw-logo"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+    <div class="tw-header" style="display:flex;align-items:center;justify-content:space-between;max-width:480px;margin:0 auto;">
+      <a href="/" class="tw-logo" style="max-width:none;margin:0;"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <div style="display:flex;align-items:center;gap:8px;position:relative;">
+        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:14px;padding:6px 14px;background:#202127;border:1px solid #0579B3;border-radius:20px;color:#0DA8D6;cursor:pointer;font-weight:600;">로그인</button>
+        <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
+          <span id="navUserCredits" style="display:none;"></span>
+          <span id="navUserName" style="display:none;"></span>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#166534,#1E3A8A);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;cursor:pointer;user-select:none;">?</div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#17181D;border:1px solid #2C2D35;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.4);z-index:10001;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #2C2D35;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#F2F2F5;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:#82828E;margin-bottom:6px;"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#0DA8D6;"></div>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:linear-gradient(135deg,#166534,#1E3A8A);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+              </div>
+            </a>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:#2C2D35;margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="tw-inner">
       <div style="display:flex;align-items:center;gap:12px;margin:12px 0 10px;">
