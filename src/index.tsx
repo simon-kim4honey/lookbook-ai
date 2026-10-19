@@ -2430,9 +2430,9 @@ app.get('/trend-weekly', (c) => {
     <div id="twIntro" style="display:none;">
       <div style="background:linear-gradient(135deg,#eef4ff,#e6f0ff);border:1px solid #cfe0ff;border-radius:16px;padding:20px;margin-bottom:20px;">
         <p style="font-size:15px;font-weight:700;color:#1b4bd1;margin:0 0 6px;">지금 무료로 주간 트렌드 분석을 받아보세요.</p>
-        <p style="font-size:13px;color:#4E5968;margin:0;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 자동으로 모아서 정리해드려요. 1주일 무료체험 후 자동 결제되지 않고, 직접 구독 버튼을 눌러야 시작돼요.</p>
+        <p style="font-size:13px;color:#4E5968;margin:0;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 자동으로 모아서 정리해드려요. 1개월 무료체험 후 자동 결제되지 않고, 직접 구독 버튼을 눌러야 시작돼요.</p>
       </div>
-      <button class="btn btn-primary btn-full btn-lg" id="twTrialBtn" onclick="twStartTrial()">1주일 무료로 시작하기</button>
+      <button class="btn btn-primary btn-full btn-lg" id="twTrialBtn" onclick="twStartTrial()">1개월 무료로 시작하기</button>
 
       <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border-color,#E5E8EB);">
         <h3 style="font-size:14px;font-weight:700;color:var(--text-primary);margin:0 0 10px;">구독 요금</h3>
@@ -2583,12 +2583,12 @@ app.get('/trend-weekly', (c) => {
       try {
         var res = await fetch('/api/trend/trial/start', { method: 'POST', headers: authHeaders() });
         var data = await res.json();
-        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '1주일 무료로 시작하기'; return; }
+        if (!data.success) { showToast(data.message || '무료체험 시작에 실패했습니다.', 'error'); btn.disabled = false; btn.textContent = '1개월 무료로 시작하기'; return; }
         showToast('무료체험이 시작됐어요!', 'success');
         hide('twIntro'); show('twLoading'); await twLoad();
       } catch (e) {
         showToast('네트워크 오류가 발생했습니다.', 'error');
-        btn.disabled = false; btn.textContent = '1주일 무료로 시작하기';
+        btn.disabled = false; btn.textContent = '1개월 무료로 시작하기';
       }
     };
 
@@ -4555,7 +4555,7 @@ app.get('/api/payments/history', async (c) => {
 // ────────────────────────────────────────────────────
 const TREND_MONTHLY_CREDITS = 50       // 정가 100 대비 50% 할인
 const TREND_ANNUAL_CREDITS = 480       // 월 50 × 12 × 0.8(연간 추가 20% 할인), 연 1회 차감
-const TREND_TRIAL_DAYS = 7
+const TREND_TRIAL_DAYS = 30
 
 async function requireTrendSession(db: D1Database, token: string): Promise<any> {
   if (!token) return null
@@ -4639,7 +4639,7 @@ app.get('/api/trend/status', async (c) => {
   }
 })
 
-// POST /api/trend/trial/start — 1주일 무료체험 시작(계정당 1회 — 이미 trend_subscriptions
+// POST /api/trend/trial/start — 1개월 무료체험 시작(계정당 1회 — 이미 trend_subscriptions
 // 행이 있으면 체험을 이미 썼거나 구독 중이라는 뜻이라 재시작 불가)
 app.post('/api/trend/trial/start', async (c) => {
   try {
