@@ -2626,12 +2626,12 @@ app.get('/trend-weekly', (c) => {
       <p style="font-size:14px;color:#B7B7C2;margin:0 0 18px;line-height:1.6;">계속 받아보시려면 구독해주세요. 보유 크레딧에서 바로 차감돼요.</p>
       <div class="tw-toggle" id="twModalPlanToggle">
         <button type="button" class="tw-toggle-opt active" data-plan="monthly" onclick="twSelectModalPlan('monthly')">월 구독</button>
-        <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectModalPlan('annual')">연 구독 · 22%↓</button>
+        <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectModalPlan('annual')">연 구독 · 20%↓</button>
       </div>
       <div id="twModalPriceLine" style="font-size:13px;color:#82828E;margin:-6px 0 14px;">
-        <span style="text-decoration:line-through;">정가 100크레딧</span> → 45크레딧 <span style="color:#F87171;font-weight:700;">55%↓</span>
+        <span style="text-decoration:line-through;">정가 300크레딧</span> → 150크레딧 <span style="color:#F87171;font-weight:700;">50%↓</span>
       </div>
-      <button class="tw-cta" id="twModalSubscribeBtn" onclick="twSubscribeFromModal()">45크레딧으로 구독하기</button>
+      <button class="tw-cta" id="twModalSubscribeBtn" onclick="twSubscribeFromModal()">150크레딧으로 구독하기</button>
     </div>
   </div>
 
@@ -3007,11 +3007,11 @@ app.get('/trend-weekly', (c) => {
       var btn = document.getElementById('twModalSubscribeBtn');
       var priceLine = document.getElementById('twModalPriceLine');
       if (plan === 'annual') {
-        btn.textContent = '420크레딧으로 구독하기(월 35)';
-        priceLine.innerHTML = '<span style="text-decoration:line-through;">정가 100크레딧</span> → 월 35크레딧 <span style="color:#F87171;font-weight:700;">65%↓</span> <span style="color:#82828E;">(월 구독가에서 22% 추가할인)</span>';
+        btn.textContent = '1440크레딧으로 구독하기(월 120)';
+        priceLine.innerHTML = '<span style="text-decoration:line-through;">정가 300크레딧</span> → 월 120크레딧 <span style="color:#F87171;font-weight:700;">60%↓</span> <span style="color:#82828E;">(월 구독가에서 20% 추가할인)</span>';
       } else {
-        btn.textContent = '45크레딧으로 구독하기';
-        priceLine.innerHTML = '<span style="text-decoration:line-through;">정가 100크레딧</span> → 45크레딧 <span style="color:#F87171;font-weight:700;">55%↓</span>';
+        btn.textContent = '150크레딧으로 구독하기';
+        priceLine.innerHTML = '<span style="text-decoration:line-through;">정가 300크레딧</span> → 150크레딧 <span style="color:#F87171;font-weight:700;">50%↓</span>';
       }
     };
 
@@ -4851,9 +4851,9 @@ app.get('/api/payments/history', async (c) => {
 // 콘텐츠(기사/검색어트렌드/쇼핑인사이트) 자체는 /api/admin/content-digest에서
 // 생성·검토하며, 여기서는 "누가 구독 중인지"와 열람 권한만 다룬다.
 // ────────────────────────────────────────────────────
-const TREND_LIST_PRICE_CREDITS = 100   // 정가(표시용) — 실제 차감되지 않음
-const TREND_MONTHLY_CREDITS = 45       // 정가 100 대비 55% 할인
-const TREND_ANNUAL_CREDITS = 420       // 월환산 35(월 구독가 45에서 추가 22% 할인) × 12, 연 1회 차감
+const TREND_LIST_PRICE_CREDITS = 300   // 정가(표시용) — 실제 차감되지 않음
+const TREND_MONTHLY_CREDITS = 150      // 정가 300 대비 50% 할인
+const TREND_ANNUAL_CREDITS = 1440      // 월환산 120(월 구독가 150에서 추가 20% 할인) × 12, 연 1회 차감
 const TREND_TRIAL_DAYS = 30
 
 async function requireTrendSession(db: D1Database, token: string): Promise<any> {
@@ -4864,12 +4864,12 @@ async function requireTrendSession(db: D1Database, token: string): Promise<any> 
 }
 
 // BFM회원이 2만원 이상 크레딧을 구매하면 주간 트렌드 분석(콘텐츠 다이제스트)을
-// 6개월 무료로 열어준다 — 이미 있는 "체험(trial)" 메커니즘을 그대로 재사용해
+// 7개월 무료로 열어준다 — 이미 있는 "체험(trial)" 메커니즘을 그대로 재사용해
 // 크레딧 차감 없이 trial_ends_at만 멀리 미뤄주는 방식(결제 성공 경로마다 호출).
-// 이미 유료(크레딧) 구독 중이면 체험으로 깎아내리지 않고, 다음 차감일을 6개월
+// 이미 유료(크레딧) 구독 중이면 체험으로 깎아내리지 않고, 다음 차감일을 7개월
 // 뒤로 밀어 그만큼 무료 기간을 더해준다.
 const BFM_TREND_PERK_MIN_KRW = 20000
-const BFM_TREND_PERK_DAYS = 180
+const BFM_TREND_PERK_DAYS = 210
 
 async function grantBfmTrendPerkIfEligible(db: D1Database, userId: string, amountKrw: number) {
   if (!userId || amountKrw < BFM_TREND_PERK_MIN_KRW) return
