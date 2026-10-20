@@ -1824,10 +1824,33 @@ function updateUserUI(partial) {
     if (sidebarAmt) sidebarAmt.textContent = credits.toLocaleString();
     if (dashStat)   dashStat.textContent   = credits.toLocaleString();
     if (dashDetail) dashDetail.textContent = credits.toLocaleString();
+
+    // 어드민 계정 전용: 드롭다운에 "관리자 페이지" 바로가기 추가
+    // (페이지별로 userDropdownMenu 마크업이 4곳에 중복돼 있어, 여기서 한 번만 주입)
+    const dropdownMenu = document.getElementById('userDropdownMenu');
+    const existingAdminLink = document.getElementById('ddAdminLink');
+    if (dropdownMenu && user.email === 'kim4honey@gmail.com') {
+      if (!existingAdminLink) {
+        const links = dropdownMenu.querySelectorAll('a');
+        const lastLink = links[links.length - 1];
+        if (lastLink) {
+          const adminLink = lastLink.cloneNode(true);
+          adminLink.id = 'ddAdminLink';
+          adminLink.href = '/admin02';
+          adminLink.textContent = '관리자 페이지';
+          lastLink.insertAdjacentElement('afterend', adminLink);
+        }
+      }
+    } else if (existingAdminLink) {
+      existingAdminLink.remove();
+    }
   } else {
     if (loginBtn)  loginBtn.style.display  = '';
     if (signupBtn) signupBtn.style.display = '';
     if (userArea)  userArea.style.display  = 'none';
+
+    const existingAdminLink = document.getElementById('ddAdminLink');
+    if (existingAdminLink) existingAdminLink.remove();
   }
 }
 
