@@ -2600,6 +2600,9 @@ app.get('/trend-weekly', (c) => {
       <!-- 구독/체험 중: 콘텐츠 + 구독관리 -->
       <div id="twMain" style="display:none;margin-top:16px;">
         <div id="twBanner" class="tw-slot" style="display:none;padding:12px 16px;margin-bottom:16px;font-size:14.5px;line-height:1.5;color:#F2F2F5;"></div>
+        <div id="twBannerSubscribeBox" style="display:none;margin:-10px 0 16px;text-align:right;">
+          <button style="background:none;border:none;color:#0DA8D6;font-size:13.5px;font-weight:700;text-decoration:underline;cursor:pointer;padding:0;" onclick="openModal('twSubscribeModal')">지금 구독 시작하기 ›</button>
+        </div>
 
         <div id="twDigests"></div>
 
@@ -2622,8 +2625,8 @@ app.get('/trend-weekly', (c) => {
   <div class="modal-overlay" id="twSubscribeModal">
     <div class="modal-box" style="background:#17181D;border:1px solid #2C2D35;max-width:380px;padding:28px 24px;">
       <button class="modal-close" onclick="closeModal('twSubscribeModal')" style="background:#202127;color:#82828E;">×</button>
-      <h3 style="font-size:17px;font-weight:700;color:#F2F2F5;margin:0 0 8px;">무료체험이 끝났어요</h3>
-      <p style="font-size:14px;color:#B7B7C2;margin:0 0 18px;line-height:1.6;">계속 받아보시려면 구독해주세요. 보유 크레딧에서 바로 차감돼요.</p>
+      <h3 style="font-size:17px;font-weight:700;color:#F2F2F5;margin:0 0 8px;">구독 시작하기</h3>
+      <p style="font-size:14px;color:#B7B7C2;margin:0 0 18px;line-height:1.6;">보유 크레딧에서 바로 차감돼요.</p>
       <div class="tw-toggle" id="twModalPlanToggle">
         <button type="button" class="tw-toggle-opt active" data-plan="monthly" onclick="twSelectModalPlan('monthly')">월 구독</button>
         <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectModalPlan('annual')">연 구독 · 20%↓</button>
@@ -2960,10 +2963,12 @@ app.get('/trend-weekly', (c) => {
         }
 
         var banner = document.getElementById('twBanner');
+        hide('twBannerSubscribeBox');
         if (status.status === 'trial') {
           banner.className = 'tw-slot'; banner.style.color = '#F2F2F5';
           banner.textContent = '무료체험 중 — ' + fmtDate(status.trialEndsAt) + '까지 무료로 이용하실 수 있어요.';
           show('twBanner');
+          show('twBannerSubscribeBox');
         } else if (status.status === 'active') {
           banner.className = 'tw-slot'; banner.style.color = '#F2F2F5';
           banner.textContent = (status.plan === 'annual' ? '연간' : '월간') + ' 구독 중 — 다음 결제(크레딧 차감)일 ' + fmtDate(status.nextBillingAt);
@@ -4439,7 +4444,7 @@ app.get('/payment/toss/success', async (c) => {
        VALUES (?, 'grant', ?, ?, 'payment', ?)`
     ).bind(log.user_id, log.credits, newBal, orderId).run()
 
-    await grantBfmTrendPerkIfEligible(db, log.user_id, Number(log.amount))
+    await grantBfmTrendPerkIfEligible(db, log.user_id, Number(log.amount), orderId)
 
     return c.redirect(`/payment/success?orderId=${encodeURIComponent(orderId)}`, 302)
   } catch (err: any) {
@@ -4534,6 +4539,7 @@ app.post('/payment/toss/webhook', async (c) => {
     }
 
     await db.prepare(`UPDATE payment_logs SET status='canceled' WHERE id=?`).bind(log.id).run()
+    await revertBfmTrendPerkIfAny(db, orderId)
 
     console.log(`토스 웹훅: 결제취소 처리 완료 — orderId=${orderId}, 회수 크레딧=${revokeAmount}`)
     return ackOk()
@@ -4643,7 +4649,7 @@ app.post('/payment/return', async (c) => {
        VALUES (?, 'grant', ?, ?, 'payment', ?)`
     ).bind(log.user_id, log.credits, newBal, orderId).run()
 
-    await grantBfmTrendPerkIfEligible(db, log.user_id, Number(log.amount))
+    await grantBfmTrendPerkIfEligible(db, log.user_id, Number(log.amount), orderId)
 
     return c.redirect(`/payment/success?orderId=${encodeURIComponent(orderId)}`, 302)
   } catch (err: any) {
@@ -4723,6 +4729,7 @@ app.post('/payment/webhook', async (c) => {
     }
 
     await db.prepare(`UPDATE payment_logs SET status='canceled' WHERE id=?`).bind(log.id).run()
+    await revertBfmTrendPerkIfAny(db, orderId)
 
     console.log(`나이스페이 웹훅: 결제취소 처리 완료 — orderId=${orderId}, 회수 크레딧=${revokeAmount}`)
     return ackOk()
@@ -4783,6 +4790,7 @@ app.post('/api/admin/payments/:orderId/force-cancel', adminAuth, async (c) => {
     }
 
     await db.prepare(`UPDATE payment_logs SET status='canceled' WHERE id=?`).bind(log.id).run()
+    await revertBfmTrendPerkIfAny(db, orderId)
 
     console.log(`관리자 수동 결제취소 처리 완료 — orderId=${orderId}, 회수 크레딧=${revokeAmount}`)
     return c.json({ success: true, revokeAmount, newBalance })
@@ -4871,7 +4879,7 @@ async function requireTrendSession(db: D1Database, token: string): Promise<any> 
 const BFM_TREND_PERK_MIN_KRW = 20000
 const BFM_TREND_PERK_DAYS = 210
 
-async function grantBfmTrendPerkIfEligible(db: D1Database, userId: string, amountKrw: number) {
+async function grantBfmTrendPerkIfEligible(db: D1Database, userId: string, amountKrw: number, orderId: string) {
   if (!userId || amountKrw < BFM_TREND_PERK_MIN_KRW) return
   const user = await db.prepare(`SELECT referrer FROM users WHERE id = ?`).bind(userId).first() as any
   if (!user || user.referrer !== 'BFM회원') return
@@ -4880,18 +4888,63 @@ async function grantBfmTrendPerkIfEligible(db: D1Database, userId: string, amoun
   const perkEndMs = Date.now() + BFM_TREND_PERK_DAYS * 24 * 60 * 60 * 1000
 
   if (sub && (sub.status === 'active' || (sub.status === 'canceled' && sub.next_billing_at && Date.parse(sub.next_billing_at) > Date.now()))) {
+    const prevValue = sub.next_billing_at || null
     const base = sub.next_billing_at && Date.parse(sub.next_billing_at) > Date.now() ? new Date(sub.next_billing_at) : new Date()
     base.setDate(base.getDate() + BFM_TREND_PERK_DAYS)
-    await db.prepare(`UPDATE trend_subscriptions SET next_billing_at=?, updated_at=datetime('now') WHERE user_id=?`).bind(base.toISOString(), userId).run()
+    const newValue = base.toISOString()
+    await db.prepare(`UPDATE trend_subscriptions SET next_billing_at=?, updated_at=datetime('now') WHERE user_id=?`).bind(newValue, userId).run()
+    await db.prepare(
+      `INSERT INTO trend_bfm_perk_grants (order_id, user_id, field, prev_value, new_value) VALUES (?,?,?,?,?)`
+    ).bind(orderId, userId, 'next_billing_at', prevValue, newValue).run()
     return
   }
 
-  const existingEndMs = sub?.trial_ends_at ? Date.parse(sub.trial_ends_at) : 0
+  const prevValue = sub?.trial_ends_at || null
+  const existingEndMs = prevValue ? Date.parse(prevValue) : 0
   const finalEnd = new Date(Math.max(existingEndMs, perkEndMs)).toISOString()
   if (sub) {
     await db.prepare(`UPDATE trend_subscriptions SET status='trial', trial_ends_at=?, updated_at=datetime('now') WHERE user_id=?`).bind(finalEnd, userId).run()
   } else {
     await db.prepare(`INSERT INTO trend_subscriptions (user_id, status, trial_ends_at) VALUES (?, 'trial', ?)`).bind(userId, finalEnd).run()
+  }
+  await db.prepare(
+    `INSERT INTO trend_bfm_perk_grants (order_id, user_id, field, prev_value, new_value) VALUES (?,?,?,?,?)`
+  ).bind(orderId, userId, 'trial_ends_at', prevValue, finalEnd).run()
+}
+
+// 환불/결제취소 통보 시 grantBfmTrendPerkIfEligible()이 지급했던 무료기간 혜택을 되돌린다.
+// 지급 이후 trend_subscriptions 값이 그대로(다른 변화 없음)일 때만 안전하게 되돌리고,
+// 그 사이 사용자가 정상 결제로 실제 구독을 시작하는 등 상태가 바뀌었다면 섣불리 덮어쓰지
+// 않고 reverted_at만 기록해 수동 확인이 필요함을 남긴다(크레딧 회수와 동일한 신중함).
+async function revertBfmTrendPerkIfAny(db: D1Database, orderId: string) {
+  const { results: grants } = await db.prepare(
+    `SELECT * FROM trend_bfm_perk_grants WHERE order_id = ? AND reverted_at IS NULL`
+  ).bind(orderId).all<any>()
+  if (!grants || !grants.length) return
+
+  for (const grant of grants) {
+    const sub = await db.prepare(`SELECT * FROM trend_subscriptions WHERE user_id = ?`).bind(grant.user_id).first() as any
+    const currentValue = sub ? sub[grant.field] : null
+    const unchanged = (currentValue || null) === (grant.new_value || null)
+
+    if (unchanged && sub) {
+      if (grant.field === 'trial_ends_at' && sub.status === 'trial') {
+        if (!grant.prev_value) {
+          // 이 혜택이 trend_subscriptions 행 자체를 새로 만든 경우 — 통째로 되돌림
+          await db.prepare(`DELETE FROM trend_subscriptions WHERE user_id = ?`).bind(grant.user_id).run()
+        } else {
+          await db.prepare(`UPDATE trend_subscriptions SET trial_ends_at=?, updated_at=datetime('now') WHERE user_id=?`).bind(grant.prev_value, grant.user_id).run()
+        }
+      } else if (grant.field === 'next_billing_at' && (sub.status === 'active' || sub.status === 'canceled')) {
+        await db.prepare(`UPDATE trend_subscriptions SET next_billing_at=?, updated_at=datetime('now') WHERE user_id=?`).bind(grant.prev_value, grant.user_id).run()
+      } else {
+        console.error('[revertBfmTrendPerkIfAny] 상태 불일치로 되돌리지 않고 기록만 남김:', orderId, grant.user_id, grant.field)
+      }
+    } else {
+      console.error('[revertBfmTrendPerkIfAny] 지급 이후 값이 바뀌어 되돌리지 않고 기록만 남김:', orderId, grant.user_id, grant.field)
+    }
+
+    await db.prepare(`UPDATE trend_bfm_perk_grants SET reverted_at = datetime('now') WHERE id = ?`).bind(grant.id).run()
   }
 }
 
