@@ -1916,8 +1916,21 @@ async function loadCreditHistory() {
   }
 }
 
+/** 모바일 사파리는 다른 앱(카톡 등)에서 링크로 들어온 사이트의 localStorage를
+ *  ITP 정책으로 7일 뒤 비운다 — 로그인했는데도 자꾸 로그아웃되는 원인.
+ *  서버가 로그인 시 함께 내려준 쿠키(ezlook_session)는 이 제약을 받지 않으므로,
+ *  localStorage가 비어있으면 쿠키에서 토큰을 복구한다. */
+function recoverSessionFromCookie() {
+  if (localStorage.getItem('lookbook_token')) return;
+  try {
+    const m = document.cookie.match(/(?:^|; )ezlook_session=([^;]*)/);
+    if (m) localStorage.setItem('lookbook_token', decodeURIComponent(m[1]));
+  } catch (e) {}
+}
+
 /** 세션 서버 검증 (페이지 로드 시) — 항상 Promise 반환 */
 async function verifySession() {
+  recoverSessionFromCookie();
   const token = localStorage.getItem('lookbook_token');
   if (!token) {
     // 토큰 없으면 localStorage 캐시도 확인 (최초 로드 flash 방지)
