@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { serveStatic } from 'hono/cloudflare-workers'
 import { cors } from 'hono/cors'
+import { setCookie } from 'hono/cookie'
 import leadsApp from './leads'
 import bizLeadsApp from './bizleads'
 import contentDigestApp from './content-digest'
@@ -2132,6 +2133,20 @@ async function createSession(db: D1Database, userId: string): Promise<string> {
   return token
 }
 
+// 모바일 사파리의 ITP(스크립트가 쓰는 storage를 7일 뒤 비우는 정책) 때문에
+// localStorage에 저장한 세션 토큰이 카톡 등 다른 앱에서 들어온 방문에서는
+// 일주일 만에 날아가 재로그인을 유발한다. 서버가 응답 헤더로 내려주는 쿠키는
+// 이 제약을 받지 않으므로, 로그인 성공 시 토큰을 쿠키로도 함께 저장해
+// 클라이언트(app.js verifySession)가 localStorage가 비었을 때 복구할 수 있게 한다.
+function setSessionCookie(c: any, token: string) {
+  setCookie(c, 'ezlook_session', token, {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30, // createSession()의 서버측 만료(30일)와 동일
+    sameSite: 'Lax',
+    secure: true,
+  })
+}
+
 // ── 공개 사용자 정보 (민감 정보 제외)
 function publicUser(u: any) {
   return { id: u.id, name: u.name, email: u.email, role: u.role, credits: u.credits, avatar_url: u.avatar_url, provider: u.provider, referrer: u.referrer ?? null }
@@ -2240,6 +2255,7 @@ app.post('/api/auth/signup', async (c) => {
     ).bind(id, initialCredits, initialCredits, `signup_${id}`).run()
 
     const token = await createSession(db, id)
+    setSessionCookie(c, token)
     const user = { id, name, email: email.toLowerCase(), role: 'user', credits: initialCredits, avatar_url: null, provider: 'email', referrer }
     return c.json({ success: true, user, token })
   } catch (err: any) {
@@ -2269,6 +2285,7 @@ app.post('/api/auth/login', async (c) => {
 
     await db.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(u.id).run()
     const token = await createSession(db, u.id)
+    setSessionCookie(c, token)
     return c.json({ success: true, user: publicUser(u), token })
   } catch (err: any) {
     console.error('login error:', err)
@@ -2418,19 +2435,26 @@ app.get('/trend-weekly', (c) => {
     .tw-wrap { min-height: 100vh; padding: 0 0 80px; background: #0A0A0D; }
     .tw-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
     .tw-header { position: sticky; top: 0; z-index: 10; background: #0A0A0D; padding: 16px; }
-    .tw-logo { display: flex; align-items: center; gap: 8px; max-width: 480px; margin: 0 auto; text-decoration: none; font-size: 23px; letter-spacing: -0.3px; }
+    .tw-logo { display: flex; align-items: center; gap: 8px; max-width: 480px; margin: 0 auto; text-decoration: none; font-size: 17px; letter-spacing: -0.3px; }
     .tw-back { width: 40px; height: 40px; border: none; background: #202127; border-radius: 50%; color: #B7B7C2; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; }
-    .tw-cta { display: block; width: 100%; padding: 15px 20px; background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; }
+    .tw-cta { display: block; width: 100%; padding: 15px 20px; background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none; transition: transform .12s ease, filter .12s ease; }
     .tw-cta:disabled { opacity: .55; cursor: not-allowed; }
+    .tw-cta:active { transform: scale(.95); filter: brightness(.88); }
     .tw-cta-outline { background: transparent; color: #0DA8D6; border: 1px solid #0579B3; }
     .tw-slot { border-radius: 16px; background: linear-gradient(135deg, #051334 0%, #0450A0 60%, #0579B3 100%); border: 1px solid #2C2D35; }
     .tw-card { border: 1px solid #2C2D35; border-radius: 14px; background: #17181D; }
     .tw-toggle { display: inline-flex; background: #202127; border-radius: 999px; padding: 4px; margin-bottom: 14px; }
     .tw-toggle-opt { border: none; background: transparent; color: #82828E; font-size: 15px; font-weight: 700; padding: 9px 18px; border-radius: 999px; cursor: pointer; }
     .tw-toggle-opt.active { background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; }
-    .tw-cardrow { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 4px; }
+    .tw-rowwrap { position: relative; }
+    .tw-cardrow { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 4px; cursor: grab; user-select: none; }
     .tw-cardrow::-webkit-scrollbar { display: none; }
+    .tw-cardrow.tw-dragging { cursor: grabbing; scroll-snap-type: none; }
     .tw-swipecard { flex: 0 0 85%; scroll-snap-align: center; border: 1px solid #2C2D35; border-radius: 16px; background: #17181D; padding: 20px; min-height: 180px; box-sizing: border-box; }
+    .tw-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; background: rgba(23,24,29,.92); border: 1px solid #2C2D35; color: #B7B7C2; font-size: 18px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; }
+    .tw-arrow:hover { background: #202127; color: #F2F2F5; }
+    .tw-arrow-left { left: 0; }
+    .tw-arrow-right { right: 0; }
   </style>
 
   <div class="tw-wrap">
@@ -2503,12 +2527,11 @@ app.get('/trend-weekly', (c) => {
 
         <div class="tw-card" style="margin-top:28px;padding:18px;">
           <h3 style="font-size:15px;font-weight:700;color:#F2F2F5;margin:0 0 10px;">새소식 카톡으로 알림받기</h3>
-          <p style="font-size:14px;color:#B7B7C2;margin:0 0 10px;">전화번호를 등록하면 새 다이제스트가 발행될 때 카톡으로 요약과 링크를 보내드려요.</p>
           <div style="display:flex;gap:8px;">
             <input type="tel" class="form-input" id="twPhoneInput" placeholder="010-0000-0000" style="flex:1;background:#202127;border-color:#2C2D35;color:#F2F2F5;font-size:15px;" />
-            <button class="tw-cta" id="twPhoneBtn" style="width:auto;padding:10px 20px;border-radius:24px;" onclick="twSavePhone()">등록</button>
+            <button class="tw-cta" id="twPhoneBtn" style="width:160px;flex-shrink:0;padding:10px 0;border-radius:24px;" onclick="twSavePhone()">등록</button>
           </div>
-          <div id="twPhoneSaved" style="display:none;font-size:14px;color:#0DA8D6;margin-top:8px;">등록된 번호로 발송돼요.</div>
+          <div id="twPhoneSaved" style="display:none;font-size:14px;color:#0DA8D6;margin-top:8px;">등록완료</div>
         </div>
 
         <div id="twManageBox" style="display:none;margin-top:18px;text-align:center;">
@@ -2562,8 +2585,49 @@ app.get('/trend-weekly', (c) => {
       return cards;
     }
 
+    // 트렌드 항목의 최근(최대 4주) 등락률 시계열로 한 줄 인사이트 생성(규칙 기반 —
+    // AI 호출 없이 추세만 보고 판단: 연속 상승/하락, 직전 평균 대비 급변 여부)
+    function trendInsight(history) {
+      if (!history || history.length < 2) return '최근 몇 주간 비교할 데이터가 아직 부족해요.';
+      var vals = history.map(function(h) { return h.change_pct; });
+      var diffs = [];
+      for (var i = 1; i < vals.length; i++) diffs.push(vals[i] - vals[i - 1]);
+      var allUp = diffs.every(function(x) { return x > 0; });
+      var allDown = diffs.every(function(x) { return x < 0; });
+      if (allUp) return (vals.length - 1) + '주 연속 상승세예요.';
+      if (allDown) return (vals.length - 1) + '주 연속 하락세예요.';
+      var last = vals[vals.length - 1];
+      var prevAvg = vals.slice(0, -1).reduce(function(a, b) { return a + b; }, 0) / (vals.length - 1);
+      if (last - prevAvg > 10) return '이번 주 들어 관심도가 크게 올랐어요.';
+      if (prevAvg - last > 10) return '이번 주 들어 관심도가 크게 꺾였어요.';
+      return '최근 ' + vals.length + '주간 등락을 반복하고 있어요.';
+    }
+
+    // 최근(최대 4주) 등락률을 0 기준선 막대그래프로 그림(최신 주만 진하게 강조)
+    function trendSparkline(history) {
+      if (!history || history.length < 2) return '';
+      var W = 220, H = 54, gap = 8;
+      var n = history.length;
+      var barW = (W - gap * (n - 1)) / n;
+      var maxAbs = Math.max.apply(null, history.map(function(x) { return Math.abs(x.change_pct); })) || 1;
+      var mid = H / 2;
+      var bars = '';
+      for (var i = 0; i < n; i++) {
+        var val = history[i].change_pct;
+        var barH = Math.max(3, Math.abs(val) / maxAbs * (mid - 6));
+        var x = i * (barW + gap);
+        var y = val >= 0 ? mid - barH : mid;
+        var color = val > 0 ? '#F87171' : val < 0 ? '#0DA8D6' : '#82828E';
+        bars += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + barH + '" rx="3" fill="' + color + '" opacity="' + (i === n - 1 ? '1' : '.5') + '"></rect>';
+      }
+      return '<svg width="100%" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" style="display:block;margin-top:12px;">' +
+        '<line x1="0" y1="' + mid + '" x2="' + W + '" y2="' + mid + '" stroke="#2C2D35" stroke-width="1"></line>' +
+        bars +
+        '</svg>';
+    }
+
     // 트렌드 다이제스트(검색어트렌드/쇼핑인사이트) — "통합 트렌드 분석" 카드 1장 +
-    // 세부 항목(키워드)당 카드 1장
+    // 세부 항목(키워드)당 카드 1장(최근 4주 시계열 그래프 + 한줄 인사이트 포함)
     function trendCards(d) {
       var cards = '<div class="tw-swipecard">' +
         '<div style="font-size:12px;color:#82828E;margin-bottom:8px;">' + (d.period || '') + ' · 통합 트렌드 분석</div>' +
@@ -2573,26 +2637,63 @@ app.get('/trend-weekly', (c) => {
         var pct = t.change_pct;
         var color = pct > 0 ? '#F87171' : pct < 0 ? '#0DA8D6' : '#82828E';
         var sign = pct > 0 ? '+' : '';
-        cards += '<div class="tw-swipecard" style="text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;">' +
-          '<div style="font-size:16px;color:#B7B7C2;margin-bottom:12px;">' + t.label + '</div>' +
-          '<div style="font-size:36px;font-weight:800;color:' + color + ';">' + sign + pct + '%</div>' +
+        cards += '<div class="tw-swipecard" style="text-align:center;">' +
+          '<div style="font-size:16px;color:#B7B7C2;margin-bottom:10px;">' + t.label + '</div>' +
+          '<div style="font-size:32px;font-weight:800;color:' + color + ';">' + sign + pct + '%</div>' +
+          trendSparkline(t.history) +
+          '<div style="font-size:12.5px;color:#82828E;margin-top:10px;line-height:1.5;">' + trendInsight(t.history) + '</div>' +
           '</div>';
       });
       return cards;
     }
 
-    // 카드 행(가로 스와이프)의 스크롤 위치를 읽어 점 인디케이터를 갱신
+    // 카드 행(가로 스와이프)의 스크롤 위치를 읽어 점 인디케이터를 갱신 +
+    // 데스크톱용 마우스 드래그 스크롤 지원
     function bindCardRow(row, dotsId) {
       var dots = document.getElementById(dotsId);
-      if (!dots) return;
-      row.addEventListener('scroll', function() {
-        var card = row.children[0];
-        if (!card) return;
-        var step = card.offsetWidth + 10; // gap과 동일
-        var idx = Math.round(row.scrollLeft / step);
-        var dotEls = dots.children;
-        for (var i = 0; i < dotEls.length; i++) dotEls[i].style.opacity = (i === idx) ? '1' : '.3';
+      if (dots) {
+        row.addEventListener('scroll', function() {
+          var card = row.children[0];
+          if (!card) return;
+          var step = card.offsetWidth + 10; // gap과 동일
+          var idx = Math.round(row.scrollLeft / step);
+          var dotEls = dots.children;
+          for (var i = 0; i < dotEls.length; i++) dotEls[i].style.opacity = (i === idx) ? '1' : '.3';
+        });
+      }
+
+      // 마우스로 클릭 후 드래그하면 카드를 넘길 수 있도록(터치/트랙패드 없는 환경)
+      var isDown = false, startX = 0, startScroll = 0, moved = false;
+      row.addEventListener('mousedown', function(e) {
+        isDown = true; moved = false;
+        startX = e.pageX; startScroll = row.scrollLeft;
+        row.classList.add('tw-dragging');
       });
+      window.addEventListener('mousemove', function(e) {
+        if (!isDown) return;
+        var dx = e.pageX - startX;
+        if (Math.abs(dx) > 3) moved = true;
+        row.scrollLeft = startScroll - dx;
+      });
+      window.addEventListener('mouseup', function() {
+        if (!isDown) return;
+        isDown = false;
+        row.classList.remove('tw-dragging');
+      });
+      // 드래그 직후의 클릭(링크 등 오작동) 방지
+      row.addEventListener('click', function(e) {
+        if (moved) { e.preventDefault(); e.stopPropagation(); moved = false; }
+      }, true);
+    }
+
+    // 화살표 버튼으로 카드 한 장씩 이동
+    window.scrollByCard = function(rowId, dir) {
+      var row = document.getElementById(rowId);
+      if (!row) return;
+      var card = row.children[0];
+      if (!card) return;
+      var step = card.offsetWidth + 10;
+      row.scrollBy({ left: dir * step, behavior: 'smooth' });
     }
 
     function renderDigests(digests) {
@@ -2609,7 +2710,13 @@ app.get('/trend-weekly', (c) => {
         for (var k = 0; k < count; k++) dots += '<span style="width:6px;height:6px;border-radius:50%;background:#0DA8D6;opacity:' + (k === 0 ? '1' : '.3') + ';"></span>';
         return '<div style="margin-bottom:28px;">' +
           '<div style="font-size:15px;font-weight:700;color:#F2F2F5;margin-bottom:10px;">' + (typeLabel[d.type] || d.type) + '</div>' +
-          '<div class="tw-cardrow" id="twRow' + i + '">' + cardsHtml + '</div>' +
+          '<div class="tw-rowwrap">' +
+            '<div class="tw-cardrow" id="twRow' + i + '">' + cardsHtml + '</div>' +
+            (count > 1 ? (
+              '<button type="button" class="tw-arrow tw-arrow-left" aria-label="이전 카드" onclick="scrollByCard(\\'twRow' + i + '\\',-1)">‹</button>' +
+              '<button type="button" class="tw-arrow tw-arrow-right" aria-label="다음 카드" onclick="scrollByCard(\\'twRow' + i + '\\',1)">›</button>'
+            ) : '') +
+          '</div>' +
           '<div id="twDots' + i + '" style="display:flex;gap:5px;justify-content:center;margin-top:10px;">' + dots + '</div>' +
           '</div>';
       }).join('');
@@ -2987,6 +3094,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
 
     await db.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(user.id).run()
     const token = await createSession(db, user.id)
+    setSessionCookie(c, token)
     const userJson = JSON.stringify(publicUser(user))
 
     if (mode === 'redirect') {
@@ -3139,6 +3247,7 @@ app.get('/api/auth/google/callback', async (c) => {
 
     await db.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(user.id).run()
     const token = await createSession(db, user.id)
+    setSessionCookie(c, token)
     const userJson = JSON.stringify(publicUser(user))
 
     if (mode === 'redirect') {
@@ -4870,7 +4979,32 @@ app.get('/api/trend/digests', async (c) => {
         const { results: trends } = await db.prepare(
           `SELECT label, change_pct FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`
         ).bind(d.id).all()
-        digests.push({ type, period: d.period, summary: d.summary, trends })
+
+        // 최근 4주치(검토완료 이상) 다이제스트를 모아 라벨별 시계열을 구성
+        const { results: recentDigests } = await db.prepare(
+          `SELECT id, period FROM content_digests WHERE type = ? AND status IN ('reviewed','sent') ORDER BY generated_at DESC LIMIT 4`
+        ).bind(type).all() as any
+        const recentAsc = (recentDigests || []).slice().reverse() // 오래된 주 → 최신 주
+        let trendsWithHistory = (trends as any[])
+        if (recentAsc.length > 1) {
+          const ids = recentAsc.map((r: any) => r.id)
+          const placeholders = ids.map(() => '?').join(',')
+          const { results: historyRows } = await db.prepare(
+            `SELECT digest_id, label, change_pct FROM digest_trends WHERE digest_id IN (${placeholders})`
+          ).bind(...ids).all() as any
+          const byDigest: Record<number, Record<string, number>> = {}
+          for (const row of (historyRows || []) as any[]) {
+            if (!byDigest[row.digest_id]) byDigest[row.digest_id] = {}
+            byDigest[row.digest_id][row.label] = row.change_pct
+          }
+          trendsWithHistory = (trends as any[]).map((t: any) => {
+            const history = recentAsc
+              .map((dg: any) => ({ period: dg.period, change_pct: byDigest[dg.id] ? byDigest[dg.id][t.label] : undefined }))
+              .filter((h: any) => h.change_pct !== undefined && h.change_pct !== null)
+            return { ...t, history }
+          })
+        }
+        digests.push({ type, period: d.period, summary: d.summary, trends: trendsWithHistory })
       }
     }
     return c.json({ success: true, digests })
@@ -7622,7 +7756,7 @@ app.get('/dashboard', (c) => {
       font-size: 18px;
     }
     .db-logo-text {
-      font-size: 18px;
+      font-size: 17px;
       font-weight: 800;
       color: #191F28;
     }
@@ -8414,7 +8548,7 @@ app.get('/credits', (c) => {
       display: flex; align-items: center; justify-content: center;
       font-size: 18px;
     }
-    .cr-logo-text { font-size: 18px; font-weight: 800; color: #191F28; }
+    .cr-logo-text { font-size: 17px; font-weight: 800; color: #191F28; }
     .cr-back {
       width: 36px; height: 36px; border: none; background: #F2F4F6; border-radius: 50%;
       color: #4E5968; font-size: 18px; cursor: pointer;
