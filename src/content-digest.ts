@@ -367,8 +367,10 @@ export async function runDigestPipeline(env: DigestBindings, type: DigestType = 
 
     const summary = buildTrendInsight(type, trends)
 
+    // 2026-10-20: 관리자 수동 검토 단계를 생략하고 생성 즉시 자동 승인(reviewed)
+    // 처리 — 사람이 /admin02에서 눌러야 했던 "검토완료 표시"를 건너뛴다.
     const insertDigest = await db.prepare(
-      `INSERT INTO content_digests (period, status, summary, keywords, type) VALUES (?, 'draft', ?, '[]', ?)`
+      `INSERT INTO content_digests (period, status, summary, keywords, type, reviewed_at) VALUES (?, 'reviewed', ?, '[]', ?, datetime('now'))`
     ).bind(period, summary, type).run()
     const digestId = insertDigest.meta.last_row_id as number
 
@@ -385,7 +387,7 @@ export async function runDigestPipeline(env: DigestBindings, type: DigestType = 
   const { summary, keywords, items } = await classifyAndSummarize(env, articles)
 
   const insertDigest = await db.prepare(
-    `INSERT INTO content_digests (period, status, summary, keywords, type) VALUES (?, 'draft', ?, ?, 'news')`
+    `INSERT INTO content_digests (period, status, summary, keywords, type, reviewed_at) VALUES (?, 'reviewed', ?, ?, 'news', datetime('now'))`
   ).bind(period, summary, JSON.stringify(keywords)).run()
   const digestId = insertDigest.meta.last_row_id as number
 
