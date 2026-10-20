@@ -2577,12 +2577,11 @@ app.get('/trend-weekly', (c) => {
 
         <div class="tw-card" style="margin-top:28px;padding:18px;">
           <h3 style="font-size:15px;font-weight:700;color:#F2F2F5;margin:0 0 10px;">새소식 카톡으로 알림받기</h3>
-          <p style="font-size:14px;color:#B7B7C2;margin:0 0 10px;">전화번호를 등록하면 새 다이제스트가 발행될 때 카톡으로 요약과 링크를 보내드려요.</p>
           <div style="display:flex;gap:8px;">
             <input type="tel" class="form-input" id="twPhoneInput" placeholder="010-0000-0000" style="flex:1;background:#202127;border-color:#2C2D35;color:#F2F2F5;font-size:15px;" />
             <button class="tw-cta" id="twPhoneBtn" style="width:auto;padding:10px 20px;border-radius:24px;" onclick="twSavePhone()">등록</button>
           </div>
-          <div id="twPhoneSaved" style="display:none;font-size:14px;color:#0DA8D6;margin-top:8px;">등록된 번호로 발송돼요.</div>
+          <div id="twPhoneSaved" style="display:none;font-size:14px;color:#0DA8D6;margin-top:8px;">등록완료</div>
         </div>
 
         <div id="twManageBox" style="display:none;margin-top:18px;text-align:center;">
