@@ -2511,7 +2511,7 @@ app.get('/trend-weekly', (c) => {
         <h2 style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 2px;">주간 트렌드 분석</h2>
         <p style="font-size:30px;font-weight:800;color:#F2F2F5;line-height:1.3;margin:0 0 16px;">1개월 무료!</p>
         <p style="font-size:13px;color:#82828E;margin:0 0 4px;">이용 기간 : 체험 시작일로부터 1개월 · 자동결제 없음</p>
-        <p style="font-size:14px;color:#B7B7C2;margin:0 0 24px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 AI가 모아서 정리해드려요.</p>
+        <p style="font-size:14px;color:#B7B7C2;margin:0 0 24px;line-height:1.6;">매주 3회 — 패션 뉴스 다이제스트(월) · 검색어트렌드(수) · 쇼핑인사이트(금)를 모아서 정리해드려요.</p>
         <button class="tw-cta" id="twTrialBtn" onclick="twStartTrial()" style="font-size:17px;padding:16px 20px;">무료 가입하기 ›</button>
       </div>
 
@@ -2722,7 +2722,7 @@ app.get('/trend-weekly', (c) => {
       }
       var typeLabel = { news: '패션 뉴스', search_trend: '검색어트렌드', shopping_insight: '쇼핑인사이트' };
       var typeInfo = {
-        news: '네이버 뉴스에서 \\'패션 트렌드\\', \\'K-패션\\', \\'패션 이커머스\\' 등 주제로 최신 기사를 모아 AI가 요약·분류해요.',
+        news: '네이버 뉴스에서 \\'패션 트렌드\\', \\'K-패션\\', \\'패션 이커머스\\' 등 주제로 최신 기사를 모아 요약·분류해요.',
         search_trend: '네이버 데이터랩(검색어트렌드)에서 원피스·니트·코트 등 의류 품목의 검색량 변화를 비교해요.',
         shopping_insight: '네이버 데이터랩(쇼핑인사이트)에서 패션의류 카테고리 내 품목별 클릭·구매 관심도 변화를 비교해요.'
       };
@@ -2868,7 +2868,7 @@ app.get('/trend-weekly', (c) => {
     twLoad();
   })();
   </script>
-  `, '', '매주 AI가 모아주는 패션 뉴스·검색어트렌드·쇼핑인사이트', c.env.GA4_MEASUREMENT_ID))
+  `, '', '매주 모아주는 패션 뉴스·검색어트렌드·쇼핑인사이트', c.env.GA4_MEASUREMENT_ID))
 })
 
 // ────────────────────────────────────────────────────
@@ -5004,32 +5004,52 @@ app.get('/api/trend/digests', async (c) => {
         digests.push({ type, period: d.period, summary: d.summary, articles })
       } else {
         const { results: trends } = await db.prepare(
-          `SELECT label, change_pct FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`
+          `SELECT label, change_pct, history_json FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`
         ).bind(d.id).all()
 
-        // 최근 4주치(검토완료 이상) 다이제스트를 모아 라벨별 시계열을 구성
+        // 과거(이 다이제스트가 생성될 당시 네이버 API 응답에서 함께 뽑아둔) 4주 시계열이
+        // history_json에 있으면 그걸 그대로 쓴다 — 새로 추적을 시작한 키워드도 첫 생성
+        // 때부터 바로 4주 그래프가 채워진다. 그 컬럼이 없던 시절(마이그레이션 이전)
+        // 생성된 행만, 예전 방식대로 최근 몇 주의 다이제스트를 모아 라벨별로 비교해 보완한다.
         const { results: recentDigests } = await db.prepare(
           `SELECT id, period FROM content_digests WHERE type = ? AND status IN ('reviewed','sent') ORDER BY generated_at DESC LIMIT 4`
         ).bind(type).all() as any
         const recentAsc = (recentDigests || []).slice().reverse() // 오래된 주 → 최신 주
-        let trendsWithHistory = (trends as any[])
-        if (recentAsc.length > 1) {
+        let fallbackByDigest: Record<number, Record<string, number>> | null = null
+        const buildFallbackMap = async () => {
+          if (fallbackByDigest || recentAsc.length <= 1) return
           const ids = recentAsc.map((r: any) => r.id)
           const placeholders = ids.map(() => '?').join(',')
           const { results: historyRows } = await db.prepare(
             `SELECT digest_id, label, change_pct FROM digest_trends WHERE digest_id IN (${placeholders})`
           ).bind(...ids).all() as any
-          const byDigest: Record<number, Record<string, number>> = {}
+          fallbackByDigest = {}
           for (const row of (historyRows || []) as any[]) {
-            if (!byDigest[row.digest_id]) byDigest[row.digest_id] = {}
-            byDigest[row.digest_id][row.label] = row.change_pct
+            if (!fallbackByDigest[row.digest_id]) fallbackByDigest[row.digest_id] = {}
+            fallbackByDigest[row.digest_id][row.label] = row.change_pct
           }
-          trendsWithHistory = (trends as any[]).map((t: any) => {
-            const history = recentAsc
-              .map((dg: any) => ({ period: dg.period, change_pct: byDigest[dg.id] ? byDigest[dg.id][t.label] : undefined }))
-              .filter((h: any) => h.change_pct !== undefined && h.change_pct !== null)
-            return { ...t, history }
-          })
+        }
+
+        const trendsWithHistory: any[] = []
+        for (const t of (trends as any[])) {
+          let history: any[] = []
+          if (t.history_json) {
+            try {
+              const parsed = JSON.parse(t.history_json)
+              if (Array.isArray(parsed) && parsed.length) {
+                history = parsed.map((h: any) => ({ period: h.period, change_pct: h.changePct }))
+              }
+            } catch {}
+          }
+          if (!history.length) {
+            await buildFallbackMap()
+            if (fallbackByDigest) {
+              history = recentAsc
+                .map((dg: any) => ({ period: dg.period, change_pct: fallbackByDigest![dg.id] ? fallbackByDigest![dg.id][t.label] : undefined }))
+                .filter((h: any) => h.change_pct !== undefined && h.change_pct !== null)
+            }
+          }
+          trendsWithHistory.push({ label: t.label, change_pct: t.change_pct, history })
         }
         digests.push({ type, period: d.period, summary: d.summary, trends: trendsWithHistory })
       }
