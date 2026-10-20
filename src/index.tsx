@@ -5,6 +5,7 @@ import { setCookie } from 'hono/cookie'
 import leadsApp from './leads'
 import bizLeadsApp from './bizleads'
 import contentDigestApp from './content-digest'
+import { rewriteForCardNews, renderCardSvg } from './card-image'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
 // → 배포할 때마다 값이 바뀌어 브라우저가 새 파일로 인식 (캐시 자동 무효화)
@@ -2530,6 +2531,8 @@ app.get('/trend-weekly', (c) => {
     .tw-info-icon:hover { border-color: #0579B3; color: #0DA8D6; }
     .tw-info-pop { display: none; position: absolute; top: 24px; left: 0; width: 230px; background: #17181D; border: 1px solid #2C2D35; border-radius: 10px; padding: 10px 12px; font-size: 12px; font-weight: 400; color: #B7B7C2; line-height: 1.55; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,.45); text-align: left; }
     .tw-info-wrap:hover .tw-info-pop, .tw-info-pop.show { display: block; }
+    .tw-cardnews-btn { margin-top: 14px; width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #2C2D35; background: #202127; color: #B7B7C2; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .tw-cardnews-btn:hover { border-color: #0579B3; color: #0DA8D6; }
   </style>
 
   <div class="tw-wrap">
@@ -2632,6 +2635,18 @@ app.get('/trend-weekly', (c) => {
     </div>
   </div>
 
+  <!-- 카드뉴스 생성 미리보기/다운로드 팝업 -->
+  <div class="modal-overlay" id="twCardModal">
+    <div class="modal-box" style="background:#17181D;border:1px solid #2C2D35;max-width:360px;padding:20px;">
+      <button class="modal-close" onclick="closeModal('twCardModal')" style="background:#202127;color:#82828E;">×</button>
+      <div id="twCardPreviewWrap" style="border-radius:14px;overflow:hidden;margin-bottom:16px;min-height:260px;display:flex;align-items:center;justify-content:center;background:#0A0A0D;">
+        <div id="twCardLoading" style="color:#82828E;font-size:14px;text-align:center;padding:40px 20px;">카드뉴스 만드는 중...<br/><span style="font-size:12px;">(AI가 문구를 다듬고 있어요)</span></div>
+        <img id="twCardPreviewImg" style="width:100%;display:none;" alt="카드뉴스 미리보기" />
+      </div>
+      <button class="tw-cta" id="twCardDownloadBtn" style="display:none;" onclick="downloadCardImage()">이미지 다운로드</button>
+    </div>
+  </div>
+
   <script>
   (function() {
     var TOKEN = localStorage.getItem('lookbook_token') || '';
@@ -2645,11 +2660,27 @@ app.get('/trend-weekly', (c) => {
       return d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
     }
 
+    // data-* 속성에 안전하게 넣기 위한 최소 이스케이프(따옴표/꺾쇠만 — 텍스트는
+    // 브라우저가 dataset 읽을 때 알아서 디코드해줌)
+    function escAttr(s) {
+      return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    // 다이제스트 카드 하나를 SNS 공유용 "카드뉴스" 이미지로 만드는 버튼 —
+    // 화면에 이미 렌더링된 텍스트를 그대로 data-*에 담아, 클릭 시 makeCardNews()가
+    // 그 값 그대로 서버에 보낸다(별도 조회 없이 "지금 보이는 내용 그대로").
+    function cardNewsBtn(opts) {
+      var attrs = 'data-type="' + escAttr(opts.type) + '" data-period="' + escAttr(opts.period) + '" data-title="' + escAttr(opts.title) + '" data-body="' + escAttr(opts.body) + '"';
+      if (opts.statText) attrs += ' data-stat="' + escAttr(opts.statText) + '" data-stat-color="' + escAttr(opts.statColor) + '"';
+      return '<button type="button" class="tw-cardnews-btn" ' + attrs + ' onclick="makeCardNews(this)">🖼️ 카드뉴스 만들기</button>';
+    }
+
     // 기사 다이제스트 — "통합 요약" 카드 1장 + 기사 1건당 카드 1장
     function newsCards(d) {
       var cards = '<div class="tw-swipecard">' +
         '<div style="font-size:12px;color:#82828E;margin-bottom:8px;">' + (d.period || '') + ' · 전체 요약</div>' +
         '<div style="font-size:16px;font-weight:700;color:#F2F2F5;line-height:1.6;">' + (d.summary || '') + '</div>' +
+        cardNewsBtn({ type: d.type, period: d.period, title: (d.period || '') + ' 전체 요약', body: d.summary || '' }) +
         '</div>';
       (d.articles || []).forEach(function(a) {
         cards += '<div class="tw-swipecard">' +
@@ -2657,6 +2688,7 @@ app.get('/trend-weekly', (c) => {
           '<div style="font-size:17px;font-weight:700;color:#F2F2F5;line-height:1.4;margin-bottom:12px;">' + a.title + '</div>' +
           '<div style="font-size:14px;color:#B7B7C2;line-height:1.6;margin-bottom:14px;">' + a.summary + '</div>' +
           (a.url ? '<a href="' + a.url + '" target="_blank" style="font-size:13px;color:#82828E;">원문 보기 ›</a>' : '') +
+          cardNewsBtn({ type: d.type, period: d.period, title: a.title, body: a.summary || '' }) +
           '</div>';
       });
       return cards;
@@ -2725,16 +2757,19 @@ app.get('/trend-weekly', (c) => {
       var cards = '<div class="tw-swipecard">' +
         '<div style="font-size:12px;color:#82828E;margin-bottom:8px;">' + (d.period || '') + ' · 통합 트렌드 분석</div>' +
         '<div style="font-size:16px;font-weight:700;color:#F2F2F5;line-height:1.6;">' + (d.summary || '') + '</div>' +
+        cardNewsBtn({ type: d.type, period: d.period, title: (d.period || '') + ' 통합 트렌드 분석', body: d.summary || '' }) +
         '</div>';
       (d.trends || []).forEach(function(t) {
         var pct = t.change_pct;
         var color = pct > 0 ? '#F87171' : pct < 0 ? '#0DA8D6' : '#82828E';
         var sign = pct > 0 ? '+' : '';
+        var insight = trendInsight(t.history);
         cards += '<div class="tw-swipecard" style="text-align:center;">' +
           '<div style="font-size:16px;color:#B7B7C2;margin-bottom:10px;">' + t.label + '</div>' +
           '<div style="font-size:32px;font-weight:800;color:' + color + ';">' + sign + pct + '%</div>' +
           trendSparkline(t.history) +
-          '<div style="font-size:12.5px;color:#82828E;margin-top:10px;line-height:1.5;">' + trendInsight(t.history) + '</div>' +
+          '<div style="font-size:12.5px;color:#82828E;margin-top:10px;line-height:1.5;">' + insight + '</div>' +
+          cardNewsBtn({ type: d.type, period: d.period, title: t.label, body: t.label + ' 전주 대비 ' + sign + pct + '%. ' + insight, statText: sign + pct + '%', statColor: color }) +
           '</div>';
       });
       return cards;
@@ -2802,6 +2837,64 @@ app.get('/trend-weekly', (c) => {
     document.addEventListener('click', function() {
       document.querySelectorAll('.tw-info-pop.show').forEach(function(p) { p.classList.remove('show'); });
     });
+
+    // 카드뉴스 만들기 — 서버가 SVG(폰트까지 벡터 패스로 구워진)를 돌려주면,
+    // <canvas>에 그려 PNG로 변환한다(서버에 WASM 래스터라이저를 두지 않기 위함).
+    var twCardPngDataUrl = null;
+    window.makeCardNews = async function(btn) {
+      var d = btn.dataset;
+      openModal('twCardModal');
+      document.getElementById('twCardLoading').style.display = '';
+      document.getElementById('twCardPreviewImg').style.display = 'none';
+      document.getElementById('twCardDownloadBtn').style.display = 'none';
+      twCardPngDataUrl = null;
+      try {
+        var payload = { type: d.type, period: d.period, title: d.title, body: d.body };
+        if (d.stat) { payload.statText = d.stat; payload.statColor = d.statColor; }
+        var res = await fetch('/api/trend/card-image', { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '카드 생성에 실패했습니다.', 'error'); closeModal('twCardModal'); return; }
+        await renderSvgToPng(data.svg);
+      } catch (e) {
+        showToast('카드 생성 중 오류가 발생했습니다.', 'error');
+        closeModal('twCardModal');
+      }
+    };
+
+    function renderSvgToPng(svgText) {
+      return new Promise(function(resolve) {
+        var svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
+        var url = URL.createObjectURL(svgBlob);
+        var img = new Image();
+        img.onload = function() {
+          var canvas = document.createElement('canvas');
+          canvas.width = 1080; canvas.height = 1350;
+          canvas.getContext('2d').drawImage(img, 0, 0, 1080, 1350);
+          URL.revokeObjectURL(url);
+          twCardPngDataUrl = canvas.toDataURL('image/png');
+          var previewImg = document.getElementById('twCardPreviewImg');
+          previewImg.src = twCardPngDataUrl;
+          previewImg.style.display = '';
+          document.getElementById('twCardLoading').style.display = 'none';
+          document.getElementById('twCardDownloadBtn').style.display = '';
+          resolve();
+        };
+        img.onerror = function() {
+          showToast('이미지 변환에 실패했습니다.', 'error');
+          closeModal('twCardModal');
+          resolve();
+        };
+        img.src = url;
+      });
+    }
+
+    window.downloadCardImage = function() {
+      if (!twCardPngDataUrl) return;
+      var a = document.createElement('a');
+      a.href = twCardPngDataUrl;
+      a.download = 'ezlook-card-' + Date.now() + '.png';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    };
 
     function renderDigests(digests) {
       var box = document.getElementById('twDigests');
@@ -5058,6 +5151,41 @@ app.get('/api/trend/digests', async (c) => {
     return c.json({ success: true, digests })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// POST /api/trend/card-image — 다이제스트 카드 하나를 SNS 공유용 "카드뉴스" SVG로
+// 재가공해서 돌려준다. 클라이언트가 화면에 보이는 카드의 텍스트를 그대로 보내면,
+// Claude가 SNS 톤으로 다시 쓰고(headline/subline) satori로 EZlook 브랜드 카드를
+// 그린다. PNG 변환은 폰트가 이미 벡터 패스로 구워진 SVG를 받은 클라이언트가
+// <canvas>에서 처리한다(서버에는 WASM 래스터라이저를 두지 않음).
+app.post('/api/trend/card-image', async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sess = await requireTrendSession(db, c.req.header('X-Session-Token') || '')
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    let sub = await db.prepare(`SELECT * FROM trend_subscriptions WHERE user_id = ?`).bind(sess.user_id).first() as any
+    if (sub) sub = await processTrendBillingIfDue(db, sub)
+    if (!trendHasAccess(sub)) return c.json({ success: false, message: '구독이 필요합니다.' }, 403)
+
+    const body = await c.req.json().catch(() => ({})) as any
+    const type = body.type === 'search_trend' || body.type === 'shopping_insight' ? body.type : 'news'
+    const typeLabel = { news: '패션 뉴스', search_trend: '검색어트렌드', shopping_insight: '쇼핑인사이트' }[type as 'news']
+    const title = String(body.title || '').slice(0, 200)
+    const cardBody = String(body.body || '').slice(0, 1000)
+    const period = String(body.period || '')
+    const statText = body.statText ? String(body.statText).slice(0, 20) : undefined
+    const statColor = body.statColor ? String(body.statColor).slice(0, 20) : undefined
+    if (!title || !cardBody) return c.json({ success: false, message: 'title/body가 필요합니다.' }, 400)
+
+    const copy = await rewriteForCardNews(c.env.ANTHROPIC_API_KEY, { typeLabel, title, body: cardBody, statText })
+    const svg = renderCardSvg({ type, typeLabel, period, title, body: cardBody, statText, statColor }, copy)
+
+    return c.json({ success: true, svg })
+  } catch (err: any) {
+    console.error('card-image error:', err)
+    return c.json({ success: false, message: '카드 이미지 생성 중 오류가 발생했습니다.' }, 500)
   }
 })
 
