@@ -2604,13 +2604,12 @@ app.get('/trend-weekly', (c) => {
 
         <div id="twDigests"></div>
 
-        <div class="tw-card" style="margin-top:28px;padding:18px;">
+        <div class="tw-card" id="twPhoneCard" style="margin-top:28px;padding:18px;">
           <h3 style="font-size:15px;font-weight:700;color:#F2F2F5;margin:0 0 10px;">새소식 카톡으로 알림받기</h3>
           <div style="display:flex;gap:8px;">
-            <input type="tel" class="form-input" id="twPhoneInput" placeholder="010-0000-0000" style="flex:1;background:#202127;border-color:#2C2D35;color:#F2F2F5;font-size:15px;" />
+            <input type="tel" class="form-input" id="twPhoneInput" placeholder="010-0000-0000" style="flex:1;background:#202127;border-color:#2C2D35;color:#F2F2F5;font-size:15px;border-radius:24px;padding:10px 18px;box-sizing:border-box;" />
             <button class="tw-cta" id="twPhoneBtn" style="width:160px;flex-shrink:0;padding:10px 0;border-radius:24px;" onclick="twSavePhone()">등록</button>
           </div>
-          <div id="twPhoneSaved" style="display:none;font-size:14px;color:#0DA8D6;margin-top:8px;">등록완료</div>
         </div>
 
         <div id="twManageBox" style="display:none;margin-top:18px;text-align:center;">
@@ -2849,8 +2848,7 @@ app.get('/trend-weekly', (c) => {
 
         show('twMain');
         if (status.kakaoPhone) {
-          document.getElementById('twPhoneInput').value = status.kakaoPhone;
-          show('twPhoneSaved');
+          hide('twPhoneCard');
         }
 
         var banner = document.getElementById('twBanner');
@@ -2935,7 +2933,7 @@ app.get('/trend-weekly', (c) => {
         var data = await res.json();
         if (!data.success) { showToast(data.message || '등록에 실패했습니다.', 'error'); return; }
         showToast('카톡 수신 번호가 등록됐어요.', 'success');
-        show('twPhoneSaved');
+        hide('twPhoneCard');
       } catch (e) {
         showToast('네트워크 오류가 발생했습니다.', 'error');
       }
