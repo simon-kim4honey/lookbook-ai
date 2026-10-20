@@ -9252,6 +9252,37 @@ app.get('/admin02', (c) => {
     .biz-mfield:last-child{border-bottom:none;}
     .biz-mlabel{width:100px;flex-shrink:0;color:#8b8ba0;font-weight:600;}
     .biz-mvalue{color:#e0e0f0;word-break:break-all;}
+    /* ── 모바일 최적화 ── */
+    @media (max-width: 640px) {
+      #loginOverlay{padding:16px;}
+      .login-card{padding:28px 22px;max-width:100%;}
+      .admin-header{padding:10px 14px;gap:8px;}
+      .admin-header .logo{font-size:15px;}
+      .admin-header .badge{font-size:10px;padding:2px 8px;}
+      .admin-header .logout{padding:6px 10px;font-size:12px;white-space:nowrap;}
+      .tab-bar{padding:0 10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+      .tab-bar::-webkit-scrollbar{display:none;}
+      .tab-btn{padding:12px 14px;font-size:14px !important;white-space:nowrap;flex-shrink:0;}
+      .admin-body{padding:18px 14px;}
+      .page-title{font-size:17px;}
+      .page-sub{font-size:12px;margin-bottom:20px;}
+      .toggle-card{padding:14px 16px;flex-wrap:wrap;gap:10px;}
+      .section-card{padding:16px;}
+      .form-row{grid-template-columns:1fr;}
+      .modal-box{padding:18px;max-width:100%;}
+      .biz-modal-box{max-width:100%;max-height:92vh;}
+      .biz-modal-head,.biz-modal-body{padding:14px 16px;}
+      .leads-tabroot{padding:18px 14px;}
+      .leads-row{gap:8px;}
+      .leads-tabroot table{font-size:11.5px;}
+      .media-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;}
+      .biz-stat-grid{grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;}
+      .biz-tablewrap{max-height:calc(100vh - 320px);}
+      .biz-mfield{flex-direction:column;gap:2px;}
+      .biz-mlabel{width:auto;}
+      .upload-form .form-row{gap:10px;}
+      .save-bar{flex-wrap:wrap;}
+    }
   </style>
 </head>
 <body>
@@ -9548,7 +9579,8 @@ app.get('/admin02', (c) => {
 
       <!-- 회원 목록 테이블 -->
       <div class="section-card" style="padding:0;overflow:hidden;">
-        <table style="width:100%;border-collapse:collapse;">
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;min-width:640px;">
           <thead>
             <tr style="background:#0f0f1a;border-bottom:1px solid #2e2e50;">
               <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">회원</th>
@@ -9564,6 +9596,7 @@ app.get('/admin02', (c) => {
             <tr><td colspan="7" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">로딩 중...</td></tr>
           </tbody>
         </table>
+        </div>
       </div>
 
       <!-- 페이징 -->
@@ -9739,7 +9772,8 @@ app.get('/admin02', (c) => {
       </div>
 
       <div class="section-card" style="padding:0;overflow:hidden;">
-        <table style="width:100%;border-collapse:collapse;">
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;min-width:640px;">
           <thead>
             <tr style="background:#0f0f1a;border-bottom:1px solid #2e2e50;">
               <th style="text-align:left;padding:12px 16px;font-size:12px;color:#8b8ba0;font-weight:600;">발생시각</th>
@@ -9754,6 +9788,7 @@ app.get('/admin02', (c) => {
             <tr><td colspan="6" style="text-align:center;padding:40px;color:#8b8ba0;font-size:13px;">로딩 중...</td></tr>
           </tbody>
         </table>
+        </div>
       </div>
       <div id="errorsPagination" style="display:flex;justify-content:center;align-items:center;gap:8px;margin-top:16px;"></div>
     </div>
