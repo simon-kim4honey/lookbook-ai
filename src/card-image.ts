@@ -124,17 +124,19 @@ function wrapByChars(text: string, maxCharsPerLine: number, maxLines: number): s
 
 const FONT_STACK = "'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR','Noto Sans CJK KR',sans-serif"
 
+// 카드뉴스는 생성 즉시 사용자 소유의 SNS 콘텐츠가 된다 — EZlook 로고/유형
+// 배지/날짜/ezlook.co.kr 같은 자체 브랜딩을 네 모퉁이에서 전부 빼고, 내용
+// (통계 수치 + 헤드라인 + 서브라인)만 담아 그 사람이 자유롭게 쓸 수 있게 한다.
 export function renderCardSvg(input: CardImageInput, copy: { headline: string; subline: string }): string {
   const W = 1080
   const H = 1350
   const padX = 64
-  const padTop = 72
 
   const headlineLines = wrapByChars(copy.headline, 13, 3)
   const sublineLines = wrapByChars(copy.subline, 22, 3)
 
-  // 중앙 블록(통계 숫자 + 헤드라인 + 서브라인)을 수직 중앙 정렬하기 위해
-  // 전체 높이를 먼저 계산한다
+  // 중앙 블록(통계 숫자 + 헤드라인 + 서브라인)을 카드 전체 높이 기준으로
+  // 수직 중앙 정렬하기 위해 블록 높이를 먼저 계산한다
   const statBlockH = input.statText ? 150 : 0
   const headlineLineH = 82
   const sublineLineH = 44
@@ -146,12 +148,7 @@ export function renderCardSvg(input: CardImageInput, copy: { headline: string; s
     gap +
     sublineLines.length * sublineLineH
 
-  const footerY = H - 64
-  const contentTop = padTop + 72 // 상단 로고/배지 행 높이만큼 아래
-  const contentBottom = footerY - 40
-  const blockStartY = contentTop + Math.max(0, (contentBottom - contentTop - blockH) / 2)
-
-  let cursorY = blockStartY
+  let cursorY = Math.max(padX, (H - blockH) / 2)
 
   const parts: string[] = []
 
@@ -167,17 +164,6 @@ export function renderCardSvg(input: CardImageInput, copy: { headline: string; s
     <rect width="${W}" height="${H}" fill="url(#bg)"/>
   `)
 
-  // 상단: 로고 + 유형 배지
-  parts.push(`
-    <text x="${padX}" y="${padTop + 36}" font-family="${FONT_STACK}" font-size="40" font-weight="800" fill="#ffffff">EZ<tspan fill="#7DD8F0" font-weight="500">look</tspan></text>
-  `)
-  const badgeText = escXml(input.typeLabel)
-  const badgeW = badgeText.length * 15 + 48
-  parts.push(`
-    <rect x="${W - padX - badgeW}" y="${padTop}" width="${badgeW}" height="48" rx="24" fill="rgba(255,255,255,0.14)"/>
-    <text x="${W - padX - badgeW / 2}" y="${padTop + 31}" text-anchor="middle" font-family="${FONT_STACK}" font-size="24" font-weight="500" fill="#BFE3F7">${badgeText}</text>
-  `)
-
   // 중앙: 통계 숫자(있으면) + 헤드라인 + 서브라인
   if (input.statText) {
     parts.push(`<text x="${padX}" y="${cursorY + 110}" font-family="${FONT_STACK}" font-size="128" font-weight="800" fill="${escXml(input.statColor || '#ffffff')}">${escXml(input.statText)}</text>`)
@@ -190,13 +176,6 @@ export function renderCardSvg(input: CardImageInput, copy: { headline: string; s
   sublineLines.forEach((line, i) => {
     parts.push(`<text x="${padX}" y="${cursorY + (i + 1) * sublineLineH - 12}" font-family="${FONT_STACK}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${escXml(line)}</text>`)
   })
-
-  // 하단: 구분선 + period / ezlook.co.kr
-  parts.push(`
-    <line x1="${padX}" y1="${footerY - 28}" x2="${W - padX}" y2="${footerY - 28}" stroke="rgba(255,255,255,0.22)" stroke-width="1"/>
-    <text x="${padX}" y="${footerY}" font-family="${FONT_STACK}" font-size="24" fill="rgba(255,255,255,0.6)">${escXml(input.period)}</text>
-    <text x="${W - padX}" y="${footerY}" text-anchor="end" font-family="${FONT_STACK}" font-size="24" fill="rgba(255,255,255,0.6)">ezlook.co.kr</text>
-  `)
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${parts.join('')}</svg>`
 }
