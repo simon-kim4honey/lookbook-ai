@@ -1962,8 +1962,11 @@ async function verifySession() {
     if (data.success && data.user) {
       AppState.user = data.user;
       localStorage.setItem('lookbook_user', JSON.stringify(data.user));
-    } else {
-      // 서버에서 만료 확인 → 정리
+    } else if (res.status === 401) {
+      // 서버가 "토큰이 무효/만료됐다"고 명시적으로 확인한 경우에만 로그아웃 처리.
+      // 그 외(500 등 서버 쪽 일시적 오류)는 네트워크 오류와 동일하게 캐시를
+      // 유지한다 — 폰 잠금 해제 직후처럼 네트워크가 막 재연결된 순간 D1
+      // 타임아웃 같은 일시적 오류가 나도 로그인이 풀리지 않도록 한다.
       AppState.user = null;
       localStorage.removeItem('lookbook_token');
       localStorage.removeItem('lookbook_user');
