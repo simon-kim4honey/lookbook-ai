@@ -115,14 +115,21 @@ async function collectArticles(env: DigestBindings, daysBack: number): Promise<R
 // https://developers.naver.com/docs/serviceapi/datalab/search/search.md
 // https://developers.naver.com/docs/serviceapi/datalab/shopping/shopping.md
 // ────────────────────────────────────────────────────
-type TrendPoint = { label: string; changePct: number }
+type TrendHistoryPoint = { period: string; changePct: number }
+type TrendPoint = { label: string; changePct: number; history: TrendHistoryPoint[] }
+
+function periodLabel(d: Date): string {
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${Math.ceil(d.getDate() / 7)}주차`
+}
 
 function trendDateRange(): { start: string; end: string } {
   // 네이버 데이터랩은 오늘이 포함된 "이번 주" 구간도 (아직 며칠 안 지났어도) 하나의 주간
-  // 버킷으로 돌려준다 — 그래서 항상 최근 3주 이상을 가져와서, 아직 안 끝난 마지막 구간은
-  // 버리고 그 앞의 "완전한 두 주"끼리 비교한다 (computeChangePct 참고).
+  // 버킷으로 돌려준다 — 그래서 항상 넉넉히(6주 이상) 가져와서, 아직 안 끝난 마지막 구간은
+  // 버리고 그 앞의 "완전한 주"들끼리 비교한다 (computeChangePct/computeHistory 참고).
+  // 42일 = 6주를 요청하면 최근 4주치 주간 등락률 그래프(trend-weekly 카드)를 채우기에
+  // 충분한 완전한 구간이 확보된다 — 단일 요청만으로 과거분까지 함께 받아오는 것.
   const end = new Date()
-  const start = new Date(end.getTime() - 21 * 24 * 60 * 60 * 1000)
+  const start = new Date(end.getTime() - 42 * 24 * 60 * 60 * 1000)
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
   return { start: fmt(start), end: fmt(end) }
 }
@@ -134,6 +141,25 @@ function computeChangePct(points: Array<{ ratio: number }>): number | null {
   const cur = points[points.length - 2].ratio
   if (!prev) return null
   return Math.round(((cur - prev) / prev) * 1000) / 10
+}
+
+// 네이버가 한 번의 요청으로 돌려준 여러 주를 이용해, 최근 4주치 "전주 대비 등락률"
+// 시계열을 바로 만든다 — 매주 다이제스트를 새로 만들 때마다 DB에 쌓이길 기다릴
+// 필요 없이, 이번 생성 한 번으로 과거분까지 함께 채워진다.
+function computeHistory(points: Array<{ period: string; ratio: number }>): TrendHistoryPoint[] {
+  if (!points || points.length < 3) return []
+  const complete = points.slice(0, points.length - 1) // 마지막(부분) 주 제외
+  const out: TrendHistoryPoint[] = []
+  for (let i = 1; i < complete.length; i++) {
+    const prev = complete[i - 1].ratio
+    const cur = complete[i].ratio
+    if (!prev) continue
+    out.push({
+      period: periodLabel(new Date(complete[i].period)),
+      changePct: Math.round(((cur - prev) / prev) * 1000) / 10,
+    })
+  }
+  return out.slice(-4)
 }
 
 async function fetchSearchTrends(env: DigestBindings, keywords: string[]): Promise<TrendPoint[]> {
@@ -165,7 +191,7 @@ async function fetchSearchTrends(env: DigestBindings, keywords: string[]): Promi
       const data = await res.json<any>()
       for (const group of data?.results || []) {
         const changePct = computeChangePct(group.data || [])
-        if (changePct !== null) results.push({ label: group.title, changePct })
+        if (changePct !== null) results.push({ label: group.title, changePct, history: computeHistory(group.data || []) })
       }
     } catch {
       // 이 배치만 건너뛰고 나머지는 계속 시도
@@ -208,7 +234,7 @@ async function fetchShoppingInsight(env: DigestBindings, keywords: string[]): Pr
       const data = await res.json<any>()
       for (const group of data?.results || []) {
         const changePct = computeChangePct(group.data || [])
-        if (changePct !== null) out.push({ label: group.title, changePct })
+        if (changePct !== null) out.push({ label: group.title, changePct, history: computeHistory(group.data || []) })
       }
     } catch {
       // 이 배치만 건너뛰고 나머지는 계속 시도
@@ -300,8 +326,7 @@ ${list}
 export type DigestType = 'news' | 'search_trend' | 'shopping_insight'
 
 function currentPeriod(): string {
-  const now = new Date()
-  return `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${Math.ceil(now.getDate() / 7)}주차`
+  return periodLabel(new Date())
 }
 
 // 오르내림 상위 품목을 뽑아 실무자가 바로 판단할 수 있는 한 문장 인사이트를 만든다
@@ -349,8 +374,8 @@ export async function runDigestPipeline(env: DigestBindings, type: DigestType = 
 
     for (const t of trends) {
       await db.prepare(
-        `INSERT INTO digest_trends (digest_id, type, label, change_pct) VALUES (?,?,?,?)`
-      ).bind(digestId, type, t.label, t.changePct).run()
+        `INSERT INTO digest_trends (digest_id, type, label, change_pct, history_json) VALUES (?,?,?,?,?)`
+      ).bind(digestId, type, t.label, t.changePct, JSON.stringify(t.history || [])).run()
     }
 
     return { digestId, articleCount: trends.length }
