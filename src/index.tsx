@@ -2529,6 +2529,11 @@ app.get('/trend-weekly', (c) => {
     .tw-arrow:hover { background: #202127; color: #F2F2F5; }
     .tw-arrow-left { left: 0; }
     .tw-arrow-right { right: 0; }
+    .tw-info-wrap { position: relative; display: inline-flex; margin-left: 6px; }
+    .tw-info-icon { width: 17px; height: 17px; border-radius: 50%; background: #202127; border: 1px solid #3a3b45; color: #82828E; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1; padding: 0; font-style: normal; }
+    .tw-info-icon:hover { border-color: #0579B3; color: #0DA8D6; }
+    .tw-info-pop { display: none; position: absolute; top: 24px; left: 0; width: 230px; background: #17181D; border: 1px solid #2C2D35; border-radius: 10px; padding: 10px 12px; font-size: 12px; font-weight: 400; color: #B7B7C2; line-height: 1.55; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,.45); text-align: left; }
+    .tw-info-wrap:hover .tw-info-pop, .tw-info-pop.show { display: block; }
   </style>
 
   <div class="tw-wrap">
@@ -2770,6 +2775,20 @@ app.get('/trend-weekly', (c) => {
       row.scrollBy({ left: dir * step, behavior: 'smooth' });
     }
 
+    // 섹션 제목 옆 "!" 아이콘 — 탭(모바일)/클릭(데스크톱)하면 설명 팝오버를 켜고 끔.
+    // 데스크톱 마우스 호버는 CSS(.tw-info-wrap:hover)로 별도 처리.
+    window.toggleInfoPop = function(e, id) {
+      e.stopPropagation();
+      var pop = document.getElementById(id);
+      if (!pop) return;
+      var willShow = !pop.classList.contains('show');
+      document.querySelectorAll('.tw-info-pop.show').forEach(function(p) { p.classList.remove('show'); });
+      if (willShow) pop.classList.add('show');
+    }
+    document.addEventListener('click', function() {
+      document.querySelectorAll('.tw-info-pop.show').forEach(function(p) { p.classList.remove('show'); });
+    });
+
     function renderDigests(digests) {
       var box = document.getElementById('twDigests');
       if (!digests || !digests.length) {
@@ -2777,13 +2796,23 @@ app.get('/trend-weekly', (c) => {
         return;
       }
       var typeLabel = { news: '패션 뉴스', search_trend: '검색어트렌드', shopping_insight: '쇼핑인사이트' };
+      var typeInfo = {
+        news: '네이버 뉴스에서 \\'패션 트렌드\\', \\'K-패션\\', \\'패션 이커머스\\' 등 주제로 최신 기사를 모아 AI가 요약·분류해요.',
+        search_trend: '네이버 데이터랩(검색어트렌드)에서 원피스·니트·코트 등 의류 품목의 검색량 변화를 비교해요.',
+        shopping_insight: '네이버 데이터랩(쇼핑인사이트)에서 패션의류 카테고리 내 품목별 클릭·구매 관심도 변화를 비교해요.'
+      };
       box.innerHTML = digests.map(function(d, i) {
         var cardsHtml = d.type === 'news' ? newsCards(d) : trendCards(d);
         var count = d.type === 'news' ? (d.articles || []).length + 1 : (d.trends || []).length + 1;
         var dots = '';
         for (var k = 0; k < count; k++) dots += '<span style="width:6px;height:6px;border-radius:50%;background:#0DA8D6;opacity:' + (k === 0 ? '1' : '.3') + ';"></span>';
         return '<div style="margin-bottom:28px;">' +
-          '<div style="font-size:15px;font-weight:700;color:#F2F2F5;margin-bottom:10px;">' + (typeLabel[d.type] || d.type) + '</div>' +
+          '<div style="font-size:15px;font-weight:700;color:#F2F2F5;margin-bottom:10px;display:flex;align-items:center;">' + (typeLabel[d.type] || d.type) +
+            '<span class="tw-info-wrap">' +
+              '<button type="button" class="tw-info-icon" onclick="toggleInfoPop(event,\\'twInfo' + i + '\\')" aria-label="설명 보기">!</button>' +
+              '<div class="tw-info-pop" id="twInfo' + i + '">' + (typeInfo[d.type] || '') + '</div>' +
+            '</span>' +
+          '</div>' +
           '<div class="tw-rowwrap">' +
             '<div class="tw-cardrow" id="twRow' + i + '">' + cardsHtml + '</div>' +
             (count > 1 ? (

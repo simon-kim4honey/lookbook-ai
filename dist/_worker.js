@@ -149,7 +149,7 @@ ${t.map((e,t)=>`${t+1}. [${e.source||`출처미상`}] ${e.title}`).join(`
 원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`;try{let r=await fetch(`https://api.anthropic.com/v1/messages`,{method:`POST`,headers:{"Content-Type":`application/json`,"x-api-key":e.env.ANTHROPIC_API_KEY,"anthropic-version":`2023-06-01`},body:JSON.stringify({model:`claude-sonnet-5`,thinking:{type:`disabled`},max_tokens:3e3,messages:[{role:`user`,content:n}]}),signal:AbortSignal.timeout(45e3)}),i=await r.text(),a=null;try{a=JSON.parse(i)?.usage??null}catch{}return e.json({success:!0,articleCount:t.length,httpStatus:r.status,usage:a,rawBodyPreview:i.slice(0,2e3)})}catch(n){return e.json({success:!1,articleCount:t.length,error:String(n?.message||n)})}}),B.get(`/debug-collect`,async e=>{let t=await Promise.all(St.map(async t=>({keyword:t,count:(await Et(e.env,t,12)).length}))),n=await Dt(e.env,7);return e.json({success:!0,perKeyword:t,afterDedupeAndDateFilter:n.length,sample:n.slice(0,3)})}),B.get(`/debug-trends`,async e=>{if(!e.env.NAVER_CLIENT_ID||!e.env.NAVER_CLIENT_SECRET)return e.json({success:!1,error:`NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다.`});let{start:t,end:n}=Ot(),r={"X-NCP-APIGW-API-KEY-ID":e.env.NAVER_CLIENT_ID,"X-NCP-APIGW-API-KEY":e.env.NAVER_CLIENT_SECRET,"Content-Type":`application/json`};try{let[i,a]=await Promise.all([fetch(`https://naverapihub.apigw.ntruss.com/search-trend/v1/search`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,keywordGroups:Ct.slice(0,5).map(e=>({groupName:e,keywords:[e]}))}),signal:AbortSignal.timeout(12e3)}),fetch(`https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,category:jt.code,keyword:Ct.slice(0,5).map(e=>({name:e,param:[e]}))}),signal:AbortSignal.timeout(12e3)})]),[o,s]=await Promise.all([i.text(),a.text()]);return e.json({success:!0,searchTrend:{httpStatus:i.status,body:o.slice(0,1500)},shoppingInsight:{httpStatus:a.status,body:s.slice(0,1500)}})}catch(t){return e.json({success:!1,error:String(t?.message||t)})}}),B.get(`/list`,async e=>{let{results:t}=await e.env.LOOKBOOK_DB.prepare(`SELECT d.*, (SELECT COUNT(*) FROM digest_articles a WHERE a.digest_id = d.id AND a.excluded = 0) AS article_count
      FROM content_digests d ORDER BY d.generated_at DESC LIMIT 50`).all();return e.json({success:!0,digests:t})}),B.get(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? ORDER BY importance DESC, id ASC`).bind(t).all(),{results:i}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all();return e.json({success:!0,digest:{...n,keywords:JSON.parse(n.keywords||`[]`)},articles:r,trends:i})}),B.patch(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.req.json(),r=[],i=[];return n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),n.status!==void 0&&(r.push(`status = ?`),i.push(n.status),n.status===`reviewed`&&r.push(`reviewed_at = datetime('now')`),n.status===`sent`&&r.push(`sent_at = datetime('now')`)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE content_digests SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),B.patch(`/:id/articles/:articleId`,async e=>{let{articleId:t}=e.req.param(),n=await e.req.json(),r=[],i=[];return n.excluded!==void 0&&(r.push(`excluded = ?`),i.push(+!!n.excluded)),n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE digest_articles SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),B.get(`/:id/kakao-text`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let r=n.type===`search_trend`||n.type===`shopping_insight`?n.type:`news`,i=e=>`${e>0?`📈+`:e<0?`📉`:`➖`}${e}%`,a=[];if(r===`news`){let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? AND excluded = 0 ORDER BY importance DESC, id ASC LIMIT 5`).bind(t).all();a.push(`🧵 EZlook 패션 트렌드 위클리 — ${n.period}`,``,n.summary,``),r.forEach((e,t)=>{a.push(`${t+1}. [${e.category}] ${e.title}`),a.push(e.summary),e.url&&a.push(`🔗 ${e.url}`),a.push(``)})}else{let{results:o}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all(),s=r===`search_trend`?`🔎 EZlook 검색어트렌드 위클리`:`🛍️ EZlook 쇼핑인사이트 위클리`;a.push(`${s} — ${n.period}`,``,n.summary,``),o.forEach(e=>a.push(`- ${e.label} ${i(e.change_pct)}`)),a.push(``)}return a.push(`👉 AI 룩북 무료 체험: https://www.aifashion.co.kr/?utm_source=kakao&utm_medium=channel&utm_campaign=weekly_digest`),e.text(a.join(`
-`))});var Rt=`mvfycndb`;function zt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Bt=e=>e?`
+`))});var Rt=`mvfyid0n`;function zt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Bt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -294,6 +294,11 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .tw-arrow:hover { background: #202127; color: #F2F2F5; }
     .tw-arrow-left { left: 0; }
     .tw-arrow-right { right: 0; }
+    .tw-info-wrap { position: relative; display: inline-flex; margin-left: 6px; }
+    .tw-info-icon { width: 17px; height: 17px; border-radius: 50%; background: #202127; border: 1px solid #3a3b45; color: #82828E; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1; padding: 0; font-style: normal; }
+    .tw-info-icon:hover { border-color: #0579B3; color: #0DA8D6; }
+    .tw-info-pop { display: none; position: absolute; top: 24px; left: 0; width: 230px; background: #17181D; border: 1px solid #2C2D35; border-radius: 10px; padding: 10px 12px; font-size: 12px; font-weight: 400; color: #B7B7C2; line-height: 1.55; z-index: 20; box-shadow: 0 8px 24px rgba(0,0,0,.45); text-align: left; }
+    .tw-info-wrap:hover .tw-info-pop, .tw-info-pop.show { display: block; }
   </style>
 
   <div class="tw-wrap">
@@ -535,6 +540,20 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       row.scrollBy({ left: dir * step, behavior: 'smooth' });
     }
 
+    // 섹션 제목 옆 "!" 아이콘 — 탭(모바일)/클릭(데스크톱)하면 설명 팝오버를 켜고 끔.
+    // 데스크톱 마우스 호버는 CSS(.tw-info-wrap:hover)로 별도 처리.
+    window.toggleInfoPop = function(e, id) {
+      e.stopPropagation();
+      var pop = document.getElementById(id);
+      if (!pop) return;
+      var willShow = !pop.classList.contains('show');
+      document.querySelectorAll('.tw-info-pop.show').forEach(function(p) { p.classList.remove('show'); });
+      if (willShow) pop.classList.add('show');
+    }
+    document.addEventListener('click', function() {
+      document.querySelectorAll('.tw-info-pop.show').forEach(function(p) { p.classList.remove('show'); });
+    });
+
     function renderDigests(digests) {
       var box = document.getElementById('twDigests');
       if (!digests || !digests.length) {
@@ -542,13 +561,23 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         return;
       }
       var typeLabel = { news: '패션 뉴스', search_trend: '검색어트렌드', shopping_insight: '쇼핑인사이트' };
+      var typeInfo = {
+        news: '네이버 뉴스에서 \\'패션 트렌드\\', \\'K-패션\\', \\'패션 이커머스\\' 등 주제로 최신 기사를 모아 AI가 요약·분류해요.',
+        search_trend: '네이버 데이터랩(검색어트렌드)에서 원피스·니트·코트 등 의류 품목의 검색량 변화를 비교해요.',
+        shopping_insight: '네이버 데이터랩(쇼핑인사이트)에서 패션의류 카테고리 내 품목별 클릭·구매 관심도 변화를 비교해요.'
+      };
       box.innerHTML = digests.map(function(d, i) {
         var cardsHtml = d.type === 'news' ? newsCards(d) : trendCards(d);
         var count = d.type === 'news' ? (d.articles || []).length + 1 : (d.trends || []).length + 1;
         var dots = '';
         for (var k = 0; k < count; k++) dots += '<span style="width:6px;height:6px;border-radius:50%;background:#0DA8D6;opacity:' + (k === 0 ? '1' : '.3') + ';"></span>';
         return '<div style="margin-bottom:28px;">' +
-          '<div style="font-size:15px;font-weight:700;color:#F2F2F5;margin-bottom:10px;">' + (typeLabel[d.type] || d.type) + '</div>' +
+          '<div style="font-size:15px;font-weight:700;color:#F2F2F5;margin-bottom:10px;display:flex;align-items:center;">' + (typeLabel[d.type] || d.type) +
+            '<span class="tw-info-wrap">' +
+              '<button type="button" class="tw-info-icon" onclick="toggleInfoPop(event,\\'twInfo' + i + '\\')" aria-label="설명 보기">!</button>' +
+              '<div class="tw-info-pop" id="twInfo' + i + '">' + (typeInfo[d.type] || '') + '</div>' +
+            '</span>' +
+          '</div>' +
           '<div class="tw-rowwrap">' +
             '<div class="tw-cardrow" id="twRow' + i + '">' + cardsHtml + '</div>' +
             (count > 1 ? (
