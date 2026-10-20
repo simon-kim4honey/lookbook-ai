@@ -2664,21 +2664,37 @@ app.get('/trend-weekly', (c) => {
     }
 
     // 트렌드 항목의 최근(최대 4주) 등락률 시계열로 한 줄 인사이트 생성(규칙 기반 —
-    // AI 호출 없이 추세만 보고 판단: 연속 상승/하락, 직전 평균 대비 급변 여부)
+    // AI 호출 없이 추세만 보고 판단). 그래프만 보고는 바로 안 읽히는 패턴(반등/꺾임/
+    // 변동성)까지 구체적인 수치와 함께 짚어줘서, "등락을 반복" 같은 뭉뚱그린 문구로
+    // 끝나지 않도록 한다.
     function trendInsight(history) {
       if (!history || history.length < 2) return '최근 몇 주간 비교할 데이터가 아직 부족해요.';
       var vals = history.map(function(h) { return h.change_pct; });
+      var n = vals.length;
+      var fmt = function(v) { return (v > 0 ? '+' : '') + v + '%'; };
       var diffs = [];
-      for (var i = 1; i < vals.length; i++) diffs.push(vals[i] - vals[i - 1]);
+      for (var i = 1; i < n; i++) diffs.push(vals[i] - vals[i - 1]);
       var allUp = diffs.every(function(x) { return x > 0; });
       var allDown = diffs.every(function(x) { return x < 0; });
-      if (allUp) return (vals.length - 1) + '주 연속 상승세예요.';
-      if (allDown) return (vals.length - 1) + '주 연속 하락세예요.';
-      var last = vals[vals.length - 1];
-      var prevAvg = vals.slice(0, -1).reduce(function(a, b) { return a + b; }, 0) / (vals.length - 1);
-      if (last - prevAvg > 10) return '이번 주 들어 관심도가 크게 올랐어요.';
-      if (prevAvg - last > 10) return '이번 주 들어 관심도가 크게 꺾였어요.';
-      return '최근 ' + vals.length + '주간 등락을 반복하고 있어요.';
+      var last = vals[n - 1], prev = vals[n - 2];
+      var lastDiff = last - prev;
+
+      if (allUp) return (n - 1) + '주 연속 상승세예요 (' + fmt(vals[0]) + ' → ' + fmt(last) + ').';
+      if (allDown) return (n - 1) + '주 연속 하락세예요 (' + fmt(vals[0]) + ' → ' + fmt(last) + ').';
+
+      // 직전까지의 추세가 이번 주에 반대로 꺾였는지(반등/하락전환)
+      if (n >= 3) {
+        var prevDiff = vals[n - 2] - vals[n - 3];
+        if (prevDiff < 0 && lastDiff > 0) return '하락하다 이번 주 반등했어요 (' + fmt(prev) + ' → ' + fmt(last) + ').';
+        if (prevDiff > 0 && lastDiff < 0) return '상승하다 이번 주 꺾였어요 (' + fmt(prev) + ' → ' + fmt(last) + ').';
+      }
+
+      // 주마다 변동폭 자체가 큰 경우(널뛰기)
+      var maxV = Math.max.apply(null, vals), minV = Math.min.apply(null, vals);
+      if (maxV - minV > 30) return '주마다 변동폭이 커요 (최저 ' + fmt(minV) + ' ~ 최고 ' + fmt(maxV) + ').';
+
+      if (Math.abs(lastDiff) < 1) return '지난주와 비슷한 수준을 유지하고 있어요 (' + fmt(last) + ').';
+      return '지난주 ' + fmt(prev) + ' → 이번 주 ' + fmt(last) + '로 ' + (lastDiff > 0 ? '올랐어요.' : '내렸어요.');
     }
 
     // 최근(최대 4주) 등락률을 0 기준선 막대그래프로 그림(최신 주만 진하게 강조)

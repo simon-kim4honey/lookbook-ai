@@ -149,7 +149,7 @@ ${t.map((e,t)=>`${t+1}. [${e.source||`출처미상`}] ${e.title}`).join(`
 원본 목록 순번(1-based)을 idx로 사용해서, 아래 JSON 형식으로만 응답하세요 (마크다운 코드펜스 없이, 내부/시스템 태그 없이):
 {"overallSummary": string, "keywords": string[], "items": [{"idx": number, "category": string, "summary": string, "importance": number}]}`;try{let r=await fetch(`https://api.anthropic.com/v1/messages`,{method:`POST`,headers:{"Content-Type":`application/json`,"x-api-key":e.env.ANTHROPIC_API_KEY,"anthropic-version":`2023-06-01`},body:JSON.stringify({model:`claude-sonnet-5`,thinking:{type:`disabled`},max_tokens:3e3,messages:[{role:`user`,content:n}]}),signal:AbortSignal.timeout(45e3)}),i=await r.text(),a=null;try{a=JSON.parse(i)?.usage??null}catch{}return e.json({success:!0,articleCount:t.length,httpStatus:r.status,usage:a,rawBodyPreview:i.slice(0,2e3)})}catch(n){return e.json({success:!1,articleCount:t.length,error:String(n?.message||n)})}}),B.get(`/debug-collect`,async e=>{let t=await Promise.all(St.map(async t=>({keyword:t,count:(await Et(e.env,t,12)).length}))),n=await Dt(e.env,7);return e.json({success:!0,perKeyword:t,afterDedupeAndDateFilter:n.length,sample:n.slice(0,3)})}),B.get(`/debug-trends`,async e=>{if(!e.env.NAVER_CLIENT_ID||!e.env.NAVER_CLIENT_SECRET)return e.json({success:!1,error:`NAVER_CLIENT_ID/NAVER_CLIENT_SECRET이 설정되지 않았습니다.`});let{start:t,end:n}=kt(),r={"X-NCP-APIGW-API-KEY-ID":e.env.NAVER_CLIENT_ID,"X-NCP-APIGW-API-KEY":e.env.NAVER_CLIENT_SECRET,"Content-Type":`application/json`};try{let[i,a]=await Promise.all([fetch(`https://naverapihub.apigw.ntruss.com/search-trend/v1/search`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,keywordGroups:Ct.slice(0,5).map(e=>({groupName:e,keywords:[e]}))}),signal:AbortSignal.timeout(12e3)}),fetch(`https://naverapihub.apigw.ntruss.com/shopping/v1/category/keywords`,{method:`POST`,headers:r,body:JSON.stringify({startDate:t,endDate:n,timeUnit:`week`,category:Nt.code,keyword:Ct.slice(0,5).map(e=>({name:e,param:[e]}))}),signal:AbortSignal.timeout(12e3)})]),[o,s]=await Promise.all([i.text(),a.text()]);return e.json({success:!0,searchTrend:{httpStatus:i.status,body:o.slice(0,1500)},shoppingInsight:{httpStatus:a.status,body:s.slice(0,1500)}})}catch(t){return e.json({success:!1,error:String(t?.message||t)})}}),B.get(`/list`,async e=>{let{results:t}=await e.env.LOOKBOOK_DB.prepare(`SELECT d.*, (SELECT COUNT(*) FROM digest_articles a WHERE a.digest_id = d.id AND a.excluded = 0) AS article_count
      FROM content_digests d ORDER BY d.generated_at DESC LIMIT 50`).all();return e.json({success:!0,digests:t})}),B.get(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? ORDER BY importance DESC, id ASC`).bind(t).all(),{results:i}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all();return e.json({success:!0,digest:{...n,keywords:JSON.parse(n.keywords||`[]`)},articles:r,trends:i})}),B.patch(`/:id`,async e=>{let t=e.req.param(`id`),n=await e.req.json(),r=[],i=[];return n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),n.status!==void 0&&(r.push(`status = ?`),i.push(n.status),n.status===`reviewed`&&r.push(`reviewed_at = datetime('now')`),n.status===`sent`&&r.push(`sent_at = datetime('now')`)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE content_digests SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),B.patch(`/:id/articles/:articleId`,async e=>{let{articleId:t}=e.req.param(),n=await e.req.json(),r=[],i=[];return n.excluded!==void 0&&(r.push(`excluded = ?`),i.push(+!!n.excluded)),n.summary!==void 0&&(r.push(`summary = ?`),i.push(n.summary)),r.length?(i.push(t),await e.env.LOOKBOOK_DB.prepare(`UPDATE digest_articles SET ${r.join(`, `)} WHERE id = ?`).bind(...i).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 필드가 없습니다.`},400)}),B.get(`/:id/kakao-text`,async e=>{let t=e.req.param(`id`),n=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM content_digests WHERE id = ?`).bind(t).first();if(!n)return e.json({success:!1,message:`찾을 수 없습니다.`},404);let r=n.type===`search_trend`||n.type===`shopping_insight`?n.type:`news`,i=e=>`${e>0?`📈+`:e<0?`📉`:`➖`}${e}%`,a=[];if(r===`news`){let{results:r}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_articles WHERE digest_id = ? AND excluded = 0 ORDER BY importance DESC, id ASC LIMIT 5`).bind(t).all();a.push(`🧵 EZlook 패션 트렌드 위클리 — ${n.period}`,``,n.summary,``),r.forEach((e,t)=>{a.push(`${t+1}. [${e.category}] ${e.title}`),a.push(e.summary),e.url&&a.push(`🔗 ${e.url}`),a.push(``)})}else{let{results:o}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM digest_trends WHERE digest_id = ? ORDER BY change_pct DESC`).bind(t).all(),s=r===`search_trend`?`🔎 EZlook 검색어트렌드 위클리`:`🛍️ EZlook 쇼핑인사이트 위클리`;a.push(`${s} — ${n.period}`,``,n.summary,``),o.forEach(e=>a.push(`- ${e.label} ${i(e.change_pct)}`)),a.push(``)}return a.push(`👉 AI 룩북 무료 체험: https://www.aifashion.co.kr/?utm_source=kakao&utm_medium=channel&utm_campaign=weekly_digest`),e.text(a.join(`
-`))});var Bt=`mvg0nvte`;function Vt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Ht=e=>e?`
+`))});var Bt=`mvgcybbb`;function Vt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Ht=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -429,21 +429,37 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     }
 
     // 트렌드 항목의 최근(최대 4주) 등락률 시계열로 한 줄 인사이트 생성(규칙 기반 —
-    // AI 호출 없이 추세만 보고 판단: 연속 상승/하락, 직전 평균 대비 급변 여부)
+    // AI 호출 없이 추세만 보고 판단). 그래프만 보고는 바로 안 읽히는 패턴(반등/꺾임/
+    // 변동성)까지 구체적인 수치와 함께 짚어줘서, "등락을 반복" 같은 뭉뚱그린 문구로
+    // 끝나지 않도록 한다.
     function trendInsight(history) {
       if (!history || history.length < 2) return '최근 몇 주간 비교할 데이터가 아직 부족해요.';
       var vals = history.map(function(h) { return h.change_pct; });
+      var n = vals.length;
+      var fmt = function(v) { return (v > 0 ? '+' : '') + v + '%'; };
       var diffs = [];
-      for (var i = 1; i < vals.length; i++) diffs.push(vals[i] - vals[i - 1]);
+      for (var i = 1; i < n; i++) diffs.push(vals[i] - vals[i - 1]);
       var allUp = diffs.every(function(x) { return x > 0; });
       var allDown = diffs.every(function(x) { return x < 0; });
-      if (allUp) return (vals.length - 1) + '주 연속 상승세예요.';
-      if (allDown) return (vals.length - 1) + '주 연속 하락세예요.';
-      var last = vals[vals.length - 1];
-      var prevAvg = vals.slice(0, -1).reduce(function(a, b) { return a + b; }, 0) / (vals.length - 1);
-      if (last - prevAvg > 10) return '이번 주 들어 관심도가 크게 올랐어요.';
-      if (prevAvg - last > 10) return '이번 주 들어 관심도가 크게 꺾였어요.';
-      return '최근 ' + vals.length + '주간 등락을 반복하고 있어요.';
+      var last = vals[n - 1], prev = vals[n - 2];
+      var lastDiff = last - prev;
+
+      if (allUp) return (n - 1) + '주 연속 상승세예요 (' + fmt(vals[0]) + ' → ' + fmt(last) + ').';
+      if (allDown) return (n - 1) + '주 연속 하락세예요 (' + fmt(vals[0]) + ' → ' + fmt(last) + ').';
+
+      // 직전까지의 추세가 이번 주에 반대로 꺾였는지(반등/하락전환)
+      if (n >= 3) {
+        var prevDiff = vals[n - 2] - vals[n - 3];
+        if (prevDiff < 0 && lastDiff > 0) return '하락하다 이번 주 반등했어요 (' + fmt(prev) + ' → ' + fmt(last) + ').';
+        if (prevDiff > 0 && lastDiff < 0) return '상승하다 이번 주 꺾였어요 (' + fmt(prev) + ' → ' + fmt(last) + ').';
+      }
+
+      // 주마다 변동폭 자체가 큰 경우(널뛰기)
+      var maxV = Math.max.apply(null, vals), minV = Math.min.apply(null, vals);
+      if (maxV - minV > 30) return '주마다 변동폭이 커요 (최저 ' + fmt(minV) + ' ~ 최고 ' + fmt(maxV) + ').';
+
+      if (Math.abs(lastDiff) < 1) return '지난주와 비슷한 수준을 유지하고 있어요 (' + fmt(last) + ').';
+      return '지난주 ' + fmt(prev) + ' → 이번 주 ' + fmt(last) + '로 ' + (lastDiff > 0 ? '올랐어요.' : '내렸어요.');
     }
 
     // 최근(최대 4주) 등락률을 0 기준선 막대그래프로 그림(최신 주만 진하게 강조)
