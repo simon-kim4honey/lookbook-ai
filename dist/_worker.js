@@ -170,7 +170,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Ht}" font-size="128" font-weight="800" fill="${Bt(e.statColor||`#ffffff`)}">${Bt(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Ht}" font-size="64" font-weight="800" fill="#ffffff">${Bt(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Ht}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Bt(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Wt=`mvgevmci`;function Gt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Kt=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Ht}" font-size="128" font-weight="800" fill="${Bt(e.statColor||`#ffffff`)}">${Bt(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Ht}" font-size="64" font-weight="800" fill="#ffffff">${Bt(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Ht}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Bt(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Wt=`mvgg6vfq`;function Gt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Kt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -311,10 +311,10 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .tw-cardrow::-webkit-scrollbar { display: none; }
     .tw-cardrow.tw-dragging { cursor: grabbing; scroll-snap-type: none; }
     .tw-swipecard { flex: 0 0 85%; scroll-snap-align: center; border: 1px solid #2C2D35; border-radius: 16px; background: #17181D; padding: 20px; min-height: 180px; box-sizing: border-box; }
-    .tw-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; background: rgba(23,24,29,.92); border: 1px solid #2C2D35; color: #B7B7C2; font-size: 18px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; }
-    .tw-arrow:hover { background: #202127; color: #F2F2F5; }
-    .tw-arrow-left { left: 0; }
-    .tw-arrow-right { right: 0; }
+    .tw-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; background: rgba(23,24,29,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,.15); color: #F2F2F5; font-size: 18px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+    .tw-arrow:hover { background: rgba(32,33,39,.75); color: #F2F2F5; }
+    .tw-arrow-left { left: 6px; }
+    .tw-arrow-right { right: 6px; }
     .tw-info-wrap { position: relative; display: inline-flex; margin-left: 6px; }
     .tw-info-icon { width: 17px; height: 17px; border-radius: 50%; background: #202127; border: 1px solid #3a3b45; color: #82828E; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1; padding: 0; font-style: normal; }
     .tw-info-icon:hover { border-color: #0579B3; color: #0DA8D6; }

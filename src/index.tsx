@@ -2522,10 +2522,10 @@ app.get('/trend-weekly', (c) => {
     .tw-cardrow::-webkit-scrollbar { display: none; }
     .tw-cardrow.tw-dragging { cursor: grabbing; scroll-snap-type: none; }
     .tw-swipecard { flex: 0 0 85%; scroll-snap-align: center; border: 1px solid #2C2D35; border-radius: 16px; background: #17181D; padding: 20px; min-height: 180px; box-sizing: border-box; }
-    .tw-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; background: rgba(23,24,29,.92); border: 1px solid #2C2D35; color: #B7B7C2; font-size: 18px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; }
-    .tw-arrow:hover { background: #202127; color: #F2F2F5; }
-    .tw-arrow-left { left: 0; }
-    .tw-arrow-right { right: 0; }
+    .tw-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border-radius: 50%; background: rgba(23,24,29,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,.15); color: #F2F2F5; font-size: 18px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+    .tw-arrow:hover { background: rgba(32,33,39,.75); color: #F2F2F5; }
+    .tw-arrow-left { left: 6px; }
+    .tw-arrow-right { right: 6px; }
     .tw-info-wrap { position: relative; display: inline-flex; margin-left: 6px; }
     .tw-info-icon { width: 17px; height: 17px; border-radius: 50%; background: #202127; border: 1px solid #3a3b45; color: #82828E; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1; padding: 0; font-style: normal; }
     .tw-info-icon:hover { border-color: #0579B3; color: #0DA8D6; }
