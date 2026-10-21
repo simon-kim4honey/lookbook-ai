@@ -2561,6 +2561,7 @@ app.get('/trend-weekly', (c) => {
             <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">누끼컷 만들기</a>
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="/gov-support" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">지원사업 도우미</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:#2C2D35;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
@@ -3067,6 +3068,169 @@ app.get('/trend-weekly', (c) => {
   })();
   </script>
   `, '', '매주 모아주는 패션 뉴스·검색어트렌드·쇼핑인사이트', c.env.GA4_MEASUREMENT_ID))
+})
+
+// ────────────────────────────────────────────────────
+// GET /gov-support — 지원사업 도우미 (패션 제조 브랜드용 정부지원사업 사업계획서 작성 도우미)
+// 지금은 9개 사업 소개 + 자격요건/평가기준 열람까지만 제공한다(정보 제공 단계).
+// AI 초안 자동생성(위저드 → 섹션별 AI 생성 → 재무 계산 → 인쇄 미리보기)은 다음 단계로 별도 구현 예정 —
+// 여기 보이는 funding/eligibility 등은 모두 예시 수치이며 연도·기관별 공고에 따라 달라진다.
+// ────────────────────────────────────────────────────
+const GOV_SUPPORT_PROGRAMS = [
+  {
+    id: 'yebi', name: '예비창업패키지', agency: '중소벤처기업부 · 창업진흥원', formType: '사업계획서형 (PSST)',
+    funding: '최대 8,000만 원 (평균 4,000만 원 내외)',
+    target: '사업자등록 전 예비창업자',
+    eligibility: ['공고일 기준 사업자등록이 되어 있지 않은 예비창업자', '동종 업종 폐업 후 재창업은 폐업일로부터 3년 경과(부도·파산 2년)', '나이 제한 없음 (특화분야: 여성·소셜벤처·사내벤처)'],
+    criteria: [['사업성', 40], ['실행가능성', 40], ['자기효능감', 20]],
+  },
+  {
+    id: 'choi', name: '초기창업패키지', agency: '중소벤처기업부 · 창업진흥원', formType: '사업계획서형 (PSST)',
+    funding: '최대 1억 원 (평균 5,000만 원 내외)',
+    target: '창업 3년 미만 대표자',
+    eligibility: ['창업(사업자등록) 3년 미만 기업 대표', '재창업·특화분야 요건은 공고 확인'],
+    criteria: [['사업성', 40], ['실행가능성', 40], ['자기효능감', 20]],
+  },
+  {
+    id: 'hope-return', name: '희망리턴패키지', agency: '소상공인시장진흥공단', formType: '자기역량기술서 + 사업계획서',
+    funding: '최대 4,000만 원 (트랙·기관별 상이)',
+    target: '경영위기·폐업(예정) 소상공인',
+    eligibility: ['경영상 어려움(폐업 예정 포함) 또는 폐업 후 재기를 준비하는 소상공인', '자립지원 트랙: 장기실업 청년 등 (요건 공고 확인)', '사전 진단·교육 이수가 선결 조건인 트랙 있음'],
+    criteria: [['신청자 역량', 30], ['사업계획의 적절성', 40], ['성장가능성', 30]],
+  },
+  {
+    id: 'youth-academy', name: '청년창업사관학교', agency: '중소벤처기업부 · 창업진흥원', formType: '입교신청서형 사업계획서 + 발표평가',
+    funding: '최대 1억 원 (평균 7,000만 원 내외)',
+    target: '만 39세 이하, 창업 3년 이내(경험창업자 7년 이내)',
+    eligibility: ['대표자 만 39세 이하', '창업 3년 이내 대표자 (예비창업자 가능)', '재창업 등 세부 요건은 공고 확인'],
+    criteria: [['사업성', 40], ['실행가능성', 40], ['자기효능감', 20]],
+  },
+  {
+    id: 'local-creator', name: '로컬크리에이터 육성', agency: '중소벤처기업부 · 소상공인시장진흥공단', formType: '신청서 + 사업계획서 (지역자원 활용 중심)',
+    funding: 'BM 구체화·멘토링·브랜딩·마케팅 자금 (280개사 내외 선정)',
+    target: '지역 자원을 활용하는 소상공인',
+    eligibility: ['지역의 자연환경·문화적 자산과 아이디어를 결합해 사업적 가치를 창출하는 창업가', '기창업자 중심 (예비창업자 대상 지자체별 공고 별도 존재)'],
+    criteria: [['지역자원 활용방안', 40], ['사업성', 30], ['신청자 역량·실행가능성', 30]],
+  },
+  {
+    id: 'innov-sop', name: '혁신소상공인 창업지원', agency: '중소벤처기업부 · 소상공인시장진흥공단', formType: '신청서 + 창업 아이템 계획 (오디션 발표 포함)',
+    funding: '창업교육 + 사업화 자금 (560명 내외 선정)',
+    target: '예비창업자 (교육 이수 후 오디션 통과자가 사업화 자금 대상)',
+    eligibility: ['예비창업자 (신사업 등 유망 아이디어·아이템 기반)', '교육 이수 후 오디션 통과자가 사업화 자금 지원 대상'],
+    criteria: [['사업성', 40], ['실현가능성', 40], ['창업의지', 20]],
+  },
+  {
+    id: 'smart-store', name: '스마트상점 기술보급사업', agency: '중소벤처기업부 · 소상공인시장진흥공단', formType: '신청서형 (경량)',
+    funding: '도입비용 50~70% 지원 (사회적 배려대상 최대 80%, 최대 1,000만 원 내외)',
+    target: '점포를 운영 중인 소상공인',
+    eligibility: ['점포를 운영 중인 소상공인', '기술공급기업과 계약 가능한 매장 (세부 요건 공고 확인)'],
+    criteria: [['도입 필요성', 40], ['기술 활용 적합성', 40], ['실행가능성', 20]],
+  },
+  {
+    id: 'online-channel', name: '온라인 판로지원사업', agency: '중소벤처기업부 · 소상공인시장진흥공단 (판판대로)', formType: '신청서형 (경량)',
+    funding: '세부사업별 연간 단가 한도 내 지원 (연 600만 원 수준)',
+    target: '온라인 판매 진출·고도화를 준비하는 소상공인',
+    eligibility: ['온라인 판매 진출(또는 고도화)을 준비하는 소상공인', '판판대로 회원가입 필수'],
+    criteria: [['진출 필요성', 40], ['활용 적합성', 40], ['기대효과', 20]],
+  },
+  {
+    id: 'innov-voucher', name: '중소기업 혁신바우처 지원사업', agency: '중소벤처기업부', formType: '신청서형 (경량)',
+    funding: '기업당 최대 5,000만 원 (바우처 서비스 조합)',
+    target: '제조업 중심 소기업',
+    eligibility: ['제조업 중심 소기업 (매출액 140억 원 이하, 일부 바우처는 1,800억 이하)', '소상공인 제조업자 포함 여부는 바우처 유형별 확인'],
+    criteria: [['이용 필요성', 40], ['서비스 적합성', 40], ['실행가능성', 20]],
+  },
+]
+
+app.get('/gov-support', (c) => {
+  const cardsHtml = GOV_SUPPORT_PROGRAMS.map((p) => `
+    <div class="gs-card">
+      <div class="gs-card-top" onclick="toggleGsCard('${p.id}')">
+        <div>
+          <div class="gs-card-name">${p.name}</div>
+          <div class="gs-card-agency">${p.agency}</div>
+        </div>
+        <span class="gs-card-arrow" id="gsArrow-${p.id}">⌄</span>
+      </div>
+      <div class="gs-card-summary">
+        <span class="gs-badge">${p.formType}</span>
+        <div class="gs-funding">${p.funding}</div>
+        <div class="gs-target">대상: ${p.target}</div>
+      </div>
+      <div class="gs-card-detail" id="gsDetail-${p.id}" style="display:none;">
+        <div class="gs-detail-label">자격 요건</div>
+        <ul class="gs-elig-list">${p.eligibility.map((e) => `<li>${e}</li>`).join('')}</ul>
+        <div class="gs-detail-label">평가 기준</div>
+        <div class="gs-criteria-row">${p.criteria.map((cr) => `<span class="gs-criteria-chip">${cr[0]} ${cr[1]}%</span>`).join('')}</div>
+      </div>
+    </div>
+  `).join('')
+
+  return c.html(htmlShell('지원사업 도우미', `
+  <div class="toast-container" id="toastContainer"></div>
+
+  <style>
+    body { background: #F2F4F6; }
+    .gs-wrap { min-height: 100vh; padding: 0 0 80px; background: #F2F4F6; }
+    .gs-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
+    .gs-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 16px; }
+    .gs-back { width: 40px; height: 40px; border: none; background: #FFFFFF; border-radius: 50%; color: #333D4B; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; box-shadow: 0 2px 8px rgba(15,23,42,0.06); }
+    .gs-intro { margin: 4px 0 20px; }
+    .gs-intro h1 { font-size: 22px; font-weight: 800; color: #191F28; margin: 0 0 8px; }
+    .gs-intro p { font-size: 14px; color: #4E5968; line-height: 1.6; margin: 0; }
+    .gs-notice { background: #FFF8E1; border: 1px solid #F5D98A; border-radius: 12px; padding: 12px 14px; font-size: 12.5px; color: #8A6D1D; line-height: 1.6; margin: 16px 0; }
+    .gs-card { background: #FFFFFF; border-radius: 16px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); margin-bottom: 12px; overflow: hidden; }
+    .gs-card-top { display: flex; align-items: flex-start; justify-content: space-between; padding: 16px 18px; cursor: pointer; gap: 10px; }
+    .gs-card-name { font-size: 16px; font-weight: 700; color: #191F28; margin-bottom: 3px; }
+    .gs-card-agency { font-size: 12px; color: #8B95A1; }
+    .gs-card-arrow { font-size: 16px; color: #B0B8C1; flex-shrink: 0; transition: transform .15s; }
+    .gs-card-arrow.open { transform: rotate(180deg); }
+    .gs-card-summary { padding: 0 18px 16px; }
+    .gs-badge { display: inline-block; font-size: 11px; font-weight: 700; color: #3182F6; background: #EAF2FF; border-radius: 999px; padding: 3px 10px; margin-bottom: 8px; }
+    .gs-funding { font-size: 14px; font-weight: 600; color: #191F28; margin-bottom: 4px; }
+    .gs-target { font-size: 12.5px; color: #4E5968; }
+    .gs-card-detail { padding: 14px 18px 18px; border-top: 1px solid #E5E8EB; background: #FAFBFC; }
+    .gs-detail-label { font-size: 12px; font-weight: 700; color: #8B95A1; margin: 0 0 6px; }
+    .gs-elig-list { margin: 0 0 14px; padding-left: 18px; font-size: 13px; color: #333D4B; line-height: 1.7; }
+    .gs-criteria-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .gs-criteria-chip { font-size: 11.5px; font-weight: 600; color: #4E5968; background: #EEF1F4; border-radius: 999px; padding: 4px 10px; }
+    .gs-cta-notice { text-align: center; font-size: 13px; color: #8B95A1; background: #FFFFFF; border-radius: 14px; padding: 18px; margin-top: 8px; }
+    .gs-footer-disclaimer { font-size: 11.5px; color: #8B95A1; line-height: 1.6; margin-top: 20px; text-align: center; }
+  </style>
+
+  <div class="gs-wrap">
+    <div class="gs-header" style="display:flex;align-items:center;justify-content:space-between;max-width:480px;margin:0 auto;">
+      <a href="/dashboard" class="gs-back">‹</a>
+      <h1 style="font-size:17px;font-weight:700;color:#191F28;margin:0;">지원사업 도우미</h1>
+      <div style="width:40px;"></div>
+    </div>
+
+    <div class="gs-inner">
+      <div class="gs-intro">
+        <h1>패션 제조 브랜드를 위한<br/>정부지원사업 사업계획서 도우미</h1>
+        <p>의류·가방·잡화·신발·주얼리 브랜드 창업자 전용. 아래 9개 사업 중 내게 맞는 것을 먼저 확인해보세요.</p>
+      </div>
+
+      <div class="gs-notice">⚠️ 배점·양식·지원금은 연도·기관별 공고에 따라 달라질 수 있습니다. 아래 정보는 참고용 예시이며, 신청 전 반드시 원문 공고를 확인하세요.</div>
+
+      ${cardsHtml}
+
+      <div class="gs-cta-notice">📝 입력한 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 준비 중입니다.</div>
+
+      <div class="gs-footer-disclaimer">본 콘텐츠는 정부지원사업 신청을 돕기 위한 참고 자료이며, 법률·세무 자문이 아닙니다.</div>
+    </div>
+  </div>
+
+  <script>
+    function toggleGsCard(id) {
+      var detail = document.getElementById('gsDetail-' + id);
+      var arrow = document.getElementById('gsArrow-' + id);
+      var open = detail.style.display !== 'none';
+      detail.style.display = open ? 'none' : 'block';
+      arrow.classList.toggle('open', !open);
+    }
+  </script>
+  `, '', '패션 제조 브랜드를 위한 정부지원사업 사업계획서 작성 도우미 — 예비창업패키지·초기창업패키지 등 9개 사업', c.env.GA4_MEASUREMENT_ID))
 })
 
 // ────────────────────────────────────────────────────
@@ -7550,6 +7714,7 @@ app.get('/about', (c) => {
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="/trend-weekly" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">주간 트렌드 분석</a>
+            <a href="/gov-support" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">지원사업 도우미</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:10px 14px;font-size:14px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:10px 14px;font-size:14px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
@@ -8222,6 +8387,12 @@ app.get('/dashboard', (c) => {
         <span class="db-menu-arrow">›</span>
       </a>
 
+      <!-- 지원사업 도우미 -->
+      <a href="/gov-support" class="db-menu-item">
+        <span class="db-menu-label">지원사업 도우미</span>
+        <span class="db-menu-arrow">›</span>
+      </a>
+
       <!-- 서비스소개 -->
       <a href="https://www.aifashion.co.kr/about" class="db-menu-item">
         <span class="db-menu-label">서비스소개</span>
@@ -8275,6 +8446,7 @@ app.get('/dashboard', (c) => {
               ${isTechpackMenuVisible(c) ? `<a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">도식화 만들기</a>` : ''}
               <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
               <a href="/trend-weekly" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">주간 트렌드 분석</a>
+              <a href="/gov-support" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">지원사업 도우미</a>
               <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#333D4B;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
               <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
               <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
@@ -9028,6 +9200,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
             <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">카톡 문의</a>
             <a href="/trend-weekly" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">주간 트렌드 분석</a>
+            <a href="/gov-support" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">지원사업 도우미</a>
             <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">서비스소개</a>
             <div style="height:1px;background:var(--gapp-border,#E5E8EB);margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
