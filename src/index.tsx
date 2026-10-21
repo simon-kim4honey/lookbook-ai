@@ -3143,27 +3143,8 @@ const GOV_SUPPORT_PROGRAMS = [
 ]
 
 app.get('/gov-support', (c) => {
-  const cardsHtml = GOV_SUPPORT_PROGRAMS.map((p) => `
-    <div class="gs-card">
-      <div class="gs-card-top" onclick="toggleGsCard('${p.id}')">
-        <div>
-          <div class="gs-card-name">${p.name}</div>
-          <div class="gs-card-agency">${p.agency}</div>
-        </div>
-        <span class="gs-card-arrow" id="gsArrow-${p.id}">⌄</span>
-      </div>
-      <div class="gs-card-summary">
-        <span class="gs-badge">${p.formType}</span>
-        <div class="gs-funding">${p.funding}</div>
-        <div class="gs-target">대상: ${p.target}</div>
-      </div>
-      <div class="gs-card-detail" id="gsDetail-${p.id}" style="display:none;">
-        <div class="gs-detail-label">자격 요건</div>
-        <ul class="gs-elig-list">${p.eligibility.map((e) => `<li>${e}</li>`).join('')}</ul>
-        <div class="gs-detail-label">평가 기준</div>
-        <div class="gs-criteria-row">${p.criteria.map((cr) => `<span class="gs-criteria-chip">${cr[0]} ${cr[1]}%</span>`).join('')}</div>
-      </div>
-    </div>
+  const buttonsHtml = GOV_SUPPORT_PROGRAMS.map((p) => `
+    <button type="button" class="gs-prog-btn" id="gsBtn-${p.id}" onclick="selectGsProgram('${p.id}', '${p.name.replace(/'/g, "\\'")}')">${p.name}</button>
   `).join('')
 
   return c.html(htmlShell('지원사업 도우미', `
@@ -3175,26 +3156,14 @@ app.get('/gov-support', (c) => {
     .gs-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
     .gs-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 16px; }
     .gs-back { width: 40px; height: 40px; border: none; background: #FFFFFF; border-radius: 50%; color: #333D4B; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; box-shadow: 0 2px 8px rgba(15,23,42,0.06); }
-    .gs-intro { margin: 4px 0 20px; }
+    .gs-intro { margin: 4px 0 24px; }
     .gs-intro h1 { font-size: 22px; font-weight: 800; color: #191F28; margin: 0 0 8px; }
     .gs-intro p { font-size: 14px; color: #4E5968; line-height: 1.6; margin: 0; }
-    .gs-notice { background: #FFF8E1; border: 1px solid #F5D98A; border-radius: 12px; padding: 12px 14px; font-size: 12.5px; color: #8A6D1D; line-height: 1.6; margin: 16px 0; }
-    .gs-card { background: #FFFFFF; border-radius: 16px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); margin-bottom: 12px; overflow: hidden; }
-    .gs-card-top { display: flex; align-items: flex-start; justify-content: space-between; padding: 16px 18px; cursor: pointer; gap: 10px; }
-    .gs-card-name { font-size: 16px; font-weight: 700; color: #191F28; margin-bottom: 3px; }
-    .gs-card-agency { font-size: 12px; color: #8B95A1; }
-    .gs-card-arrow { font-size: 16px; color: #B0B8C1; flex-shrink: 0; transition: transform .15s; }
-    .gs-card-arrow.open { transform: rotate(180deg); }
-    .gs-card-summary { padding: 0 18px 16px; }
-    .gs-badge { display: inline-block; font-size: 11px; font-weight: 700; color: #3182F6; background: #EAF2FF; border-radius: 999px; padding: 3px 10px; margin-bottom: 8px; }
-    .gs-funding { font-size: 14px; font-weight: 600; color: #191F28; margin-bottom: 4px; }
-    .gs-target { font-size: 12.5px; color: #4E5968; }
-    .gs-card-detail { padding: 14px 18px 18px; border-top: 1px solid #E5E8EB; background: #FAFBFC; }
-    .gs-detail-label { font-size: 12px; font-weight: 700; color: #8B95A1; margin: 0 0 6px; }
-    .gs-elig-list { margin: 0 0 14px; padding-left: 18px; font-size: 13px; color: #333D4B; line-height: 1.7; }
-    .gs-criteria-row { display: flex; flex-wrap: wrap; gap: 6px; }
-    .gs-criteria-chip { font-size: 11.5px; font-weight: 600; color: #4E5968; background: #EEF1F4; border-radius: 999px; padding: 4px 10px; }
-    .gs-cta-notice { text-align: center; font-size: 13px; color: #8B95A1; background: #FFFFFF; border-radius: 14px; padding: 18px; margin-top: 8px; }
+    .gs-prog-grid { display: flex; flex-direction: column; gap: 10px; }
+    .gs-prog-btn { width: 100%; text-align: left; padding: 18px 20px; background: #FFFFFF; border: 2px solid transparent; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); font-size: 16px; font-weight: 700; color: #191F28; cursor: pointer; transition: border-color .12s, transform .08s; }
+    .gs-prog-btn:active { transform: scale(.98); }
+    .gs-prog-btn.selected { border-color: #3182F6; color: #3182F6; background: #EAF2FF; }
+    .gs-cta-notice { text-align: center; font-size: 13px; color: #8B95A1; background: #FFFFFF; border-radius: 14px; padding: 18px; margin-top: 20px; }
     .gs-footer-disclaimer { font-size: 11.5px; color: #8B95A1; line-height: 1.6; margin-top: 20px; text-align: center; }
   </style>
 
@@ -3207,27 +3176,30 @@ app.get('/gov-support', (c) => {
 
     <div class="gs-inner">
       <div class="gs-intro">
-        <h1>패션 제조 브랜드를 위한<br/>정부지원사업 사업계획서 도우미</h1>
-        <p>의류·가방·잡화·신발·주얼리 브랜드 창업자 전용. 아래 9개 사업 중 내게 맞는 것을 먼저 확인해보세요.</p>
+        <h1>어떤 지원사업을<br/>준비하고 계신가요?</h1>
+        <p>신청하려는 사업을 선택해주세요.</p>
       </div>
 
-      <div class="gs-notice">⚠️ 배점·양식·지원금은 연도·기관별 공고에 따라 달라질 수 있습니다. 아래 정보는 참고용 예시이며, 신청 전 반드시 원문 공고를 확인하세요.</div>
+      <div class="gs-prog-grid">
+        ${buttonsHtml}
+      </div>
 
-      ${cardsHtml}
-
-      <div class="gs-cta-notice">📝 입력한 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 준비 중입니다.</div>
+      <div class="gs-cta-notice" id="gsCtaNotice">📝 입력한 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 준비 중입니다.</div>
 
       <div class="gs-footer-disclaimer">본 콘텐츠는 정부지원사업 신청을 돕기 위한 참고 자료이며, 법률·세무 자문이 아닙니다.</div>
     </div>
   </div>
 
   <script>
-    function toggleGsCard(id) {
-      var detail = document.getElementById('gsDetail-' + id);
-      var arrow = document.getElementById('gsArrow-' + id);
-      var open = detail.style.display !== 'none';
-      detail.style.display = open ? 'none' : 'block';
-      arrow.classList.toggle('open', !open);
+    var gsSelected = null;
+    function selectGsProgram(id, name) {
+      if (gsSelected) {
+        var prev = document.getElementById('gsBtn-' + gsSelected);
+        if (prev) prev.classList.remove('selected');
+      }
+      gsSelected = id;
+      document.getElementById('gsBtn-' + id).classList.add('selected');
+      document.getElementById('gsCtaNotice').textContent = '📝 "' + name + '" 선택됨 — 입력 내용으로 AI가 초안을 만들어주는 기능은 준비 중입니다.';
     }
   </script>
   `, '', '패션 제조 브랜드를 위한 정부지원사업 사업계획서 작성 도우미 — 예비창업패키지·초기창업패키지 등 9개 사업', c.env.GA4_MEASUREMENT_ID))
