@@ -3090,8 +3090,10 @@ app.get('/gov-support', (c) => {
     .gs-prog-btn:active { transform: scale(.98); }
     .gs-prog-btn.selected { border-color: #3182F6; color: #3182F6; background: #EAF2FF; }
     .gs-prog-btn-etc { color: #4E5968; }
-    .gs-cta-notice { text-align: center; font-size: 13px; color: #8B95A1; background: #FFFFFF; border-radius: 14px; padding: 18px; margin-top: 20px; }
-    .gs-footer-disclaimer { font-size: 11.5px; color: #8B95A1; line-height: 1.6; margin-top: 20px; text-align: center; }
+    .gs-footer-disclaimer { font-size: 11.5px; color: #8B95A1; line-height: 1.6; margin-top: 20px; text-align: center; padding-bottom: 90px; }
+    .gs-next-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #E5E8EB; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 20; }
+    .gs-next-btn { display: block; width: 100%; max-width: 448px; margin: 0 auto; padding: 15px; background: #3182F6; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
+    .gs-next-btn:disabled { background: #D1D6DB; cursor: not-allowed; }
     .gs-etc-form { display: none; background: #FFFFFF; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); padding: 18px; margin-top: 10px; }
     .gs-etc-form.open { display: block; }
     .gs-etc-label { font-size: 13px; font-weight: 700; color: #333D4B; margin: 0 0 6px; }
@@ -3129,23 +3131,27 @@ app.get('/gov-support', (c) => {
         <div class="gs-etc-hint">업로드해주신 양식은 검토 후 추가 지원 여부를 안내드립니다. (PDF·HWP·DOC, 최대 10MB)</div>
       </div>
 
-      <div class="gs-cta-notice" id="gsCtaNotice">📝 입력한 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 준비 중입니다.</div>
-
       <div class="gs-footer-disclaimer">본 콘텐츠는 정부지원사업 신청을 돕기 위한 참고 자료이며, 법률·세무 자문이 아닙니다.</div>
+    </div>
+
+    <div class="gs-next-bar" id="gsNextBar">
+      <button type="button" class="gs-next-btn" id="gsNextBtn" disabled onclick="goToGsWizard()">다음</button>
     </div>
   </div>
 
   <script>
     var gsSelected = null;
+    var gsSelectedName = null;
     function selectGsProgram(id, name) {
       if (gsSelected) {
         var prev = document.getElementById('gsBtn-' + gsSelected);
         if (prev) prev.classList.remove('selected');
       }
       gsSelected = id;
+      gsSelectedName = name;
       document.getElementById('gsBtn-' + id).classList.add('selected');
-      document.getElementById('gsCtaNotice').textContent = '📝 "' + name + '" 선택됨 — 입력 내용으로 AI가 초안을 만들어주는 기능은 준비 중입니다.';
       document.getElementById('gsEtcForm').classList.remove('open');
+      document.getElementById('gsNextBtn').disabled = false;
     }
 
     function toggleGsEtcForm() {
@@ -3153,8 +3159,37 @@ app.get('/gov-support', (c) => {
         var prev = document.getElementById('gsBtn-' + gsSelected);
         if (prev) prev.classList.remove('selected');
         gsSelected = null;
+        gsSelectedName = null;
+        document.getElementById('gsNextBtn').disabled = true;
       }
       document.getElementById('gsEtcForm').classList.toggle('open');
+    }
+
+    var GS_WIZARD_READY = ['yebi','choi','hope-return','youth-academy','local-creator','innov-sop'];
+
+    async function goToGsWizard() {
+      if (!gsSelected) return;
+      var token = localStorage.getItem('lookbook_token') || '';
+      if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); return; }
+      if (GS_WIZARD_READY.indexOf(gsSelected) === -1) {
+        showToast('"' + gsSelectedName + '"은(는) 입력 양식을 준비 중입니다. 조금만 기다려주세요!', 'info');
+        return;
+      }
+      var btn = document.getElementById('gsNextBtn');
+      btn.disabled = true; btn.textContent = '불러오는 중...';
+      try {
+        var res = await fetch('/api/gov-support/projects', {
+          method: 'POST',
+          headers: { 'X-Session-Token': token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ programId: gsSelected, programName: gsSelectedName }),
+        });
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '시작에 실패했어요.', 'error'); btn.disabled = false; btn.textContent = '다음'; return; }
+        location.href = '/gov-support/wizard/' + data.projectId;
+      } catch (e) {
+        showToast('네트워크 오류가 발생했어요.', 'error');
+        btn.disabled = false; btn.textContent = '다음';
+      }
     }
 
     function fileToBase64(file) {
@@ -3236,6 +3271,480 @@ app.post('/api/gov-support/custom-request', async (c) => {
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
+})
+
+// ────────────────────────────────────────────────────
+// 지원사업 도우미 — 위저드(입력 수집) API + 화면
+// 9개 사업 중 "사업계획서형" 6종(예비/초기/희망리턴/청년사관학교/로컬크리에이터/혁신소상공인)은
+// 공통 8단계 위저드를 공유한다(수집해야 하는 사업 정보 자체는 비슷하고, 사업별로 갈리는
+// 부분은 다음 단계인 "AI 섹션 생성"에서 각 프로그램의 sections 구조를 따라간다).
+// 스마트상점·온라인판로·혁신바우처(경량 신청서형 3종)는 별도 3단계 위저드가 필요해 아직
+// 미구현 — /gov-support에서 "준비 중" 안내만 하고 이 위저드로 들어오지 않는다.
+//
+// AI 섹션 초안 생성/재무 계산기/시각화/인쇄 미리보기는 이 단계엔 없다(다음 단계에서 구현).
+// 여기서는 입력 수집 + 중간 저장(자동 저장 + 수동 "임시저장" 버튼)까지만 다룬다.
+// ────────────────────────────────────────────────────
+const GS_WIZARD_READY_IDS = ['yebi', 'choi', 'hope-return', 'youth-academy', 'local-creator', 'innov-sop']
+
+app.post('/api/gov-support/projects', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const body = await c.req.json()
+    const programId = String(body.programId || '')
+    const program = GOV_SUPPORT_PROGRAMS.find((p) => p.id === programId)
+    if (!program || !GS_WIZARD_READY_IDS.includes(programId)) {
+      return c.json({ success: false, message: '아직 지원하지 않는 사업입니다.' }, 400)
+    }
+
+    const projectId = crypto.randomUUID()
+    await db.prepare(
+      `INSERT INTO gov_support_projects (id, user_id, program_id, program_name, answers) VALUES (?,?,?,?,'{}')`
+    ).bind(projectId, sess.user_id, programId, program.name).run()
+
+    return c.json({ success: true, projectId })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.get('/api/gov-support/projects/:id', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const project = await db.prepare(
+      `SELECT id, program_id, program_name, answers, status, updated_at FROM gov_support_projects WHERE id = ? AND user_id = ?`
+    ).bind(c.req.param('id'), sess.user_id).first() as any
+    if (!project) return c.json({ success: false, message: '프로젝트를 찾을 수 없습니다.' }, 404)
+
+    const program = GOV_SUPPORT_PROGRAMS.find((p) => p.id === project.program_id)
+    return c.json({
+      success: true,
+      project: { ...project, answers: JSON.parse(project.answers || '{}') },
+      eligibility: program?.eligibility || [],
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.patch('/api/gov-support/projects/:id/answers', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const existing = await db.prepare(
+      `SELECT answers FROM gov_support_projects WHERE id = ? AND user_id = ?`
+    ).bind(c.req.param('id'), sess.user_id).first() as any
+    if (!existing) return c.json({ success: false, message: '프로젝트를 찾을 수 없습니다.' }, 404)
+
+    const body = await c.req.json()
+    const patch = body.answers || {}
+    const merged = { ...JSON.parse(existing.answers || '{}'), ...patch }
+    const mergedStr = JSON.stringify(merged)
+    if (mergedStr.length > 200000) return c.json({ success: false, message: '입력 내용이 너무 많습니다.' }, 400)
+
+    await db.prepare(
+      `UPDATE gov_support_projects SET answers = ?, updated_at = datetime('now') WHERE id = ?`
+    ).bind(mergedStr, c.req.param('id')).run()
+
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.get('/gov-support/wizard/:id', (c) => {
+  const projectId = c.req.param('id')
+  return c.html(htmlShell('지원사업 작성', `
+  <div class="toast-container" id="toastContainer"></div>
+
+  <style>
+    body { background: #F2F4F6; }
+    .wz-wrap { min-height: 100vh; padding: 0 0 100px; background: #F2F4F6; }
+    .wz-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
+    .wz-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 14px 16px; display: flex; align-items: center; gap: 10px; max-width: 480px; margin: 0 auto; }
+    .wz-back { width: 36px; height: 36px; border: none; background: #FFFFFF; border-radius: 50%; color: #333D4B; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(15,23,42,0.06); }
+    .wz-progress { flex: 1; height: 6px; background: #E5E8EB; border-radius: 999px; overflow: hidden; }
+    .wz-progress-bar { height: 100%; background: #3182F6; border-radius: 999px; transition: width .2s; width: 12.5%; }
+    .wz-save-btn { font-size: 12.5px; font-weight: 700; color: #3182F6; background: #EAF2FF; border: none; border-radius: 999px; padding: 7px 12px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+    .wz-step { display: none; }
+    .wz-step.active { display: block; }
+    .wz-step-label { font-size: 12.5px; font-weight: 700; color: #3182F6; margin: 8px 0 4px; }
+    .wz-step h2 { font-size: 21px; font-weight: 800; color: #191F28; margin: 0 0 20px; line-height: 1.3; }
+    .wz-field { margin-bottom: 18px; }
+    .wz-field-label { font-size: 13.5px; font-weight: 700; color: #333D4B; margin-bottom: 8px; }
+    .wz-field-hint { font-size: 12px; color: #8B95A1; margin-top: 6px; line-height: 1.5; }
+    .wz-input, .wz-textarea, .wz-select { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 1px solid #E5E8EB; border-radius: 12px; font-size: 15px; color: #191F28; background: #FFFFFF; font-family: inherit; }
+    .wz-textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
+    .wz-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .wz-chip { padding: 10px 16px; border: 1px solid #E5E8EB; border-radius: 999px; background: #FFFFFF; font-size: 13.5px; color: #4E5968; cursor: pointer; }
+    .wz-chip.on { background: #3182F6; border-color: #3182F6; color: #fff; font-weight: 700; }
+    .wz-sub3 { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .wz-info-box { background: #EAF2FF; border-radius: 10px; padding: 12px 14px; font-size: 12.5px; color: #3182F6; line-height: 1.6; margin-top: 10px; }
+    .wz-competitor-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .wz-elig-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid #E5E8EB; font-size: 13.5px; color: #333D4B; line-height: 1.5; }
+    .wz-elig-item input { margin-top: 3px; flex-shrink: 0; }
+    .wz-nav-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #E5E8EB; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 20; display: flex; gap: 8px; max-width: 480px; margin: 0 auto; }
+    .wz-nav-btn { flex: 1; padding: 15px; border-radius: 14px; font-size: 15.5px; font-weight: 700; cursor: pointer; border: none; }
+    .wz-nav-prev { background: #F2F4F6; color: #4E5968; flex: 0 0 90px; }
+    .wz-nav-next { background: #3182F6; color: #fff; }
+    .wz-done-box { text-align: center; padding: 40px 10px; }
+    .wz-done-box .wz-done-icon { font-size: 44px; margin-bottom: 14px; }
+    .wz-done-box h2 { font-size: 20px; margin-bottom: 10px; }
+    .wz-done-box p { font-size: 14px; color: #4E5968; line-height: 1.6; margin-bottom: 24px; }
+  </style>
+
+  <div class="wz-wrap">
+    <div class="wz-header">
+      <a href="/gov-support" class="wz-back">‹</a>
+      <div class="wz-progress"><div class="wz-progress-bar" id="wzProgressBar"></div></div>
+      <button type="button" class="wz-save-btn" onclick="wzManualSave()">임시 저장</button>
+    </div>
+
+    <div class="wz-inner">
+      <div id="wzLoading" style="text-align:center;padding:60px 0;color:#8B95A1;font-size:14px;">불러오는 중...</div>
+      <form id="wzForm" style="display:none;">
+
+        <div class="wz-step active" data-step="1">
+          <div class="wz-step-label">1 / 8 · 기본 정보</div>
+          <h2>브랜드를 소개해주세요</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">브랜드명 (가칭 가능)</div>
+            <input type="text" class="wz-input" id="f_brandName" maxlength="60" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">대표자 연령대</div>
+            <div class="wz-chip-row" data-field="founderAge">
+              ${['20대 이하', '30대', '40대', '50대 이상'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">창업 단계</div>
+            <div class="wz-chip-row" data-field="stage">
+              ${['사업자등록 전', '사업자등록 후 3년 이내', '사업자등록 후 3년 이상'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="2">
+          <div class="wz-step-label">2 / 8 · 아이템</div>
+          <h2>어떤 제품을 만드시나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">주력 카테고리</div>
+            <div class="wz-chip-row" data-field="category">
+              ${['의류(여성)', '의류(남성)', '의류(유니섹스)', '가방', '잡화', '신발', '주얼리', '키즈'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">주력 상품 3개</div>
+            <div class="wz-sub3">
+              <input type="text" class="wz-input" id="f_product1" placeholder="예: 오버핏 셔츠" maxlength="40" />
+              <input type="text" class="wz-input" id="f_product2" placeholder="예: 와이드 슬랙스" maxlength="40" />
+              <input type="text" class="wz-input" id="f_product3" placeholder="예: 니트 가디건" maxlength="40" />
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">브랜드 컨셉 한 줄</div>
+            <input type="text" class="wz-input" id="f_concept" placeholder="예: 30대 직장인을 위한 출퇴근 캡슐 워드로브" maxlength="80" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">목표 가격대 (선택)</div>
+            <div class="wz-chip-row" data-field="priceRange">
+              ${['2~5만', '5~10만', '10~20만', '20만+'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="3">
+          <div class="wz-step-label">3 / 8 · 고객과 경쟁</div>
+          <h2>누가, 왜 사나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">타겟 고객</div>
+            <input type="text" class="wz-input" id="f_target" placeholder="예: 20대 후반~30대 직장 여성" maxlength="80" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">고객이 사는 이유 1개</div>
+            <div class="wz-chip-row" data-field="buyReason">
+              ${['핏/사이즈', '가성비', '스토리·취향', '지속가능성', '기능성'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">경쟁사·유사 브랜드 (선택, 비교표에 쓰여요)</div>
+            <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor1_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor1_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+            <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor2_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor2_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="4">
+          <div class="wz-step-label">4 / 8 · 생산과 차별성</div>
+          <h2>어떻게, 남들과 다르게 만드나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">생산 방식</div>
+            <div class="wz-chip-row" data-field="productionMethod">
+              ${['자체 제작(공방)', '국내 OEM·CMT 위탁', '소량생산 전문업체', '해외 생산', '미정(추천 원함)'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">제작 공정을 설명해주세요</div>
+            <textarea class="wz-textarea" id="f_processDetail" placeholder="예: 원단은 OO시장에서 직접 조달 → 자체 패턴 제작 → 협력 공장에서 봉제 → 전수 검수 후 출고"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">다른 업체와 다른 점이 있나요?</div>
+            <textarea class="wz-textarea" id="f_differentiation" placeholder="예: 전 제품 전수 검사, 국내산 친환경 원단만 사용, 손바느질 마감 등 — 잘 모르겠다면 '모르겠음'도 괜찮아요"></textarea>
+            <div class="wz-field-hint">구체적인 공정·검수 방식 하나가 심사에서 강력한 차별점이 됩니다.</div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">목표 원가 / 판매가 (선택, 원)</div>
+            <div class="wz-sub3" style="grid-template-columns:1fr 1fr;">
+              <input type="number" class="wz-input" id="f_targetCost" placeholder="원가" />
+              <input type="number" class="wz-input" id="f_targetPrice" placeholder="판매가" />
+            </div>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="5">
+          <div class="wz-step-label">5 / 8 · 판매 채널</div>
+          <h2>어디서 파시나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">판매 채널 (복수 선택)</div>
+            <div class="wz-chip-row" data-field="channels" data-multi="1">
+              ${['자사몰', '무신사', '지그재그', '에이블리', '스마트스토어', '도매·위탁', '팝업', '오프라인 매장'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <div class="wz-info-box">채널 수수료 참고: 자사몰 3~5% · 패션 플랫폼 8~15%+광고비 · 도매 납품 40~50%</div>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="6">
+          <div class="wz-step-label">6 / 8 · 자금 계획</div>
+          <h2>지원금을 어디에 쓰실 건가요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">보유 준비자본 (선택)</div>
+            <div class="wz-chip-row" data-field="capital">
+              ${['300만 미만', '300~1000만', '1000~3000만', '3000만+'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">지원금 사용 항목 (복수 선택)</div>
+            <div class="wz-chip-row" data-field="fundUse" data-multi="1">
+              ${['소재·부자재', '샘플·가봉', '생산(봉제)비', '포장·라벨', '촬영·마케팅', '인건비', '임대료·장비'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="7">
+          <div class="wz-step-label">7 / 8 · 역량과 비전</div>
+          <h2>왜 대표님이어야 하나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">관련 경력 (복수 선택)</div>
+            <div class="wz-chip-row" data-field="experience" data-multi="1">
+              ${['봉제/재단 경험', '패션 전공·교육', '업계 근무', '쇼핑몰 운영·판매', '없음'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">창업 동기 한 줄</div>
+            <input type="text" class="wz-input" id="f_motivation" placeholder="예: 내가 입고 싶은 옷이 시장에 없어서 직접 만들기 시작했다" maxlength="100" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">3년 후 목표 (선택)</div>
+            <textarea class="wz-textarea" id="f_threeYearGoal" placeholder="예: 연매출 3억, 자사몰+플랫폼 2곳 입점, 오프라인 쇼룸 1호점 — 자유롭게 적어주세요"></textarea>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="8">
+          <div class="wz-step-label">8 / 8 · 자격 확인</div>
+          <h2>자격 요건을 확인해주세요</h2>
+          <div id="wzEligibilityList"></div>
+        </div>
+
+      </form>
+
+      <div class="wz-step" id="wzDoneStep" style="display:none;">
+        <div class="wz-done-box">
+          <div class="wz-done-icon">✅</div>
+          <h2>입력이 저장됐어요</h2>
+          <p>입력하신 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 아직 준비 중이에요.<br/>완성되면 알려드릴게요!</p>
+          <a href="/gov-support" class="wz-nav-btn wz-nav-next" style="display:inline-block;text-decoration:none;padding:15px 28px;">목록으로</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="wz-nav-bar" id="wzNavBar" style="display:none;">
+      <button type="button" class="wz-nav-btn wz-nav-prev" id="wzPrevBtn" onclick="wzPrevStep()">이전</button>
+      <button type="button" class="wz-nav-btn wz-nav-next" id="wzNextBtn" onclick="wzNextStep()">다음</button>
+    </div>
+  </div>
+
+  <script>
+    var WZ_PROJECT_ID = ${JSON.stringify(projectId)};
+    var WZ_TOTAL_STEPS = 8;
+    var wzCurrentStep = 1;
+    var wzAnswers = {};
+    var wzEligibility = [];
+
+    function authHeaders() {
+      var token = localStorage.getItem('lookbook_token') || '';
+      return { 'X-Session-Token': token, 'Content-Type': 'application/json' };
+    }
+
+    async function wzLoad() {
+      var token = localStorage.getItem('lookbook_token') || '';
+      if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); location.href = '/'; return; }
+      try {
+        var res = await fetch('/api/gov-support/projects/' + WZ_PROJECT_ID, { headers: authHeaders() });
+        if (res.status === 401) { showToast('로그인 후 이용할 수 있어요.', 'error'); location.href = '/'; return; }
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '불러오기에 실패했어요.', 'error'); location.href = '/gov-support'; return; }
+
+        wzAnswers = data.project.answers || {};
+        wzEligibility = data.eligibility || [];
+        wzFillFormFromAnswers();
+        wzRenderEligibility();
+
+        document.getElementById('wzLoading').style.display = 'none';
+        document.getElementById('wzForm').style.display = 'block';
+        document.getElementById('wzNavBar').style.display = 'flex';
+        wzShowStep(1);
+      } catch (e) {
+        showToast('네트워크 오류가 발생했어요.', 'error');
+      }
+    }
+
+    function wzFillFormFromAnswers() {
+      var simpleFields = ['brandName','product1','product2','product3','concept','target','processDetail','differentiation','targetCost','targetPrice','motivation','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature'];
+      simpleFields.forEach(function (k) {
+        var el = document.getElementById('f_' + k);
+        if (el && wzAnswers[k] !== undefined) el.value = wzAnswers[k];
+      });
+      document.querySelectorAll('.wz-chip-row').forEach(function (row) {
+        var field = row.getAttribute('data-field');
+        var multi = row.getAttribute('data-multi');
+        var val = wzAnswers[field];
+        if (val === undefined) return;
+        var chips = row.querySelectorAll('.wz-chip');
+        chips.forEach(function (chip) {
+          var v = chip.getAttribute('data-value');
+          var on = multi ? (Array.isArray(val) && val.indexOf(v) !== -1) : (val === v);
+          chip.classList.toggle('on', on);
+        });
+      });
+    }
+
+    document.addEventListener('click', function (e) {
+      var chip = e.target.closest('.wz-chip');
+      if (!chip) return;
+      var row = chip.parentElement;
+      var multi = row.getAttribute('data-multi');
+      if (multi) {
+        chip.classList.toggle('on');
+      } else {
+        row.querySelectorAll('.wz-chip').forEach(function (c) { c.classList.remove('on'); });
+        chip.classList.add('on');
+      }
+    });
+
+    function wzCollectStep(stepNum) {
+      var patch = {};
+      if (stepNum === 1) {
+        patch.brandName = val('f_brandName');
+      } else if (stepNum === 2) {
+        patch.product1 = val('f_product1'); patch.product2 = val('f_product2'); patch.product3 = val('f_product3');
+        patch.concept = val('f_concept');
+      } else if (stepNum === 3) {
+        patch.target = val('f_target');
+        patch.competitor1_name = val('f_competitor1_name'); patch.competitor1_feature = val('f_competitor1_feature');
+        patch.competitor2_name = val('f_competitor2_name'); patch.competitor2_feature = val('f_competitor2_feature');
+      } else if (stepNum === 4) {
+        patch.processDetail = val('f_processDetail'); patch.differentiation = val('f_differentiation');
+        patch.targetCost = val('f_targetCost'); patch.targetPrice = val('f_targetPrice');
+      } else if (stepNum === 7) {
+        patch.motivation = val('f_motivation'); patch.threeYearGoal = val('f_threeYearGoal');
+      }
+      var stepEl = document.querySelector('.wz-step[data-step="' + stepNum + '"]');
+      if (stepEl) {
+        stepEl.querySelectorAll('.wz-chip-row').forEach(function (row) {
+          var field = row.getAttribute('data-field');
+          var multi = row.getAttribute('data-multi');
+          var onChips = Array.prototype.slice.call(row.querySelectorAll('.wz-chip.on')).map(function (c) { return c.getAttribute('data-value'); });
+          patch[field] = multi ? onChips : (onChips[0] || '');
+        });
+      }
+      Object.assign(wzAnswers, patch);
+      return patch;
+    }
+
+    function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+
+    var wzSaveTimer = null;
+    function wzAutoSave() {
+      fetch('/api/gov-support/projects/' + WZ_PROJECT_ID + '/answers', {
+        method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ answers: wzAnswers }),
+      }).catch(function () {});
+    }
+
+    function wzManualSave() {
+      wzCollectStep(wzCurrentStep);
+      wzAutoSave();
+      showToast('임시 저장됐어요.', 'success');
+    }
+
+    function wzShowStep(n) {
+      document.querySelectorAll('.wz-step[data-step]').forEach(function (el) {
+        el.classList.toggle('active', Number(el.getAttribute('data-step')) === n);
+      });
+      wzCurrentStep = n;
+      document.getElementById('wzProgressBar').style.width = (n / WZ_TOTAL_STEPS * 100) + '%';
+      document.getElementById('wzPrevBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
+      document.getElementById('wzNextBtn').textContent = n === WZ_TOTAL_STEPS ? '완료' : '다음';
+      window.scrollTo(0, 0);
+    }
+
+    function wzRenderEligibility() {
+      var list = document.getElementById('wzEligibilityList');
+      list.innerHTML = wzEligibility.map(function (text, i) {
+        var checked = wzAnswers.eligibilityChecks && wzAnswers.eligibilityChecks[i] ? 'checked' : '';
+        return '<label class="wz-elig-item"><input type="checkbox" data-elig-idx="' + i + '" ' + checked + '/><span>' + text + '</span></label>';
+      }).join('');
+    }
+
+    function wzNextStep() {
+      wzCollectStep(wzCurrentStep);
+      wzAutoSave();
+      if (wzCurrentStep === WZ_TOTAL_STEPS) {
+        var checks = Array.prototype.slice.call(document.querySelectorAll('[data-elig-idx]')).map(function (el) { return el.checked; });
+        wzAnswers.eligibilityChecks = checks;
+        wzAutoSave();
+        document.getElementById('wzForm').style.display = 'none';
+        document.getElementById('wzNavBar').style.display = 'none';
+        document.getElementById('wzDoneStep').style.display = 'block';
+        return;
+      }
+      wzShowStep(wzCurrentStep + 1);
+    }
+
+    function wzPrevStep() {
+      if (wzCurrentStep === 1) return;
+      wzCollectStep(wzCurrentStep);
+      wzShowStep(wzCurrentStep - 1);
+    }
+
+    wzLoad();
+  </script>
+  `, '', '지원사업 사업계획서 작성 — EZlook 지원사업 도우미', c.env.GA4_MEASUREMENT_ID))
 })
 
 // ────────────────────────────────────────────────────
