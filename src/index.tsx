@@ -3163,8 +3163,17 @@ app.get('/gov-support', (c) => {
     .gs-prog-btn { width: 100%; text-align: left; padding: 18px 20px; background: #FFFFFF; border: 2px solid transparent; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); font-size: 16px; font-weight: 700; color: #191F28; cursor: pointer; transition: border-color .12s, transform .08s; }
     .gs-prog-btn:active { transform: scale(.98); }
     .gs-prog-btn.selected { border-color: #3182F6; color: #3182F6; background: #EAF2FF; }
+    .gs-prog-btn-etc { color: #4E5968; }
     .gs-cta-notice { text-align: center; font-size: 13px; color: #8B95A1; background: #FFFFFF; border-radius: 14px; padding: 18px; margin-top: 20px; }
     .gs-footer-disclaimer { font-size: 11.5px; color: #8B95A1; line-height: 1.6; margin-top: 20px; text-align: center; }
+    .gs-etc-form { display: none; background: #FFFFFF; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); padding: 18px; margin-top: 10px; }
+    .gs-etc-form.open { display: block; }
+    .gs-etc-label { font-size: 13px; font-weight: 700; color: #333D4B; margin: 0 0 6px; }
+    .gs-etc-input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #E5E8EB; border-radius: 10px; font-size: 14px; color: #191F28; margin-bottom: 14px; }
+    .gs-etc-file { width: 100%; font-size: 13px; color: #4E5968; margin-bottom: 14px; }
+    .gs-etc-submit { width: 100%; padding: 13px; background: #3182F6; color: #fff; border: none; border-radius: 10px; font-size: 14.5px; font-weight: 700; cursor: pointer; }
+    .gs-etc-submit:disabled { opacity: .5; cursor: not-allowed; }
+    .gs-etc-hint { font-size: 11.5px; color: #8B95A1; margin-top: 8px; line-height: 1.5; }
   </style>
 
   <div class="gs-wrap">
@@ -3182,6 +3191,16 @@ app.get('/gov-support', (c) => {
 
       <div class="gs-prog-grid">
         ${buttonsHtml}
+        <button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-etc" onclick="toggleGsEtcForm()">기타 (원하는 지원사업이 없어요)</button>
+      </div>
+
+      <div class="gs-etc-form" id="gsEtcForm">
+        <div class="gs-etc-label">지원사업명</div>
+        <input type="text" class="gs-etc-input" id="gsEtcName" placeholder="예: OO지역 청년창업 지원사업" maxlength="100" />
+        <div class="gs-etc-label">해당 사업 양식 파일</div>
+        <input type="file" class="gs-etc-file" id="gsEtcFile" accept=".pdf,.hwp,.hwpx,.doc,.docx" />
+        <button type="button" class="gs-etc-submit" id="gsEtcSubmitBtn" onclick="submitGsEtcRequest()">요청 보내기</button>
+        <div class="gs-etc-hint">업로드해주신 양식은 검토 후 추가 지원 여부를 안내드립니다. (PDF·HWP·DOC, 최대 10MB)</div>
       </div>
 
       <div class="gs-cta-notice" id="gsCtaNotice">📝 입력한 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 준비 중입니다.</div>
@@ -3200,9 +3219,97 @@ app.get('/gov-support', (c) => {
       gsSelected = id;
       document.getElementById('gsBtn-' + id).classList.add('selected');
       document.getElementById('gsCtaNotice').textContent = '📝 "' + name + '" 선택됨 — 입력 내용으로 AI가 초안을 만들어주는 기능은 준비 중입니다.';
+      document.getElementById('gsEtcForm').classList.remove('open');
+    }
+
+    function toggleGsEtcForm() {
+      if (gsSelected) {
+        var prev = document.getElementById('gsBtn-' + gsSelected);
+        if (prev) prev.classList.remove('selected');
+        gsSelected = null;
+      }
+      document.getElementById('gsEtcForm').classList.toggle('open');
+    }
+
+    function fileToBase64(file) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(String(reader.result).split(',')[1] || ''); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function submitGsEtcRequest() {
+      var token = localStorage.getItem('lookbook_token') || '';
+      if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); return; }
+
+      var name = document.getElementById('gsEtcName').value.trim();
+      var fileInput = document.getElementById('gsEtcFile');
+      var file = fileInput.files[0];
+      if (!name) { showToast('지원사업명을 입력해주세요.', 'error'); return; }
+      if (!file) { showToast('양식 파일을 첨부해주세요.', 'error'); return; }
+      if (file.size > 10 * 1024 * 1024) { showToast('파일 용량은 최대 10MB까지 가능해요.', 'error'); return; }
+
+      var btn = document.getElementById('gsEtcSubmitBtn');
+      btn.disabled = true; btn.textContent = '전송 중...';
+      try {
+        var fileBase64 = await fileToBase64(file);
+        var res = await fetch('/api/gov-support/custom-request', {
+          method: 'POST',
+          headers: { 'X-Session-Token': token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ programName: name, fileName: file.name, contentType: file.type, fileBase64: fileBase64 }),
+        });
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '요청 전송에 실패했어요.', 'error'); btn.disabled = false; btn.textContent = '요청 보내기'; return; }
+        showToast('요청이 접수됐어요. 검토 후 안내드릴게요!', 'success');
+        document.getElementById('gsEtcName').value = '';
+        fileInput.value = '';
+        document.getElementById('gsEtcForm').classList.remove('open');
+        btn.disabled = false; btn.textContent = '요청 보내기';
+      } catch (e) {
+        showToast('네트워크 오류가 발생했어요.', 'error');
+        btn.disabled = false; btn.textContent = '요청 보내기';
+      }
     }
   </script>
   `, '', '패션 제조 브랜드를 위한 정부지원사업 사업계획서 작성 도우미 — 예비창업패키지·초기창업패키지 등 9개 사업', c.env.GA4_MEASUREMENT_ID))
+})
+
+// POST /api/gov-support/custom-request — 목록 9개에 없는 지원사업을 사용자가 "기타"로
+// 요청할 때, 업로드한 양식 파일을 KV에 base64로 저장하고 요청 정보를 D1에 기록한다.
+// 관리자가 검토해 새 프로그램 JSON(GOV_SUPPORT_PROGRAMS)으로 추가할지 판단하는 용도.
+app.post('/api/gov-support/custom-request', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  const kv = c.env.LOOKBOOK_KV
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const body = await c.req.json()
+    const programName = String(body.programName || '').trim().slice(0, 200)
+    const fileName = String(body.fileName || '').slice(0, 200)
+    const contentType = String(body.contentType || '').slice(0, 100)
+    const fileBase64 = String(body.fileBase64 || '')
+    if (!programName) return c.json({ success: false, message: '지원사업명을 입력해주세요.' }, 400)
+    if (!fileBase64) return c.json({ success: false, message: '파일을 첨부해주세요.' }, 400)
+    // base64는 원본 대비 ~1.37배 — 10MB 원본 기준 여유있게 15MB로 제한(KV 값 25MB 한도 이내)
+    if (fileBase64.length > 15 * 1024 * 1024) return c.json({ success: false, message: '파일 용량이 너무 큽니다 (최대 약 10MB).' }, 400)
+
+    const kvKey = `gov_support_custom:${crypto.randomUUID()}`
+    await kv.put(kvKey, fileBase64, { metadata: { contentType, fileName } })
+
+    await db.prepare(
+      `INSERT INTO gov_support_custom_requests (user_id, program_name, file_name, kv_key, content_type) VALUES (?,?,?,?,?)`
+    ).bind(sess.user_id, programName, fileName, kvKey, contentType).run()
+
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
 })
 
 // ────────────────────────────────────────────────────
