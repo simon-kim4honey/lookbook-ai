@@ -4159,13 +4159,20 @@ async function generateGovSupportProcessImage(apiKey: string | undefined, proces
   }
 }
 
-async function generateGovSupportSections(apiKey: string | undefined, answers: any, finance: any, competitorTable: any): Promise<any[]> {
-  const fallbackSections = GS_YEBI_SECTIONS.map((s) => ({
+function gsBuildFallbackSections(how: string) {
+  return GS_YEBI_SECTIONS.map((s) => ({
     sectionId: s.id, headline: s.title, lead: '',
-    blocks: [{ type: 'evidenceGap', need: 'AI 초안 생성', how: 'ANTHROPIC_API_KEY 미설정 — 관리자에게 문의해주세요.' }],
+    blocks: [{ type: 'evidenceGap', need: 'AI 초안 생성', how }],
     visualSpecs: [],
   }))
-  if (!apiKey) return fallbackSections
+}
+
+async function generateGovSupportSections(apiKey: string | undefined, answers: any, finance: any, competitorTable: any): Promise<any[]> {
+  // 실패 사유별로 다른 안내 문구를 남긴다 — 전부 "ANTHROPIC_API_KEY 미설정"으로 뭉뚱그리면
+  // 키가 실제로는 바인딩돼 있는데 API 호출 자체가 실패(401/429/모델명 오류 등)하거나 응답
+  // 파싱이 깨진 경우도 똑같이 "키가 없다"는 오진단 메시지가 떠서, 서버 로그 없이는
+  // 화면만 보고 원인을 구분할 방법이 없어진다(실제로 이 문제로 운영 디버깅이 막혔던 사례 있음).
+  if (!apiKey) return gsBuildFallbackSections('ANTHROPIC_API_KEY 미설정 — 관리자에게 문의해주세요.')
 
   const sectionSpecJson = JSON.stringify(GS_YEBI_SECTIONS.map((s) => ({ id: s.id, title: s.title, guidance: s.guidance, targetChars: s.targetChars })))
 
@@ -4213,17 +4220,27 @@ ${JSON.stringify(competitorTable)}
       }),
       signal: AbortSignal.timeout(55000),
     })
-    if (!res.ok) { console.error('gov-support 섹션 생성 HTTP 실패:', res.status); return fallbackSections }
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '')
+      console.error('gov-support 섹션 생성 HTTP 실패:', res.status, bodyText.slice(0, 500))
+      return gsBuildFallbackSections(`Anthropic API 호출 실패 (status ${res.status}) — 관리자에게 문의해주세요.`)
+    }
     const data = await res.json<any>()
     if (data?.stop_reason === 'max_tokens') console.error('gov-support 섹션 생성 max_tokens로 잘림')
     const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
     const text = (textBlock?.text || '[]').replace(/^```json\s*|```$/g, '').trim()
-    const parsed = JSON.parse(text)
-    if (!Array.isArray(parsed) || !parsed.length) return fallbackSections
+    let parsed: any
+    try {
+      parsed = JSON.parse(text)
+    } catch (parseErr) {
+      console.error('gov-support 섹션 생성 JSON 파싱 실패:', parseErr, text.slice(0, 500))
+      return gsBuildFallbackSections('AI 응답 파싱 실패 — 관리자에게 문의해주세요.')
+    }
+    if (!Array.isArray(parsed) || !parsed.length) return gsBuildFallbackSections('AI 응답이 비어있음 — 관리자에게 문의해주세요.')
     return parsed
   } catch (e) {
     console.error('gov-support 섹션 생성 실패:', e)
-    return fallbackSections
+    return gsBuildFallbackSections('AI 호출 중 오류가 발생했어요 (' + (e instanceof Error ? e.message : String(e)).slice(0, 150) + ') — 관리자에게 문의해주세요.')
   }
 }
 
