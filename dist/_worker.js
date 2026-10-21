@@ -178,7 +178,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Zt}" font-size="128" font-weight="800" fill="${Yt(e.statColor||`#ffffff`)}">${Yt(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Zt}" font-size="64" font-weight="800" fill="#ffffff">${Yt(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Zt}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Yt(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var $t=`mvhrrduq`;function en(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var tn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Zt}" font-size="128" font-weight="800" fill="${Yt(e.statColor||`#ffffff`)}">${Yt(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Zt}" font-size="64" font-weight="800" fill="#ffffff">${Yt(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Zt}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Yt(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var $t=`mvhrrln6`;function en(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var tn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -871,8 +871,17 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .gs-prog-btn { width: 100%; text-align: left; padding: 18px 20px; background: #FFFFFF; border: 2px solid transparent; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); font-size: 16px; font-weight: 700; color: #191F28; cursor: pointer; transition: border-color .12s, transform .08s; }
     .gs-prog-btn:active { transform: scale(.98); }
     .gs-prog-btn.selected { border-color: #3182F6; color: #3182F6; background: #EAF2FF; }
+    .gs-prog-btn-etc { color: #4E5968; }
     .gs-cta-notice { text-align: center; font-size: 13px; color: #8B95A1; background: #FFFFFF; border-radius: 14px; padding: 18px; margin-top: 20px; }
     .gs-footer-disclaimer { font-size: 11.5px; color: #8B95A1; line-height: 1.6; margin-top: 20px; text-align: center; }
+    .gs-etc-form { display: none; background: #FFFFFF; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); padding: 18px; margin-top: 10px; }
+    .gs-etc-form.open { display: block; }
+    .gs-etc-label { font-size: 13px; font-weight: 700; color: #333D4B; margin: 0 0 6px; }
+    .gs-etc-input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #E5E8EB; border-radius: 10px; font-size: 14px; color: #191F28; margin-bottom: 14px; }
+    .gs-etc-file { width: 100%; font-size: 13px; color: #4E5968; margin-bottom: 14px; }
+    .gs-etc-submit { width: 100%; padding: 13px; background: #3182F6; color: #fff; border: none; border-radius: 10px; font-size: 14.5px; font-weight: 700; cursor: pointer; }
+    .gs-etc-submit:disabled { opacity: .5; cursor: not-allowed; }
+    .gs-etc-hint { font-size: 11.5px; color: #8B95A1; margin-top: 8px; line-height: 1.5; }
   </style>
 
   <div class="gs-wrap">
@@ -890,6 +899,16 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
 
       <div class="gs-prog-grid">
         ${t}
+        <button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-etc" onclick="toggleGsEtcForm()">기타 (원하는 지원사업이 없어요)</button>
+      </div>
+
+      <div class="gs-etc-form" id="gsEtcForm">
+        <div class="gs-etc-label">지원사업명</div>
+        <input type="text" class="gs-etc-input" id="gsEtcName" placeholder="예: OO지역 청년창업 지원사업" maxlength="100" />
+        <div class="gs-etc-label">해당 사업 양식 파일</div>
+        <input type="file" class="gs-etc-file" id="gsEtcFile" accept=".pdf,.hwp,.hwpx,.doc,.docx" />
+        <button type="button" class="gs-etc-submit" id="gsEtcSubmitBtn" onclick="submitGsEtcRequest()">요청 보내기</button>
+        <div class="gs-etc-hint">업로드해주신 양식은 검토 후 추가 지원 여부를 안내드립니다. (PDF·HWP·DOC, 최대 10MB)</div>
       </div>
 
       <div class="gs-cta-notice" id="gsCtaNotice">📝 입력한 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 준비 중입니다.</div>
@@ -908,9 +927,61 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       gsSelected = id;
       document.getElementById('gsBtn-' + id).classList.add('selected');
       document.getElementById('gsCtaNotice').textContent = '📝 "' + name + '" 선택됨 — 입력 내용으로 AI가 초안을 만들어주는 기능은 준비 중입니다.';
+      document.getElementById('gsEtcForm').classList.remove('open');
+    }
+
+    function toggleGsEtcForm() {
+      if (gsSelected) {
+        var prev = document.getElementById('gsBtn-' + gsSelected);
+        if (prev) prev.classList.remove('selected');
+        gsSelected = null;
+      }
+      document.getElementById('gsEtcForm').classList.toggle('open');
+    }
+
+    function fileToBase64(file) {
+      return new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(String(reader.result).split(',')[1] || ''); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function submitGsEtcRequest() {
+      var token = localStorage.getItem('lookbook_token') || '';
+      if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); return; }
+
+      var name = document.getElementById('gsEtcName').value.trim();
+      var fileInput = document.getElementById('gsEtcFile');
+      var file = fileInput.files[0];
+      if (!name) { showToast('지원사업명을 입력해주세요.', 'error'); return; }
+      if (!file) { showToast('양식 파일을 첨부해주세요.', 'error'); return; }
+      if (file.size > 10 * 1024 * 1024) { showToast('파일 용량은 최대 10MB까지 가능해요.', 'error'); return; }
+
+      var btn = document.getElementById('gsEtcSubmitBtn');
+      btn.disabled = true; btn.textContent = '전송 중...';
+      try {
+        var fileBase64 = await fileToBase64(file);
+        var res = await fetch('/api/gov-support/custom-request', {
+          method: 'POST',
+          headers: { 'X-Session-Token': token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ programName: name, fileName: file.name, contentType: file.type, fileBase64: fileBase64 }),
+        });
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '요청 전송에 실패했어요.', 'error'); btn.disabled = false; btn.textContent = '요청 보내기'; return; }
+        showToast('요청이 접수됐어요. 검토 후 안내드릴게요!', 'success');
+        document.getElementById('gsEtcName').value = '';
+        fileInput.value = '';
+        document.getElementById('gsEtcForm').classList.remove('open');
+        btn.disabled = false; btn.textContent = '요청 보내기';
+      } catch (e) {
+        showToast('네트워크 오류가 발생했어요.', 'error');
+        btn.disabled = false; btn.textContent = '요청 보내기';
+      }
     }
   <\/script>
-  `,``,`패션 제조 브랜드를 위한 정부지원사업 사업계획서 작성 도우미 — 예비창업패키지·초기창업패키지 등 9개 사업`,e.env.GA4_MEASUREMENT_ID))}),B.get(`/api/auth/me`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await or(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);return n?e.json({success:!0,user:lr(n)}):e.json({success:!1,message:`로그인이 필요합니다.`},401)}catch{return e.json({success:!1,message:`서버 오류`},500)}}),B.get(`/api/techpack/handoff-token`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await or(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);if(!n)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let r=await dr(e.env.TECHPACK_HANDOFF_SECRET,{sub:n.id,email:n.email,name:n.name});return e.json({success:!0,token:r})}catch{return e.json({success:!1,message:`서버 오류`},500)}}),B.get(`/api/techpack/upload-history`,async e=>{try{let t=e.req.header(`authorization`)||``,n=t.startsWith(`Bearer `)?t.slice(7):null,r=n?await pr(e.env.TECHPACK_HANDOFF_SECRET,n):null;if(!r)return e.json({success:!1,message:`인증에 실패했습니다.`},401);let i=e.env.LOOKBOOK_DB,a=e.env?.LOOKBOOK_KV,o=Z(e),s=await i.prepare(`SELECT job_id, model_name, created_at FROM generation_logs
+  `,``,`패션 제조 브랜드를 위한 정부지원사업 사업계획서 작성 도우미 — 예비창업패키지·초기창업패키지 등 9개 사업`,e.env.GA4_MEASUREMENT_ID))}),B.post(`/api/gov-support/custom-request`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.env.LOOKBOOK_KV;try{let r=e.req.header(`X-Session-Token`)||``,i=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(r).first();if(!i)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let a=await e.req.json(),o=String(a.programName||``).trim().slice(0,200),s=String(a.fileName||``).slice(0,200),l=String(a.contentType||``).slice(0,100),u=String(a.fileBase64||``);if(!o)return e.json({success:!1,message:`지원사업명을 입력해주세요.`},400);if(!u)return e.json({success:!1,message:`파일을 첨부해주세요.`},400);if(u.length>15*1024*1024)return e.json({success:!1,message:`파일 용량이 너무 큽니다 (최대 약 10MB).`},400);let d=`gov_support_custom:${crypto.randomUUID()}`;return await n.put(d,u,{metadata:{contentType:l,fileName:s}}),await t.prepare(`INSERT INTO gov_support_custom_requests (user_id, program_name, file_name, kv_key, content_type) VALUES (?,?,?,?,?)`).bind(i.user_id,o,s,d,l).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/api/auth/me`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await or(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);return n?e.json({success:!0,user:lr(n)}):e.json({success:!1,message:`로그인이 필요합니다.`},401)}catch{return e.json({success:!1,message:`서버 오류`},500)}}),B.get(`/api/techpack/handoff-token`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await or(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);if(!n)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let r=await dr(e.env.TECHPACK_HANDOFF_SECRET,{sub:n.id,email:n.email,name:n.name});return e.json({success:!0,token:r})}catch{return e.json({success:!1,message:`서버 오류`},500)}}),B.get(`/api/techpack/upload-history`,async e=>{try{let t=e.req.header(`authorization`)||``,n=t.startsWith(`Bearer `)?t.slice(7):null,r=n?await pr(e.env.TECHPACK_HANDOFF_SECRET,n):null;if(!r)return e.json({success:!1,message:`인증에 실패했습니다.`},401);let i=e.env.LOOKBOOK_DB,a=e.env?.LOOKBOOK_KV,o=Z(e),s=await i.prepare(`SELECT job_id, model_name, created_at FROM generation_logs
        WHERE user_id = ? AND (kind IS NULL OR kind != 'video') ORDER BY created_at DESC LIMIT 30`).bind(r.sub).all(),l=[];if(a)for(let e of s.results||[])try{let t=await a.get(`clothing_img:${e.job_id}`);if(!t)continue;let n=JSON.parse(t);if(!Array.isArray(n)||n.length===0)continue;let r=!!(e.model_name&&String(e.model_name).startsWith(`고스트컷`));l.push({job_id:e.job_id,created_at:e.created_at,label:r?`누끼컷`:`모델컷`,images:n.map((t,n)=>`${o}/api/proxy/clothing/${encodeURIComponent(e.job_id)}/${n}`)})}catch{}return e.json({success:!0,uploads:l})}catch(t){return console.error(`techpack/upload-history error:`,t),e.json({success:!1,message:`서버 오류`},500)}}),B.get(`/api/techpack/account-summary`,async e=>{try{let t=e.req.header(`authorization`)||``,n=t.startsWith(`Bearer `)?t.slice(7):null,r=n?await pr(e.env.TECHPACK_HANDOFF_SECRET,n):null;if(!r)return e.json({success:!1,message:`인증에 실패했습니다.`},401);let i=await e.env.LOOKBOOK_DB.prepare(`SELECT name, email, credits FROM users WHERE id = ?`).bind(r.sub).first();return i?e.json({success:!0,name:i.name,email:i.email,credits:i.credits}):e.json({success:!1,message:`사용자를 찾을 수 없습니다.`},404)}catch(t){return console.error(`techpack/account-summary error:`,t),e.json({success:!1,message:`서버 오류`},500)}}),B.post(`/api/auth/logout`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=e.req.header(`X-Session-Token`);return n&&await t.prepare(`DELETE FROM user_sessions WHERE token = ?`).bind(n).run(),e.json({success:!0})}catch{return e.json({success:!0})}});function Z(e){let t=e.req.header(`host`)||e.req.header(`x-forwarded-host`)||``;return`${t.startsWith(`localhost`)?`http`:`https`}://${t}`}B.get(`/api/auth/kakao`,e=>{let t=Z(e),n=e.req.query(`mode`)||`popup`,r=e.req.query(`ref`)||``,i=`${t}/api/auth/kakao/callback`,a=e.env.KAKAO_CLIENT_ID||``;if(!a)return n===`redirect`?e.redirect(`/?oauth_error=kakao_no_key`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'카카오 앱 키가 설정되지 않았습니다.'},'*');window.close();<\/script>`);let o=r?`${n}:${r}`:n,s=`https://kauth.kakao.com/oauth/authorize?client_id=${a}&redirect_uri=${encodeURIComponent(i)}&response_type=code&state=${encodeURIComponent(o)}&scope=profile_nickname,account_email,plusfriends`;return e.redirect(s)}),B.get(`/api/auth/kakao/callback`,async e=>{let t=e.env.LOOKBOOK_DB,n=Z(e),r=e.req.query(`code`),i=e.req.query(`error`),[a,o]=String(e.req.query(`state`)||`popup`).split(`:`),s=_r[o]||null;function l(t){return a===`redirect`?e.redirect(`/?oauth_error=${encodeURIComponent(t)}`):e.html(`<script>window.opener?.postMessage({type:'oauth_error',provider:'kakao',error:'${t}'},'*');window.close();<\/script>`)}if(i||!r)return l(i||`cancelled`);try{let i=`${n}/api/auth/kakao/callback`,o=await(await fetch(`https://kauth.kakao.com/oauth/token`,{method:`POST`,headers:{"Content-Type":`application/x-www-form-urlencoded`},body:new URLSearchParams({grant_type:`authorization_code`,code:r,client_id:e.env.KAKAO_CLIENT_ID||``,client_secret:e.env.KAKAO_CLIENT_SECRET||``,redirect_uri:i})})).json();if(!o.access_token)throw Error(`카카오 토큰 발급 실패`);let l=await(await fetch(`https://kapi.kakao.com/v2/user/me`,{headers:{Authorization:`Bearer ${o.access_token}`}})).json(),u=String(l.id),d=l.kakao_account?.email||`kakao_${u}@kakao.local`,f=l.kakao_account?.profile?.nickname||`카카오 사용자`,p=l.kakao_account?.profile?.profile_image_url||null,m=l.kakao_account?.phone_number||null,h=!1,g=await t.prepare(`SELECT * FROM users WHERE provider = 'kakao' AND provider_id = ?`).bind(u).first();if(g){let e=[],n=[];m&&g.phone_number!==m&&(e.push(`phone_number = ?`),n.push(m),g.phone_number=m),g.name===`카카오 사용자`&&f!==`카카오 사용자`&&(e.push(`name = ?`),n.push(f),g.name=f),!g.avatar_url&&p&&(e.push(`avatar_url = ?`),n.push(p),g.avatar_url=p),e.length&&(n.push(g.id),await t.prepare(`UPDATE users SET ${e.join(`, `)} WHERE id = ?`).bind(...n).run())}else if(g=await t.prepare(`SELECT * FROM users WHERE email = ?`).bind(d).first(),g)await t.prepare(`UPDATE users SET provider_id = ?, avatar_url = ?, phone_number = COALESCE(?, phone_number) WHERE id = ?`).bind(u,p,m,g.id).run();else{let e=nr(),n=s===`BFM회원`?hr:200;await t.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, phone_number, status, credits, role, referrer) VALUES (?, ?, ?, 'kakao', ?, ?, ?, 'active', ?, 'user', ?)`).bind(e,d,f,u,p,m,n,s).run(),await t.prepare(`INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
            VALUES (?, 'grant', ?, ?, 'signup_bonus', ?)`).bind(e,n,n,`signup_${e}`).run(),g=await t.prepare(`SELECT * FROM users WHERE id = ?`).bind(e).first(),h=!0}if(!g||g.status!==`active`)throw Error(`계정이 정지 상태입니다.`);await t.prepare(`UPDATE users SET last_login_at = datetime('now') WHERE id = ?`).bind(g.id).run();let _=await sr(t,g.id);cr(e,_);let v=JSON.stringify(lr(g));return a===`redirect`?e.html(`<!DOCTYPE html>
 <html lang="ko">
