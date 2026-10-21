@@ -3499,8 +3499,17 @@ app.get('/gov-support/wizard/:id', (c) => {
     .wz-sub3 { display: grid; grid-template-columns: 1fr; gap: 8px; }
     .wz-info-box { background: #EAF2FF; border-radius: 10px; padding: 12px 14px; font-size: 12.5px; color: #3182F6; line-height: 1.6; margin-top: 10px; }
     .wz-competitor-row { display: flex; gap: 8px; margin-bottom: 8px; }
-    .wz-elig-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid #E5E8EB; font-size: 13.5px; color: #333D4B; line-height: 1.5; }
-    .wz-elig-item input { margin-top: 3px; flex-shrink: 0; }
+    .wz-elig-item { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; border-bottom: 1px solid #E5E8EB; font-size: 15.5px; color: #333D4B; line-height: 1.5; }
+    .wz-elig-item input { margin-top: 2px; flex-shrink: 0; width: 20px; height: 20px; }
+    .wz-unknown-btn { width: 100%; padding: 12px; border: 1px dashed #B0B8C1; border-radius: 12px; background: #FAFBFC; color: #4E5968; font-size: 13.5px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+    .wz-unknown-btn.on { background: #EAF2FF; border: 1px solid #3182F6; border-style: solid; color: #3182F6; }
+    .wz-highlight-box { background: #FFF8E1; border: 1.5px solid #F5C842; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+    .wz-highlight-box .wz-highlight-title { font-size: 13px; font-weight: 800; color: #8A6D1D; margin-bottom: 4px; }
+    .wz-highlight-box .wz-highlight-desc { font-size: 12.5px; color: #8A6D1D; line-height: 1.5; }
+    .wz-chip-sm { padding: 8px 13px; border: 1px solid #E5E8EB; border-radius: 999px; background: #FFFFFF; font-size: 12.5px; color: #4E5968; cursor: pointer; }
+    .wz-chip-sm.on { background: #191F28; border-color: #191F28; color: #fff; font-weight: 700; }
+    .wz-product-cost-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .wz-product-cost-row .wz-product-label { font-size: 12.5px; color: #4E5968; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .wz-nav-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #E5E8EB; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 20; display: flex; gap: 8px; max-width: 480px; margin: 0 auto; }
     .wz-nav-btn { flex: 1; padding: 15px; border-radius: 14px; font-size: 15.5px; font-weight: 700; cursor: pointer; border: none; }
     .wz-nav-prev { background: #F2F4F6; color: #4E5968; flex: 0 0 90px; }
@@ -3580,15 +3589,18 @@ app.get('/gov-support/wizard/:id', (c) => {
             <input type="text" class="wz-input" id="f_target" placeholder="예: 20대 후반~30대 직장 여성" maxlength="80" />
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">고객이 사는 이유 1개</div>
-            <div class="wz-chip-row" data-field="buyReason">
+            <div class="wz-field-label">고객이 사는 이유 (최대 2개)</div>
+            <div class="wz-chip-row" data-field="buyReason" data-multi="1" data-max="2">
               ${['핏/사이즈', '가성비', '스토리·취향', '지속가능성', '기능성'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
           <div class="wz-field">
             <div class="wz-field-label">경쟁사·유사 브랜드 (선택, 비교표에 쓰여요)</div>
-            <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor1_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor1_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
-            <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor2_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor2_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+            <div id="wzCompetitorInputs">
+              <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor1_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor1_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+              <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor2_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor2_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+            </div>
+            <button type="button" class="wz-unknown-btn" id="wzCompetitorUnknownBtn" onclick="wzToggleCompetitorUnknown()">🔍 경쟁사를 잘 모르겠어요 — 찾아주세요</button>
           </div>
         </div>
 
@@ -3598,24 +3610,31 @@ app.get('/gov-support/wizard/:id', (c) => {
           <div class="wz-field">
             <div class="wz-field-label">생산 방식</div>
             <div class="wz-chip-row" data-field="productionMethod">
-              ${['자체 제작(공방)', '국내 OEM·CMT 위탁', '소량생산 전문업체', '해외 생산', '미정(추천 원함)'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+              ${['자체 제작(공방)', '자체 공장(일반)', '자체 공장(스마트팩토리)', '국내 OEM·CMT 위탁', '소량생산 전문업체', '해외 생산', '미정(추천 원함)'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
+            <div class="wz-field-hint">공방은 소규모 수작업, 자체 공장은 직접 소유한 생산 설비를 뜻해요. 스마트팩토리는 자동화·IoT 설비를 갖춘 공장이에요.</div>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">제작 공정을 설명해주세요</div>
-            <textarea class="wz-textarea" id="f_processDetail" placeholder="예: 원단은 OO시장에서 직접 조달 → 자체 패턴 제작 → 협력 공장에서 봉제 → 전수 검수 후 출고"></textarea>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">다른 업체와 다른 점이 있나요?</div>
-            <textarea class="wz-textarea" id="f_differentiation" placeholder="예: 전 제품 전수 검사, 국내산 친환경 원단만 사용, 손바느질 마감 등 — 잘 모르겠다면 '모르겠음'도 괜찮아요"></textarea>
-            <div class="wz-field-hint">구체적인 공정·검수 방식 하나가 심사에서 강력한 차별점이 됩니다.</div>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">목표 원가 / 판매가 (선택, 원)</div>
-            <div class="wz-sub3" style="grid-template-columns:1fr 1fr;">
-              <input type="number" class="wz-input" id="f_targetCost" placeholder="원가" />
-              <input type="number" class="wz-input" id="f_targetPrice" placeholder="판매가" />
+            <div class="wz-field-label">제작 공정 (해당되는 단계 모두 선택)</div>
+            <div class="wz-chip-row" data-field="processSteps" data-multi="1">
+              ${['기획/디자인', '원단·부자재 소싱', '패턴 설계', '샘플 제작', '가봉/보정', '재단·봉제(생산)', '품질 검수', '포장·출고'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
+            <textarea class="wz-textarea" id="f_processNote" placeholder="추가로 설명하고 싶은 점이 있다면 적어주세요 (선택)" style="margin-top:10px;min-height:60px;"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-highlight-box">
+              <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
+              <div class="wz-highlight-desc">아래 내용 하나가 심사에서 선정 확률을 가장 크게 좌우하는 "차별점"이 됩니다. 잘 모르겠으면 아래에서 해당되는 항목만 골라주세요 — 거기서부터 같이 풀어볼게요.</div>
+            </div>
+            <div class="wz-field-label">다른 업체와 다른 점이 있다면 어느 쪽인가요?</div>
+            <div class="wz-chip-row" data-field="differentiationTypes" data-multi="1">
+              ${['원단·소재', '제작 방식', '검수·품질관리', '디자인·패턴', '친환경·지속가능성', '납기·속도', '가격·접근성', '기타'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <textarea class="wz-textarea" id="f_differentiation" placeholder="예: 전 제품 전수 검사, 국내산 친환경 원단만 사용, 손바느질 마감 등 — 위에서 고른 항목을 조금 더 구체적으로 적어주세요. 잘 모르겠다면 비워두셔도 괜찮아요." style="margin-top:10px;"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">상품별 원가 / 판매가 (선택, 원)</div>
+            <div id="wzProductCostRows"></div>
           </div>
         </div>
 
@@ -3627,7 +3646,8 @@ app.get('/gov-support/wizard/:id', (c) => {
             <div class="wz-chip-row" data-field="channels" data-multi="1">
               ${['자사몰', '무신사', '지그재그', '에이블리', '스마트스토어', '도매·위탁', '팝업', '오프라인 매장'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
-            <div class="wz-info-box">채널 수수료 참고: 자사몰 3~5% · 패션 플랫폼 8~15%+광고비 · 도매 납품 40~50%</div>
+            <input type="text" class="wz-input" id="f_selfMallUrl" placeholder="자사몰 URL (예: https://mystore.com)" style="display:none;margin-top:10px;" />
+            <div class="wz-info-box">선택한 채널의 수수료율로 예상 마진을 자동 계산해드려요 — 자사몰 3~5% · 패션 플랫폼 8~15%+광고비 · 도매 납품 40~50%</div>
           </div>
         </div>
 
@@ -3735,7 +3755,7 @@ app.get('/gov-support/wizard/:id', (c) => {
     }
 
     function wzFillFormFromAnswers() {
-      var simpleFields = ['brandName','product1','product2','product3','concept','target','processDetail','differentiation','targetCost','targetPrice','motivation','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature'];
+      var simpleFields = ['brandName','product1','product2','product3','concept','target','processNote','differentiation','motivation','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl'];
       simpleFields.forEach(function (k) {
         var el = document.getElementById('f_' + k);
         if (el && wzAnswers[k] !== undefined) el.value = wzAnswers[k];
@@ -3752,6 +3772,9 @@ app.get('/gov-support/wizard/:id', (c) => {
           chip.classList.toggle('on', on);
         });
       });
+      wzRenderProductCostRows();
+      wzUpdateSelfMallUrlVisibility();
+      wzApplyCompetitorUnknownUI();
     }
 
     document.addEventListener('click', function (e) {
@@ -3759,13 +3782,57 @@ app.get('/gov-support/wizard/:id', (c) => {
       if (!chip) return;
       var row = chip.parentElement;
       var multi = row.getAttribute('data-multi');
+      var max = Number(row.getAttribute('data-max') || 0);
       if (multi) {
+        if (!chip.classList.contains('on') && max > 0) {
+          var onCount = row.querySelectorAll('.wz-chip.on').length;
+          if (onCount >= max) { showToast('최대 ' + max + '개까지 선택할 수 있어요.', 'info'); return; }
+        }
         chip.classList.toggle('on');
       } else {
         row.querySelectorAll('.wz-chip').forEach(function (c) { c.classList.remove('on'); });
         chip.classList.add('on');
       }
+      if (row.getAttribute('data-field') === 'channels') wzUpdateSelfMallUrlVisibility();
     });
+
+    function wzUpdateSelfMallUrlVisibility() {
+      var row = document.querySelector('.wz-chip-row[data-field="channels"]');
+      if (!row) return;
+      var selfMallOn = row.querySelector('.wz-chip[data-value="자사몰"]');
+      var urlInput = document.getElementById('f_selfMallUrl');
+      if (urlInput) urlInput.style.display = (selfMallOn && selfMallOn.classList.contains('on')) ? 'block' : 'none';
+    }
+
+    function wzApplyCompetitorUnknownUI() {
+      var btn = document.getElementById('wzCompetitorUnknownBtn');
+      var inputs = document.getElementById('wzCompetitorInputs');
+      btn.classList.toggle('on', !!wzAnswers.competitorsUnknown);
+      inputs.style.opacity = wzAnswers.competitorsUnknown ? '0.4' : '1';
+      inputs.querySelectorAll('input').forEach(function (el) { el.disabled = !!wzAnswers.competitorsUnknown; });
+    }
+
+    function wzToggleCompetitorUnknown() {
+      wzAnswers.competitorsUnknown = !wzAnswers.competitorsUnknown;
+      wzApplyCompetitorUnknownUI();
+    }
+
+    var GS_PRODUCT_FIELDS = ['product1', 'product2', 'product3'];
+    function wzRenderProductCostRows() {
+      var container = document.getElementById('wzProductCostRows');
+      if (!container) return;
+      var html = GS_PRODUCT_FIELDS.map(function (key, i) {
+        var name = wzAnswers[key] || ('상품 ' + (i + 1));
+        var cost = wzAnswers['cost_' + key] || '';
+        var price = wzAnswers['price_' + key] || '';
+        return '<div class="wz-product-cost-row">' +
+          '<div class="wz-product-label">' + name + '</div>' +
+          '<input type="number" class="wz-input" id="f_cost_' + key + '" placeholder="원가" value="' + cost + '" />' +
+          '<input type="number" class="wz-input" id="f_price_' + key + '" placeholder="판매가" value="' + price + '" />' +
+          '</div>';
+      }).join('');
+      container.innerHTML = html;
+    }
 
     function wzCollectStep(stepNum) {
       var patch = {};
@@ -3778,9 +3845,15 @@ app.get('/gov-support/wizard/:id', (c) => {
         patch.target = val('f_target');
         patch.competitor1_name = val('f_competitor1_name'); patch.competitor1_feature = val('f_competitor1_feature');
         patch.competitor2_name = val('f_competitor2_name'); patch.competitor2_feature = val('f_competitor2_feature');
+        patch.competitorsUnknown = !!wzAnswers.competitorsUnknown;
       } else if (stepNum === 4) {
-        patch.processDetail = val('f_processDetail'); patch.differentiation = val('f_differentiation');
-        patch.targetCost = val('f_targetCost'); patch.targetPrice = val('f_targetPrice');
+        patch.processNote = val('f_processNote'); patch.differentiation = val('f_differentiation');
+        GS_PRODUCT_FIELDS.forEach(function (key) {
+          patch['cost_' + key] = val('f_cost_' + key);
+          patch['price_' + key] = val('f_price_' + key);
+        });
+      } else if (stepNum === 5) {
+        patch.selfMallUrl = val('f_selfMallUrl');
       } else if (stepNum === 7) {
         patch.motivation = val('f_motivation'); patch.threeYearGoal = val('f_threeYearGoal');
       }
@@ -3820,6 +3893,7 @@ app.get('/gov-support/wizard/:id', (c) => {
       document.getElementById('wzProgressBar').style.width = (n / WZ_TOTAL_STEPS * 100) + '%';
       document.getElementById('wzPrevBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
       document.getElementById('wzNextBtn').textContent = n === WZ_TOTAL_STEPS ? '완료' : '다음';
+      if (n === 4) wzRenderProductCostRows();
       window.scrollTo(0, 0);
     }
 
@@ -3928,10 +4002,20 @@ const GS_YEBI_SECTIONS = [
 ]
 
 function calcGovSupportFinance(answers: any) {
-  const cost = Number(answers.targetCost) || 0
-  const price = Number(answers.targetPrice) || 0
-  const margin = price > 0 ? price - cost : null
-  const marginRate = price > 0 ? Math.round(((price - cost) / price) * 1000) / 10 : null
+  const productKeys = ['product1', 'product2', 'product3']
+  const products = productKeys
+    .map((key) => ({
+      name: answers[key] || null,
+      cost: Number(answers['cost_' + key]) || 0,
+      price: Number(answers['price_' + key]) || 0,
+    }))
+    .filter((p) => p.name && p.price > 0)
+    .map((p) => ({ ...p, margin: p.price - p.cost, marginRate: Math.round(((p.price - p.cost) / p.price) * 1000) / 10 }))
+
+  // 대표 상품(첫 번째로 원가·판매가를 입력한 상품) 기준으로 채널 마진·매출 시나리오 계산
+  const primary = products[0] || { cost: 0, price: 0 }
+  const cost = primary.cost
+  const price = primary.price
 
   const channelInfo: Record<string, { fee: number; label: string }> = {
     '자사몰': { fee: 0.04, label: '자사몰 (4%)' },
@@ -3963,16 +4047,18 @@ function calcGovSupportFinance(answers: any) {
   const evenShare = fundUse.length ? Math.round(100 / fundUse.length) : 0
   const budgetSplit = fundUse.map((item) => ({ item, pctShare: evenShare }))
 
-  return { cost, price, margin, marginRate, channelMargins, baseQty, scenario, budgetSplit }
+  return { products, cost, price, margin: primary.price > 0 ? primary.margin : null, marginRate: primary.price > 0 ? primary.marginRate : null, channelMargins, baseQty, scenario, budgetSplit }
 }
 
 function buildGsCompetitorTable(answers: any) {
   const rows: string[][] = []
-  if (answers.competitor1_name) rows.push([answers.competitor1_name, answers.competitor1_feature || '-'])
-  if (answers.competitor2_name) rows.push([answers.competitor2_name, answers.competitor2_feature || '-'])
+  if (!answers.competitorsUnknown) {
+    if (answers.competitor1_name) rows.push([answers.competitor1_name, answers.competitor1_feature || '-'])
+    if (answers.competitor2_name) rows.push([answers.competitor2_name, answers.competitor2_feature || '-'])
+  }
   const selfFeature = (answers.differentiation || answers.concept || '').toString().slice(0, 60) || '-'
   rows.push([(answers.brandName || '본 브랜드') + ' (본 브랜드)', selfFeature])
-  return { headers: ['브랜드', '특징'], rows }
+  return { headers: ['브랜드', '특징'], rows, competitorsUnknown: !!answers.competitorsUnknown }
 }
 
 // 공정 순서도를 AtlasCloud(google/nano-banana-2/edit)로 생성 — edit 전용 모델이라 흰
@@ -3980,10 +4066,12 @@ function buildGsCompetitorTable(answers: any) {
 // 호출부(generateGovSupportSections)가 evidenceGap 블록으로 대체한다.
 const GS_BLANK_CANVAS_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
 
-async function generateGovSupportProcessImage(apiKey: string | undefined, processDetail: string, category: string): Promise<string | null> {
-  if (!apiKey || !processDetail) return null
+async function generateGovSupportProcessImage(apiKey: string | undefined, processSteps: string[], processNote: string, category: string): Promise<string | null> {
+  const stepsText = Array.isArray(processSteps) ? processSteps.join(' → ') : ''
+  if (!apiKey || !stepsText) return null
   try {
-    const prompt = `Create a clean, professional infographic flowchart (process diagram) for a Korean government startup grant business plan document, in a minimalist corporate style with a white background, consistent icon style, and connecting arrows. Draw the following fashion ${category || 'product'} production process as a left-to-right or top-to-bottom flow with 4-6 clearly labeled steps, each with a short Korean label and a simple icon: ${processDetail}. No photorealistic people or products — use simple flat-design icons and boxes only. No watermarks, no extra text besides the step labels.`
+    const noteText = processNote ? ` Additional detail to incorporate: ${processNote}.` : ''
+    const prompt = `Create a clean, professional infographic flowchart (process diagram) for a Korean government startup grant business plan document, in a minimalist corporate style with a white background, consistent icon style, and connecting arrows. Draw the following fashion ${category || 'product'} production process as a left-to-right or top-to-bottom flow with clearly labeled steps, each with a short Korean label and a simple icon: ${stepsText}.${noteText} No photorealistic people or products — use simple flat-design icons and boxes only. No watermarks, no extra text besides the step labels.`
     return await atlasGenerateAndWait({
       images: [`data:image/png;base64,${GS_BLANK_CANVAS_PNG_B64}`],
       prompt,
@@ -4017,7 +4105,9 @@ async function generateGovSupportSections(apiKey: string | undefined, answers: a
 5. 문체: 정중한 개조식("~한다/~이다") + 필요한 곳만 표. 1인칭 "본 브랜드" 사용.
 6. 출력은 마크다운이 아니라 아래 JSON 스키마의 배열. 각 섹션은 headline(서술형 1줄, 40~60자) + lead(1~2문장) + blocks(중분류 순서, paragraph/bullets 혼합, 문단 연속 3개·개조식 연속 2개 금지) + visualSpecs.
 7. blocks의 type: "subhead"(text) | "paragraph"(text) | "bullets"(items:string[]) | "table"(headers:string[],rows:string[][]) | "visual"(visualId,caption) | "evidenceGap"(need,how).
-8. solution 섹션엔 competitor-table(아래 제공된 경쟁사 비교표 데이터를 표로 그대로 사용, 지어내지 말 것), market 섹션엔 market-analysis 표, operation 섹션엔 process-flow 시각화 블록과 asis-tobe 표를 반드시 포함.
+8. solution 섹션엔 competitor-table(아래 제공된 경쟁사 비교표 데이터를 표로 그대로 사용), market 섹션엔 market-analysis 표, operation 섹션엔 process-flow 시각화 블록과 asis-tobe 표를 반드시 포함.
+9. 경쟁사 비교표의 competitorsUnknown이 true면, 사용자가 실제 경쟁 브랜드를 모른다는 뜻이다 — 특정 브랜드명을 지어내지 말고, 카테고리/컨셉에 맞는 "경쟁 유형"을 일반 명사로 2개 제시한다(예: "대형 SPA 브랜드", "동일 가격대 온라인 전용 브랜드", "수입 편집샵 브랜드" 등 — 실존 브랜드명 금지, 유형 설명만).
+10. 사용자 답변의 processSteps는 사용자가 선택한 공정 단계 목록, differentiationTypes는 사용자가 선택한 차별점 유형 목록이다 — 이 선택값을 중심으로 구체화하고, differentiation 텍스트가 비어있으면 선택한 유형에 대해 패션 업계 일반적인 모범 사례를 제안 형태(예: "~것을 권장한다", "~하면 차별점이 될 수 있다")로 쓰되 사용자가 실제로 한다고 단정하지 않는다.
 
 [DOMAIN_KB]
 ${GS_DOMAIN_KB}
@@ -4086,7 +4176,7 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
 
     const [sections, processImageUrl] = await Promise.all([
       generateGovSupportSections(c.env.ANTHROPIC_API_KEY, answers, finance, competitorTable),
-      generateGovSupportProcessImage(c.env.ATLAS_API_KEY, answers.processDetail, answers.category),
+      generateGovSupportProcessImage(c.env.ATLAS_API_KEY, answers.processSteps, answers.processNote, answers.category),
     ])
 
     const generatedContent = { sections, finance, competitorTable, processImageUrl }
