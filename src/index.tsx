@@ -3408,6 +3408,34 @@ app.get('/api/gov-support/projects/:id', async (c) => {
   }
 })
 
+app.get('/api/gov-support/projects/:id/result', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const project = await db.prepare(
+      `SELECT id, program_id, program_name, status, generated_content, generated_at FROM gov_support_projects WHERE id = ? AND user_id = ?`
+    ).bind(c.req.param('id'), sess.user_id).first() as any
+    if (!project) return c.json({ success: false, message: '프로젝트를 찾을 수 없습니다.' }, 404)
+    if (project.status !== 'generated' || !project.generated_content) {
+      return c.json({ success: false, message: '아직 생성된 초안이 없습니다.' }, 400)
+    }
+
+    return c.json({
+      success: true,
+      programName: project.program_name,
+      generatedAt: project.generated_at,
+      content: JSON.parse(project.generated_content),
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 app.patch('/api/gov-support/projects/:id/answers', async (c) => {
   const db: D1Database = c.env.LOOKBOOK_DB
   try {
@@ -3644,11 +3672,16 @@ app.get('/gov-support/wizard/:id', (c) => {
       </form>
 
       <div class="wz-step" id="wzDoneStep" style="display:none;">
-        <div class="wz-done-box">
+        <div class="wz-done-box" id="wzDoneBoxIdle">
           <div class="wz-done-icon">✅</div>
-          <h2>입력이 저장됐어요</h2>
-          <p>입력하신 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 아직 준비 중이에요.<br/>완성되면 알려드릴게요!</p>
-          <a href="/gov-support" class="wz-nav-btn wz-nav-next" style="display:inline-block;text-decoration:none;padding:15px 28px;">목록으로</a>
+          <h2>입력이 끝났어요</h2>
+          <p id="wzDoneMsg">입력하신 내용으로 AI가 초안을 만들어드릴게요.</p>
+          <button type="button" class="wz-nav-btn wz-nav-next" id="wzGenerateBtn" style="display:inline-block;padding:15px 28px;" onclick="wzStartGenerate()">AI 초안 생성하기</button>
+        </div>
+        <div class="wz-done-box" id="wzDoneBoxLoading" style="display:none;">
+          <div class="wz-done-icon">✨</div>
+          <h2>초안을 작성하고 있어요</h2>
+          <p>텍스트와 공정 순서도 이미지를 함께 만들고 있어요. 최대 1~2분 정도 걸릴 수 있어요.</p>
         </div>
       </div>
     </div>
@@ -3661,10 +3694,12 @@ app.get('/gov-support/wizard/:id', (c) => {
 
   <script>
     var WZ_PROJECT_ID = ${JSON.stringify(projectId)};
+    var WZ_GENERATION_READY = ${JSON.stringify(GS_GENERATION_READY_IDS)};
     var WZ_TOTAL_STEPS = 8;
     var wzCurrentStep = 1;
     var wzAnswers = {};
     var wzEligibility = [];
+    var wzProgramId = null;
 
     function authHeaders() {
       var token = localStorage.getItem('lookbook_token') || '';
@@ -3682,6 +3717,7 @@ app.get('/gov-support/wizard/:id', (c) => {
 
         wzAnswers = data.project.answers || {};
         wzEligibility = data.eligibility || [];
+        wzProgramId = data.project.program_id;
         wzFillFormFromAnswers();
         wzRenderEligibility();
 
@@ -3801,9 +3837,35 @@ app.get('/gov-support/wizard/:id', (c) => {
         document.getElementById('wzForm').style.display = 'none';
         document.getElementById('wzNavBar').style.display = 'none';
         document.getElementById('wzDoneStep').style.display = 'block';
+        if (WZ_GENERATION_READY.indexOf(wzProgramId) === -1) {
+          document.getElementById('wzDoneMsg').textContent = '입력하신 내용으로 AI가 초안을 만들어주는 기능은 이 사업에서는 아직 준비 중이에요. 완성되면 알려드릴게요!';
+          document.getElementById('wzGenerateBtn').style.display = 'none';
+        }
         return;
       }
       wzShowStep(wzCurrentStep + 1);
+    }
+
+    async function wzStartGenerate() {
+      document.getElementById('wzDoneBoxIdle').style.display = 'none';
+      document.getElementById('wzDoneBoxLoading').style.display = 'block';
+      try {
+        var res = await fetch('/api/gov-support/projects/' + WZ_PROJECT_ID + '/generate', {
+          method: 'POST', headers: authHeaders(),
+        });
+        var data = await res.json();
+        if (!data.success) {
+          showToast(data.message || '초안 생성에 실패했어요.', 'error');
+          document.getElementById('wzDoneBoxLoading').style.display = 'none';
+          document.getElementById('wzDoneBoxIdle').style.display = 'block';
+          return;
+        }
+        location.href = '/gov-support/result/' + WZ_PROJECT_ID;
+      } catch (e) {
+        showToast('네트워크 오류가 발생했어요.', 'error');
+        document.getElementById('wzDoneBoxLoading').style.display = 'none';
+        document.getElementById('wzDoneBoxIdle').style.display = 'block';
+      }
     }
 
     function wzPrevStep() {
@@ -3815,6 +3877,332 @@ app.get('/gov-support/wizard/:id', (c) => {
     wzLoad();
   </script>
   `, '', '지원사업 사업계획서 작성 — EZlook 지원사업 도우미', c.env.GA4_MEASUREMENT_ID))
+})
+
+// ────────────────────────────────────────────────────
+// 지원사업 도우미 — AI 초안 생성 (현재 예비창업패키지(yebi)만 지원, PSST 구조)
+//
+// 설계 원칙(사용자 요청 반영):
+// 1. 소상공인이 스스로 인지 못하는 차별성은 위저드 4단계 질문(제작공정/차별점)으로 이미
+//    끌어냈으므로, 여기서는 그 답변을 "solution"/"operation" 섹션에 구체적으로 녹인다.
+// 2. 경쟁사 비교표는 AI가 지어내지 않고 사용자가 입력한 경쟁사 답변으로 결정론적으로
+//    만든다(buildGsCompetitorTable) — 선정 여부와 무관하게 항상 포함.
+// 3. 시장분석표/AS-IS·TO-BE표는 market/operation 섹션의 table 블록으로 포함.
+// 4. 공정 순서도는 AtlasCloud가 실제 이미지로 그린다(디자인 품질 우선 — 사용자 확인됨).
+//    생성 실패 시 숫자/표는 전부 코드 계산값이라 영향 없고, 공정도만 비어 보일 수 있다.
+// 5. 3개년 계획(향후 3년)은 F1 원 양식에 없는 EZlook 자체 부가 섹션 — 매출·홍보·상품확장·
+//    생산고도화·조직·재무 6개 축으로 연도별 구체화.
+// 재무 숫자는 전부 코드로 계산(calcGovSupportFinance)하고 Claude에게 그대로 인용하게만
+// 시켜 환각을 막는다(PART D4/E3 원칙).
+// ────────────────────────────────────────────────────
+const GS_GENERATION_READY_IDS = ['yebi']
+
+const GS_DOMAIN_KB = `[원가 구조] 소매원가 = 소재비(원단+부자재) + 임가공비(패턴·샘플·봉제·마감) + 라벨/택 + 포장 + 검사·기획비.
+[목표 원가율] 원가율(원가÷판매가) 30~40%가 일반적. 소량생산(50장 미만)은 단가 상승으로 원가율 40~50%, 이 경우 고가격대 포지셔닝 또는 프리오더로 리스크 통제가 필요하다.
+[채널 수수료] 자사몰 3~5% / 패션 플랫폼(무신사·지그재그·에이블리 등) 8~15%+자체 광고비 별도 / 도매·위탁 납품은 소매가 대비 40~50% 공급 / 팝업·오프라인은 임대료 고정비.
+[소량생산] 국내 봉제·OEM 최소발주량 통상 10~50장(품목별 상이), 샘플→가봉→양산 리드타임 2~6주. 해외는 단가 유리하나 최소발주량 수백 장, 리드타임 6~12주.
+[시즌 캘린더] SS(3~5월 판매)는 12~1월 발주, FW(9~11월 판매)는 6~7월 발주. 기획은 판매 3~6개월 선행.
+[재고 리스크] 시즌 후 잔여 재고가 가장 큰 리스크 — 프리오더, 소량 다품종, 베이스 아이템 구성으로 대응.
+[심사 관점] 심사위원은 "하고 싶은 것"보다 "실행될 것"을 본다. 이미 해온 준비(샘플, 업체 컨택, 팔로워, 무대재)를 현재 진행형으로 쓸수록 설득력이 높다.`
+
+// F1(예비창업패키지) 섹션 구조 + EZlook 부가 섹션(future-plan)
+const GS_YEBI_SECTIONS = [
+  { id: 'problem', title: 'Ⅰ. Problem — 문제 인식', evaluationLink: ['사업성'], targetChars: 700,
+    guidance: '고객이 지금 쓰는 대안과 그 한계를 먼저 쓰고, 미충족 니즈를 구체적 상황으로 설명한다.' },
+  { id: 'solution', title: 'Ⅱ. Solution — 해결 아이템', evaluationLink: ['사업성'], targetChars: 900,
+    guidance: '아이템이 문제를 어떻게 푸는지, 사용자가 입력한 제작 공정·차별점(differentiation)을 구체적으로 녹여 대안 대비 차별점을 원가·소재·검수 방식 등 패션의 언어로 쓴다. 이 섹션에 경쟁사 비교표(table 블록, visualId="competitor-table")를 반드시 포함한다.' },
+  { id: 'market', title: 'Ⅲ. Scale-up(1) — 시장 & 전략', evaluationLink: ['사업성'], targetChars: 900,
+    guidance: '시장 규모·성장성은 사용자가 제공한 근거가 없으면 evidenceGap 블록으로 남기고 숫자를 지어내지 않는다. 타겟 고객·구매 이유를 중심으로 한 시장분석표(table 블록, visualId="market-analysis")를 포함한다.' },
+  { id: 'operation', title: 'Ⅲ. Scale-up(2) — 실행 계획 (생산·마케팅·재무)', evaluationLink: ['실행가능성'], targetChars: 1300,
+    guidance: '생산/조달 계획에 사용자가 입력한 제작 공정(processDetail)을 단계별로 서술하고, 공정 순서도 시각화 블록(visual, visualId="process-flow")을 반드시 포함한다. 지원금 수령 전/후 변화를 보여주는 AS-IS·TO-BE 비교표(table 블록, visualId="asis-tobe")를 포함한다. 재무 계획은 제공된 {{finance}} 숫자를 그대로 인용한다(재계산·변형 금지).' },
+  { id: 'team', title: 'Ⅳ. Team — 대표자 역량·창업 준비도', evaluationLink: ['자기효능감'], targetChars: 600,
+    guidance: '왜 이 사람이 이 아이템인가. 경력·창업 동기를 근거와 연결하고 부족한 부분은 보완 계획으로 쓴다.' },
+  { id: 'budget', title: 'Ⅴ. 정부지원사업비 집행 계획', evaluationLink: ['실행가능성'], targetChars: 500,
+    guidance: '제공된 {{finance}}의 비목 배분표를 그대로 인용하고, 각 비목이 어떤 마일스톤에 필요한지 서술한다.' },
+  { id: 'future-plan', title: 'Ⅵ. 향후 3개년 계획 (EZlook 부가)', evaluationLink: ['성장가능성'], targetChars: 900,
+    guidance: '매출·홍보·상품확장·생산고도화·조직·재무 6개 축으로 1년차/2년차/3년차를 구체적이고 현실적으로 구분해 bullets로 쓴다. 사용자가 입력한 3년 후 목표(threeYearGoal)가 있으면 그 방향에 맞춰 구체화하고, 없으면 사업 규모에 맞는 보수적인 추정치로 채우되 반드시 evidenceGap 성격임을 암시하는 표현("추정치", "목표")을 쓴다.' },
+]
+
+function calcGovSupportFinance(answers: any) {
+  const cost = Number(answers.targetCost) || 0
+  const price = Number(answers.targetPrice) || 0
+  const margin = price > 0 ? price - cost : null
+  const marginRate = price > 0 ? Math.round(((price - cost) / price) * 1000) / 10 : null
+
+  const channelInfo: Record<string, { fee: number; label: string }> = {
+    '자사몰': { fee: 0.04, label: '자사몰 (4%)' },
+    '무신사': { fee: 0.12, label: '무신사 (12%+광고비)' },
+    '지그재그': { fee: 0.12, label: '지그재그 (12%+광고비)' },
+    '에이블리': { fee: 0.12, label: '에이블리 (12%+광고비)' },
+    '스마트스토어': { fee: 0.058, label: '스마트스토어 (5.8%)' },
+    '도매·위탁': { fee: 0.45, label: '도매·위탁 (공급가 45%)' },
+    '팝업': { fee: 0, label: '팝업 (임대료 고정비)' },
+    '오프라인 매장': { fee: 0, label: '오프라인 매장 (임대료 고정비)' },
+  }
+  const channels = Array.isArray(answers.channels) ? answers.channels : []
+  const channelMargins = channels.map((ch: string) => {
+    const info = channelInfo[ch] || { fee: 0.1, label: ch }
+    const netMarginRate = price > 0 ? Math.round((1 - cost / price - info.fee) * 1000) / 10 : null
+    return { channel: ch, feeLabel: info.label, netMarginRate }
+  })
+
+  const scaleToQty: Record<string, number> = { '샘플만': 10, '10~30장': 20, '50~100장': 75, '100장+': 150, '프리오더': 50 }
+  const baseQty = scaleToQty[answers.productionScale] || 50
+  const monthlyBase = price > 0 ? baseQty * price : null
+  const scenario = monthlyBase === null ? null : {
+    conservative: Math.round(monthlyBase * 0.5),
+    base: Math.round(monthlyBase),
+    aggressive: Math.round(monthlyBase * 1.5),
+  }
+
+  const fundUse: string[] = Array.isArray(answers.fundUse) ? answers.fundUse : []
+  const evenShare = fundUse.length ? Math.round(100 / fundUse.length) : 0
+  const budgetSplit = fundUse.map((item) => ({ item, pctShare: evenShare }))
+
+  return { cost, price, margin, marginRate, channelMargins, baseQty, scenario, budgetSplit }
+}
+
+function buildGsCompetitorTable(answers: any) {
+  const rows: string[][] = []
+  if (answers.competitor1_name) rows.push([answers.competitor1_name, answers.competitor1_feature || '-'])
+  if (answers.competitor2_name) rows.push([answers.competitor2_name, answers.competitor2_feature || '-'])
+  const selfFeature = (answers.differentiation || answers.concept || '').toString().slice(0, 60) || '-'
+  rows.push([(answers.brandName || '본 브랜드') + ' (본 브랜드)', selfFeature])
+  return { headers: ['브랜드', '특징'], rows }
+}
+
+// 공정 순서도를 AtlasCloud(google/nano-banana-2/edit)로 생성 — edit 전용 모델이라 흰
+// 캔버스를 "원본 이미지"로 넘기고 처음부터 그리도록 지시한다. 실패하면 null을 반환하고
+// 호출부(generateGovSupportSections)가 evidenceGap 블록으로 대체한다.
+const GS_BLANK_CANVAS_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+
+async function generateGovSupportProcessImage(apiKey: string | undefined, processDetail: string, category: string): Promise<string | null> {
+  if (!apiKey || !processDetail) return null
+  try {
+    const prompt = `Create a clean, professional infographic flowchart (process diagram) for a Korean government startup grant business plan document, in a minimalist corporate style with a white background, consistent icon style, and connecting arrows. Draw the following fashion ${category || 'product'} production process as a left-to-right or top-to-bottom flow with 4-6 clearly labeled steps, each with a short Korean label and a simple icon: ${processDetail}. No photorealistic people or products — use simple flat-design icons and boxes only. No watermarks, no extra text besides the step labels.`
+    return await atlasGenerateAndWait({
+      images: [`data:image/png;base64,${GS_BLANK_CANVAS_PNG_B64}`],
+      prompt,
+      aspect_ratio: '16:9',
+      resolution: '1K',
+      apiKey,
+    })
+  } catch (e) {
+    console.error('generateGovSupportProcessImage 실패 (무시):', e)
+    return null
+  }
+}
+
+async function generateGovSupportSections(apiKey: string | undefined, answers: any, finance: any, competitorTable: any): Promise<any[]> {
+  const fallbackSections = GS_YEBI_SECTIONS.map((s) => ({
+    sectionId: s.id, headline: s.title, lead: '',
+    blocks: [{ type: 'evidenceGap', need: 'AI 초안 생성', how: 'ANTHROPIC_API_KEY 미설정 — 관리자에게 문의해주세요.' }],
+    visualSpecs: [],
+  }))
+  if (!apiKey) return fallbackSections
+
+  const sectionSpecJson = JSON.stringify(GS_YEBI_SECTIONS.map((s) => ({ id: s.id, title: s.title, guidance: s.guidance, targetChars: s.targetChars })))
+
+  const prompt = `당신은 한국 정부지원사업(예비창업패키지 등) 심사 경험이 풍부한 패션 제조 전문 컨설턴트다. 아래 소상공인의 답변을 바탕으로 사업계획서 섹션 7개를 작성한다.
+
+[작성 원칙]
+1. 평가기준 역매핑: 각 섹션은 지정된 목적을 채우기 위해 존재한다.
+2. 구체성 우선: "품질이 좋다" 금지. 소재명, 원가율, 리드타임, 수수료 등 숫자로 쓴다.
+3. 환각 금지: 사용자가 제공하지 않은 사실(판매 실적, 통계)을 만들지 않는다. 필요한 근거는 evidenceGap 블록(need=무엇, how=준비 방법)으로 남긴다.
+4. 재무 숫자는 {{finance}}에 제공된 값만 그대로 인용한다 — 재계산·변형 절대 금지.
+5. 문체: 정중한 개조식("~한다/~이다") + 필요한 곳만 표. 1인칭 "본 브랜드" 사용.
+6. 출력은 마크다운이 아니라 아래 JSON 스키마의 배열. 각 섹션은 headline(서술형 1줄, 40~60자) + lead(1~2문장) + blocks(중분류 순서, paragraph/bullets 혼합, 문단 연속 3개·개조식 연속 2개 금지) + visualSpecs.
+7. blocks의 type: "subhead"(text) | "paragraph"(text) | "bullets"(items:string[]) | "table"(headers:string[],rows:string[][]) | "visual"(visualId,caption) | "evidenceGap"(need,how).
+8. solution 섹션엔 competitor-table(아래 제공된 경쟁사 비교표 데이터를 표로 그대로 사용, 지어내지 말 것), market 섹션엔 market-analysis 표, operation 섹션엔 process-flow 시각화 블록과 asis-tobe 표를 반드시 포함.
+
+[DOMAIN_KB]
+${GS_DOMAIN_KB}
+
+[섹션 스펙]
+${sectionSpecJson}
+
+[사용자 답변]
+${JSON.stringify(answers)}
+
+[재무 계산 결과 — 그대로 인용]
+${JSON.stringify(finance)}
+
+[경쟁사 비교표 — solution 섹션의 table 블록에 그대로 사용]
+${JSON.stringify(competitorTable)}
+
+아래 JSON 배열 형식으로만 응답하세요(마크다운 코드펜스 없이):
+[{"sectionId": string, "headline": string, "lead": string, "blocks": [...], "visualSpecs": [{"visualId": string, "kind": string, "renderer": string, "title": string}]}, ...] (7개 섹션 전부)`
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        thinking: { type: 'disabled' },
+        max_tokens: 8000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: AbortSignal.timeout(55000),
+    })
+    if (!res.ok) { console.error('gov-support 섹션 생성 HTTP 실패:', res.status); return fallbackSections }
+    const data = await res.json<any>()
+    if (data?.stop_reason === 'max_tokens') console.error('gov-support 섹션 생성 max_tokens로 잘림')
+    const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
+    const text = (textBlock?.text || '[]').replace(/^```json\s*|```$/g, '').trim()
+    const parsed = JSON.parse(text)
+    if (!Array.isArray(parsed) || !parsed.length) return fallbackSections
+    return parsed
+  } catch (e) {
+    console.error('gov-support 섹션 생성 실패:', e)
+    return fallbackSections
+  }
+}
+
+app.post('/api/gov-support/projects/:id/generate', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const project = await db.prepare(
+      `SELECT id, program_id, answers FROM gov_support_projects WHERE id = ? AND user_id = ?`
+    ).bind(c.req.param('id'), sess.user_id).first() as any
+    if (!project) return c.json({ success: false, message: '프로젝트를 찾을 수 없습니다.' }, 404)
+    if (!GS_GENERATION_READY_IDS.includes(project.program_id)) {
+      return c.json({ success: false, message: '이 사업은 초안 생성을 아직 지원하지 않습니다.' }, 400)
+    }
+
+    const answers = JSON.parse(project.answers || '{}')
+    const finance = calcGovSupportFinance(answers)
+    const competitorTable = buildGsCompetitorTable(answers)
+
+    const [sections, processImageUrl] = await Promise.all([
+      generateGovSupportSections(c.env.ANTHROPIC_API_KEY, answers, finance, competitorTable),
+      generateGovSupportProcessImage(c.env.ATLAS_API_KEY, answers.processDetail, answers.category),
+    ])
+
+    const generatedContent = { sections, finance, competitorTable, processImageUrl }
+
+    await db.prepare(
+      `UPDATE gov_support_projects SET finance = ?, generated_content = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+    ).bind(JSON.stringify(finance), JSON.stringify(generatedContent), project.id).run()
+
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.get('/gov-support/result/:id', (c) => {
+  const projectId = c.req.param('id')
+  return c.html(htmlShell('지원사업 초안', `
+  <div class="toast-container" id="toastContainer"></div>
+
+  <style>
+    body { background: #F2F4F6; }
+    .rs-wrap { min-height: 100vh; padding: 0 0 40px; background: #F2F4F6; }
+    .rs-inner { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+    .rs-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; max-width: 560px; margin: 0 auto; }
+    .rs-back { width: 36px; height: 36px; border: none; background: #FFFFFF; border-radius: 50%; color: #333D4B; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(15,23,42,0.06); }
+    .rs-print-btn { font-size: 13px; font-weight: 700; color: #fff; background: #3182F6; border: none; border-radius: 999px; padding: 9px 16px; cursor: pointer; }
+    .rs-notice { background: #FFF8E1; border: 1px solid #F5D98A; border-radius: 12px; padding: 12px 14px; font-size: 12px; color: #8A6D1D; line-height: 1.6; margin: 10px 0 20px; }
+    .rs-doc { background: #FFFFFF; border-radius: 16px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); padding: 24px 22px; }
+    .rs-section { margin-bottom: 36px; }
+    .rs-section:last-child { margin-bottom: 0; }
+    .rs-section-badge { display: inline-block; font-size: 10.5px; font-weight: 700; color: #3182F6; background: #EAF2FF; border-radius: 999px; padding: 3px 9px; margin-bottom: 8px; }
+    .rs-headline { font-size: 18px; font-weight: 800; color: #191F28; line-height: 1.4; margin: 0 0 8px; }
+    .rs-lead { font-size: 13.5px; color: #4E5968; line-height: 1.6; margin: 0 0 16px; }
+    .rs-subhead { font-size: 15px; font-weight: 700; color: #191F28; margin: 18px 0 8px; }
+    .rs-paragraph { font-size: 14px; color: #333D4B; line-height: 1.7; margin: 0 0 10px; }
+    .rs-bullets { margin: 0 0 10px; padding-left: 18px; font-size: 14px; color: #333D4B; line-height: 1.8; }
+    .rs-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0 14px; }
+    .rs-table th, .rs-table td { border: 1px solid #E5E8EB; padding: 8px 10px; text-align: left; }
+    .rs-table th { background: #F8F9FA; font-weight: 700; color: #333D4B; }
+    .rs-visual-img { width: 100%; border-radius: 10px; margin: 10px 0; display: block; }
+    .rs-visual-caption { font-size: 11.5px; color: #8B95A1; text-align: center; margin: -4px 0 14px; }
+    .rs-evidence-gap { background: #FFF5F5; border: 1px dashed #FCA5A5; border-radius: 10px; padding: 12px 14px; font-size: 12.5px; color: #B91C1C; line-height: 1.6; margin: 0 0 14px; }
+    .rs-evidence-gap b { display: block; margin-bottom: 4px; }
+    @media print {
+      body { background: #fff; }
+      .rs-header, .rs-notice { display: none !important; }
+      .rs-wrap { padding: 0; }
+      .rs-doc { box-shadow: none; border-radius: 0; padding: 0; }
+      .rs-section { page-break-inside: avoid; }
+    }
+  </style>
+
+  <div class="rs-wrap">
+    <div class="rs-header">
+      <a href="/gov-support" class="rs-back">‹</a>
+      <button type="button" class="rs-print-btn" onclick="window.print()">인쇄 / PDF 저장</button>
+    </div>
+    <div class="rs-inner">
+      <div id="rsLoading" style="text-align:center;padding:60px 0;color:#8B95A1;font-size:14px;">불러오는 중...</div>
+      <div id="rsContent" style="display:none;">
+        <div class="rs-notice">⚠️ AI가 생성한 초안입니다. 수치·사실관계를 반드시 직접 확인하고, 제출 전 원문 공고 양식에 맞춰 다듬어주세요.</div>
+        <div class="rs-doc" id="rsDoc"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var RS_PROJECT_ID = ${JSON.stringify(projectId)};
+
+    function rsEsc(s) {
+      return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function rsRenderBlock(b) {
+      if (b.type === 'subhead') return '<div class="rs-subhead">' + rsEsc(b.text) + '</div>';
+      if (b.type === 'paragraph') return '<p class="rs-paragraph">' + rsEsc(b.text) + '</p>';
+      if (b.type === 'bullets') return '<ul class="rs-bullets">' + (b.items||[]).map(function(i){ return '<li>' + rsEsc(i) + '</li>'; }).join('') + '</ul>';
+      if (b.type === 'table') {
+        var head = '<tr>' + (b.headers||[]).map(function(h){ return '<th>' + rsEsc(h) + '</th>'; }).join('') + '</tr>';
+        var rows = (b.rows||[]).map(function(r){ return '<tr>' + r.map(function(cell){ return '<td>' + rsEsc(cell) + '</td>'; }).join('') + '</tr>'; }).join('');
+        return '<table class="rs-table">' + head + rows + '</table>';
+      }
+      if (b.type === 'visual') {
+        if (b.visualId === 'process-flow' && window.RS_PROCESS_IMAGE_URL) {
+          return '<img class="rs-visual-img" src="' + rsEsc(window.RS_PROCESS_IMAGE_URL) + '" alt="' + rsEsc(b.caption||'') + '"/>' + (b.caption ? '<div class="rs-visual-caption">' + rsEsc(b.caption) + '</div>' : '');
+        }
+        return '<div class="rs-evidence-gap"><b>📊 시각화: ' + rsEsc(b.caption || b.visualId || '') + '</b>다음 업데이트에서 자동으로 그려드릴게요. 지금은 직접 표/그래프로 채워주세요.</div>';
+      }
+      if (b.type === 'evidenceGap') return '<div class="rs-evidence-gap"><b>⚠️ 근거 필요: ' + rsEsc(b.need) + '</b>' + rsEsc(b.how) + '</div>';
+      return '';
+    }
+
+    async function rsLoad() {
+      var token = localStorage.getItem('lookbook_token') || '';
+      if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); location.href = '/'; return; }
+      try {
+        var res = await fetch('/api/gov-support/projects/' + RS_PROJECT_ID + '/result', { headers: { 'X-Session-Token': token } });
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '불러오기에 실패했어요.', 'error'); location.href = '/gov-support/wizard/' + RS_PROJECT_ID; return; }
+
+        window.RS_PROCESS_IMAGE_URL = data.content.processImageUrl || null;
+        var sections = data.content.sections || [];
+        var html = '<h1 style="font-size:20px;font-weight:800;color:#191F28;margin:0 0 4px;">' + rsEsc(data.programName) + ' 사업계획서 초안</h1>';
+        html += '<p style="font-size:12px;color:#8B95A1;margin:0 0 24px;">AI 생성 — ' + rsEsc(data.generatedAt || '') + '</p>';
+        html += sections.map(function (s) {
+          var badges = '';
+          var blocksHtml = (s.blocks || []).map(rsRenderBlock).join('');
+          return '<div class="rs-section">' + badges + '<div class="rs-headline">' + rsEsc(s.headline) + '</div>' + (s.lead ? '<p class="rs-lead">' + rsEsc(s.lead) + '</p>' : '') + blocksHtml + '</div>';
+        }).join('<hr style="border:none;border-top:1px solid #E5E8EB;margin:28px 0;" />');
+        document.getElementById('rsDoc').innerHTML = html;
+        document.getElementById('rsLoading').style.display = 'none';
+        document.getElementById('rsContent').style.display = 'block';
+      } catch (e) {
+        showToast('네트워크 오류가 발생했어요.', 'error');
+      }
+    }
+
+    rsLoad();
+  </script>
+  `, '', 'AI가 생성한 지원사업 사업계획서 초안 — EZlook 지원사업 도우미', c.env.GA4_MEASUREMENT_ID))
 })
 
 // ────────────────────────────────────────────────────
