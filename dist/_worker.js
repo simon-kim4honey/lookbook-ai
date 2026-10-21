@@ -170,7 +170,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Wt}" font-size="128" font-weight="800" fill="${Ht(e.statColor||`#ffffff`)}">${Ht(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Wt}" font-size="64" font-weight="800" fill="#ffffff">${Ht(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Wt}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ht(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Kt=`mvhsmtg5`;function qt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Jt=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Wt}" font-size="128" font-weight="800" fill="${Ht(e.statColor||`#ffffff`)}">${Ht(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Wt}" font-size="64" font-weight="800" fill="#ffffff">${Ht(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Wt}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ht(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Kt=`mvhszkd8`;function qt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Jt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1042,8 +1042,17 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .wz-sub3 { display: grid; grid-template-columns: 1fr; gap: 8px; }
     .wz-info-box { background: #EAF2FF; border-radius: 10px; padding: 12px 14px; font-size: 12.5px; color: #3182F6; line-height: 1.6; margin-top: 10px; }
     .wz-competitor-row { display: flex; gap: 8px; margin-bottom: 8px; }
-    .wz-elig-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid #E5E8EB; font-size: 13.5px; color: #333D4B; line-height: 1.5; }
-    .wz-elig-item input { margin-top: 3px; flex-shrink: 0; }
+    .wz-elig-item { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; border-bottom: 1px solid #E5E8EB; font-size: 15.5px; color: #333D4B; line-height: 1.5; }
+    .wz-elig-item input { margin-top: 2px; flex-shrink: 0; width: 20px; height: 20px; }
+    .wz-unknown-btn { width: 100%; padding: 12px; border: 1px dashed #B0B8C1; border-radius: 12px; background: #FAFBFC; color: #4E5968; font-size: 13.5px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+    .wz-unknown-btn.on { background: #EAF2FF; border: 1px solid #3182F6; border-style: solid; color: #3182F6; }
+    .wz-highlight-box { background: #FFF8E1; border: 1.5px solid #F5C842; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+    .wz-highlight-box .wz-highlight-title { font-size: 13px; font-weight: 800; color: #8A6D1D; margin-bottom: 4px; }
+    .wz-highlight-box .wz-highlight-desc { font-size: 12.5px; color: #8A6D1D; line-height: 1.5; }
+    .wz-chip-sm { padding: 8px 13px; border: 1px solid #E5E8EB; border-radius: 999px; background: #FFFFFF; font-size: 12.5px; color: #4E5968; cursor: pointer; }
+    .wz-chip-sm.on { background: #191F28; border-color: #191F28; color: #fff; font-weight: 700; }
+    .wz-product-cost-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .wz-product-cost-row .wz-product-label { font-size: 12.5px; color: #4E5968; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .wz-nav-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #E5E8EB; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 20; display: flex; gap: 8px; max-width: 480px; margin: 0 auto; }
     .wz-nav-btn { flex: 1; padding: 15px; border-radius: 14px; font-size: 15.5px; font-weight: 700; cursor: pointer; border: none; }
     .wz-nav-prev { background: #F2F4F6; color: #4E5968; flex: 0 0 90px; }
@@ -1123,15 +1132,18 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
             <input type="text" class="wz-input" id="f_target" placeholder="예: 20대 후반~30대 직장 여성" maxlength="80" />
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">고객이 사는 이유 1개</div>
-            <div class="wz-chip-row" data-field="buyReason">
+            <div class="wz-field-label">고객이 사는 이유 (최대 2개)</div>
+            <div class="wz-chip-row" data-field="buyReason" data-multi="1" data-max="2">
               ${[`핏/사이즈`,`가성비`,`스토리·취향`,`지속가능성`,`기능성`].map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
             </div>
           </div>
           <div class="wz-field">
             <div class="wz-field-label">경쟁사·유사 브랜드 (선택, 비교표에 쓰여요)</div>
-            <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor1_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor1_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
-            <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor2_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor2_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+            <div id="wzCompetitorInputs">
+              <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor1_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor1_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+              <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor2_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor2_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+            </div>
+            <button type="button" class="wz-unknown-btn" id="wzCompetitorUnknownBtn" onclick="wzToggleCompetitorUnknown()">🔍 경쟁사를 잘 모르겠어요 — 찾아주세요</button>
           </div>
         </div>
 
@@ -1141,24 +1153,31 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           <div class="wz-field">
             <div class="wz-field-label">생산 방식</div>
             <div class="wz-chip-row" data-field="productionMethod">
-              ${[`자체 제작(공방)`,`국내 OEM·CMT 위탁`,`소량생산 전문업체`,`해외 생산`,`미정(추천 원함)`].map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
+              ${[`자체 제작(공방)`,`자체 공장(일반)`,`자체 공장(스마트팩토리)`,`국내 OEM·CMT 위탁`,`소량생산 전문업체`,`해외 생산`,`미정(추천 원함)`].map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
             </div>
+            <div class="wz-field-hint">공방은 소규모 수작업, 자체 공장은 직접 소유한 생산 설비를 뜻해요. 스마트팩토리는 자동화·IoT 설비를 갖춘 공장이에요.</div>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">제작 공정을 설명해주세요</div>
-            <textarea class="wz-textarea" id="f_processDetail" placeholder="예: 원단은 OO시장에서 직접 조달 → 자체 패턴 제작 → 협력 공장에서 봉제 → 전수 검수 후 출고"></textarea>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">다른 업체와 다른 점이 있나요?</div>
-            <textarea class="wz-textarea" id="f_differentiation" placeholder="예: 전 제품 전수 검사, 국내산 친환경 원단만 사용, 손바느질 마감 등 — 잘 모르겠다면 '모르겠음'도 괜찮아요"></textarea>
-            <div class="wz-field-hint">구체적인 공정·검수 방식 하나가 심사에서 강력한 차별점이 됩니다.</div>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">목표 원가 / 판매가 (선택, 원)</div>
-            <div class="wz-sub3" style="grid-template-columns:1fr 1fr;">
-              <input type="number" class="wz-input" id="f_targetCost" placeholder="원가" />
-              <input type="number" class="wz-input" id="f_targetPrice" placeholder="판매가" />
+            <div class="wz-field-label">제작 공정 (해당되는 단계 모두 선택)</div>
+            <div class="wz-chip-row" data-field="processSteps" data-multi="1">
+              ${[`기획/디자인`,`원단·부자재 소싱`,`패턴 설계`,`샘플 제작`,`가봉/보정`,`재단·봉제(생산)`,`품질 검수`,`포장·출고`].map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
             </div>
+            <textarea class="wz-textarea" id="f_processNote" placeholder="추가로 설명하고 싶은 점이 있다면 적어주세요 (선택)" style="margin-top:10px;min-height:60px;"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-highlight-box">
+              <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
+              <div class="wz-highlight-desc">아래 내용 하나가 심사에서 선정 확률을 가장 크게 좌우하는 "차별점"이 됩니다. 잘 모르겠으면 아래에서 해당되는 항목만 골라주세요 — 거기서부터 같이 풀어볼게요.</div>
+            </div>
+            <div class="wz-field-label">다른 업체와 다른 점이 있다면 어느 쪽인가요?</div>
+            <div class="wz-chip-row" data-field="differentiationTypes" data-multi="1">
+              ${[`원단·소재`,`제작 방식`,`검수·품질관리`,`디자인·패턴`,`친환경·지속가능성`,`납기·속도`,`가격·접근성`,`기타`].map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
+            </div>
+            <textarea class="wz-textarea" id="f_differentiation" placeholder="예: 전 제품 전수 검사, 국내산 친환경 원단만 사용, 손바느질 마감 등 — 위에서 고른 항목을 조금 더 구체적으로 적어주세요. 잘 모르겠다면 비워두셔도 괜찮아요." style="margin-top:10px;"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">상품별 원가 / 판매가 (선택, 원)</div>
+            <div id="wzProductCostRows"></div>
           </div>
         </div>
 
@@ -1170,7 +1189,8 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
             <div class="wz-chip-row" data-field="channels" data-multi="1">
               ${[`자사몰`,`무신사`,`지그재그`,`에이블리`,`스마트스토어`,`도매·위탁`,`팝업`,`오프라인 매장`].map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
             </div>
-            <div class="wz-info-box">채널 수수료 참고: 자사몰 3~5% · 패션 플랫폼 8~15%+광고비 · 도매 납품 40~50%</div>
+            <input type="text" class="wz-input" id="f_selfMallUrl" placeholder="자사몰 URL (예: https://mystore.com)" style="display:none;margin-top:10px;" />
+            <div class="wz-info-box">선택한 채널의 수수료율로 예상 마진을 자동 계산해드려요 — 자사몰 3~5% · 패션 플랫폼 8~15%+광고비 · 도매 납품 40~50%</div>
           </div>
         </div>
 
@@ -1278,7 +1298,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     }
 
     function wzFillFormFromAnswers() {
-      var simpleFields = ['brandName','product1','product2','product3','concept','target','processDetail','differentiation','targetCost','targetPrice','motivation','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature'];
+      var simpleFields = ['brandName','product1','product2','product3','concept','target','processNote','differentiation','motivation','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl'];
       simpleFields.forEach(function (k) {
         var el = document.getElementById('f_' + k);
         if (el && wzAnswers[k] !== undefined) el.value = wzAnswers[k];
@@ -1295,6 +1315,9 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           chip.classList.toggle('on', on);
         });
       });
+      wzRenderProductCostRows();
+      wzUpdateSelfMallUrlVisibility();
+      wzApplyCompetitorUnknownUI();
     }
 
     document.addEventListener('click', function (e) {
@@ -1302,13 +1325,57 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       if (!chip) return;
       var row = chip.parentElement;
       var multi = row.getAttribute('data-multi');
+      var max = Number(row.getAttribute('data-max') || 0);
       if (multi) {
+        if (!chip.classList.contains('on') && max > 0) {
+          var onCount = row.querySelectorAll('.wz-chip.on').length;
+          if (onCount >= max) { showToast('최대 ' + max + '개까지 선택할 수 있어요.', 'info'); return; }
+        }
         chip.classList.toggle('on');
       } else {
         row.querySelectorAll('.wz-chip').forEach(function (c) { c.classList.remove('on'); });
         chip.classList.add('on');
       }
+      if (row.getAttribute('data-field') === 'channels') wzUpdateSelfMallUrlVisibility();
     });
+
+    function wzUpdateSelfMallUrlVisibility() {
+      var row = document.querySelector('.wz-chip-row[data-field="channels"]');
+      if (!row) return;
+      var selfMallOn = row.querySelector('.wz-chip[data-value="자사몰"]');
+      var urlInput = document.getElementById('f_selfMallUrl');
+      if (urlInput) urlInput.style.display = (selfMallOn && selfMallOn.classList.contains('on')) ? 'block' : 'none';
+    }
+
+    function wzApplyCompetitorUnknownUI() {
+      var btn = document.getElementById('wzCompetitorUnknownBtn');
+      var inputs = document.getElementById('wzCompetitorInputs');
+      btn.classList.toggle('on', !!wzAnswers.competitorsUnknown);
+      inputs.style.opacity = wzAnswers.competitorsUnknown ? '0.4' : '1';
+      inputs.querySelectorAll('input').forEach(function (el) { el.disabled = !!wzAnswers.competitorsUnknown; });
+    }
+
+    function wzToggleCompetitorUnknown() {
+      wzAnswers.competitorsUnknown = !wzAnswers.competitorsUnknown;
+      wzApplyCompetitorUnknownUI();
+    }
+
+    var GS_PRODUCT_FIELDS = ['product1', 'product2', 'product3'];
+    function wzRenderProductCostRows() {
+      var container = document.getElementById('wzProductCostRows');
+      if (!container) return;
+      var html = GS_PRODUCT_FIELDS.map(function (key, i) {
+        var name = wzAnswers[key] || ('상품 ' + (i + 1));
+        var cost = wzAnswers['cost_' + key] || '';
+        var price = wzAnswers['price_' + key] || '';
+        return '<div class="wz-product-cost-row">' +
+          '<div class="wz-product-label">' + name + '</div>' +
+          '<input type="number" class="wz-input" id="f_cost_' + key + '" placeholder="원가" value="' + cost + '" />' +
+          '<input type="number" class="wz-input" id="f_price_' + key + '" placeholder="판매가" value="' + price + '" />' +
+          '</div>';
+      }).join('');
+      container.innerHTML = html;
+    }
 
     function wzCollectStep(stepNum) {
       var patch = {};
@@ -1321,9 +1388,15 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         patch.target = val('f_target');
         patch.competitor1_name = val('f_competitor1_name'); patch.competitor1_feature = val('f_competitor1_feature');
         patch.competitor2_name = val('f_competitor2_name'); patch.competitor2_feature = val('f_competitor2_feature');
+        patch.competitorsUnknown = !!wzAnswers.competitorsUnknown;
       } else if (stepNum === 4) {
-        patch.processDetail = val('f_processDetail'); patch.differentiation = val('f_differentiation');
-        patch.targetCost = val('f_targetCost'); patch.targetPrice = val('f_targetPrice');
+        patch.processNote = val('f_processNote'); patch.differentiation = val('f_differentiation');
+        GS_PRODUCT_FIELDS.forEach(function (key) {
+          patch['cost_' + key] = val('f_cost_' + key);
+          patch['price_' + key] = val('f_price_' + key);
+        });
+      } else if (stepNum === 5) {
+        patch.selfMallUrl = val('f_selfMallUrl');
       } else if (stepNum === 7) {
         patch.motivation = val('f_motivation'); patch.threeYearGoal = val('f_threeYearGoal');
       }
@@ -1363,6 +1436,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       document.getElementById('wzProgressBar').style.width = (n / WZ_TOTAL_STEPS * 100) + '%';
       document.getElementById('wzPrevBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
       document.getElementById('wzNextBtn').textContent = n === WZ_TOTAL_STEPS ? '완료' : '다음';
+      if (n === 4) wzRenderProductCostRows();
       window.scrollTo(0, 0);
     }
 
@@ -1429,7 +1503,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
 [소량생산] 국내 봉제·OEM 최소발주량 통상 10~50장(품목별 상이), 샘플→가봉→양산 리드타임 2~6주. 해외는 단가 유리하나 최소발주량 수백 장, 리드타임 6~12주.
 [시즌 캘린더] SS(3~5월 판매)는 12~1월 발주, FW(9~11월 판매)는 6~7월 발주. 기획은 판매 3~6개월 선행.
 [재고 리스크] 시즌 후 잔여 재고가 가장 큰 리스크 — 프리오더, 소량 다품종, 베이스 아이템 구성으로 대응.
-[심사 관점] 심사위원은 "하고 싶은 것"보다 "실행될 것"을 본다. 이미 해온 준비(샘플, 업체 컨택, 팔로워, 무대재)를 현재 진행형으로 쓸수록 설득력이 높다.`,vr=[{id:`problem`,title:`Ⅰ. Problem — 문제 인식`,evaluationLink:[`사업성`],targetChars:700,guidance:`고객이 지금 쓰는 대안과 그 한계를 먼저 쓰고, 미충족 니즈를 구체적 상황으로 설명한다.`},{id:`solution`,title:`Ⅱ. Solution — 해결 아이템`,evaluationLink:[`사업성`],targetChars:900,guidance:`아이템이 문제를 어떻게 푸는지, 사용자가 입력한 제작 공정·차별점(differentiation)을 구체적으로 녹여 대안 대비 차별점을 원가·소재·검수 방식 등 패션의 언어로 쓴다. 이 섹션에 경쟁사 비교표(table 블록, visualId="competitor-table")를 반드시 포함한다.`},{id:`market`,title:`Ⅲ. Scale-up(1) — 시장 & 전략`,evaluationLink:[`사업성`],targetChars:900,guidance:`시장 규모·성장성은 사용자가 제공한 근거가 없으면 evidenceGap 블록으로 남기고 숫자를 지어내지 않는다. 타겟 고객·구매 이유를 중심으로 한 시장분석표(table 블록, visualId="market-analysis")를 포함한다.`},{id:`operation`,title:`Ⅲ. Scale-up(2) — 실행 계획 (생산·마케팅·재무)`,evaluationLink:[`실행가능성`],targetChars:1300,guidance:`생산/조달 계획에 사용자가 입력한 제작 공정(processDetail)을 단계별로 서술하고, 공정 순서도 시각화 블록(visual, visualId="process-flow")을 반드시 포함한다. 지원금 수령 전/후 변화를 보여주는 AS-IS·TO-BE 비교표(table 블록, visualId="asis-tobe")를 포함한다. 재무 계획은 제공된 {{finance}} 숫자를 그대로 인용한다(재계산·변형 금지).`},{id:`team`,title:`Ⅳ. Team — 대표자 역량·창업 준비도`,evaluationLink:[`자기효능감`],targetChars:600,guidance:`왜 이 사람이 이 아이템인가. 경력·창업 동기를 근거와 연결하고 부족한 부분은 보완 계획으로 쓴다.`},{id:`budget`,title:`Ⅴ. 정부지원사업비 집행 계획`,evaluationLink:[`실행가능성`],targetChars:500,guidance:`제공된 {{finance}}의 비목 배분표를 그대로 인용하고, 각 비목이 어떤 마일스톤에 필요한지 서술한다.`},{id:`future-plan`,title:`Ⅵ. 향후 3개년 계획 (EZlook 부가)`,evaluationLink:[`성장가능성`],targetChars:900,guidance:`매출·홍보·상품확장·생산고도화·조직·재무 6개 축으로 1년차/2년차/3년차를 구체적이고 현실적으로 구분해 bullets로 쓴다. 사용자가 입력한 3년 후 목표(threeYearGoal)가 있으면 그 방향에 맞춰 구체화하고, 없으면 사업 규모에 맞는 보수적인 추정치로 채우되 반드시 evidenceGap 성격임을 암시하는 표현("추정치", "목표")을 쓴다.`}];function yr(e){let t=Number(e.targetCost)||0,n=Number(e.targetPrice)||0,r=n>0?n-t:null,i=n>0?Math.round((n-t)/n*1e3)/10:null,a={자사몰:{fee:.04,label:`자사몰 (4%)`},무신사:{fee:.12,label:`무신사 (12%+광고비)`},지그재그:{fee:.12,label:`지그재그 (12%+광고비)`},에이블리:{fee:.12,label:`에이블리 (12%+광고비)`},스마트스토어:{fee:.058,label:`스마트스토어 (5.8%)`},도매·위탁:{fee:.45,label:`도매·위탁 (공급가 45%)`},팝업:{fee:0,label:`팝업 (임대료 고정비)`},"오프라인 매장":{fee:0,label:`오프라인 매장 (임대료 고정비)`}},o=(Array.isArray(e.channels)?e.channels:[]).map(e=>{let r=a[e]||{fee:.1,label:e},i=n>0?Math.round((1-t/n-r.fee)*1e3)/10:null;return{channel:e,feeLabel:r.label,netMarginRate:i}}),s={샘플만:10,"10~30장":20,"50~100장":75,"100장+":150,프리오더:50}[e.productionScale]||50,l=n>0?s*n:null,u=l===null?null:{conservative:Math.round(l*.5),base:Math.round(l),aggressive:Math.round(l*1.5)},d=Array.isArray(e.fundUse)?e.fundUse:[],f=d.length?Math.round(100/d.length):0;return{cost:t,price:n,margin:r,marginRate:i,channelMargins:o,baseQty:s,scenario:u,budgetSplit:d.map(e=>({item:e,pctShare:f}))}}function br(e){let t=[];e.competitor1_name&&t.push([e.competitor1_name,e.competitor1_feature||`-`]),e.competitor2_name&&t.push([e.competitor2_name,e.competitor2_feature||`-`]);let n=(e.differentiation||e.concept||``).toString().slice(0,60)||`-`;return t.push([(e.brandName||`본 브랜드`)+` (본 브랜드)`,n]),{headers:[`브랜드`,`특징`],rows:t}}var xr=`iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=`;async function Sr(e,t,n){if(!e||!t)return null;try{let r=`Create a clean, professional infographic flowchart (process diagram) for a Korean government startup grant business plan document, in a minimalist corporate style with a white background, consistent icon style, and connecting arrows. Draw the following fashion ${n||`product`} production process as a left-to-right or top-to-bottom flow with 4-6 clearly labeled steps, each with a short Korean label and a simple icon: ${t}. No photorealistic people or products — use simple flat-design icons and boxes only. No watermarks, no extra text besides the step labels.`;return await Mn({images:[`data:image/png;base64,${xr}`],prompt:r,aspect_ratio:`16:9`,resolution:`1K`,apiKey:e})}catch(e){return console.error(`generateGovSupportProcessImage 실패 (무시):`,e),null}}async function Cr(e,t,n,r){let i=vr.map(e=>({sectionId:e.id,headline:e.title,lead:``,blocks:[{type:`evidenceGap`,need:`AI 초안 생성`,how:`ANTHROPIC_API_KEY 미설정 — 관리자에게 문의해주세요.`}],visualSpecs:[]}));if(!e)return i;let a=`당신은 한국 정부지원사업(예비창업패키지 등) 심사 경험이 풍부한 패션 제조 전문 컨설턴트다. 아래 소상공인의 답변을 바탕으로 사업계획서 섹션 7개를 작성한다.
+[심사 관점] 심사위원은 "하고 싶은 것"보다 "실행될 것"을 본다. 이미 해온 준비(샘플, 업체 컨택, 팔로워, 무대재)를 현재 진행형으로 쓸수록 설득력이 높다.`,vr=[{id:`problem`,title:`Ⅰ. Problem — 문제 인식`,evaluationLink:[`사업성`],targetChars:700,guidance:`고객이 지금 쓰는 대안과 그 한계를 먼저 쓰고, 미충족 니즈를 구체적 상황으로 설명한다.`},{id:`solution`,title:`Ⅱ. Solution — 해결 아이템`,evaluationLink:[`사업성`],targetChars:900,guidance:`아이템이 문제를 어떻게 푸는지, 사용자가 입력한 제작 공정·차별점(differentiation)을 구체적으로 녹여 대안 대비 차별점을 원가·소재·검수 방식 등 패션의 언어로 쓴다. 이 섹션에 경쟁사 비교표(table 블록, visualId="competitor-table")를 반드시 포함한다.`},{id:`market`,title:`Ⅲ. Scale-up(1) — 시장 & 전략`,evaluationLink:[`사업성`],targetChars:900,guidance:`시장 규모·성장성은 사용자가 제공한 근거가 없으면 evidenceGap 블록으로 남기고 숫자를 지어내지 않는다. 타겟 고객·구매 이유를 중심으로 한 시장분석표(table 블록, visualId="market-analysis")를 포함한다.`},{id:`operation`,title:`Ⅲ. Scale-up(2) — 실행 계획 (생산·마케팅·재무)`,evaluationLink:[`실행가능성`],targetChars:1300,guidance:`생산/조달 계획에 사용자가 입력한 제작 공정(processDetail)을 단계별로 서술하고, 공정 순서도 시각화 블록(visual, visualId="process-flow")을 반드시 포함한다. 지원금 수령 전/후 변화를 보여주는 AS-IS·TO-BE 비교표(table 블록, visualId="asis-tobe")를 포함한다. 재무 계획은 제공된 {{finance}} 숫자를 그대로 인용한다(재계산·변형 금지).`},{id:`team`,title:`Ⅳ. Team — 대표자 역량·창업 준비도`,evaluationLink:[`자기효능감`],targetChars:600,guidance:`왜 이 사람이 이 아이템인가. 경력·창업 동기를 근거와 연결하고 부족한 부분은 보완 계획으로 쓴다.`},{id:`budget`,title:`Ⅴ. 정부지원사업비 집행 계획`,evaluationLink:[`실행가능성`],targetChars:500,guidance:`제공된 {{finance}}의 비목 배분표를 그대로 인용하고, 각 비목이 어떤 마일스톤에 필요한지 서술한다.`},{id:`future-plan`,title:`Ⅵ. 향후 3개년 계획 (EZlook 부가)`,evaluationLink:[`성장가능성`],targetChars:900,guidance:`매출·홍보·상품확장·생산고도화·조직·재무 6개 축으로 1년차/2년차/3년차를 구체적이고 현실적으로 구분해 bullets로 쓴다. 사용자가 입력한 3년 후 목표(threeYearGoal)가 있으면 그 방향에 맞춰 구체화하고, 없으면 사업 규모에 맞는 보수적인 추정치로 채우되 반드시 evidenceGap 성격임을 암시하는 표현("추정치", "목표")을 쓴다.`}];function yr(e){let t=[`product1`,`product2`,`product3`].map(t=>({name:e[t]||null,cost:Number(e[`cost_`+t])||0,price:Number(e[`price_`+t])||0})).filter(e=>e.name&&e.price>0).map(e=>({...e,margin:e.price-e.cost,marginRate:Math.round((e.price-e.cost)/e.price*1e3)/10})),n=t[0]||{cost:0,price:0},r=n.cost,i=n.price,a={자사몰:{fee:.04,label:`자사몰 (4%)`},무신사:{fee:.12,label:`무신사 (12%+광고비)`},지그재그:{fee:.12,label:`지그재그 (12%+광고비)`},에이블리:{fee:.12,label:`에이블리 (12%+광고비)`},스마트스토어:{fee:.058,label:`스마트스토어 (5.8%)`},도매·위탁:{fee:.45,label:`도매·위탁 (공급가 45%)`},팝업:{fee:0,label:`팝업 (임대료 고정비)`},"오프라인 매장":{fee:0,label:`오프라인 매장 (임대료 고정비)`}},o=(Array.isArray(e.channels)?e.channels:[]).map(e=>{let t=a[e]||{fee:.1,label:e},n=i>0?Math.round((1-r/i-t.fee)*1e3)/10:null;return{channel:e,feeLabel:t.label,netMarginRate:n}}),s={샘플만:10,"10~30장":20,"50~100장":75,"100장+":150,프리오더:50}[e.productionScale]||50,l=i>0?s*i:null,u=l===null?null:{conservative:Math.round(l*.5),base:Math.round(l),aggressive:Math.round(l*1.5)},d=Array.isArray(e.fundUse)?e.fundUse:[],f=d.length?Math.round(100/d.length):0,p=d.map(e=>({item:e,pctShare:f}));return{products:t,cost:r,price:i,margin:n.price>0?n.margin:null,marginRate:n.price>0?n.marginRate:null,channelMargins:o,baseQty:s,scenario:u,budgetSplit:p}}function br(e){let t=[];e.competitorsUnknown||(e.competitor1_name&&t.push([e.competitor1_name,e.competitor1_feature||`-`]),e.competitor2_name&&t.push([e.competitor2_name,e.competitor2_feature||`-`]));let n=(e.differentiation||e.concept||``).toString().slice(0,60)||`-`;return t.push([(e.brandName||`본 브랜드`)+` (본 브랜드)`,n]),{headers:[`브랜드`,`특징`],rows:t,competitorsUnknown:!!e.competitorsUnknown}}var xr=`iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=`;async function Sr(e,t,n,r){let i=Array.isArray(t)?t.join(` → `):``;if(!e||!i)return null;try{let t=n?` Additional detail to incorporate: ${n}.`:``,a=`Create a clean, professional infographic flowchart (process diagram) for a Korean government startup grant business plan document, in a minimalist corporate style with a white background, consistent icon style, and connecting arrows. Draw the following fashion ${r||`product`} production process as a left-to-right or top-to-bottom flow with clearly labeled steps, each with a short Korean label and a simple icon: ${i}.${t} No photorealistic people or products — use simple flat-design icons and boxes only. No watermarks, no extra text besides the step labels.`;return await Mn({images:[`data:image/png;base64,${xr}`],prompt:a,aspect_ratio:`16:9`,resolution:`1K`,apiKey:e})}catch(e){return console.error(`generateGovSupportProcessImage 실패 (무시):`,e),null}}async function Cr(e,t,n,r){let i=vr.map(e=>({sectionId:e.id,headline:e.title,lead:``,blocks:[{type:`evidenceGap`,need:`AI 초안 생성`,how:`ANTHROPIC_API_KEY 미설정 — 관리자에게 문의해주세요.`}],visualSpecs:[]}));if(!e)return i;let a=`당신은 한국 정부지원사업(예비창업패키지 등) 심사 경험이 풍부한 패션 제조 전문 컨설턴트다. 아래 소상공인의 답변을 바탕으로 사업계획서 섹션 7개를 작성한다.
 
 [작성 원칙]
 1. 평가기준 역매핑: 각 섹션은 지정된 목적을 채우기 위해 존재한다.
@@ -1439,7 +1513,9 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
 5. 문체: 정중한 개조식("~한다/~이다") + 필요한 곳만 표. 1인칭 "본 브랜드" 사용.
 6. 출력은 마크다운이 아니라 아래 JSON 스키마의 배열. 각 섹션은 headline(서술형 1줄, 40~60자) + lead(1~2문장) + blocks(중분류 순서, paragraph/bullets 혼합, 문단 연속 3개·개조식 연속 2개 금지) + visualSpecs.
 7. blocks의 type: "subhead"(text) | "paragraph"(text) | "bullets"(items:string[]) | "table"(headers:string[],rows:string[][]) | "visual"(visualId,caption) | "evidenceGap"(need,how).
-8. solution 섹션엔 competitor-table(아래 제공된 경쟁사 비교표 데이터를 표로 그대로 사용, 지어내지 말 것), market 섹션엔 market-analysis 표, operation 섹션엔 process-flow 시각화 블록과 asis-tobe 표를 반드시 포함.
+8. solution 섹션엔 competitor-table(아래 제공된 경쟁사 비교표 데이터를 표로 그대로 사용), market 섹션엔 market-analysis 표, operation 섹션엔 process-flow 시각화 블록과 asis-tobe 표를 반드시 포함.
+9. 경쟁사 비교표의 competitorsUnknown이 true면, 사용자가 실제 경쟁 브랜드를 모른다는 뜻이다 — 특정 브랜드명을 지어내지 말고, 카테고리/컨셉에 맞는 "경쟁 유형"을 일반 명사로 2개 제시한다(예: "대형 SPA 브랜드", "동일 가격대 온라인 전용 브랜드", "수입 편집샵 브랜드" 등 — 실존 브랜드명 금지, 유형 설명만).
+10. 사용자 답변의 processSteps는 사용자가 선택한 공정 단계 목록, differentiationTypes는 사용자가 선택한 차별점 유형 목록이다 — 이 선택값을 중심으로 구체화하고, differentiation 텍스트가 비어있으면 선택한 유형에 대해 패션 업계 일반적인 모범 사례를 제안 형태(예: "~것을 권장한다", "~하면 차별점이 될 수 있다")로 쓰되 사용자가 실제로 한다고 단정하지 않는다.
 
 [DOMAIN_KB]
 ${_r}
@@ -1457,7 +1533,7 @@ ${JSON.stringify(n)}
 ${JSON.stringify(r)}
 
 아래 JSON 배열 형식으로만 응답하세요(마크다운 코드펜스 없이):
-[{"sectionId": string, "headline": string, "lead": string, "blocks": [...], "visualSpecs": [{"visualId": string, "kind": string, "renderer": string, "title": string}]}, ...] (7개 섹션 전부)`;try{let t=await fetch(`https://api.anthropic.com/v1/messages`,{method:`POST`,headers:{"Content-Type":`application/json`,"x-api-key":e,"anthropic-version":`2023-06-01`},body:JSON.stringify({model:`claude-sonnet-5`,thinking:{type:`disabled`},max_tokens:8e3,messages:[{role:`user`,content:a}]}),signal:AbortSignal.timeout(55e3)});if(!t.ok)return console.error(`gov-support 섹션 생성 HTTP 실패:`,t.status),i;let n=await t.json();n?.stop_reason===`max_tokens`&&console.error(`gov-support 섹션 생성 max_tokens로 잘림`);let r=((n?.content||[]).find(e=>e.type===`text`)?.text||`[]`).replace(/^```json\s*|```$/g,``).trim(),o=JSON.parse(r);return!Array.isArray(o)||!o.length?i:o}catch(e){return console.error(`gov-support 섹션 생성 실패:`,e),i}}B.post(`/api/gov-support/projects/:id/generate`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT id, program_id, answers FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();if(!i)return e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404);if(!gr.includes(i.program_id))return e.json({success:!1,message:`이 사업은 초안 생성을 아직 지원하지 않습니다.`},400);let a=JSON.parse(i.answers||`{}`),o=yr(a),s=br(a),[l,u]=await Promise.all([Cr(e.env.ANTHROPIC_API_KEY,a,o,s),Sr(e.env.ATLAS_API_KEY,a.processDetail,a.category)]),d={sections:l,finance:o,competitorTable:s,processImageUrl:u};return await t.prepare(`UPDATE gov_support_projects SET finance = ?, generated_content = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).bind(JSON.stringify(o),JSON.stringify(d),i.id).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/gov-support/result/:id`,e=>{let t=e.req.param(`id`);return e.html($(`지원사업 초안`,`
+[{"sectionId": string, "headline": string, "lead": string, "blocks": [...], "visualSpecs": [{"visualId": string, "kind": string, "renderer": string, "title": string}]}, ...] (7개 섹션 전부)`;try{let t=await fetch(`https://api.anthropic.com/v1/messages`,{method:`POST`,headers:{"Content-Type":`application/json`,"x-api-key":e,"anthropic-version":`2023-06-01`},body:JSON.stringify({model:`claude-sonnet-5`,thinking:{type:`disabled`},max_tokens:8e3,messages:[{role:`user`,content:a}]}),signal:AbortSignal.timeout(55e3)});if(!t.ok)return console.error(`gov-support 섹션 생성 HTTP 실패:`,t.status),i;let n=await t.json();n?.stop_reason===`max_tokens`&&console.error(`gov-support 섹션 생성 max_tokens로 잘림`);let r=((n?.content||[]).find(e=>e.type===`text`)?.text||`[]`).replace(/^```json\s*|```$/g,``).trim(),o=JSON.parse(r);return!Array.isArray(o)||!o.length?i:o}catch(e){return console.error(`gov-support 섹션 생성 실패:`,e),i}}B.post(`/api/gov-support/projects/:id/generate`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT id, program_id, answers FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();if(!i)return e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404);if(!gr.includes(i.program_id))return e.json({success:!1,message:`이 사업은 초안 생성을 아직 지원하지 않습니다.`},400);let a=JSON.parse(i.answers||`{}`),o=yr(a),s=br(a),[l,u]=await Promise.all([Cr(e.env.ANTHROPIC_API_KEY,a,o,s),Sr(e.env.ATLAS_API_KEY,a.processSteps,a.processNote,a.category)]),d={sections:l,finance:o,competitorTable:s,processImageUrl:u};return await t.prepare(`UPDATE gov_support_projects SET finance = ?, generated_content = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).bind(JSON.stringify(o),JSON.stringify(d),i.id).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/gov-support/result/:id`,e=>{let t=e.req.param(`id`);return e.html($(`지원사업 초안`,`
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
