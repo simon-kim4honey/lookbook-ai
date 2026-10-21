@@ -3498,7 +3498,7 @@ app.get('/gov-support/wizard/:id', (c) => {
       <form id="wzForm" style="display:none;">
 
         <div class="wz-step active" data-step="1">
-          <div class="wz-step-label">1 / 8 · 기본 정보</div>
+          <div class="wz-step-label">1 / 11 · 기본 정보</div>
           <h2>브랜드를 소개해주세요</h2>
           <div class="wz-field">
             <div class="wz-field-label">브랜드명 (가칭 가능)</div>
@@ -3519,7 +3519,7 @@ app.get('/gov-support/wizard/:id', (c) => {
         </div>
 
         <div class="wz-step" data-step="2">
-          <div class="wz-step-label">2 / 8 · 아이템</div>
+          <div class="wz-step-label">2 / 11 · 아이템</div>
           <h2>어떤 제품을 만드시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">주력 카테고리</div>
@@ -3548,7 +3548,7 @@ app.get('/gov-support/wizard/:id', (c) => {
         </div>
 
         <div class="wz-step" data-step="3">
-          <div class="wz-step-label">3 / 8 · 고객과 경쟁</div>
+          <div class="wz-step-label">3 / 11 · 고객과 경쟁</div>
           <h2>누가, 왜 사나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">타겟 고객</div>
@@ -3673,8 +3673,8 @@ app.get('/gov-support/wizard/:id', (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="8">
-          <div class="wz-step-label">8 / 8 · 자격 확인</div>
+        <div class="wz-step" data-step="11">
+          <div class="wz-step-label">11 / 11 · 자격 확인</div>
           <h2>자격 요건을 확인해주세요</h2>
           <div id="wzEligibilityList"></div>
         </div>
@@ -3705,7 +3705,7 @@ app.get('/gov-support/wizard/:id', (c) => {
   <script>
     var WZ_PROJECT_ID = ${JSON.stringify(projectId)};
     var WZ_GENERATION_READY = ${JSON.stringify(GS_GENERATION_READY_IDS)};
-    var WZ_TOTAL_STEPS = 8;
+    var WZ_TOTAL_STEPS = 11;
     var wzCurrentStep = 1;
     var wzAnswers = {};
     var wzEligibility = [];
@@ -3804,10 +3804,14 @@ app.get('/gov-support/wizard/:id', (c) => {
     }
 
     var GS_PRODUCT_FIELDS = ['product1', 'product2', 'product3'];
+    var wzVisibleProductCostCount = 2;
     function wzRenderProductCostRows() {
       var container = document.getElementById('wzProductCostRows');
       if (!container) return;
-      var html = GS_PRODUCT_FIELDS.map(function (key, i) {
+      // 재방문(새로고침/복귀) 시 3번째 상품까지 이미 입력돼 있었다면 처음부터 3개 다 보여준다.
+      if (wzAnswers['cost_product3'] || wzAnswers['price_product3']) wzVisibleProductCostCount = 3;
+      var visibleFields = GS_PRODUCT_FIELDS.slice(0, wzVisibleProductCostCount);
+      var html = visibleFields.map(function (key, i) {
         var name = wzAnswers[key] || ('상품 ' + (i + 1));
         var cost = wzAnswers['cost_' + key] || '';
         var price = wzAnswers['price_' + key] || '';
@@ -3818,6 +3822,17 @@ app.get('/gov-support/wizard/:id', (c) => {
           '</div>';
       }).join('');
       container.innerHTML = html;
+      var addBtn = document.getElementById('wzAddProductCostBtn');
+      if (addBtn) addBtn.style.display = wzVisibleProductCostCount >= GS_PRODUCT_FIELDS.length ? 'none' : 'block';
+    }
+
+    function wzAddProductCostRow() {
+      GS_PRODUCT_FIELDS.slice(0, wzVisibleProductCostCount).forEach(function (key) {
+        wzAnswers['cost_' + key] = val('f_cost_' + key);
+        wzAnswers['price_' + key] = val('f_price_' + key);
+      });
+      wzVisibleProductCostCount = Math.min(wzVisibleProductCostCount + 1, GS_PRODUCT_FIELDS.length);
+      wzRenderProductCostRows();
     }
 
     function wzCollectStep(stepNum) {
@@ -3832,15 +3847,18 @@ app.get('/gov-support/wizard/:id', (c) => {
         patch.competitor1_name = val('f_competitor1_name'); patch.competitor1_feature = val('f_competitor1_feature');
         patch.competitor2_name = val('f_competitor2_name'); patch.competitor2_feature = val('f_competitor2_feature');
         patch.competitorsUnknown = !!wzAnswers.competitorsUnknown;
-      } else if (stepNum === 4) {
-        patch.processNote = val('f_processNote'); patch.differentiation = val('f_differentiation');
-        GS_PRODUCT_FIELDS.forEach(function (key) {
+      } else if (stepNum === 5) {
+        patch.processNote = val('f_processNote');
+      } else if (stepNum === 6) {
+        patch.differentiation = val('f_differentiation');
+      } else if (stepNum === 7) {
+        GS_PRODUCT_FIELDS.slice(0, wzVisibleProductCostCount).forEach(function (key) {
           patch['cost_' + key] = val('f_cost_' + key);
           patch['price_' + key] = val('f_price_' + key);
         });
-      } else if (stepNum === 5) {
+      } else if (stepNum === 8) {
         patch.selfMallUrl = val('f_selfMallUrl');
-      } else if (stepNum === 7) {
+      } else if (stepNum === 10) {
         patch.motivation = val('f_motivation'); patch.threeYearGoal = val('f_threeYearGoal');
       }
       var stepEl = document.querySelector('.wz-step[data-step="' + stepNum + '"]');
@@ -3879,7 +3897,7 @@ app.get('/gov-support/wizard/:id', (c) => {
       document.getElementById('wzProgressBar').style.width = (n / WZ_TOTAL_STEPS * 100) + '%';
       document.getElementById('wzPrevBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
       document.getElementById('wzNextBtn').textContent = n === WZ_TOTAL_STEPS ? '완료' : '다음';
-      if (n === 4) wzRenderProductCostRows();
+      if (n === 7) wzRenderProductCostRows();
       window.scrollTo(0, 0);
     }
 
