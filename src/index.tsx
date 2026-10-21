@@ -4148,7 +4148,10 @@ ${JSON.stringify(competitorTable)}
         max_tokens: 8000,
         messages: [{ role: 'user', content: prompt }],
       }),
-      signal: AbortSignal.timeout(55000),
+      // 7개 섹션을 한 번에 생성하는 긴 요청이라 기존 55초 제한이 너무 짧았다 — 실제 운영에서
+      // "The operation was aborted due to timeout"로 중간에 끊기는 게 확인됨(2026-10-21).
+      // 완료 화면에 이미 "최대 1~2분 정도 걸릴 수 있어요"라고 안내하고 있으므로 그에 맞춰 완화.
+      signal: AbortSignal.timeout(110000),
     })
     if (!res.ok) {
       const bodyText = await res.text().catch(() => '')
