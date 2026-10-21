@@ -170,7 +170,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Gt}" font-size="128" font-weight="800" fill="${Ut(e.statColor||`#ffffff`)}">${Ut(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Gt}" font-size="64" font-weight="800" fill="#ffffff">${Ut(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Gt}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ut(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var qt=`mvhqygnd`;function Jt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Yt=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Gt}" font-size="128" font-weight="800" fill="${Ut(e.statColor||`#ffffff`)}">${Ut(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Gt}" font-size="64" font-weight="800" fill="#ffffff">${Ut(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Gt}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ut(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var qt=`mvhr1ynu`;function Jt(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Yt=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -853,26 +853,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
   })();
   <\/script>
   `,``,`매주 모아주는 패션 뉴스·검색어트렌드·쇼핑인사이트`,e.env.GA4_MEASUREMENT_ID)));var pr=[{id:`yebi`,name:`예비창업패키지`,agency:`중소벤처기업부 · 창업진흥원`,formType:`사업계획서형 (PSST)`,funding:`최대 8,000만 원 (평균 4,000만 원 내외)`,target:`사업자등록 전 예비창업자`,eligibility:[`공고일 기준 사업자등록이 되어 있지 않은 예비창업자`,`동종 업종 폐업 후 재창업은 폐업일로부터 3년 경과(부도·파산 2년)`,`나이 제한 없음 (특화분야: 여성·소셜벤처·사내벤처)`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]},{id:`choi`,name:`초기창업패키지`,agency:`중소벤처기업부 · 창업진흥원`,formType:`사업계획서형 (PSST)`,funding:`최대 1억 원 (평균 5,000만 원 내외)`,target:`창업 3년 미만 대표자`,eligibility:[`창업(사업자등록) 3년 미만 기업 대표`,`재창업·특화분야 요건은 공고 확인`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]},{id:`hope-return`,name:`희망리턴패키지`,agency:`소상공인시장진흥공단`,formType:`자기역량기술서 + 사업계획서`,funding:`최대 4,000만 원 (트랙·기관별 상이)`,target:`경영위기·폐업(예정) 소상공인`,eligibility:[`경영상 어려움(폐업 예정 포함) 또는 폐업 후 재기를 준비하는 소상공인`,`자립지원 트랙: 장기실업 청년 등 (요건 공고 확인)`,`사전 진단·교육 이수가 선결 조건인 트랙 있음`],criteria:[[`신청자 역량`,30],[`사업계획의 적절성`,40],[`성장가능성`,30]]},{id:`youth-academy`,name:`청년창업사관학교`,agency:`중소벤처기업부 · 창업진흥원`,formType:`입교신청서형 사업계획서 + 발표평가`,funding:`최대 1억 원 (평균 7,000만 원 내외)`,target:`만 39세 이하, 창업 3년 이내(경험창업자 7년 이내)`,eligibility:[`대표자 만 39세 이하`,`창업 3년 이내 대표자 (예비창업자 가능)`,`재창업 등 세부 요건은 공고 확인`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]},{id:`local-creator`,name:`로컬크리에이터 육성`,agency:`중소벤처기업부 · 소상공인시장진흥공단`,formType:`신청서 + 사업계획서 (지역자원 활용 중심)`,funding:`BM 구체화·멘토링·브랜딩·마케팅 자금 (280개사 내외 선정)`,target:`지역 자원을 활용하는 소상공인`,eligibility:[`지역의 자연환경·문화적 자산과 아이디어를 결합해 사업적 가치를 창출하는 창업가`,`기창업자 중심 (예비창업자 대상 지자체별 공고 별도 존재)`],criteria:[[`지역자원 활용방안`,40],[`사업성`,30],[`신청자 역량·실행가능성`,30]]},{id:`innov-sop`,name:`혁신소상공인 창업지원`,agency:`중소벤처기업부 · 소상공인시장진흥공단`,formType:`신청서 + 창업 아이템 계획 (오디션 발표 포함)`,funding:`창업교육 + 사업화 자금 (560명 내외 선정)`,target:`예비창업자 (교육 이수 후 오디션 통과자가 사업화 자금 대상)`,eligibility:[`예비창업자 (신사업 등 유망 아이디어·아이템 기반)`,`교육 이수 후 오디션 통과자가 사업화 자금 지원 대상`],criteria:[[`사업성`,40],[`실현가능성`,40],[`창업의지`,20]]},{id:`smart-store`,name:`스마트상점 기술보급사업`,agency:`중소벤처기업부 · 소상공인시장진흥공단`,formType:`신청서형 (경량)`,funding:`도입비용 50~70% 지원 (사회적 배려대상 최대 80%, 최대 1,000만 원 내외)`,target:`점포를 운영 중인 소상공인`,eligibility:[`점포를 운영 중인 소상공인`,`기술공급기업과 계약 가능한 매장 (세부 요건 공고 확인)`],criteria:[[`도입 필요성`,40],[`기술 활용 적합성`,40],[`실행가능성`,20]]},{id:`online-channel`,name:`온라인 판로지원사업`,agency:`중소벤처기업부 · 소상공인시장진흥공단 (판판대로)`,formType:`신청서형 (경량)`,funding:`세부사업별 연간 단가 한도 내 지원 (연 600만 원 수준)`,target:`온라인 판매 진출·고도화를 준비하는 소상공인`,eligibility:[`온라인 판매 진출(또는 고도화)을 준비하는 소상공인`,`판판대로 회원가입 필수`],criteria:[[`진출 필요성`,40],[`활용 적합성`,40],[`기대효과`,20]]},{id:`innov-voucher`,name:`중소기업 혁신바우처 지원사업`,agency:`중소벤처기업부`,formType:`신청서형 (경량)`,funding:`기업당 최대 5,000만 원 (바우처 서비스 조합)`,target:`제조업 중심 소기업`,eligibility:[`제조업 중심 소기업 (매출액 140억 원 이하, 일부 바우처는 1,800억 이하)`,`소상공인 제조업자 포함 여부는 바우처 유형별 확인`],criteria:[[`이용 필요성`,40],[`서비스 적합성`,40],[`실행가능성`,20]]}];z.get(`/gov-support`,e=>{let t=pr.map(e=>`
-    <div class="gs-card">
-      <div class="gs-card-top" onclick="toggleGsCard('${e.id}')">
-        <div>
-          <div class="gs-card-name">${e.name}</div>
-          <div class="gs-card-agency">${e.agency}</div>
-        </div>
-        <span class="gs-card-arrow" id="gsArrow-${e.id}">⌄</span>
-      </div>
-      <div class="gs-card-summary">
-        <span class="gs-badge">${e.formType}</span>
-        <div class="gs-funding">${e.funding}</div>
-        <div class="gs-target">대상: ${e.target}</div>
-      </div>
-      <div class="gs-card-detail" id="gsDetail-${e.id}" style="display:none;">
-        <div class="gs-detail-label">자격 요건</div>
-        <ul class="gs-elig-list">${e.eligibility.map(e=>`<li>${e}</li>`).join(``)}</ul>
-        <div class="gs-detail-label">평가 기준</div>
-        <div class="gs-criteria-row">${e.criteria.map(e=>`<span class="gs-criteria-chip">${e[0]} ${e[1]}%</span>`).join(``)}</div>
-      </div>
-    </div>
+    <button type="button" class="gs-prog-btn" id="gsBtn-${e.id}" onclick="selectGsProgram('${e.id}', '${e.name.replace(/'/g,`\\'`)}')">${e.name}</button>
   `).join(``);return e.html($(`지원사업 도우미`,`
   <div class="toast-container" id="toastContainer"></div>
 
@@ -882,26 +863,14 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .gs-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
     .gs-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 16px; }
     .gs-back { width: 40px; height: 40px; border: none; background: #FFFFFF; border-radius: 50%; color: #333D4B; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; box-shadow: 0 2px 8px rgba(15,23,42,0.06); }
-    .gs-intro { margin: 4px 0 20px; }
+    .gs-intro { margin: 4px 0 24px; }
     .gs-intro h1 { font-size: 22px; font-weight: 800; color: #191F28; margin: 0 0 8px; }
     .gs-intro p { font-size: 14px; color: #4E5968; line-height: 1.6; margin: 0; }
-    .gs-notice { background: #FFF8E1; border: 1px solid #F5D98A; border-radius: 12px; padding: 12px 14px; font-size: 12.5px; color: #8A6D1D; line-height: 1.6; margin: 16px 0; }
-    .gs-card { background: #FFFFFF; border-radius: 16px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); margin-bottom: 12px; overflow: hidden; }
-    .gs-card-top { display: flex; align-items: flex-start; justify-content: space-between; padding: 16px 18px; cursor: pointer; gap: 10px; }
-    .gs-card-name { font-size: 16px; font-weight: 700; color: #191F28; margin-bottom: 3px; }
-    .gs-card-agency { font-size: 12px; color: #8B95A1; }
-    .gs-card-arrow { font-size: 16px; color: #B0B8C1; flex-shrink: 0; transition: transform .15s; }
-    .gs-card-arrow.open { transform: rotate(180deg); }
-    .gs-card-summary { padding: 0 18px 16px; }
-    .gs-badge { display: inline-block; font-size: 11px; font-weight: 700; color: #3182F6; background: #EAF2FF; border-radius: 999px; padding: 3px 10px; margin-bottom: 8px; }
-    .gs-funding { font-size: 14px; font-weight: 600; color: #191F28; margin-bottom: 4px; }
-    .gs-target { font-size: 12.5px; color: #4E5968; }
-    .gs-card-detail { padding: 14px 18px 18px; border-top: 1px solid #E5E8EB; background: #FAFBFC; }
-    .gs-detail-label { font-size: 12px; font-weight: 700; color: #8B95A1; margin: 0 0 6px; }
-    .gs-elig-list { margin: 0 0 14px; padding-left: 18px; font-size: 13px; color: #333D4B; line-height: 1.7; }
-    .gs-criteria-row { display: flex; flex-wrap: wrap; gap: 6px; }
-    .gs-criteria-chip { font-size: 11.5px; font-weight: 600; color: #4E5968; background: #EEF1F4; border-radius: 999px; padding: 4px 10px; }
-    .gs-cta-notice { text-align: center; font-size: 13px; color: #8B95A1; background: #FFFFFF; border-radius: 14px; padding: 18px; margin-top: 8px; }
+    .gs-prog-grid { display: flex; flex-direction: column; gap: 10px; }
+    .gs-prog-btn { width: 100%; text-align: left; padding: 18px 20px; background: #FFFFFF; border: 2px solid transparent; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); font-size: 16px; font-weight: 700; color: #191F28; cursor: pointer; transition: border-color .12s, transform .08s; }
+    .gs-prog-btn:active { transform: scale(.98); }
+    .gs-prog-btn.selected { border-color: #3182F6; color: #3182F6; background: #EAF2FF; }
+    .gs-cta-notice { text-align: center; font-size: 13px; color: #8B95A1; background: #FFFFFF; border-radius: 14px; padding: 18px; margin-top: 20px; }
     .gs-footer-disclaimer { font-size: 11.5px; color: #8B95A1; line-height: 1.6; margin-top: 20px; text-align: center; }
   </style>
 
@@ -914,27 +883,30 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
 
     <div class="gs-inner">
       <div class="gs-intro">
-        <h1>패션 제조 브랜드를 위한<br/>정부지원사업 사업계획서 도우미</h1>
-        <p>의류·가방·잡화·신발·주얼리 브랜드 창업자 전용. 아래 9개 사업 중 내게 맞는 것을 먼저 확인해보세요.</p>
+        <h1>어떤 지원사업을<br/>준비하고 계신가요?</h1>
+        <p>신청하려는 사업을 선택해주세요.</p>
       </div>
 
-      <div class="gs-notice">⚠️ 배점·양식·지원금은 연도·기관별 공고에 따라 달라질 수 있습니다. 아래 정보는 참고용 예시이며, 신청 전 반드시 원문 공고를 확인하세요.</div>
+      <div class="gs-prog-grid">
+        ${t}
+      </div>
 
-      ${t}
-
-      <div class="gs-cta-notice">📝 입력한 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 준비 중입니다.</div>
+      <div class="gs-cta-notice" id="gsCtaNotice">📝 입력한 내용으로 AI가 섹션별 초안을 자동 생성해주는 기능은 준비 중입니다.</div>
 
       <div class="gs-footer-disclaimer">본 콘텐츠는 정부지원사업 신청을 돕기 위한 참고 자료이며, 법률·세무 자문이 아닙니다.</div>
     </div>
   </div>
 
   <script>
-    function toggleGsCard(id) {
-      var detail = document.getElementById('gsDetail-' + id);
-      var arrow = document.getElementById('gsArrow-' + id);
-      var open = detail.style.display !== 'none';
-      detail.style.display = open ? 'none' : 'block';
-      arrow.classList.toggle('open', !open);
+    var gsSelected = null;
+    function selectGsProgram(id, name) {
+      if (gsSelected) {
+        var prev = document.getElementById('gsBtn-' + gsSelected);
+        if (prev) prev.classList.remove('selected');
+      }
+      gsSelected = id;
+      document.getElementById('gsBtn-' + id).classList.add('selected');
+      document.getElementById('gsCtaNotice').textContent = '📝 "' + name + '" 선택됨 — 입력 내용으로 AI가 초안을 만들어주는 기능은 준비 중입니다.';
     }
   <\/script>
   `,``,`패션 제조 브랜드를 위한 정부지원사업 사업계획서 작성 도우미 — 예비창업패키지·초기창업패키지 등 9개 사업`,e.env.GA4_MEASUREMENT_ID))}),z.get(`/api/auth/me`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await tr(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);return n?e.json({success:!0,user:ir(n)}):e.json({success:!1,message:`로그인이 필요합니다.`},401)}catch{return e.json({success:!1,message:`서버 오류`},500)}}),z.get(`/api/techpack/handoff-token`,async e=>{try{let t=e.env.LOOKBOOK_DB,n=await tr(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null);if(!n)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let r=await or(e.env.TECHPACK_HANDOFF_SECRET,{sub:n.id,email:n.email,name:n.name});return e.json({success:!0,token:r})}catch{return e.json({success:!1,message:`서버 오류`},500)}}),z.get(`/api/techpack/upload-history`,async e=>{try{let t=e.req.header(`authorization`)||``,n=t.startsWith(`Bearer `)?t.slice(7):null,r=n?await cr(e.env.TECHPACK_HANDOFF_SECRET,n):null;if(!r)return e.json({success:!1,message:`인증에 실패했습니다.`},401);let i=e.env.LOOKBOOK_DB,a=e.env?.LOOKBOOK_KV,o=Z(e),s=await i.prepare(`SELECT job_id, model_name, created_at FROM generation_logs
