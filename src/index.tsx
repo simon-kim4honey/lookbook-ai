@@ -3066,6 +3066,44 @@ app.get('/trend-weekly', (c) => {
   `, '', '매주 모아주는 패션 뉴스·검색어트렌드·쇼핑인사이트', c.env.GA4_MEASUREMENT_ID))
 })
 
+// 지원사업 도우미(/gov-support, /gov-support/wizard/:id, /gov-support/result/:id) 전용 상단
+// 네비게이션 바 — 로고(홈으로) + 사용자 아바타 드롭다운(다른 서비스로 이동/충전/로그아웃).
+// 각 페이지가 자체 뒤로가기 버튼(‹)을 이미 갖고 있어 이 바는 그걸 대체하지 않고 그 위에 추가된다.
+// #gapp-header의 로그인/아바타/드롭다운 마크업을 그대로 재사용한다 — var(--gapp-*, fallback) 체인이
+// 이미 #gapp 밖에서도 안전하게 fallback되도록 되어 있어 라이트 테마인 이 페이지들에서도 그대로 동작한다.
+function govSupportTopNav(c: any, maxWidth: number): string {
+  return `
+  <div class="gs-topnav" style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0;max-width:${maxWidth}px;margin:0 auto;">
+    <a href="/" class="gapp-logo" style="font-size:17px;text-decoration:none;white-space:nowrap;letter-spacing:-0.3px;"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+    <div style="display:flex;align-items:center;gap:8px;position:relative;">
+      <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:13px;padding:6px 12px;background:var(--gapp-surface-2,var(--primary-bg));border:1px solid var(--gapp-accent,var(--primary));border-radius:20px;color:var(--gapp-accent,var(--primary));cursor:pointer;font-weight:600;">로그인</button>
+      <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
+        <span id="navUserCredits" style="display:none;"></span>
+        <span id="navUserName" style="display:none;"></span>
+        <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:30px;height:30px;border-radius:50%;background:var(--gapp-gradient,var(--primary));display:flex;align-items:center;justify-content:center;color:white;font-size:13px;font-weight:700;cursor:pointer;user-select:none;box-shadow:0 2px 8px rgba(49,130,246,0.4);">?</div>
+        <div id="userDropdownMenu" style="display:none;position:absolute;top:38px;right:0;background:var(--gapp-surface,#FFFFFF);border:1px solid var(--gapp-border,#E5E8EB);border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(15,23,42,0.16);z-index:10001;">
+          <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid var(--gapp-border,#E5E8EB);margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">
+            <div id="ddUserName" style="font-size:13px;font-weight:700;color:var(--gapp-text,#191F28);margin-bottom:2px;"></div>
+            <div id="ddUserEmail" style="font-size:11px;color:var(--gapp-text-muted,#8B95A1);margin-bottom:6px;"></div>
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:var(--gapp-accent,#3182F6);"></div>
+              <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:12px;padding:3px 10px;background:var(--gapp-gradient,#3182F6);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;" data-i18n="nav-charge">충전</button>
+            </div>
+          </a>
+          <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">모델컷 만들기</a>
+          <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+          ${isTechpackMenuVisible(c) ? `<a href="/techpack" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">도식화 만들기</a>` : ''}
+          <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''" data-i18n="nav-history">생성 내역</a>
+          <a href="/trend-weekly" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">주간 트렌드 분석</a>
+          <a href="/gov-support" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:var(--gapp-text-secondary,#333D4B);text-decoration:none;border-radius:10px;" onmouseover="this.style.background='var(--gapp-surface-2,#F2F4F6)'" onmouseout="this.style.background=''">지원사업 도우미</a>
+          <div style="height:1px;background:var(--gapp-border,#E5E8EB);margin:4px 0;"></div>
+          <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''" data-i18n="nav-logout">로그아웃</button>
+        </div>
+      </div>
+    </div>
+  </div>`
+}
+
 // ────────────────────────────────────────────────────
 // GET /gov-support — 지원사업 도우미 (패션 제조 브랜드용 정부지원사업 사업계획서 작성 도우미)
 // 지금은 9개 사업 소개 + 자격요건/평가기준 열람까지만 제공한다(정보 제공 단계).
@@ -3175,6 +3213,7 @@ app.get('/gov-support', (c) => {
   </style>
 
   <div class="gs-wrap">
+    ${govSupportTopNav(c, 480)}
     <div class="gs-header" style="display:flex;align-items:center;justify-content:space-between;max-width:480px;margin:0 auto;">
       <a href="/dashboard" class="gs-back">‹</a>
       <h1 style="font-size:17px;font-weight:700;color:#191F28;margin:0;">지원사업 도우미</h1>
@@ -3517,6 +3556,7 @@ app.get('/gov-support/wizard/:id', (c) => {
   </style>
 
   <div class="wz-wrap">
+    ${govSupportTopNav(c, 480)}
     <div class="wz-header">
       <a href="/gov-support" class="wz-back">‹</a>
       <div class="wz-progress"><div class="wz-progress-bar" id="wzProgressBar"></div></div>
@@ -3601,8 +3641,8 @@ app.get('/gov-support/wizard/:id', (c) => {
         </div>
 
         <div class="wz-step" data-step="4">
-          <div class="wz-step-label">4 / 8 · 생산과 차별성</div>
-          <h2>어떻게, 남들과 다르게 만드나요?</h2>
+          <div class="wz-step-label">4 / 11 · 생산 방식</div>
+          <h2>어떻게 만드시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">생산 방식</div>
             <div class="wz-chip-row" data-field="productionMethod">
@@ -3610,13 +3650,27 @@ app.get('/gov-support/wizard/:id', (c) => {
             </div>
             <div class="wz-field-hint">공방은 소규모 수작업, 자체 공장은 직접 소유한 생산 설비를 뜻해요. 스마트팩토리는 자동화·IoT 설비를 갖춘 공장이에요.</div>
           </div>
+        </div>
+
+        <div class="wz-step" data-step="5">
+          <div class="wz-step-label">5 / 11 · 제작 공정</div>
+          <h2>어떤 과정을 거쳐 만드나요?</h2>
           <div class="wz-field">
+            <div class="wz-highlight-box">
+              <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
+              <div class="wz-highlight-desc">공정 하나하나가 심사에서 "실행 가능성"을 보여주는 근거가 됩니다. 해당되는 단계만 골라주시면 돼요.</div>
+            </div>
             <div class="wz-field-label">제작 공정 (해당되는 단계 모두 선택)</div>
             <div class="wz-chip-row" data-field="processSteps" data-multi="1">
               ${['기획/디자인', '원단·부자재 소싱', '패턴 설계', '샘플 제작', '가봉/보정', '재단·봉제(생산)', '품질 검수', '포장·출고'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
             <textarea class="wz-textarea" id="f_processNote" placeholder="추가로 설명하고 싶은 점이 있다면 적어주세요 (선택)" style="margin-top:10px;min-height:60px;"></textarea>
           </div>
+        </div>
+
+        <div class="wz-step" data-step="6">
+          <div class="wz-step-label">6 / 11 · 차별성</div>
+          <h2>남들과 다르게 만드나요?</h2>
           <div class="wz-field">
             <div class="wz-highlight-box">
               <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
@@ -3628,14 +3682,20 @@ app.get('/gov-support/wizard/:id', (c) => {
             </div>
             <textarea class="wz-textarea" id="f_differentiation" placeholder="예: 전 제품 전수 검사, 국내산 친환경 원단만 사용, 손바느질 마감 등 — 위에서 고른 항목을 조금 더 구체적으로 적어주세요. 잘 모르겠다면 비워두셔도 괜찮아요." style="margin-top:10px;"></textarea>
           </div>
+        </div>
+
+        <div class="wz-step" data-step="7">
+          <div class="wz-step-label">7 / 11 · 상품별 원가</div>
+          <h2>원가와 판매가는요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">상품별 원가 / 판매가 (선택, 원)</div>
             <div id="wzProductCostRows"></div>
+            <button type="button" class="wz-unknown-btn" id="wzAddProductCostBtn" onclick="wzAddProductCostRow()">+ 상품 추가</button>
           </div>
         </div>
 
-        <div class="wz-step" data-step="5">
-          <div class="wz-step-label">5 / 8 · 판매 채널</div>
+        <div class="wz-step" data-step="8">
+          <div class="wz-step-label">8 / 11 · 판매 채널</div>
           <h2>어디서 파시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">판매 채널 (복수 선택)</div>
@@ -3647,8 +3707,8 @@ app.get('/gov-support/wizard/:id', (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="6">
-          <div class="wz-step-label">6 / 8 · 자금 계획</div>
+        <div class="wz-step" data-step="9">
+          <div class="wz-step-label">9 / 11 · 자금 계획</div>
           <h2>지원금을 어디에 쓰실 건가요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">보유 준비자본 (선택)</div>
@@ -3664,8 +3724,8 @@ app.get('/gov-support/wizard/:id', (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="7">
-          <div class="wz-step-label">7 / 8 · 역량과 비전</div>
+        <div class="wz-step" data-step="10">
+          <div class="wz-step-label">10 / 11 · 역량과 비전</div>
           <h2>왜 대표님이어야 하나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">관련 경력 (복수 선택)</div>
@@ -4218,7 +4278,7 @@ app.get('/gov-support/result/:id', (c) => {
     .rs-evidence-gap b { display: block; margin-bottom: 4px; }
     @media print {
       body { background: #fff; }
-      .rs-header, .rs-notice { display: none !important; }
+      .rs-header, .rs-notice, .gs-topnav { display: none !important; }
       .rs-wrap { padding: 0; }
       .rs-doc { box-shadow: none; border-radius: 0; padding: 0; }
       .rs-section { page-break-inside: avoid; }
@@ -4226,6 +4286,7 @@ app.get('/gov-support/result/:id', (c) => {
   </style>
 
   <div class="rs-wrap">
+    ${govSupportTopNav(c, 560)}
     <div class="rs-header">
       <a href="/gov-support" class="rs-back">‹</a>
       <button type="button" class="rs-print-btn" onclick="window.print()">인쇄 / PDF 저장</button>
@@ -4233,7 +4294,7 @@ app.get('/gov-support/result/:id', (c) => {
     <div class="rs-inner">
       <div id="rsLoading" style="text-align:center;padding:60px 0;color:#8B95A1;font-size:14px;">불러오는 중...</div>
       <div id="rsContent" style="display:none;">
-        <div class="rs-notice">⚠️ AI가 생성한 초안입니다. 수치·사실관계를 반드시 직접 확인하고, 제출 전 원문 공고 양식에 맞춰 다듬어주세요.</div>
+        <div class="rs-notice">⚠️ 이 초안은 대표님이 직접 입력하신 답변을 바탕으로 AI가 작성을 돕는 <b>참고용 초안</b>입니다. EZlook이 대신 작성·제출하는 대필·대행 서비스가 아니며, 다수의 지원사업 공고는 '신청자 본인 작성'을 요건으로 합니다. 반드시 본인의 경험과 표현으로 직접 수정·보완하고 수치·사실관계를 확인한 뒤, 원문 공고 양식에 맞춰 신청자 본인 책임하에 제출해주세요.</div>
         <div class="rs-doc" id="rsDoc"></div>
       </div>
     </div>
