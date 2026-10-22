@@ -284,6 +284,150 @@ app.patch('/api/admin/errors/:id', errorsAuth, async (c) => {
 })
 
 // ────────────────────────────────────────────────────
+// 지원사업 AI 초안 구조 관리 (어드민 전용, X-Admin-Password 필요)
+// 2026-10-22: "프롬프트로 설명하면 한계가 있다"는 사용자 피드백에 따라, 예비창업패키지
+// 하드코딩(GS_YEBI_SECTIONS/STRUCTURE)을 사용자가 직접 추가·삭제·보완할 수 있게
+// gov_support_sections/gov_support_items 테이블 + 이 CRUD API로 이관했다.
+// generateGovSupportSections()가 이 데이터를 읽어 프롬프트를 조립한다(gsLoadProgramStructure).
+// ────────────────────────────────────────────────────
+const GS_EXPRESSION_TYPES = ['headlineBox', 'subhead', 'subhead2', 'paragraph', 'bullets', 'table', 'visual', 'iconStats']
+
+// 프로그램 목록 + 어드민에서 구조를 등록했는지 여부(= 생성 가능 여부)
+app.get('/api/admin/gov-support/programs', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const rows = (await db.prepare(
+      `SELECT program_id, COUNT(*) as section_count FROM gov_support_sections GROUP BY program_id`
+    ).all()).results as any[]
+    const countByProgram: Record<string, number> = {}
+    for (const r of rows || []) countByProgram[r.program_id] = r.section_count
+    const programs = GOV_SUPPORT_PROGRAMS.map((p) => ({
+      id: p.id, name: p.name,
+      sectionCount: countByProgram[p.id] || 0,
+      generationReady: GS_GENERATION_READY_IDS.includes(p.id) || !!countByProgram[p.id],
+    }))
+    return c.json({ success: true, programs })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// 특정 프로그램의 섹션 + 항목 전체 조회
+app.get('/api/admin/gov-support/structure/:programId', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const programId = c.req.param('programId')
+    const sections = (await db.prepare(
+      `SELECT id, section_key, title, display_order, target_chars FROM gov_support_sections WHERE program_id = ? ORDER BY display_order`
+    ).bind(programId).all()).results as any[]
+    for (const s of sections || []) {
+      s.items = (await db.prepare(
+        `SELECT id, item_order, expression_type, label, notes FROM gov_support_items WHERE section_id = ? ORDER BY item_order`
+      ).bind(s.id).all()).results
+    }
+    return c.json({ success: true, sections: sections || [] })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.post('/api/admin/gov-support/structure/:programId/sections', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const programId = c.req.param('programId')
+    const body = await c.req.json().catch(() => ({}))
+    if (!body.sectionKey || !body.title) return c.json({ success: false, message: 'sectionKey, title은 필수입니다.' }, 400)
+    const id = crypto.randomUUID()
+    await db.prepare(
+      `INSERT INTO gov_support_sections (id, program_id, section_key, title, display_order, target_chars) VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(id, programId, body.sectionKey, body.title, Number(body.displayOrder) || 0, Number(body.targetChars) || 800).run()
+    return c.json({ success: true, id })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.patch('/api/admin/gov-support/sections/:id', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}))
+    const sets: string[] = ['updated_at = datetime(\'now\')']
+    const params: any[] = []
+    if (body.sectionKey !== undefined)  { sets.push('section_key = ?');  params.push(body.sectionKey) }
+    if (body.title !== undefined)       { sets.push('title = ?');        params.push(body.title) }
+    if (body.displayOrder !== undefined){ sets.push('display_order = ?'); params.push(Number(body.displayOrder) || 0) }
+    if (body.targetChars !== undefined) { sets.push('target_chars = ?'); params.push(Number(body.targetChars) || 0) }
+    params.push(id)
+    await db.prepare(`UPDATE gov_support_sections SET ${sets.join(', ')} WHERE id = ?`).bind(...params).run()
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.delete('/api/admin/gov-support/sections/:id', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    await db.prepare(`DELETE FROM gov_support_sections WHERE id = ?`).bind(c.req.param('id')).run()
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.post('/api/admin/gov-support/sections/:id/items', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const sectionId = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}))
+    if (!body.expressionType || !GS_EXPRESSION_TYPES.includes(body.expressionType)) {
+      return c.json({ success: false, message: 'expressionType이 올바르지 않습니다.' }, 400)
+    }
+    if (!body.label) return c.json({ success: false, message: 'label은 필수입니다.' }, 400)
+    const id = crypto.randomUUID()
+    await db.prepare(
+      `INSERT INTO gov_support_items (id, section_id, item_order, expression_type, label, notes) VALUES (?, ?, ?, ?, ?, ?)`
+    ).bind(id, sectionId, Number(body.itemOrder) || 0, body.expressionType, body.label, body.notes || '').run()
+    return c.json({ success: true, id })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.patch('/api/admin/gov-support/items/:id', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const id = c.req.param('id')
+    const body = await c.req.json().catch(() => ({}))
+    if (body.expressionType !== undefined && !GS_EXPRESSION_TYPES.includes(body.expressionType)) {
+      return c.json({ success: false, message: 'expressionType이 올바르지 않습니다.' }, 400)
+    }
+    const sets: string[] = ['updated_at = datetime(\'now\')']
+    const params: any[] = []
+    if (body.itemOrder !== undefined)     { sets.push('item_order = ?');      params.push(Number(body.itemOrder) || 0) }
+    if (body.expressionType !== undefined){ sets.push('expression_type = ?'); params.push(body.expressionType) }
+    if (body.label !== undefined)         { sets.push('label = ?');           params.push(body.label) }
+    if (body.notes !== undefined)         { sets.push('notes = ?');           params.push(body.notes) }
+    params.push(id)
+    await db.prepare(`UPDATE gov_support_items SET ${sets.join(', ')} WHERE id = ?`).bind(...params).run()
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+app.delete('/api/admin/gov-support/items/:id', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    await db.prepare(`DELETE FROM gov_support_items WHERE id = ?`).bind(c.req.param('id')).run()
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
 // Admin Prompt Store  (Cloudflare Workers 메모리 싱글톤)
 // Workers는 요청마다 재사용되는 isolate를 공유하므로
 // 모듈 스코프 변수가 인스턴스 내에서 유지됩니다.
@@ -3449,8 +3593,12 @@ app.patch('/api/gov-support/projects/:id/answers', async (c) => {
   }
 })
 
-app.get('/gov-support/wizard/:id', (c) => {
+app.get('/gov-support/wizard/:id', async (c) => {
   const projectId = c.req.param('id')
+  // 어드민이 gov_support_sections에 구조를 등록한 프로그램은 코드 배포 없이 바로 생성 가능
+  // 목록에 포함되도록 DB에서 동적으로 조회(GS_GENERATION_READY_IDS 하드코딩과 합집합).
+  const dbReadyRows = (await c.env.LOOKBOOK_DB.prepare(`SELECT DISTINCT program_id FROM gov_support_sections`).all()).results as any[]
+  const wzGenerationReady = Array.from(new Set([...GS_GENERATION_READY_IDS, ...(dbReadyRows || []).map((r) => r.program_id)]))
   return c.html(htmlShell('지원사업 작성', `
   <div class="toast-container" id="toastContainer"></div>
 
@@ -3748,7 +3896,7 @@ app.get('/gov-support/wizard/:id', (c) => {
 
   <script>
     var WZ_PROJECT_ID = ${JSON.stringify(projectId)};
-    var WZ_GENERATION_READY = ${JSON.stringify(GS_GENERATION_READY_IDS)};
+    var WZ_GENERATION_READY = ${JSON.stringify(wzGenerationReady)};
     var WZ_TOTAL_STEPS = 12;
     var wzCurrentStep = 1;
     var wzAnswers = {};
@@ -4067,6 +4215,15 @@ app.get('/gov-support/wizard/:id', (c) => {
 // ────────────────────────────────────────────────────
 const GS_GENERATION_READY_IDS = ['yebi']
 
+// 2026-10-22(어드민 구조 관리): 'yebi'는 하드코딩 폴백(GS_YEBI_SECTIONS/STRUCTURE)이 있어
+// 항상 생성 가능하고, 그 외 프로그램은 어드민에서 gov_support_sections에 섹션을 하나라도
+// 등록하면(코드 배포 없이) 바로 생성 가능해진다.
+async function gsIsGenerationReady(db: D1Database, programId: string): Promise<boolean> {
+  if (GS_GENERATION_READY_IDS.includes(programId)) return true
+  const row = await db.prepare(`SELECT 1 FROM gov_support_sections WHERE program_id = ? LIMIT 1`).bind(programId).first()
+  return !!row
+}
+
 const GS_DOMAIN_KB = `[원가 구조] 소매원가 = 소재비(원단+부자재) + 임가공비(패턴·샘플·봉제·마감) + 라벨/택 + 포장 + 검사·기획비.
 [목표 원가율] 원가율(원가÷판매가) 30~40%가 일반적. 소량생산(50장 미만)은 단가 상승으로 원가율 40~50%, 이 경우 고가격대 포지셔닝 또는 프리오더로 리스크 통제가 필요하다.
 [채널 수수료] 자사몰 3~5% / 패션 플랫폼(무신사·지그재그·에이블리 등) 8~15%+자체 광고비 별도 / 도매·위탁 납품은 소매가 대비 40~50% 공급 / 팝업·오프라인은 임대료 고정비.
@@ -4295,12 +4452,43 @@ async function fetchSelfMallExcerpt(url: string | undefined): Promise<string | n
   }
 }
 
-function gsBuildFallbackSections(how: string, sectionIds?: string[]) {
-  const targets = sectionIds ? GS_YEBI_SECTIONS.filter((s) => sectionIds.includes(s.id)) : GS_YEBI_SECTIONS
+type GsSectionMeta = { id: string; title: string; targetChars: number }
+
+function gsBuildFallbackSections(sectionsMeta: GsSectionMeta[], how: string, sectionIds?: string[]) {
+  const targets = sectionIds ? sectionsMeta.filter((s) => sectionIds.includes(s.id)) : sectionsMeta
   return targets.map((s) => ({
     sectionId: s.id, headline: s.title, lead: '',
     blocks: [{ type: 'evidenceGap', need: 'AI 초안 생성', how }],
   }))
+}
+
+// 2026-10-22(어드민 구조 관리): 지원사업별 섹션·항목을 코드가 아니라 어드민 화면에서 직접
+// 추가·삭제·보완할 수 있도록 gov_support_sections/gov_support_items 테이블로 이관했다.
+// 이 함수가 program_id의 섹션이 하나라도 있으면 거기서 구조를 읽어오고(관리자가 최신으로
+// 편집한 내용), 없으면 null을 반환해 호출부가 하드코딩된 GS_YEBI_SECTIONS/STRUCTURE로
+// 폴백하게 한다(마이그레이션 직후·아직 관리자가 설정 안 한 프로그램 보호용 안전장치).
+async function gsLoadProgramStructure(db: D1Database, programId: string): Promise<{ sections: GsSectionMeta[]; structureText: Record<string, string> } | null> {
+  const sectionRows = (await db.prepare(
+    `SELECT id, section_key, title, target_chars FROM gov_support_sections WHERE program_id = ? ORDER BY display_order`
+  ).bind(programId).all()).results as any[]
+  if (!sectionRows || !sectionRows.length) return null
+
+  const sections: GsSectionMeta[] = sectionRows.map((r) => ({ id: r.section_key, title: r.title, targetChars: r.target_chars }))
+  const structureText: Record<string, string> = {}
+  for (const r of sectionRows) {
+    const itemRows = (await db.prepare(
+      `SELECT expression_type, label, notes FROM gov_support_items WHERE section_id = ? ORDER BY item_order`
+    ).bind(r.id).all()).results as any[]
+    const lines = (itemRows || []).map((it) => `- ${it.expression_type}: ${it.label}${it.notes ? ' — ' + it.notes : ''}`)
+    structureText[r.section_key] = `"${r.title}" — 다음 항목을 이 순서로 그대로 따른다(항목을 생략·추가·순서변경 금지):\n${lines.join('\n')}`
+  }
+  return { sections, structureText }
+}
+
+function gsChunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
 }
 
 // 두 섹션 그룹(1부/2부) + 요약, 세 번의 호출에서 공통으로 쓰는 배경 지식·사용자 답변·재무·
@@ -4464,9 +4652,9 @@ async function gsCallClaudeSections(
   }
 }
 
-function gsBuildGroupPrompt(sectionIds: string[], sharedContext: string, intro: string): string {
-  const spec = JSON.stringify(GS_YEBI_SECTIONS.filter((s) => sectionIds.includes(s.id)).map((s) => ({ id: s.id, title: s.title, targetChars: s.targetChars })))
-  const structure = sectionIds.map((id) => `[${id}] ${GS_YEBI_STRUCTURE[id]}`).join('\n\n')
+function gsBuildGroupPrompt(sectionIds: string[], sharedContext: string, intro: string, sectionsMeta: GsSectionMeta[], structureText: Record<string, string>): string {
+  const spec = JSON.stringify(sectionsMeta.filter((s) => sectionIds.includes(s.id)).map((s) => ({ id: s.id, title: s.title, targetChars: s.targetChars })))
+  const structure = sectionIds.map((id) => `[${id}] ${structureText[id] || ''}`).join('\n\n')
   return `${intro}
 
 ${GS_WRITING_PRINCIPLES}
@@ -4481,54 +4669,76 @@ ${structure}
 응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것. 입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 ${sectionIds.join(', ')} 섹션 전부(이 순서로) 완전하게 작성한다.`
 }
 
-async function generateGovSupportSections(apiKey: string | undefined, answers: any, finance: any, competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string }): Promise<any[]> {
+async function generateGovSupportSections(
+  apiKey: string | undefined, programId: string, programName: string, answers: any, finance: any,
+  competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string }
+): Promise<any[]> {
+  // 2026-10-22(어드민 구조 관리): program_id의 구조를 DB(gov_support_sections/items,
+  // 어드민에서 직접 편집)에서 먼저 읽고, 없으면 예비창업패키지 하드코딩(GS_YEBI_SECTIONS/
+  // STRUCTURE)으로 폴백한다 — 마이그레이션 직후나 관리자가 아직 설정하지 않은 프로그램도
+  // 깨지지 않게 하는 안전장치다. 새 지원사업은 코드 배포 없이 어드민에서 구조를 등록하면
+  // 바로 생성 가능해진다.
+  const loaded = env ? await gsLoadProgramStructure(env.LOOKBOOK_DB, programId).catch(() => null) : null
+  const sectionsMeta: GsSectionMeta[] = loaded?.sections?.length ? loaded.sections : (programId === 'yebi' ? GS_YEBI_SECTIONS : [])
+  const structureText: Record<string, string> = loaded?.structureText && Object.keys(loaded.structureText).length ? loaded.structureText : (programId === 'yebi' ? GS_YEBI_STRUCTURE : {})
+
+  if (!sectionsMeta.length) return gsBuildFallbackSections([{ id: 'notice', title: '안내', targetChars: 0 }], '이 사업은 아직 AI 초안 생성 구조가 설정되지 않았습니다 — 관리자에게 문의해주세요.')
+
   // 실패 사유별로 다른 안내 문구를 남긴다 — 전부 "ANTHROPIC_API_KEY 미설정"으로 뭉뚱그리면
   // 키가 실제로는 바인딩돼 있는데 API 호출 자체가 실패(401/429/모델명 오류 등)하거나 응답
   // 파싱이 깨진 경우도 똑같이 "키가 없다"는 오진단 메시지가 떠서, 서버 로그 없이는
   // 화면만 보고 원인을 구분할 방법이 없어진다(실제로 이 문제로 운영 디버깅이 막혔던 사례 있음).
-  if (!apiKey) return gsBuildFallbackSections('ANTHROPIC_API_KEY 미설정 — 관리자에게 문의해주세요.')
+  if (!apiKey) return gsBuildFallbackSections(sectionsMeta, 'ANTHROPIC_API_KEY 미설정 — 관리자에게 문의해주세요.')
 
   const sharedContext = gsBuildSharedContext(answers, finance, competitorTable, selfMallExcerpt)
-  const intro = '당신은 한국 정부지원사업(예비창업패키지) 심사 경험이 10년 이상인 패션 제조 전문 컨설턴트다. 실제로 선정된 사업계획서를 여러 건 써온 사람처럼, 자연스럽고 전문적인 문장으로 아래 소상공인의 답변을 바탕으로 중소벤처기업부 공식 사업계획서 양식의 섹션을 작성한다.'
+  const intro = `당신은 한국 정부지원사업(${programName}) 심사 경험이 10년 이상인 패션 제조 전문 컨설턴트다. 실제로 선정된 사업계획서를 여러 건 써온 사람처럼, 자연스럽고 전문적인 문장으로 아래 소상공인의 답변을 바탕으로 공식 사업계획서 양식의 섹션을 작성한다.`
 
   // 2026-10-22: 섹션을 한 번에 전부 생성했더니(7개) 응답이 길어져 max_tokens를 8000→16000으로
   // 올려도 JSON이 중간에 잘리거나(truncation) 모델이 설명 문장을 먼저 쓰다 전체 파싱이 깨지는
   // 사례가 반복 재현됨. 지금 구조는 섹션당 박스형 헤드카피·아이콘 도식화·표가 훨씬 많아 응답이
-  // 더 길어지므로, 한 번에 전부 요청하는 대신 1부(문제인식·실현가능성)/2부(성장전략·팀구성)를
-  // 병렬로 나눠 호출해 각 호출의 응답 길이를 줄이고, 요약은 1부·2부 결과를 받은 뒤 마지막에
-  // 짧게 생성한다(1~2부가 실패해도 그 부분만 fallback으로 대체되고 나머지는 살아있게 함).
-  const promptA = gsBuildGroupPrompt(['problem', 'solution'], sharedContext, intro)
-  const promptB = gsBuildGroupPrompt(['scaleup', 'team'], sharedContext, intro)
+  // 더 길어지므로, 한 번에 전부 요청하는 대신 "summary" 섹션을 제외한 나머지를 2개씩 묶어
+  // 병렬 호출하고, summary는 다른 섹션이 전부 끝난 뒤 그 내용을 요약하는 마지막 호출로 별도
+  // 생성한다(한 그룹이 실패해도 그 부분만 fallback으로 대체되고 나머지는 살아있게 함). 섹션
+  // 구성은 어드민에서 자유롭게 바뀌므로 "problem+solution/scaleup+team" 같은 고정 분할이
+  // 아니라 summary를 제외한 섹션을 2개씩 자동으로 나눈다.
+  const summaryMeta = sectionsMeta.find((s) => s.id === 'summary')
+  const mainMeta = sectionsMeta.filter((s) => s.id !== 'summary')
+  const groups = gsChunk(mainMeta, 2)
 
-  const [groupA, groupB] = await Promise.all([
-    gsCallClaudeSections(apiKey, promptA, ['problem', 'solution'], 16000, 100000, env, '1부: 문제인식·실현가능성'),
-    gsCallClaudeSections(apiKey, promptB, ['scaleup', 'team'], 16000, 100000, env, '2부: 성장전략·팀구성'),
-  ])
+  const groupResults = await Promise.all(groups.map((g) => {
+    const ids = g.map((s) => s.id)
+    const prompt = gsBuildGroupPrompt(ids, sharedContext, intro, sectionsMeta, structureText)
+    return gsCallClaudeSections(apiKey, prompt, ids, 16000, 100000, env, `${g.map((s) => s.title).join('·')}`)
+  }))
 
-  const sectionsA = groupA || gsBuildFallbackSections('AI 초안 생성 실패(1부: 문제 인식·실현 가능성) — 관리자에게 문의해주세요.', ['problem', 'solution'])
-  const sectionsB = groupB || gsBuildFallbackSections('AI 초안 생성 실패(2부: 성장전략·팀 구성) — 관리자에게 문의해주세요.', ['scaleup', 'team'])
+  const mainSections = groups.flatMap((g, i) => {
+    const ids = g.map((s) => s.id)
+    return groupResults[i] || gsBuildFallbackSections(sectionsMeta, `AI 초안 생성 실패(${g.map((s) => s.title).join('·')}) — 관리자에게 문의해주세요.`, ids)
+  })
+
+  if (!summaryMeta) return mainSections
 
   let summarySection: any
-  if (groupA && groupB) {
+  if (groupResults.every((r) => r !== null)) {
     const promptC = `${intro}
 
 ${GS_WRITING_PRINCIPLES}
 
 ${sharedContext}
-[이미 작성된 1~4번 섹션 전체 — 아래 내용만 압축 요약할 것, 새로 지어내지 말 것]
-${JSON.stringify([...sectionsA, ...sectionsB])}
+[이미 작성된 다른 섹션 전체 — 아래 내용만 압축 요약할 것, 새로 지어내지 말 것]
+${JSON.stringify(mainSections)}
 
 [섹션별 필수 구조]
-[summary] ${GS_YEBI_STRUCTURE.summary}
+[summary] ${structureText.summary || ''}
 
 응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것.`
-    const groupC = await gsCallClaudeSections(apiKey, promptC, ['summary'], 4000, 60000, env, '3부: 요약')
-    summarySection = (groupC && groupC[0]) || gsBuildFallbackSections('AI 초안 생성 실패(요약) — 관리자에게 문의해주세요.', ['summary'])[0]
+    const groupC = await gsCallClaudeSections(apiKey, promptC, ['summary'], 4000, 60000, env, summaryMeta.title)
+    summarySection = (groupC && groupC[0]) || gsBuildFallbackSections(sectionsMeta, 'AI 초안 생성 실패(요약) — 관리자에게 문의해주세요.', ['summary'])[0]
   } else {
-    summarySection = gsBuildFallbackSections('1부 또는 2부 생성이 실패해 요약을 만들 수 없습니다 — 관리자에게 문의해주세요.', ['summary'])[0]
+    summarySection = gsBuildFallbackSections(sectionsMeta, '다른 섹션 생성이 실패해 요약을 만들 수 없습니다 — 관리자에게 문의해주세요.', ['summary'])[0]
   }
 
-  return [...sectionsA, ...sectionsB, summarySection]
+  return [...mainSections, summarySection]
 }
 
 app.post('/api/gov-support/projects/:id/generate', async (c) => {
@@ -4541,10 +4751,10 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
     if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
 
     const project = await db.prepare(
-      `SELECT id, program_id, answers FROM gov_support_projects WHERE id = ? AND user_id = ?`
+      `SELECT id, program_id, program_name, answers FROM gov_support_projects WHERE id = ? AND user_id = ?`
     ).bind(c.req.param('id'), sess.user_id).first() as any
     if (!project) return c.json({ success: false, message: '프로젝트를 찾을 수 없습니다.' }, 404)
-    if (!GS_GENERATION_READY_IDS.includes(project.program_id)) {
+    if (!(await gsIsGenerationReady(db, project.program_id))) {
       return c.json({ success: false, message: '이 사업은 초안 생성을 아직 지원하지 않습니다.' }, 400)
     }
 
@@ -4554,7 +4764,7 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
     const selfMallExcerpt = await fetchSelfMallExcerpt(answers.selfMallUrl)
 
     const [sections, processImageResult] = await Promise.all([
-      generateGovSupportSections(c.env.ANTHROPIC_API_KEY, answers, finance, competitorTable, selfMallExcerpt, c.env),
+      generateGovSupportSections(c.env.ANTHROPIC_API_KEY, project.program_id, project.program_name, answers, finance, competitorTable, selfMallExcerpt, c.env),
       generateGovSupportProcessImage(c.env.ATLAS_API_KEY, answers.processSteps, answers.processNote, answers.category, answers.differentiationTypes, answers.differentiation),
     ])
 
@@ -11448,6 +11658,7 @@ app.get('/admin02', (c) => {
     <button class="tab-btn" onclick="switchTab('ghostcut')"><i class="fas fa-tshirt"></i> 누끼컷 샘플</button>
     <button class="tab-btn" onclick="switchTab('contentdigest')"><i class="fas fa-newspaper"></i> 콘텐츠 다이제스트</button>
     <button class="tab-btn" onclick="switchTab('errors')"><i class="fas fa-triangle-exclamation"></i> 에러 로그<span id="errorsBadge" class="tab-badge" style="display:none;"></span></button>
+    <button class="tab-btn" onclick="switchTab('govsupport')"><i class="fas fa-file-contract"></i> 지원사업</button>
   </div>
 
   <!-- ▼ 탭: 프롬프트 -->
@@ -11935,6 +12146,35 @@ app.get('/admin02', (c) => {
     </div>
   </div>
 
+  <!-- ▼ 탭: 지원사업 구조 관리 -->
+  <div class="tab-panel" id="tabGovSupport">
+    <div class="admin-body">
+      <div class="page-title">📋 지원사업 AI 초안 구조</div>
+      <div class="page-sub">사업별로 AI가 초안을 생성할 때 따라야 할 섹션·항목·표현방법을 직접 관리합니다. 섹션을 하나라도 등록하면 그 사업은 배포 없이 바로 AI 초안 생성이 가능해집니다(예비창업패키지는 등록 여부와 무관하게 기본 지원됩니다).</div>
+
+      <div class="section-card">
+        <h3>사업 선택</h3>
+        <select id="gsAdminProgramSelect" class="form-input" style="max-width:420px;" onchange="gsAdminLoadStructure()">
+          <option value="">불러오는 중...</option>
+        </select>
+      </div>
+
+      <div id="gsAdminSectionsWrap"></div>
+
+      <div class="section-card" id="gsAdminAddSectionCard" style="display:none;">
+        <h3>+ 섹션 추가</h3>
+        <div class="section-desc">섹션 키는 영문(예: problem)으로, AI 응답의 sectionId와 매칭됩니다. "summary"로 지으면 다른 섹션을 전부 작성한 뒤 그 내용을 요약하는 마지막 섹션으로 특별 취급됩니다.</div>
+        <div style="display:grid;grid-template-columns:1fr 2fr 90px 110px auto;gap:8px;align-items:center;">
+          <input id="gsNewSectionKey" class="form-input" placeholder="섹션 키 (예: problem)" />
+          <input id="gsNewSectionTitle" class="form-input" placeholder="제목 (예: 1. 문제 인식 (Problem))" />
+          <input id="gsNewSectionOrder" class="form-input" type="number" placeholder="순서" value="0" />
+          <input id="gsNewSectionChars" class="form-input" type="number" placeholder="목표 글자수" value="800" />
+          <button class="btn-sm btn-primary-sm" onclick="gsAdminAddSection()">섹션 추가</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 에러 상세 모달 -->
   <div class="modal-overlay" id="errorDetailModal" style="z-index:5000;">
     <div class="modal-box" style="max-width:640px;max-height:80vh;overflow-y:auto;">
@@ -11983,7 +12223,7 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs','home','users','bizleads','ghostcut','contentdigest','errors']
+    const names = ['prompt','models','bgs','home','users','bizleads','ghostcut','contentdigest','errors','govsupport']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
@@ -11995,6 +12235,7 @@ function switchTab(name) {
   document.getElementById('tabGhostCut').classList.toggle('active', name === 'ghostcut')
   document.getElementById('tabContentDigest').classList.toggle('active', name === 'contentdigest')
   document.getElementById('tabErrors').classList.toggle('active', name === 'errors')
+  document.getElementById('tabGovSupport').classList.toggle('active', name === 'govsupport')
   if (name === 'models') loadCustomModels()
   if (name === 'bgs')    loadCustomBgs()
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos(); loadGcLoadingImages() }
@@ -12003,6 +12244,7 @@ function switchTab(name) {
   if (name === 'ghostcut') ghostCutInit()
   if (name === 'contentdigest') digestInit()
   if (name === 'errors') loadErrors()
+  if (name === 'govsupport') gsAdminInit()
 }
 
 // ══════════════════════════════════════════════
@@ -14004,6 +14246,161 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.id === 'userDetailModal') closeModal('userDetailModal')
   })
 })
+
+// ══════════════════════════════════════════════
+// 지원사업 AI 초안 구조 관리 — 섹션/항목을 어드민에서 직접 추가·삭제·보완
+// ══════════════════════════════════════════════
+const GS_EXPRESSION_TYPES_CLIENT = ['headlineBox', 'subhead', 'subhead2', 'paragraph', 'bullets', 'table', 'visual', 'iconStats']
+const GS_EXPR_LABELS = {
+  headlineBox: '박스형 헤드카피', subhead: '중제목(가/나/다)', subhead2: '소제목(1/2/3)',
+  paragraph: '서술형 문단', bullets: '개조식(불릿)', table: '표', visual: '시각화(이미지)', iconStats: '아이콘 도식화',
+}
+let gsAdminProgramsLoaded = false
+
+async function gsAdminApi(path, opts) {
+  opts = opts || {}
+  opts.headers = Object.assign({ 'X-Admin-Password': adminPassword, 'Content-Type': 'application/json' }, opts.headers || {})
+  const res = await fetch('/api/admin/gov-support' + path, opts)
+  return res.json()
+}
+
+async function gsAdminInit() {
+  if (gsAdminProgramsLoaded) return
+  gsAdminProgramsLoaded = true
+  const data = await gsAdminApi('/programs')
+  const sel = document.getElementById('gsAdminProgramSelect')
+  if (!data.success) { sel.innerHTML = '<option value="">불러오기 실패</option>'; return }
+  sel.innerHTML = '<option value="">사업을 선택하세요</option>' + data.programs.map(function (p) {
+    return '<option value="' + p.id + '">' + p.name + (p.generationReady ? ' ✅ 생성가능' : ' (미설정)') + '</option>'
+  }).join('')
+}
+
+function gsAdminLoadStructure() {
+  const programId = document.getElementById('gsAdminProgramSelect').value
+  const addCard = document.getElementById('gsAdminAddSectionCard')
+  if (!programId) {
+    document.getElementById('gsAdminSectionsWrap').innerHTML = ''
+    addCard.style.display = 'none'
+    return
+  }
+  addCard.style.display = 'block'
+  gsAdminFetchAndRender(programId)
+}
+
+async function gsAdminFetchAndRender(programId) {
+  const wrap = document.getElementById('gsAdminSectionsWrap')
+  wrap.innerHTML = '<div class="section-card">불러오는 중...</div>'
+  const data = await gsAdminApi('/structure/' + programId)
+  if (!data.success) { wrap.innerHTML = '<div class="section-card">불러오기 실패: ' + (data.message || '') + '</div>'; return }
+  if (!data.sections.length) {
+    wrap.innerHTML = '<div class="section-card">아직 등록된 섹션이 없습니다. 아래에서 첫 섹션을 추가해주세요.</div>'
+    return
+  }
+  wrap.innerHTML = data.sections.map(gsAdminRenderSection).join('')
+}
+
+function gsAdminExprOptions(selected) {
+  return GS_EXPRESSION_TYPES_CLIENT.map(function (t) {
+    return '<option value="' + t + '"' + (t === selected ? ' selected' : '') + '>' + (GS_EXPR_LABELS[t] || t) + '</option>'
+  }).join('')
+}
+
+function gsAdminRenderSection(s) {
+  const itemsHtml = (s.items || []).map(function (it) {
+    return '<div style="display:grid;grid-template-columns:60px 160px 1.3fr 1.3fr auto auto;gap:6px;align-items:start;margin-bottom:6px;">' +
+      '<input class="form-input" type="number" value="' + it.item_order + '" onchange="gsAdminItemField(\\'' + it.id + '\\',\\'itemOrder\\',this.value)" />' +
+      '<select class="form-input" onchange="gsAdminItemField(\\'' + it.id + '\\',\\'expressionType\\',this.value)">' + gsAdminExprOptions(it.expression_type) + '</select>' +
+      '<input class="form-input" value="' + rsAdminEsc(it.label) + '" onchange="gsAdminItemField(\\'' + it.id + '\\',\\'label\\',this.value)" />' +
+      '<input class="form-input" value="' + rsAdminEsc(it.notes || '') + '" placeholder="추가 지시(선택)" onchange="gsAdminItemField(\\'' + it.id + '\\',\\'notes\\',this.value)" />' +
+      '<span style="font-size:11px;color:#8b8ba0;align-self:center;">자동저장</span>' +
+      '<button class="btn-sm btn-danger-sm" onclick="gsAdminDeleteItem(\\'' + it.id + '\\',\\'' + s.id + '\\')">삭제</button>' +
+      '</div>'
+  }).join('')
+  return '<div class="section-card" data-section-id="' + s.id + '">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+    '<h3 style="margin:0;">' + rsAdminEsc(s.title) + ' <span style="color:#8b8ba0;font-weight:400;font-size:12px;">(' + rsAdminEsc(s.section_key) + ')</span></h3>' +
+    '<button class="btn-sm btn-danger-sm" onclick="gsAdminDeleteSection(\\'' + s.id + '\\')">섹션 삭제</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px;">' +
+    '<input class="form-input" value="' + rsAdminEsc(s.title) + '" onchange="gsAdminSectionField(\\'' + s.id + '\\',\\'title\\',this.value)" placeholder="제목" />' +
+    '<input class="form-input" value="' + rsAdminEsc(s.section_key) + '" onchange="gsAdminSectionField(\\'' + s.id + '\\',\\'sectionKey\\',this.value)" placeholder="섹션 키" />' +
+    '<input class="form-input" type="number" value="' + s.display_order + '" onchange="gsAdminSectionField(\\'' + s.id + '\\',\\'displayOrder\\',this.value)" placeholder="순서" />' +
+    '<input class="form-input" type="number" value="' + s.target_chars + '" onchange="gsAdminSectionField(\\'' + s.id + '\\',\\'targetChars\\',this.value)" placeholder="목표 글자수" />' +
+    '</div>' +
+    '<div class="section-desc">항목(순서/표현방법/제목/추가 지시) — 값을 바꾸면 자동 저장됩니다.</div>' +
+    itemsHtml +
+    '<div style="display:grid;grid-template-columns:60px 160px 1.3fr 1.3fr auto auto;gap:6px;margin-top:8px;">' +
+    '<input class="form-input" type="number" id="gsNewItemOrder_' + s.id + '" value="' + (s.items ? s.items.length : 0) + '" />' +
+    '<select class="form-input" id="gsNewItemType_' + s.id + '">' + gsAdminExprOptions('subhead') + '</select>' +
+    '<input class="form-input" id="gsNewItemLabel_' + s.id + '" placeholder="예: 가. 창업아이템 배경" />' +
+    '<input class="form-input" id="gsNewItemNotes_' + s.id + '" placeholder="추가 지시(선택)" />' +
+    '<span></span>' +
+    '<button class="btn-sm btn-primary-sm" onclick="gsAdminAddItem(\\'' + s.id + '\\')">+ 항목 추가</button>' +
+    '</div>' +
+    '</div>'
+}
+
+function rsAdminEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+async function gsAdminAddSection() {
+  const programId = document.getElementById('gsAdminProgramSelect').value
+  const sectionKey = document.getElementById('gsNewSectionKey').value.trim()
+  const title = document.getElementById('gsNewSectionTitle').value.trim()
+  const displayOrder = document.getElementById('gsNewSectionOrder').value
+  const targetChars = document.getElementById('gsNewSectionChars').value
+  if (!sectionKey || !title) { alert('섹션 키와 제목을 입력해주세요.'); return }
+  const data = await gsAdminApi('/structure/' + programId + '/sections', { method: 'POST', body: JSON.stringify({ sectionKey, title, displayOrder, targetChars }) })
+  if (!data.success) { alert(data.message || '추가 실패'); return }
+  document.getElementById('gsNewSectionKey').value = ''
+  document.getElementById('gsNewSectionTitle').value = ''
+  gsAdminFetchAndRender(programId)
+  gsAdminProgramsLoaded = false
+  gsAdminInit()
+}
+
+async function gsAdminSectionField(id, field, value) {
+  const body = {}; body[field] = value
+  const data = await gsAdminApi('/sections/' + id, { method: 'PATCH', body: JSON.stringify(body) })
+  if (!data.success) alert(data.message || '저장 실패')
+}
+
+async function gsAdminDeleteSection(id) {
+  if (!confirm('이 섹션과 그 안의 모든 항목을 삭제할까요?')) return
+  const programId = document.getElementById('gsAdminProgramSelect').value
+  const data = await gsAdminApi('/sections/' + id, { method: 'DELETE' })
+  if (!data.success) { alert(data.message || '삭제 실패'); return }
+  gsAdminFetchAndRender(programId)
+  gsAdminProgramsLoaded = false
+  gsAdminInit()
+}
+
+async function gsAdminAddItem(sectionId) {
+  const itemOrder = document.getElementById('gsNewItemOrder_' + sectionId).value
+  const expressionType = document.getElementById('gsNewItemType_' + sectionId).value
+  const label = document.getElementById('gsNewItemLabel_' + sectionId).value.trim()
+  const notes = document.getElementById('gsNewItemNotes_' + sectionId).value.trim()
+  if (!label) { alert('항목 제목(label)을 입력해주세요.'); return }
+  const data = await gsAdminApi('/sections/' + sectionId + '/items', { method: 'POST', body: JSON.stringify({ itemOrder, expressionType, label, notes }) })
+  if (!data.success) { alert(data.message || '추가 실패'); return }
+  const programId = document.getElementById('gsAdminProgramSelect').value
+  gsAdminFetchAndRender(programId)
+}
+
+async function gsAdminItemField(id, field, value) {
+  const body = {}; body[field] = value
+  const data = await gsAdminApi('/items/' + id, { method: 'PATCH', body: JSON.stringify(body) })
+  if (!data.success) alert(data.message || '저장 실패')
+}
+
+async function gsAdminDeleteItem(id, sectionId) {
+  if (!confirm('이 항목을 삭제할까요?')) return
+  const data = await gsAdminApi('/items/' + id, { method: 'DELETE' })
+  if (!data.success) { alert(data.message || '삭제 실패'); return }
+  const programId = document.getElementById('gsAdminProgramSelect').value
+  gsAdminFetchAndRender(programId)
+}
 </script>
 </body>
 </html>`)
