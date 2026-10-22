@@ -4082,7 +4082,7 @@ const GS_YEBI_SECTIONS = [
   { id: 'solution', title: 'Ⅱ. Solution — 해결 아이템', evaluationLink: ['사업성'], targetChars: 900,
     guidance: '아이템이 문제를 어떻게 푸는지, 사용자가 입력한 제작 공정·차별점(differentiation)을 구체적으로 녹여 대안 대비 차별점을 원가·소재·검수 방식 등 패션의 언어로 쓴다. 이 섹션에 경쟁사 비교표(table 블록, visualId="competitor-table")를 반드시 포함한다.' },
   { id: 'market', title: 'Ⅲ. Scale-up(1) — 시장 & 전략', evaluationLink: ['사업성'], targetChars: 900,
-    guidance: '시장 규모·성장성은 사용자가 제공한 근거가 없으면 evidenceGap 블록으로 남기고 숫자를 지어내지 않는다. 타겟 고객·구매 이유를 중심으로 한 시장분석표(table 블록, visualId="market-analysis")를 포함한다.' },
+    guidance: '시장 규모·성장성은 사용자가 제공한 근거가 없으면 패션 소상공인 시장 상황에 맞는 합리적인 추정치를 직접 제시하고 "(임의 작성 추정치 — 제출 전 실제 자료로 교체 권장)"을 덧붙인다. 타겟 고객·구매 이유를 중심으로 한 시장분석표(table 블록, visualId="market-analysis")를 포함한다.' },
   { id: 'operation', title: 'Ⅲ. Scale-up(2) — 실행 계획 (생산·마케팅·재무)', evaluationLink: ['실행가능성'], targetChars: 1300,
     guidance: '생산/조달 계획에 사용자가 입력한 제작 공정(processDetail)을 단계별로 서술하고, 공정 순서도 시각화 블록(visual, visualId="process-flow")을 반드시 포함한다. 지원금 수령 전/후 변화를 보여주는 AS-IS·TO-BE 비교표(table 블록, visualId="asis-tobe")를 포함한다. 재무 계획은 제공된 {{finance}} 숫자를 그대로 인용한다(재계산·변형 금지).' },
   { id: 'team', title: 'Ⅳ. Team — 대표자 역량·창업 준비도', evaluationLink: ['자기효능감'], targetChars: 600,
@@ -4090,7 +4090,7 @@ const GS_YEBI_SECTIONS = [
   { id: 'budget', title: 'Ⅴ. 정부지원사업비 집행 계획', evaluationLink: ['실행가능성'], targetChars: 500,
     guidance: '제공된 {{finance}}의 비목 배분표를 그대로 인용하고, 각 비목이 어떤 마일스톤에 필요한지 서술한다.' },
   { id: 'future-plan', title: 'Ⅵ. 향후 3개년 계획 (EZlook 부가)', evaluationLink: ['성장가능성'], targetChars: 900,
-    guidance: '매출·홍보·상품확장·생산고도화·조직·재무 6개 축으로 1년차/2년차/3년차를 구체적이고 현실적으로 구분해 bullets로 쓴다. 사용자가 입력한 3년 후 목표(threeYearGoal)가 있으면 그 방향에 맞춰 구체화하고, 없으면 사업 규모에 맞는 보수적인 추정치로 채우되 반드시 evidenceGap 성격임을 암시하는 표현("추정치", "목표")을 쓴다.' },
+    guidance: '매출·홍보·상품확장·생산고도화·조직·재무 6개 축으로 1년차/2년차/3년차를 구체적이고 현실적으로 구분해 bullets로 쓴다. 사용자가 입력한 3년 후 목표(threeYearGoal)가 있으면 그 방향에 맞춰 구체화하고, 없으면 사업 규모에 맞는 보수적인 목표치를 직접 채워 쓰되 "(임의 작성)"을 덧붙인다.' },
 ]
 
 function calcGovSupportFinance(answers: any) {
@@ -4241,11 +4241,11 @@ async function generateGovSupportSections(apiKey: string | undefined, answers: a
 [작성 원칙]
 1. 평가기준 역매핑: 각 섹션은 지정된 목적을 채우기 위해 존재한다.
 2. 구체성 우선: "품질이 좋다" 금지. 소재명, 원가율, 리드타임, 수수료 등 숫자로 쓴다.
-3. 추정치 허용(근거 공란 금지): 사용자 본인 사업에 대한 사실(매출 실적, 보유 인증, 실제 계약·거래처 등)은 절대 지어내지 않고, 제공되지 않았다면 evidenceGap 블록(need=무엇, how=준비 방법)으로 남긴다. 반면 시장 규모·업계 평균·소비자 통계처럼 외부에서 일반적으로 통용되는 참고 수치는 evidenceGap으로 비워두지 말고, 패션 소상공인 시장 상황에 맞는 합리적인 추정치를 직접 제시하되 문장이나 표 셀 끝에 반드시 "(임의 작성 추정치 — 제출 전 실제 자료로 교체 권장)"을 그대로 덧붙인다. 이 둘을 혼동하지 말 것 — "사용자 사업 자체의 사실"과 "외부 참고 통계"는 다르게 취급한다.
+3. 추정치 허용(공란 금지, evidenceGap 사용 금지): 사용자가 답변을 비워둔 항목은 사용자 본인 사업의 사실(매출 실적, 보유 인증, 실제 계약·거래처 등)이라도 빈 칸이나 evidenceGap 블록으로 남기지 말고, 브랜드 컨셉·업종·규모에 맞게 그럴듯한 내용을 직접 채워 쓰되 문장이나 표 셀 끝에 반드시 "(임의 작성)"을 그대로 덧붙인다. 시장 규모·업계 평균·소비자 통계처럼 외부에서 일반적으로 통용되는 참고 수치도 마찬가지로 비워두지 말고, 합리적인 추정치를 직접 제시하되 "(임의 작성 추정치 — 제출 전 실제 자료로 교체 권장)"을 덧붙인다. 두 표기를 혼동하지 말 것 — 사용자 본인 사업의 빈 답변은 "(임의 작성)", 외부 참고 통계 추정은 "(임의 작성 추정치 — 제출 전 실제 자료로 교체 권장)"으로 구분한다. 어떤 경우에도 evidenceGap 블록 타입은 사용하지 않는다 — 항상 완전한 내용으로 채운 JSON을 끝까지 생성할 것.
 4. 재무 숫자는 {{finance}}에 제공된 값만 그대로 인용한다 — 재계산·변형 절대 금지.
 5. 문체: 정부지원사업 컨설턴트가 직접 쓴 것처럼 자연스럽고 전문적인 문장. 개조식("~한다/~이다")과 서술형을 섞어 쓰고 한 섹션 안에서 같은 유형(문단 또는 불릿)을 3개 이상 연속하지 않는다. 1인칭 "본 브랜드" 사용.
 6. 구조(모듈형, 반드시 지킬 것): 각 섹션의 blocks는 다음 순서를 따른다 — (a) 섹션 전체를 한 줄로 요약하는 headline과 1~2문장 lead(이미 별도 필드), (b) 섹션 내용을 2~4개의 중분류로 나누고 각 중분류마다 subhead 블록 + paragraph/bullets 혼합 설명(중분류당 최소 1개 이상 구체적 수치 포함 — 수치가 없으면 원칙 3에 따라 추정치+문구를 쓴다), (c) 섹션 마지막은 반드시 table 또는 visual 또는 chart 블록으로 마무리해 내용을 시각적으로 정리한다. 서술만 나열하고 끝내지 말 것.
-7. blocks의 type: "subhead"(text) | "paragraph"(text) | "bullets"(items:string[]) | "table"(headers:string[],rows:string[][]) | "visual"(visualId,caption) | "chart"(chartId,caption) | "evidenceGap"(need,how).
+7. blocks의 type: "subhead"(text) | "paragraph"(text) | "bullets"(items:string[]) | "table"(headers:string[],rows:string[][]) | "visual"(visualId,caption) | "chart"(chartId,caption). evidenceGap은 사용하지 않는다(원칙 3).
 8. chart 블록의 chartId는 다음 중에서만 선택: "cost-breakdown"(원가/마진 구조, operation 또는 budget 섹션에 추천), "channel-margin"(채널별 순마진 비교, operation 섹션 추천), "revenue-scenario"(3단계 매출 시나리오, budget 또는 future-plan 섹션 추천). 이 차트들은 실제 {{finance}} 숫자로 화면에서 그려지므로 캡션만 적절히 쓰면 된다 — 데이터를 직접 쓰지 않는다.
 9. solution 섹션엔 competitor-table(아래 제공된 경쟁사 비교표 데이터를 표로 그대로 사용), market 섹션엔 market-analysis 표 + 가능하면 revenue-scenario 차트, operation 섹션엔 process-flow 시각화 블록과 asis-tobe 표와 cost-breakdown 또는 channel-margin 차트 중 최소 1개, budget 섹션엔 revenue-scenario 또는 cost-breakdown 차트 중 1개를 반드시 포함.
 10. 경쟁사 비교표의 competitorsUnknown이 true면, 사용자가 실제 경쟁 브랜드를 모른다는 뜻이다 — 특정 브랜드명을 지어내지 말고, 카테고리/컨셉에 맞는 "경쟁 유형"을 일반 명사로 2개 제시한다(예: "대형 SPA 브랜드", "동일 가격대 온라인 전용 브랜드", "수입 편집샵 브랜드" 등 — 실존 브랜드명 금지, 유형 설명만).
@@ -4267,7 +4267,7 @@ ${JSON.stringify(finance)}
 [경쟁사 비교표 — solution 섹션의 table 블록에 그대로 사용]
 ${JSON.stringify(competitorTable)}
 ${selfMallBlock}
-아래 JSON 배열 형식으로만 응답하세요(마크다운 코드펜스 없이):
+아래 JSON 배열 형식으로만 응답하세요(마크다운 코드펜스 없이). 입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 JSON 앞뒤에 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 7개 섹션 전부 완전한 JSON으로 끝까지 생성한다. 응답의 첫 글자는 반드시 [ 이어야 한다:
 [{"sectionId": string, "headline": string, "lead": string, "blocks": [...], "visualSpecs": [{"visualId": string, "kind": string, "renderer": string, "title": string}]}, ...] (7개 섹션 전부)`
 
   try {
@@ -4296,7 +4296,17 @@ ${selfMallBlock}
     const data = await res.json<any>()
     if (data?.stop_reason === 'max_tokens') console.error('gov-support 섹션 생성 max_tokens로 잘림')
     const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
-    const text = (textBlock?.text || '[]').replace(/^```json\s*|```$/g, '').trim()
+    let text = (textBlock?.text || '[]').trim()
+    // 사용자 답변이 거의 비어있으면 모델이 "원칙 3에 따라 지어낼 수 없다"는 식의 설명 문장을
+    // JSON 앞에 먼저 붙이는 경우가 실제 운영에서 확인됨(2026-10-22) — 문자열 맨 앞/끝에 붙은
+    // 코드펜스만 벗기던 기존 정규식(^```json .. ```$)은 앞에 설명 텍스트가 있으면 전혀 못 벗겨내
+    // JSON.parse가 즉시 깨진다. 코드펜스 유무·앞뒤 설명 텍스트 유무와 무관하게 첫 '['부터 마지막
+    // ']'까지만 잘라내 파싱한다.
+    const firstBracket = text.indexOf('[')
+    const lastBracket = text.lastIndexOf(']')
+    if (firstBracket !== -1 && lastBracket > firstBracket) {
+      text = text.slice(firstBracket, lastBracket + 1)
+    }
     let parsed: any
     try {
       parsed = JSON.parse(text)
