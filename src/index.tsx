@@ -4203,7 +4203,10 @@ ${selfMallBlock}
       body: JSON.stringify({
         model: 'claude-sonnet-5',
         thinking: { type: 'disabled' },
-        max_tokens: 8000,
+        // 모듈형 구조(섹션당 중분류 2~4개 + 표/차트) 요구로 응답이 길어져 기존 8000으로는
+        // JSON이 중간에 잘려 전체 파싱이 깨지는 게 운영에서 확인됨(2026-10-22) — 7개 섹션 전부
+        // "AI 응답 파싱 실패"로 뜨던 원인. claude-sonnet-5는 최대 128K 출력을 지원하므로 여유있게 상향.
+        max_tokens: 16000,
         messages: [{ role: 'user', content: prompt }],
       }),
       // 7개 섹션을 한 번에 생성하는 긴 요청이라 기존 55초 제한이 너무 짧았다 — 실제 운영에서
