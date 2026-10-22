@@ -4220,7 +4220,7 @@ function gsBuildFallbackSections(how: string) {
   }))
 }
 
-async function generateGovSupportSections(apiKey: string | undefined, answers: any, finance: any, competitorTable: any, selfMallExcerpt: string | null): Promise<any[]> {
+async function generateGovSupportSections(apiKey: string | undefined, answers: any, finance: any, competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string }): Promise<any[]> {
   // 실패 사유별로 다른 안내 문구를 남긴다 — 전부 "ANTHROPIC_API_KEY 미설정"으로 뭉뚱그리면
   // 키가 실제로는 바인딩돼 있는데 API 호출 자체가 실패(401/429/모델명 오류 등)하거나 응답
   // 파싱이 깨진 경우도 똑같이 "키가 없다"는 오진단 메시지가 떠서, 서버 로그 없이는
@@ -4298,6 +4298,17 @@ ${selfMallBlock}
       parsed = JSON.parse(text)
     } catch (parseErr) {
       console.error('gov-support 섹션 생성 JSON 파싱 실패:', parseErr, text.slice(0, 500))
+      // 화면에는 "파싱 실패"로만 뜨고 원인(어디가 깨졌는지)은 Cloudflare 실시간 로그로만
+      // 볼 수 있어 운영 디버깅이 막혔던 전례가 있다(위 55초 타임아웃 오진단 사례) — 같은 실수를
+      // 반복하지 않도록 실제 응답 스니펫을 error_logs에 영구 기록한다.
+      if (env) {
+        await logError(env, {
+          source: 'server',
+          message: 'gov-support 섹션 생성 JSON 파싱 실패: ' + (parseErr instanceof Error ? parseErr.message : String(parseErr)),
+          route: '/api/gov-support/projects/:id/generate',
+          extra: { stopReason: data?.stop_reason, textLen: text.length, textHead: text.slice(0, 800), textTail: text.slice(-400) },
+        })
+      }
       return gsBuildFallbackSections('AI 응답 파싱 실패 — 관리자에게 문의해주세요.')
     }
     if (!Array.isArray(parsed) || !parsed.length) return gsBuildFallbackSections('AI 응답이 비어있음 — 관리자에게 문의해주세요.')
@@ -4331,7 +4342,7 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
     const selfMallExcerpt = await fetchSelfMallExcerpt(answers.selfMallUrl)
 
     const [sections, processImageResult] = await Promise.all([
-      generateGovSupportSections(c.env.ANTHROPIC_API_KEY, answers, finance, competitorTable, selfMallExcerpt),
+      generateGovSupportSections(c.env.ANTHROPIC_API_KEY, answers, finance, competitorTable, selfMallExcerpt, c.env),
       generateGovSupportProcessImage(c.env.ATLAS_API_KEY, answers.processSteps, answers.processNote, answers.category, answers.differentiationTypes, answers.differentiation),
     ])
 
