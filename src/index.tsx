@@ -3540,6 +3540,8 @@ app.get('/gov-support/wizard/:id', (c) => {
     .wz-field { margin-bottom: 18px; }
     .wz-field-label { font-size: 13.5px; font-weight: 700; color: #333D4B; margin-bottom: 8px; }
     .wz-field-hint { font-size: 12px; color: #8B95A1; margin-top: 6px; line-height: 1.5; }
+    .wz-required { color: #F04452; font-weight: 800; }
+    .wz-input.wz-invalid, .wz-chip-row.wz-invalid { border-color: #F04452 !important; box-shadow: 0 0 0 2px rgba(240,68,82,0.15); border-radius: 12px; }
     .wz-input, .wz-textarea, .wz-select { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 1px solid #E5E8EB; border-radius: 12px; font-size: 15px; color: #191F28; background: #FFFFFF; font-family: inherit; }
     .wz-textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
     .wz-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -3585,18 +3587,18 @@ app.get('/gov-support/wizard/:id', (c) => {
           <div class="wz-step-label">1 / 11 · 기본 정보</div>
           <h2>브랜드를 소개해주세요</h2>
           <div class="wz-field">
-            <div class="wz-field-label">브랜드명 (가칭 가능)</div>
-            <input type="text" class="wz-input" id="f_brandName" maxlength="60" />
+            <div class="wz-field-label">브랜드명 (가칭 가능) <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_brandName" maxlength="60" data-required="1" />
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">대표자 연령대</div>
-            <div class="wz-chip-row" data-field="founderAge">
+            <div class="wz-field-label">대표자 연령대 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="founderAge" data-required="1">
               ${['20대 이하', '30대', '40대', '50대 이상'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">창업 단계</div>
-            <div class="wz-chip-row" data-field="stage">
+            <div class="wz-field-label">창업 단계 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="stage" data-required="1">
               ${['사업자등록 전', '사업자등록 후 3년 이내', '사업자등록 후 3년 이상'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
@@ -3606,22 +3608,22 @@ app.get('/gov-support/wizard/:id', (c) => {
           <div class="wz-step-label">2 / 11 · 아이템</div>
           <h2>어떤 제품을 만드시나요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">주력 카테고리</div>
-            <div class="wz-chip-row" data-field="category">
+            <div class="wz-field-label">주력 카테고리 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="category" data-required="1">
               ${['의류(여성)', '의류(남성)', '의류(유니섹스)', '가방', '잡화', '신발', '주얼리', '키즈'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">주력 상품 3개</div>
+            <div class="wz-field-label">주력 상품 3개 (최소 1개 필수) <span class="wz-required">*</span></div>
             <div class="wz-sub3">
-              <input type="text" class="wz-input" id="f_product1" placeholder="예: 오버핏 셔츠" maxlength="40" />
+              <input type="text" class="wz-input" id="f_product1" placeholder="예: 오버핏 셔츠" maxlength="40" data-required="1" />
               <input type="text" class="wz-input" id="f_product2" placeholder="예: 와이드 슬랙스" maxlength="40" />
               <input type="text" class="wz-input" id="f_product3" placeholder="예: 니트 가디건" maxlength="40" />
             </div>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">브랜드 컨셉 한 줄</div>
-            <input type="text" class="wz-input" id="f_concept" placeholder="예: 30대 직장인을 위한 출퇴근 캡슐 워드로브" maxlength="80" />
+            <div class="wz-field-label">브랜드 컨셉 한 줄 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_concept" placeholder="예: 30대 직장인을 위한 출퇴근 캡슐 워드로브" maxlength="80" data-required="1" />
           </div>
           <div class="wz-field">
             <div class="wz-field-label">목표 가격대 (선택)</div>
@@ -3635,12 +3637,12 @@ app.get('/gov-support/wizard/:id', (c) => {
           <div class="wz-step-label">3 / 11 · 고객과 경쟁</div>
           <h2>누가, 왜 사나요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">타겟 고객</div>
-            <input type="text" class="wz-input" id="f_target" placeholder="예: 20대 후반~30대 직장 여성" maxlength="80" />
+            <div class="wz-field-label">타겟 고객 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_target" placeholder="예: 20대 후반~30대 직장 여성" maxlength="80" data-required="1" />
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">고객이 사는 이유 (최대 2개)</div>
-            <div class="wz-chip-row" data-field="buyReason" data-multi="1" data-max="2">
+            <div class="wz-field-label">고객이 사는 이유 (최대 2개) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="buyReason" data-multi="1" data-max="2" data-required="1">
               ${['핏/사이즈', '가성비', '스토리·취향', '지속가능성', '기능성'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
@@ -3658,8 +3660,8 @@ app.get('/gov-support/wizard/:id', (c) => {
           <div class="wz-step-label">4 / 11 · 생산 방식</div>
           <h2>어떻게 만드시나요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">생산 방식</div>
-            <div class="wz-chip-row" data-field="productionMethod">
+            <div class="wz-field-label">생산 방식 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="productionMethod" data-required="1">
               ${['자체 제작(공방)', '자체 공장(일반)', '자체 공장(스마트팩토리)', '국내 OEM·CMT 위탁', '소량생산 전문업체', '해외 생산', '미정(추천 원함)'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
             <div class="wz-field-hint">공방은 소규모 수작업, 자체 공장은 직접 소유한 생산 설비를 뜻해요. 스마트팩토리는 자동화·IoT 설비를 갖춘 공장이에요.</div>
@@ -3674,8 +3676,8 @@ app.get('/gov-support/wizard/:id', (c) => {
               <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
               <div class="wz-highlight-desc">공정 하나하나가 심사에서 "실행 가능성"을 보여주는 근거가 됩니다. 해당되는 단계만 골라주시면 돼요.</div>
             </div>
-            <div class="wz-field-label">제작 공정 (해당되는 단계 모두 선택)</div>
-            <div class="wz-chip-row" data-field="processSteps" data-multi="1">
+            <div class="wz-field-label">제작 공정 (해당되는 단계 모두 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="processSteps" data-multi="1" data-required="1">
               ${['기획/디자인', '원단·부자재 소싱', '패턴 설계', '샘플 제작', '가봉/보정', '재단·봉제(생산)', '품질 검수', '포장·출고'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
             <textarea class="wz-textarea" id="f_processNote" placeholder="추가로 설명하고 싶은 점이 있다면 적어주세요 (선택)" style="margin-top:10px;min-height:60px;"></textarea>
@@ -3690,8 +3692,8 @@ app.get('/gov-support/wizard/:id', (c) => {
               <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
               <div class="wz-highlight-desc">아래 내용 하나가 심사에서 선정 확률을 가장 크게 좌우하는 "차별점"이 됩니다. 잘 모르겠으면 아래에서 해당되는 항목만 골라주세요 — 거기서부터 같이 풀어볼게요.</div>
             </div>
-            <div class="wz-field-label">다른 업체와 다른 점이 있다면 어느 쪽인가요?</div>
-            <div class="wz-chip-row" data-field="differentiationTypes" data-multi="1">
+            <div class="wz-field-label">다른 업체와 다른 점이 있다면 어느 쪽인가요? <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="differentiationTypes" data-multi="1" data-required="1">
               ${['원단·소재', '제작 방식', '검수·품질관리', '디자인·패턴', '친환경·지속가능성', '납기·속도', '가격·접근성', '기타'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
             <textarea class="wz-textarea" id="f_differentiation" placeholder="예: 전 제품 전수 검사, 국내산 친환경 원단만 사용, 손바느질 마감 등 — 위에서 고른 항목을 조금 더 구체적으로 적어주세요. 잘 모르겠다면 비워두셔도 괜찮아요." style="margin-top:10px;"></textarea>
@@ -3702,7 +3704,7 @@ app.get('/gov-support/wizard/:id', (c) => {
           <div class="wz-step-label">7 / 11 · 상품별 원가</div>
           <h2>원가와 판매가는요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">상품별 원가 / 판매가 (선택, 원)</div>
+            <div class="wz-field-label">상품별 원가 / 판매가 (상품1은 필수, 원) <span class="wz-required">*</span></div>
             <div id="wzProductCostRows"></div>
             <button type="button" class="wz-unknown-btn" id="wzAddProductCostBtn" onclick="wzAddProductCostRow()">+ 상품 추가</button>
           </div>
@@ -3712,8 +3714,8 @@ app.get('/gov-support/wizard/:id', (c) => {
           <div class="wz-step-label">8 / 11 · 판매 채널</div>
           <h2>어디서 파시나요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">판매 채널 (복수 선택)</div>
-            <div class="wz-chip-row" data-field="channels" data-multi="1">
+            <div class="wz-field-label">판매 채널 (복수 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="channels" data-multi="1" data-required="1">
               ${['자사몰', '무신사', '지그재그', '에이블리', '스마트스토어', '도매·위탁', '팝업', '오프라인 매장'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
             <input type="text" class="wz-input" id="f_selfMallUrl" placeholder="자사몰 URL (예: https://mystore.com)" style="display:none;margin-top:10px;" />
@@ -3731,8 +3733,8 @@ app.get('/gov-support/wizard/:id', (c) => {
             </div>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">지원금 사용 항목 (복수 선택)</div>
-            <div class="wz-chip-row" data-field="fundUse" data-multi="1">
+            <div class="wz-field-label">지원금 사용 항목 (복수 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="fundUse" data-multi="1" data-required="1">
               ${['소재·부자재', '샘플·가봉', '생산(봉제)비', '포장·라벨', '촬영·마케팅', '인건비', '임대료·장비'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
@@ -3742,14 +3744,14 @@ app.get('/gov-support/wizard/:id', (c) => {
           <div class="wz-step-label">10 / 11 · 역량과 비전</div>
           <h2>왜 대표님이어야 하나요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">관련 경력 (복수 선택)</div>
-            <div class="wz-chip-row" data-field="experience" data-multi="1">
+            <div class="wz-field-label">관련 경력 (복수 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="experience" data-multi="1" data-required="1">
               ${['봉제/재단 경험', '패션 전공·교육', '업계 근무', '쇼핑몰 운영·판매', '없음'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">창업 동기 한 줄</div>
-            <input type="text" class="wz-input" id="f_motivation" placeholder="예: 내가 입고 싶은 옷이 시장에 없어서 직접 만들기 시작했다" maxlength="100" />
+            <div class="wz-field-label">창업 동기 한 줄 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_motivation" placeholder="예: 내가 입고 싶은 옷이 시장에 없어서 직접 만들기 시작했다" maxlength="100" data-required="1" />
           </div>
           <div class="wz-field">
             <div class="wz-field-label">3년 후 목표 (선택)</div>
@@ -3899,10 +3901,11 @@ app.get('/gov-support/wizard/:id', (c) => {
         var name = wzAnswers[key] || ('상품 ' + (i + 1));
         var cost = wzAnswers['cost_' + key] || '';
         var price = wzAnswers['price_' + key] || '';
+        var req = i === 0 ? ' data-required="1"' : '';
         return '<div class="wz-product-cost-row">' +
           '<div class="wz-product-label">' + name + '</div>' +
-          '<input type="number" class="wz-input" id="f_cost_' + key + '" placeholder="원가" value="' + cost + '" />' +
-          '<input type="number" class="wz-input" id="f_price_' + key + '" placeholder="판매가" value="' + price + '" />' +
+          '<input type="number" class="wz-input" id="f_cost_' + key + '" placeholder="원가" value="' + cost + '"' + req + ' />' +
+          '<input type="number" class="wz-input" id="f_price_' + key + '" placeholder="판매가" value="' + price + '"' + req + ' />' +
           '</div>';
       }).join('');
       container.innerHTML = html;
@@ -3993,8 +3996,34 @@ app.get('/gov-support/wizard/:id', (c) => {
       }).join('');
     }
 
+    // 필수 항목(data-required="1") 검증 — 입력칸은 값 공란 여부, 칩 묶음은 선택된(.on) 칩 존재 여부로 판단.
+    // 문항의 70% 이상을 필수로 지정해 공란이 많을 때 AI가 JSON 대신 대화형 응답을 쓰며 생성이
+    // 깨지던 문제(답변이 거의 비어있을 때 재현됨)를 입력 단계에서부터 줄인다.
+    function wzValidateStep(stepNum) {
+      var stepEl = document.querySelector('.wz-step[data-step="' + stepNum + '"]');
+      if (!stepEl) return true;
+      var firstInvalid = null;
+      stepEl.querySelectorAll('[data-required="1"]').forEach(function (el) {
+        var ok;
+        if (el.classList.contains('wz-chip-row')) {
+          ok = !!el.querySelector('.wz-chip.on');
+        } else {
+          ok = !!(el.value && el.value.trim());
+        }
+        el.classList.toggle('wz-invalid', !ok);
+        if (!ok && !firstInvalid) firstInvalid = el;
+      });
+      if (firstInvalid) {
+        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showToast('필수 항목(*)을 채워주세요.', 'error');
+        return false;
+      }
+      return true;
+    }
+
     function wzNextStep() {
       wzCollectStep(wzCurrentStep);
+      if (!wzValidateStep(wzCurrentStep)) return;
       wzAutoSave();
       if (wzCurrentStep === WZ_TOTAL_STEPS) {
         var checks = Array.prototype.slice.call(document.querySelectorAll('[data-elig-idx]')).map(function (el) { return el.checked; });
@@ -4378,14 +4407,18 @@ app.get('/gov-support/result/:id', (c) => {
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
-    body { background: #F2F4F6; }
-    .rs-wrap { min-height: 100vh; padding: 0 0 40px; background: #F2F4F6; }
-    .rs-inner { max-width: 560px; margin: 0 auto; padding: 0 16px; }
-    .rs-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; max-width: 560px; margin: 0 auto; }
+    body { background: #E8EAED; }
+    /* 사업계획서 초안은 다른 화면(위저드 등)과 달리 모바일 폭 고정이 아니라 A4 용지 비율로
+       보여준다 — 데스크톱에서 실제 문서처럼 보이도록 .rs-doc만 A4 가로폭(210mm ≈ 96dpi 794px)에
+       맞추고, 바깥 래퍼는 그 폭을 넉넉히 담을 수 있게 가로폭 제한을 두지 않는다. */
+    .rs-wrap { min-height: 100vh; padding: 0 0 40px; background: #E8EAED; }
+    .rs-inner { width: 100%; margin: 0 auto; padding: 0 16px; box-sizing: border-box; }
+    .rs-header { position: sticky; top: 0; z-index: 10; background: #E8EAED; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
     .rs-back { width: 36px; height: 36px; border: none; background: #FFFFFF; border-radius: 50%; color: #333D4B; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(15,23,42,0.06); }
     .rs-print-btn { font-size: 13px; font-weight: 700; color: #fff; background: #3182F6; border: none; border-radius: 999px; padding: 9px 16px; cursor: pointer; }
-    .rs-notice { background: #FFF8E1; border: 1px solid #F5D98A; border-radius: 12px; padding: 12px 14px; font-size: 12px; color: #8A6D1D; line-height: 1.6; margin: 10px 0 20px; }
-    .rs-doc { background: #FFFFFF; border-radius: 16px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); padding: 24px 22px; }
+    .rs-notice { max-width: 794px; margin: 10px auto 20px; background: #FFF8E1; border: 1px solid #F5D98A; border-radius: 12px; padding: 12px 14px; font-size: 12px; color: #8A6D1D; line-height: 1.6; }
+    .rs-doc { max-width: 794px; margin: 0 auto; background: #FFFFFF; border-radius: 4px; box-shadow: 0 2px 16px rgba(15,23,42,0.1); padding: 56px 64px; }
+    @media (max-width: 860px) { .rs-doc { padding: 24px 22px; border-radius: 16px; } }
     .rs-section { margin-bottom: 36px; }
     .rs-section:last-child { margin-bottom: 0; }
     .rs-section-badge { display: inline-block; font-size: 10.5px; font-weight: 700; color: #3182F6; background: #EAF2FF; border-radius: 999px; padding: 3px 9px; margin-bottom: 8px; }
@@ -4426,7 +4459,7 @@ app.get('/gov-support/result/:id', (c) => {
   </style>
 
   <div class="rs-wrap">
-    ${govSupportTopNav(c, 560)}
+    ${govSupportTopNav(c, 794)}
     <div class="rs-header">
       <a href="/gov-support" class="rs-back">‹</a>
       <button type="button" class="rs-print-btn" onclick="window.print()">인쇄 / PDF 저장</button>
