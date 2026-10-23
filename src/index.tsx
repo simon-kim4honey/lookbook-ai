@@ -9,7 +9,7 @@ import govNodesApp, { loadProgramNodes } from './gov/nodesApi.ts'
 import { validateProgram } from './gov/validate.ts'
 import {
   buildCategoryTrees, buildGroupResponseSchema, buildCategoryStructureText, mergeCategoryBlocks,
-  isAiGeneratedNode, flattenCategory, decodeTableRows, type CategoryTree,
+  isAiGeneratedNode, flattenCategory, type CategoryTree,
 } from './gov/generationAssembly.ts'
 import { rewriteForCardNews, renderCardSvg } from './card-image'
 
@@ -5514,7 +5514,7 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 4. 재무 숫자는 [재무 계산 결과]에 제공된 값(budgetStages.stage1Split/stage2Split 포함)만 그대로 인용한다 — 재계산·변형 절대 금지.
 5. 문체: 정부지원사업 컨설턴트가 직접 쓴 것처럼 자연스럽고 전문적인 문장. 개조식("~한다/~이다")과 서술형을 섞어 쓰고 같은 유형을 3개 이상 연속하지 않는다. 1인칭 "본 브랜드" 사용.
 6. 구조(반드시 지킬 것): 아래 [섹션별 필수 구조]에 지정된 항목·순서·블록 타입을 절대 바꾸지 않는다 — 항목을 생략하거나 추가하거나 순서를 바꾸지 말 것("위 항목과 작성방법 변경금지").
-7. blocks의 type: "headlineBox"(text) | "subhead"(text) | "subhead2"(text) | "paragraph"(text) | "bullets"(items:string[]) | "table"(headers:string[], rows: 각 행의 셀 배열을 JSON 문자열로 직렬화한 string[]) | "visual"(visualId,caption) | "iconStats"(tiles:[{icon:string(이모지 1개),value:string,label:string}], 2~4개). evidenceGap은 사용하지 않는다.
+7. blocks의 type: "headlineBox"(text) | "subhead"(text) | "subhead2"(text) | "paragraph"(text) | "bullets"(items:string[]) | "table"(headers:string[],rows:string[][]) | "visual"(visualId,caption) | "iconStats"(items:[{icon:string(이모지 1개),value:string,label:string}], 2~4개). evidenceGap은 사용하지 않는다.
 8. 경쟁사 비교표의 competitorsUnknown이 true면 사용자가 실제 경쟁 브랜드를 모른다는 뜻이다 — 특정 브랜드명을 지어내지 말고 카테고리/컨셉에 맞는 "경쟁 유형"을 일반 명사로 제시한다(예: "대형 SPA 브랜드" 등 — 실존 브랜드명 금지).
 9. 사용자 답변의 processSteps는 선택한 제작 공정 단계, differentiationTypes는 선택한 차별점 유형이다 — 이 선택값을 중심으로 구체화하고, differentiation 텍스트가 비어있으면 선택한 유형에 대해 패션 업계 일반적인 모범 사례를 제안 형태로 쓰되 단정하지 않는다.
 10. teamMembers(팀원)·partners(협력기관) 답변이 비어있으면 지어내지 말고 "4-1-1 나.조직현황" 표에 각각 "대표자 단독 창업"/"협력기관 추후 발굴 예정" 한 줄로 명시한다(원칙 3의 예외 — 빈 팀/협력사를 꾸며내는 것은 사실 왜곡 위험이 커서 허용하지 않는다).
@@ -5524,98 +5524,19 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 // 2026-10-22: 프롬프트 지시만으로는 "JSON만 응답할 것"을 강제할 수 없어 입력이 비어있을 때
 // 모델이 설명 문장을 먼저 쓰다 파싱이 깨지는 사례가 반복됐다 — output_config.format(structured
 // outputs)으로 응답 자체를 JSON 스키마에 문법적으로 맞춰 생성하게 해 이 실패 유형을 구조적으로
-// 막는다.
+// 막았었다.
 //
-// 2026-10-23: blocks를 "타입별로 필드가 다른 polymorphic 배열"로 표현하려고 anyOf(8종
-// 변형) + const 판별자를 썼었는데, Anthropic 구조화 출력 문서가 "union 타입(anyOf)은
-// 컴파일 비용이 지수적으로 커진다"고 명시한 대로 실제로 400 "Schema is too complex for
-// compilation"에 걸렸다(table.rows 평탄화만으로는 해결 안 됨 — 스테이징 실측 확인).
-// anyOf를 완전히 없애고 모든 타입의 필드를 하나의 평평한 객체에 전부 선택필드로 모았다
-// (타입마다 안 쓰는 필드는 그냥 비워둠 — type이 실제 사용 필드를 결정). gsNormalizeGsBlock()이
-// 응답을 받은 뒤 타입별로 필요한 필드만 골라 기존과 동일한 블록 형태로 재조립해 저장하므로
-// 렌더러(rsRenderBlock)와 기존에 이미 생성·저장된 사업계획서 데이터는 전혀 바뀌지 않는다.
-const GS_BLOCK_SCHEMA = {
-  type: 'object',
-  properties: {
-    type: { type: 'string', enum: ['headlineBox', 'subhead', 'subhead2', 'paragraph', 'bullets', 'table', 'visual', 'iconStats'] },
-    text: { type: 'string', description: 'type이 headlineBox/subhead/subhead2/paragraph일 때만 사용' },
-    items: { type: 'array', items: { type: 'string' }, description: 'type이 bullets일 때만 사용' },
-    headers: { type: 'array', items: { type: 'string' }, description: 'type이 table일 때만 사용' },
-    rows: {
-      type: 'array',
-      items: { type: 'string' },
-      description: 'type이 table일 때만 사용. 각 원소는 그 행의 셀 배열을 JSON 배열 문자열로 직렬화. 예: "[\\"셀1\\",\\"셀2\\"]"',
-    },
-    visualId: { type: 'string', description: 'type이 visual일 때만 사용' },
-    caption: { type: 'string', description: 'type이 visual일 때만 사용' },
-    tiles: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { icon: { type: 'string' }, value: { type: 'string' }, label: { type: 'string' } },
-        required: ['icon', 'value', 'label'],
-        additionalProperties: false,
-      },
-      description: 'type이 iconStats일 때만 사용(2~4개)',
-    },
-  },
-  required: ['type'],
-  additionalProperties: false,
-}
-
-// GS_BLOCK_SCHEMA(평평한 선택필드 객체)로 받은 응답을 타입별 필요한 필드만 골라
-// 기존 블록 형태(렌더러·저장 형식과 동일)로 재조립한다. table은 rows를 JSON 문자열에서
-// string[][]로 복원, iconStats는 tiles→items로 이름을 되돌린다.
-function gsNormalizeGsBlock(raw: any): any {
-  const type = raw?.type
-  switch (type) {
-    case 'headlineBox': case 'subhead': case 'subhead2': case 'paragraph':
-      return { type, text: raw.text }
-    case 'bullets':
-      return { type, items: raw.items || [] }
-    case 'table':
-      return { type, headers: raw.headers || [], rows: decodeTableRows(raw.rows) }
-    case 'visual':
-      return { type, visualId: raw.visualId, caption: raw.caption }
-    case 'iconStats':
-      return { type, items: raw.tiles || [] }
-    default:
-      return raw
-  }
-}
-
-function gsSectionsSchema(sectionIds: string[]) {
-  return {
-    type: 'object',
-    properties: {
-      sections: {
-        type: 'array',
-        minItems: 1,
-        items: {
-          type: 'object',
-          properties: {
-            sectionId: { type: 'string', enum: sectionIds },
-            headline: { type: 'string' },
-            lead: { type: 'string' },
-            blocks: { type: 'array', items: GS_BLOCK_SCHEMA },
-          },
-          required: ['sectionId', 'headline', 'lead', 'blocks'],
-          additionalProperties: false,
-        },
-      },
-    },
-    required: ['sections'],
-    additionalProperties: false,
-  }
-}
-
-// 2026-10-23(P4): HTTP 호출·파싱·에러로깅 "코어"를 스키마 인자로 분리했다 — 기존
-// gsCallClaudeSections(섹션ID 기반 GS_BLOCK_SCHEMA)는 그대로 쓰고, 새 노드 트리
-// 기반 생성(generateGovSupportSectionsFromNodes)은 §11-3에서 동적으로 만든 스키마를
-// 넘겨 같은 코어를 재사용한다. gsCallClaudeSections의 동작은 전혀 바뀌지 않았다 —
-// 단순히 자기 안에서 만들던 스키마를 인자로 받는 것으로만 바꿨다(동일 값 전달).
+// 2026-10-23: 그런데 claude-sonnet-5에서 이 스키마가 400 "Schema is too complex for
+// compilation"으로 거부되기 시작했다(스테이징 실측). table.rows 평탄화 → anyOf(8종
+// 유니온) 완전 제거까지 단계적으로 단순화했지만, 최종적으로 속성 8개·선택필드뿐인
+// 1.4KB짜리 평평한 스키마조차 똑같이 거부됨을 확인했다 — 더 줄일 여지가 없는 수준까지
+// 줄였는데도 동일 오류라는 건 "이 스키마가 실제로 복잡해서"가 아니라 이 모델의 구조화
+// 출력 기능 자체에 문제가 있다는 뜻으로 판단했다. output_config.format을 완전히 걷어내고
+// 원래(structured outputs 도입 전) 방식 — 프롬프트로 JSON 형식을 명시적으로 지시하고
+// 서버에서 파싱 — 으로 되돌린다. 아래 파싱·재시도·에러로깅은 원래부터 이 상황(프롬프트
+// 기반 JSON)을 전제로 만들어졌던 것이라 그대로 재사용된다.
 async function gsCallClaudeWithSchema(
-  apiKey: string, prompt: string, schema: any, expectCount: number, maxTokens: number, timeoutMs: number,
+  apiKey: string, prompt: string, schema: any | null, expectCount: number, maxTokens: number, timeoutMs: number,
   env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string, temperature?: number
 ): Promise<any[] | null> {
   try {
@@ -5628,7 +5549,7 @@ async function gsCallClaudeWithSchema(
         ...(temperature !== undefined ? { temperature } : {}),
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
-        output_config: { format: { type: 'json_schema', schema } },
+        ...(schema ? { output_config: { format: { type: 'json_schema', schema } } } : {}),
       }),
       signal: AbortSignal.timeout(timeoutMs),
     })
@@ -5661,8 +5582,8 @@ async function gsCallClaudeWithSchema(
     if (data?.stop_reason === 'max_tokens') console.error(`gov-support 섹션 생성(${label}) max_tokens로 잘림`)
     const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
     let text = (textBlock?.text || '{}').trim()
-    // structured outputs를 쓰므로 응답은 항상 {"sections":[...]} 형태의 JSON 객체다. 그래도
-    // 혹시 모를 코드펜스·여백에 대비해 첫 '{'~마지막 '}' 구간만 방어적으로 잘라낸다.
+    // schema가 없으면(프롬프트 기반 JSON) 모델이 설명 문장이나 코드펜스를 앞뒤에 덧붙일 수
+    // 있으므로, 첫 '{'~마지막 '}' 구간만 방어적으로 잘라낸다.
     const firstBrace = text.indexOf('{')
     const lastBrace = text.lastIndexOf('}')
     if (firstBrace !== -1 && lastBrace > firstBrace) text = text.slice(firstBrace, lastBrace + 1)
@@ -5713,12 +5634,7 @@ async function gsCallClaudeSections(
   apiKey: string, prompt: string, sectionIds: string[], maxTokens: number, timeoutMs: number,
   env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string
 ): Promise<any[] | null> {
-  const sections = await gsCallClaudeWithSchema(apiKey, prompt, gsSectionsSchema(sectionIds), sectionIds.length, maxTokens, timeoutMs, env, label)
-  if (!sections) return null
-  for (const section of sections) {
-    section.blocks = (section?.blocks || []).map(gsNormalizeGsBlock)
-  }
-  return sections
+  return gsCallClaudeWithSchema(apiKey, prompt, null, sectionIds.length, maxTokens, timeoutMs, env, label)
 }
 
 function gsBuildGroupPrompt(sectionIds: string[], sharedContext: string, intro: string, sectionsMeta: GsSectionMeta[], structureText: Record<string, string>): string {
@@ -5735,7 +5651,7 @@ ${spec}
 [섹션별 필수 구조]
 ${structure}
 
-응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것. 입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 ${sectionIds.join(', ')} 섹션 전부(이 순서로) 완전하게 작성한다.`
+반드시 아래 형식의 JSON "객체" 하나만 응답할 것 — 설명 문장, 코드펜스(\`\`\`), 그 어떤 다른 텍스트도 앞뒤에 붙이지 않는다: {"sections":[{"sectionId":"...","headline":"...","lead":"...","blocks":[...]}]}. 입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 ${sectionIds.join(', ')} 섹션 전부(이 순서로) 완전하게 작성한다.`
 }
 
 // ────────────────────────────────────────────────────
@@ -5962,7 +5878,7 @@ ${JSON.stringify(mainSections)}
 [섹션별 필수 구조]
 [summary] ${structureText.summary || ''}
 
-응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것.`
+반드시 아래 형식의 JSON "객체" 하나만 응답할 것 — 설명 문장, 코드펜스(\`\`\`), 그 어떤 다른 텍스트도 앞뒤에 붙이지 않는다: {"sections":[{"sectionId":"summary","headline":"...","lead":"...","blocks":[...]}]}.`
     const groupC = await gsCallClaudeSections(apiKey, promptC, ['summary'], 4000, 60000, env, summaryMeta.title)
     summarySection = (groupC && groupC[0]) || gsBuildFallbackSections(sectionsMeta, 'AI 초안 생성 실패(요약) — 관리자에게 문의해주세요.', ['summary'])[0]
   } else {
