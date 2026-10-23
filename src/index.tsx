@@ -9,7 +9,7 @@ import govNodesApp, { loadProgramNodes } from './gov/nodesApi.ts'
 import { validateProgram } from './gov/validate.ts'
 import {
   buildCategoryTrees, buildGroupResponseSchema, buildCategoryStructureText, mergeCategoryBlocks,
-  isAiGeneratedNode, flattenCategory, type CategoryTree,
+  isAiGeneratedNode, flattenCategory, decodeTableRows, type CategoryTree,
 } from './gov/generationAssembly.ts'
 import { rewriteForCardNews, renderCardSvg } from './card-image'
 
@@ -5545,9 +5545,12 @@ const GS_BLOCK_SCHEMA = {
     gsBlockVariant('subhead2', { text: { type: 'string' } }, ['text']),
     gsBlockVariant('paragraph', { text: { type: 'string' } }, ['text']),
     gsBlockVariant('bullets', { items: { type: 'array', items: { type: 'string' } } }, ['items']),
+    // rows는 행마다 셀 배열을 JSON 문자열로 직렬화한 array<string> — 중첩 배열을
+    // 쓰면 400 "Schema is too complex for compilation"에 걸린다(gsCallClaudeSections
+    // 호출부에서 decodeTableRows()로 원래 형태(string[][])로 되돌려 저장한다).
     gsBlockVariant('table', {
       headers: { type: 'array', items: { type: 'string' } },
-      rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+      rows: { type: 'array', items: { type: 'string', description: '한 행의 셀들을 담은 JSON 배열을 문자열로 직렬화. 예: "[\\"셀1\\",\\"셀2\\"]"' } },
     }, ['headers', 'rows']),
     gsBlockVariant('visual', { visualId: { type: 'string' }, caption: { type: 'string' } }, ['visualId', 'caption']),
     gsBlockVariant('iconStats', {
@@ -5693,7 +5696,14 @@ async function gsCallClaudeSections(
   apiKey: string, prompt: string, sectionIds: string[], maxTokens: number, timeoutMs: number,
   env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string
 ): Promise<any[] | null> {
-  return gsCallClaudeWithSchema(apiKey, prompt, gsSectionsSchema(sectionIds), sectionIds.length, maxTokens, timeoutMs, env, label)
+  const sections = await gsCallClaudeWithSchema(apiKey, prompt, gsSectionsSchema(sectionIds), sectionIds.length, maxTokens, timeoutMs, env, label)
+  if (!sections) return null
+  for (const section of sections) {
+    for (const block of section?.blocks || []) {
+      if (block?.type === 'table' && block.rows !== undefined) block.rows = decodeTableRows(block.rows)
+    }
+  }
+  return sections
 }
 
 function gsBuildGroupPrompt(sectionIds: string[], sharedContext: string, intro: string, sectionsMeta: GsSectionMeta[], structureText: Record<string, string>): string {
