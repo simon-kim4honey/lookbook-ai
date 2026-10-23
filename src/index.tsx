@@ -167,6 +167,781 @@ app.route('/api/admin/content-digest', contentDigestApp)
 app.route('/api/admin/gov', govNodesApp)
 
 // ────────────────────────────────────────────────────
+// 지원사업 구조 모듈 빌더 UI (P3) — /admin02/gov/:programId/builder
+// (기획서 §7, §12-4)
+//
+// admin02 자체는 탭 전환형 단일 페이지(/admin02 하나, 비밀번호는 로그인할 때마다
+// 매번 입력 — localStorage에 저장하지 않는 기존 관행)라서, 이 빌더는 거대한 admin02
+// 템플릿 문자열을 더 불리지 않도록 별도 라우트로 뺐다. 로그인 방식(POST /api/admin/auth)은
+// admin02와 동일하게 재사용한다 — 어차피 admin02도 페이지를 새로고침하면 다시
+// 로그인해야 하므로 별도 URL이라고 더 불편해지는 건 없다.
+//
+// 기획서 §7/§12-4가 요구하는 전체 범위(가상 스크롤, 단축키 M/G/C, Alt+화살표
+// 레벨승격, 다중선택 일괄바, 템플릿·이미지·도식 플로팅 버튼) 중 이번에 구현한 건:
+// 3단 레이아웃(트리 네비게이터/카드 캔버스/인스펙터), 카드 추가·복제·삭제(10초
+// 되돌리기)·드래그이동(레벨규칙 위반 거부), 표현방법 전환(30초 되돌리기),
+// 인스펙터(표현방법/페이로드-SchemaForm/바인딩/반복/조건/메모/노드정보),
+// 자동저장(800ms 디바운스, PUT structure라 동시편집 409가 그대로 동작),
+// 실행취소/재실행(Ctrl+Z/Ctrl+Shift+Z, 50스텝), 검증패널+게시게이트. AC-01·03·05·
+// 06·07·17은 이걸로 충족된다. 나머지(가상스크롤·전체 단축키·다중선택·템플릿
+// 연동)는 범위 밖으로 남겨뒀다 — yebi가 67개 노드뿐이라 성능 문제가 없고, 템플릿은
+// P5에서 다룬다.
+// ────────────────────────────────────────────────────
+const GOV_BUILDER_PAGE_HTML = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>지원사업 구조 빌더 | EZlook Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:#e0e0f0;}
+#gbLoginOverlay{position:fixed;inset:0;background:#0f0f1a;display:flex;align-items:center;justify-content:center;z-index:200;}
+.gb-login-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center;}
+.gb-login-card h2{font-size:18px;font-weight:700;margin-bottom:4px;}
+.gb-login-card p{font-size:12px;color:#8b8ba0;margin-bottom:20px;}
+.gb-login-card input{width:100%;padding:12px 16px;background:#252540;border:1px solid #3a3a60;border-radius:10px;color:#e0e0f0;font-size:15px;outline:none;margin-bottom:12px;}
+.gb-login-card button{width:100%;padding:12px;background:#3182F6;border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer;font-size:14px;}
+.gb-login-err{font-size:12px;color:#ef4444;margin-bottom:10px;min-height:16px;}
+#gbMain{display:none;height:100vh;flex-direction:column;}
+.gb-header{display:flex;align-items:center;gap:12px;padding:10px 20px;background:#1a1a2e;border-bottom:1px solid #2e2e50;flex-shrink:0;}
+.gb-back{color:#8b8ba0;text-decoration:none;font-size:13px;}
+.gb-title{font-weight:700;font-size:14px;}
+.gb-status-badge{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid #3a3a60;color:#8b8ba0;}
+.gb-status-badge.published{color:#22c55e;border-color:#22c55e55;}
+.gb-save-status{font-size:12px;color:#8b8ba0;margin-left:auto;}
+.gb-save-status.saving{color:#f59e0b;}
+.gb-save-status.err{color:#ef4444;}
+.gb-btn{padding:7px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid #3a3a60;background:none;color:#e0e0f0;}
+.gb-btn:hover{border-color:#3182F6;color:#5B9DF7;}
+.gb-btn.primary{background:#3182F6;border-color:#3182F6;color:#fff;}
+.gb-btn.primary:hover{background:#7c5bff;}
+.gb-btn:disabled{opacity:.5;cursor:not-allowed;}
+.gb-body{display:flex;flex:1;overflow:hidden;}
+.gb-tree{width:240px;flex-shrink:0;background:#14141f;border-right:1px solid #2e2e50;display:flex;flex-direction:column;overflow:hidden;}
+.gb-tree-search{padding:10px;border-bottom:1px solid #2e2e50;}
+.gb-tree-search input{width:100%;padding:7px 10px;background:#252540;border:1px solid #3a3a60;border-radius:8px;color:#e0e0f0;font-size:12px;outline:none;}
+.gb-tree-list{flex:1;overflow-y:auto;padding:6px 0;}
+.gb-tree-row{padding:6px 10px;font-size:12px;color:#a0a0c0;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:2px solid transparent;}
+.gb-tree-row:hover{background:#1f1f35;}
+.gb-tree-row.selected{background:#1f1f35;border-left-color:#3182F6;color:#fff;}
+.gb-tree-row.hidden{display:none;}
+.gb-tree-summary{padding:10px;border-top:1px solid #2e2e50;font-size:11px;color:#8b8ba0;line-height:1.6;}
+.gb-canvas{flex:1;overflow-y:auto;padding:16px 20px;background:#0f0f1a;}
+.gb-canvas-toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.gb-validation-bar{background:#1a1a2e;border:1px solid #3a3a60;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#a0a0c0;}
+.gb-validation-bar.has-error{border-color:#ef444477;}
+.gb-validation-summary{cursor:pointer;color:inherit;}
+.gb-validation-bar.has-error .gb-validation-summary{color:#ef4444;}
+.gb-validation-detail{display:none;margin-top:8px;border-top:1px solid #2e2e50;padding-top:8px;max-height:200px;overflow-y:auto;}
+.gb-validation-detail.open{display:block;}
+.gb-validation-issue{padding:4px 0;cursor:pointer;}
+.gb-validation-issue:hover{color:#5B9DF7;}
+.gb-validation-issue.error{color:#ef4444;}
+.gb-validation-issue.warn{color:#f59e0b;}
+.gb-validation-issue.info{color:#8b8ba0;}
+.gb-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:10px;margin-bottom:8px;cursor:pointer;transition:border-color .15s;}
+.gb-card.selected{border-color:#3182F6;}
+.gb-card.drop-ok{outline:2px solid #3182F6;}
+.gb-card.drop-reject{outline:2px solid #ef4444;}
+.gb-card-head{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #2e2e5055;}
+.gb-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;color:#fff;flex-shrink:0;}
+.gb-badge.l1{background:#8b5cf6;}
+.gb-badge.l2{background:#3182F6;}
+.gb-badge.l3{background:#6b7280;}
+.gb-type-label{font-size:12px;color:#a0a0c0;flex:1;}
+.gb-binding-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.gb-card-head select{background:#252540;border:1px solid #3a3a60;color:#e0e0f0;font-size:11px;border-radius:6px;padding:3px 6px;}
+.gb-icon-btn{background:none;border:none;color:#8b8ba0;cursor:pointer;font-size:14px;padding:2px 4px;}
+.gb-icon-btn:hover{color:#ef4444;}
+.gb-card-body{padding:10px 12px;font-size:13px;color:#c0c0d0;white-space:pre-wrap;word-break:break-word;min-height:20px;}
+.gb-inspector{width:320px;flex-shrink:0;background:#14141f;border-left:1px solid #2e2e50;overflow-y:auto;padding:16px;}
+.gb-inspector-empty{color:#8b8ba0;font-size:13px;text-align:center;margin-top:40px;}
+.gb-inspector h4{font-size:11px;color:#8b8ba0;margin:18px 0 8px;text-transform:uppercase;letter-spacing:.5px;}
+.gb-inspector h4:first-child{margin-top:0;}
+.sf-field{margin-bottom:10px;}
+.sf-label{display:block;font-size:12px;color:#a0a0c0;margin-bottom:4px;}
+.sf-required{color:#ef4444;}
+.sf-input,.sf-textarea,.sf-select{width:100%;padding:7px 10px;background:#252540;border:1px solid #3a3a60;border-radius:8px;color:#e0e0f0;font-size:13px;outline:none;font-family:inherit;}
+.sf-textarea{min-height:60px;resize:vertical;}
+.sf-help{font-size:11px;color:#6b6b88;margin-top:3px;}
+.sf-field-error{font-size:11px;color:#ef4444;margin-top:3px;}
+.sf-list-row{display:flex;gap:6px;margin-bottom:6px;}
+.sf-list-row input{flex:1;}
+.sf-list-row button,.sf-list button,.sf-table button{padding:5px 8px;font-size:11px;border-radius:6px;border:1px solid #3a3a60;background:none;color:#8b8ba0;cursor:pointer;margin-top:4px;}
+.gb-radio-row{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#c0c0d0;margin-bottom:8px;}
+.gb-radio-row label{display:flex;align-items:center;gap:4px;cursor:pointer;}
+.gb-node-info{font-size:11px;color:#6b6b88;line-height:1.8;word-break:break-all;}
+.gb-toast-wrap{position:fixed;bottom:20px;right:20px;z-index:150;display:flex;flex-direction:column;gap:8px;}
+.gb-toast{background:#1a1a2e;border:1px solid #3a3a60;border-radius:10px;padding:12px 16px;font-size:13px;color:#e0e0f0;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,.4);}
+.gb-toast button{background:#3182F6;border:none;color:#fff;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;}
+.gb-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:180;}
+.gb-modal{background:#1a1a2e;border:1px solid #3a3a60;border-radius:14px;padding:24px;max-width:420px;}
+.gb-modal h3{font-size:15px;margin-bottom:10px;}
+.gb-modal p{font-size:13px;color:#a0a0c0;margin-bottom:18px;line-height:1.6;}
+.gb-modal .row{display:flex;gap:10px;justify-content:flex-end;}
+</style>
+</head>
+<body>
+
+<div id="gbLoginOverlay">
+  <div class="gb-login-card">
+    <div style="font-size:26px;margin-bottom:8px;">🧩</div>
+    <h2>지원사업 구조 빌더</h2>
+    <p>관리자 비밀번호를 입력하세요</p>
+    <input type="password" id="gbPwInput" placeholder="비밀번호" />
+    <div class="gb-login-err" id="gbLoginErr"></div>
+    <button id="gbLoginBtn">로그인</button>
+  </div>
+</div>
+
+<div id="gbMain">
+  <div class="gb-header">
+    <a href="/admin02" class="gb-back">‹ 관리자</a>
+    <span class="gb-title" id="gbTitle">지원사업 구조 빌더</span>
+    <span class="gb-status-badge" id="gbStatusBadge">-</span>
+    <span class="gb-save-status" id="gbSaveStatus"></span>
+    <button class="gb-btn" id="gbUndoBtn" aria-label="실행취소" title="실행취소 (Ctrl+Z)">↶</button>
+    <button class="gb-btn" id="gbRedoBtn" aria-label="재실행" title="재실행 (Ctrl+Shift+Z)">↷</button>
+    <button class="gb-btn primary" id="gbPublishBtn" disabled>게시</button>
+  </div>
+  <div class="gb-body">
+    <div class="gb-tree">
+      <div class="gb-tree-search"><input type="text" id="gbSearchInput" placeholder="제목 검색" /></div>
+      <div class="gb-tree-list" id="gbTreeList"></div>
+      <div class="gb-tree-summary" id="gbTreeSummary"></div>
+    </div>
+    <div class="gb-canvas">
+      <div class="gb-validation-bar" id="gbValidationBar">
+        <div class="gb-validation-summary" id="gbValidationSummary">검증 결과 불러오는 중…</div>
+        <div class="gb-validation-detail" id="gbValidationDetail"></div>
+      </div>
+      <div class="gb-canvas-toolbar">
+        <button class="gb-btn" id="gbAddL1Btn">+ 대분류</button>
+        <button class="gb-btn" id="gbAddL2Btn">+ 중분류(선택한 카드 아래)</button>
+        <button class="gb-btn" id="gbAddL3Btn">+ 소분류(선택한 카드 아래)</button>
+      </div>
+      <div id="gbCards"></div>
+    </div>
+    <div class="gb-inspector" id="gbInspector">
+      <div class="gb-inspector-empty" id="gbInspectorEmpty">카드를 선택하면 여기서 편집할 수 있어요.</div>
+      <div id="gbInspectorBody" style="display:none;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="gb-toast-wrap" id="gbToastWrap"></div>
+
+<div class="gb-modal-overlay" id="gbConflictModal" style="display:none;">
+  <div class="gb-modal">
+    <h3>다른 곳에서 수정되었습니다</h3>
+    <p>같은 프로그램을 다른 화면(또는 다른 사람)이 먼저 저장했어요. 최신 내용을 불러오거나, 내가 지금 보고 있는 내용으로 덮어쓸 수 있어요.</p>
+    <div class="row">
+      <button class="gb-btn" id="gbConflictReloadBtn">최신 불러오기</button>
+      <button class="gb-btn primary" id="gbConflictForceBtn">내 변경 강제 적용</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var GB_PROGRAM_ID = __GB_PROGRAM_ID_JSON__;
+var adminPassword = '';
+var gbNodes = [];
+var gbTree = [];
+var gbUpdatedAt = 0;
+var gbSelectedId = null;
+var gbTypes = {};
+var gbUndoStack = [];
+var gbRedoStack = [];
+var gbSnapshotPushedThisBatch = false;
+var gbSaveTimer = null;
+var gbPendingUpserts = {};
+var gbDragId = null;
+var gbPendingForceBody = null;
+
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function authHeaders(json) {
+  var h = { 'X-Admin-Password': adminPassword };
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+}
+
+// ── 로그인 (admin02와 동일한 /api/admin/auth 재사용) ──
+async function gbDoLogin() {
+  var pw = document.getElementById('gbPwInput').value;
+  var err = document.getElementById('gbLoginErr');
+  err.textContent = '';
+  try {
+    var res = await fetch('/api/admin/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+    var data = await res.json();
+    if (data.success) {
+      adminPassword = pw;
+      document.getElementById('gbLoginOverlay').style.display = 'none';
+      document.getElementById('gbMain').style.display = 'flex';
+      gbInit();
+    } else {
+      err.textContent = '비밀번호가 올바르지 않습니다.';
+    }
+  } catch (e) {
+    err.textContent = '서버 오류가 발생했습니다.';
+  }
+}
+
+async function gbInit() {
+  await gbLoadTypes();
+  await gbLoadTree();
+  document.addEventListener('keydown', gbKeyHandler);
+}
+
+async function gbLoadTypes() {
+  var res = await fetch('/api/admin/gov/module-types', { headers: authHeaders(false) });
+  var data = await res.json();
+  if (data.success) data.types.forEach(function (t) { gbTypes[t.key] = t; });
+}
+
+async function gbLoadTree() {
+  var res = await fetch('/api/admin/gov/programs/' + GB_PROGRAM_ID + '/structure', { headers: authHeaders(false) });
+  var data = await res.json();
+  if (!data.success) { alert(data.message || '불러오기 실패'); return; }
+  gbNodes = data.nodes; gbTree = data.tree; gbUpdatedAt = data.updatedAt;
+  document.getElementById('gbTitle').textContent = '지원사업 구조 빌더 — ' + GB_PROGRAM_ID;
+  gbRenderAll();
+  gbLoadValidation();
+  gbLoadProgramStatus();
+}
+
+async function gbLoadProgramStatus() {
+  var res = await fetch('/api/admin/gov/programs', { headers: authHeaders(false) });
+  var data = await res.json();
+  if (!data.success) return;
+  var p = data.programs.find(function (x) { return x.programId === GB_PROGRAM_ID; });
+  var badge = document.getElementById('gbStatusBadge');
+  if (p) {
+    badge.textContent = p.structureStatus === 'published' ? ('게시됨 · ' + (p.publishedVersion || '')) : '초안';
+    badge.className = 'gb-status-badge' + (p.structureStatus === 'published' ? ' published' : '');
+  }
+}
+
+function gbRenderAll() { gbRenderTree(); gbRenderCanvas(); gbRenderInspector(); }
+
+function gbChildrenOf(parentId) {
+  return gbNodes.filter(function (n) { return n.parentId === parentId; })
+    .sort(function (a, b) { return a.sortKey < b.sortKey ? -1 : (a.sortKey > b.sortKey ? 1 : 0); });
+}
+function gbDescendantIds(id) {
+  var out = []; var stack = gbChildrenOf(id);
+  while (stack.length) { var cur = stack.pop(); out.push(cur.id); stack = stack.concat(gbChildrenOf(cur.id)); }
+  return out;
+}
+function gbFlattenDFS() {
+  var out = [];
+  function walk(parentId) { gbChildrenOf(parentId).forEach(function (n) { out.push(n); walk(n.id); }); }
+  walk(null);
+  return out;
+}
+
+function gbRenderTree() {
+  var html = '';
+  function walk(parentId, depth) {
+    gbChildrenOf(parentId).forEach(function (n) {
+      html += '<div class="gb-tree-row' + (n.id === gbSelectedId ? ' selected' : '') + '" data-id="' + n.id +
+        '" data-title="' + esc((n.title || '').toLowerCase()) + '" style="padding-left:' + (10 + depth * 14) + 'px">' +
+        esc(n.title || '(제목 없음)') + '</div>';
+      walk(n.id, depth + 1);
+    });
+  }
+  walk(null, 0);
+  document.getElementById('gbTreeList').innerHTML = html;
+
+  var l1 = 0, l2 = 0, l3 = 0;
+  gbNodes.forEach(function (n) { if (n.level === 1) l1++; else if (n.level === 2) l2++; else l3++; });
+  document.getElementById('gbTreeSummary').textContent = '대분류 ' + l1 + ' / 중분류 ' + l2 + ' / 소분류 ' + l3 + ' / 총 ' + gbNodes.length + '개';
+}
+
+function gbFilterTree() {
+  var q = document.getElementById('gbSearchInput').value.toLowerCase();
+  document.querySelectorAll('.gb-tree-row').forEach(function (row) {
+    row.classList.toggle('hidden', !!q && row.getAttribute('data-title').indexOf(q) === -1);
+  });
+}
+
+var GB_LEVEL_CLASS = { 1: 'l1', 2: 'l2', 3: 'l3' };
+var GB_BINDING_COLOR = { static: '#8b8ba0', answer: '#22c55e', computed: '#3182F6', ai: '#f59e0b' };
+var GB_LEVEL_BORDER = { 1: '#8b5cf6', 2: '#3182F6', 3: '#6b7280' };
+
+function gbTypeOptionsHtml(selected) {
+  var html = '';
+  Object.keys(gbTypes).forEach(function (key) {
+    var t = gbTypes[key];
+    html += '<option value="' + key + '"' + (key === selected ? ' selected' : '') + '>' + esc(t.labelKo) + '</option>';
+  });
+  return html;
+}
+
+function gbCardHtml(n) {
+  var levelClass = GB_LEVEL_CLASS[n.level] || 'l3';
+  var typeLabel = n.level === 1 ? '대분류' : (gbTypes[n.expressionType] ? gbTypes[n.expressionType].labelKo : n.expressionType);
+  var bindingColor = GB_BINDING_COLOR[n.binding] || '#8b8ba0';
+  var typeSelect = n.level === 1 ? '' :
+    '<select class="gb-type-select" data-id="' + n.id + '" aria-label="표현방법">' + gbTypeOptionsHtml(n.expressionType) + '</select>';
+  var indent = (n.level - 1) * 18;
+  return '<div class="gb-card' + (n.id === gbSelectedId ? ' selected' : '') + '" draggable="true" data-id="' + n.id +
+    '" style="margin-left:' + indent + 'px;border-left:3px solid ' + GB_LEVEL_BORDER[n.level] + '">' +
+    '<div class="gb-card-head">' +
+      '<span class="gb-badge ' + levelClass + '">L' + n.level + '</span>' +
+      '<span class="gb-type-label">' + esc(typeLabel) + '</span>' +
+      '<span class="gb-binding-dot" style="background:' + bindingColor + '" title="바인딩: ' + n.binding + '"></span>' +
+      typeSelect +
+      '<button class="gb-icon-btn" data-action="duplicate" data-id="' + n.id + '" aria-label="복제" title="복제 (Ctrl+D)">⧉</button>' +
+      '<button class="gb-icon-btn" data-action="delete" data-id="' + n.id + '" aria-label="삭제" title="삭제 (Delete)">🗑</button>' +
+    '</div>' +
+    '<div class="gb-card-body">' + esc(n.title || '') + '</div>' +
+  '</div>';
+}
+
+function gbRenderCanvas() {
+  document.getElementById('gbCards').innerHTML = gbFlattenDFS().map(gbCardHtml).join('');
+}
+
+function gbSelect(id) {
+  gbSelectedId = id;
+  document.querySelectorAll('.gb-card').forEach(function (el) { el.classList.toggle('selected', el.getAttribute('data-id') === id); });
+  document.querySelectorAll('.gb-tree-row').forEach(function (el) { el.classList.toggle('selected', el.getAttribute('data-id') === id); });
+  gbRenderInspector();
+}
+function gbSelectAndScroll(id) {
+  gbSelect(id);
+  var card = document.querySelector('.gb-card[data-id="' + id + '"]');
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function gbRenderInspector() {
+  var empty = document.getElementById('gbInspectorEmpty');
+  var body = document.getElementById('gbInspectorBody');
+  var node = gbNodes.find(function (n) { return n.id === gbSelectedId; });
+  if (!node) { empty.style.display = 'block'; body.style.display = 'none'; return; }
+  empty.style.display = 'none'; body.style.display = 'block';
+
+  if (node.level === 1) {
+    body.innerHTML =
+      '<h4>대분류</h4>' +
+      '<div class="sf-field"><label class="sf-label">제목</label><input class="sf-input" id="gbL1Title" value="' + esc(node.title || '') + '" /></div>' +
+      '<div class="sf-field"><label class="sf-label">목표 글자수</label><input class="sf-input" type="number" id="gbL1Chars" value="' + (node.targetChars || '') + '" /></div>' +
+      gbNodeInfoHtml(node);
+    document.getElementById('gbL1Title').addEventListener('change', function () { gbPatchNode(node.id, { title: this.value }); });
+    document.getElementById('gbL1Chars').addEventListener('change', function () { gbPatchNode(node.id, { targetChars: this.valueAsNumber || null }); });
+    return;
+  }
+
+  body.innerHTML =
+    '<h4>표현방법</h4>' +
+    '<select class="sf-select" id="gbInspectorTypeSelect">' + gbTypeOptionsHtml(node.expressionType) + '</select>' +
+    '<h4>페이로드</h4><div id="gbPayloadForm">불러오는 중…</div>' +
+    '<h4>바인딩</h4>' + gbBindingSectionHtml(node) +
+    '<h4>반복</h4>' + gbRepeatSectionHtml(node) +
+    '<h4>조건</h4>' + gbConditionSectionHtml(node) +
+    '<h4>관리자 메모</h4><textarea class="sf-textarea" id="gbNoteInput">' + esc(node.note || '') + '</textarea>' +
+    '<h4>이 노드 정보</h4>' + gbNodeInfoHtml(node);
+
+  document.getElementById('gbInspectorTypeSelect').addEventListener('change', function () { gbSwitchType(node.id, this.value); });
+  document.getElementById('gbNoteInput').addEventListener('change', function () { gbPatchNode(node.id, { note: this.value }); });
+  gbWireBindingSection(node);
+  gbWireRepeatSection(node);
+  gbWireConditionSection(node);
+
+  var res = await fetch('/api/admin/gov/nodes/' + node.id + '/inspector', { headers: authHeaders(false) });
+  var data = await res.json();
+  var holder = document.getElementById('gbPayloadForm');
+  if (holder) holder.innerHTML = data.success ? data.html : '불러오기 실패';
+}
+
+function gbNodeInfoHtml(n) {
+  return '<div class="gb-node-info">id: ' + n.id + '<br/>parentId: ' + (n.parentId || '-') + '<br/>sortKey: ' + n.sortKey + '</div>';
+}
+
+function gbBindingSectionHtml(n) {
+  var options = ['static', 'answer', 'computed', 'ai'];
+  var radios = options.map(function (v) {
+    return '<label><input type="radio" name="gbBinding" value="' + v + '" ' + (n.binding === v ? 'checked' : '') + ' /> ' + v + '</label>';
+  }).join('');
+  return '<div class="gb-radio-row" id="gbBindingRadios">' + radios + '</div>' +
+    '<div class="sf-field"><label class="sf-label">bindingKey (answer/computed일 때)</label>' +
+    '<input class="sf-input" id="gbBindingKeyInput" value="' + esc(n.bindingKey || '') + '" /></div>';
+}
+function gbWireBindingSection(node) {
+  document.querySelectorAll('#gbBindingRadios input[name=gbBinding]').forEach(function (el) {
+    el.addEventListener('change', function () { if (this.checked) gbPatchNode(node.id, { binding: this.value }); });
+  });
+  document.getElementById('gbBindingKeyInput').addEventListener('change', function () { gbPatchNode(node.id, { bindingKey: this.value || null }); });
+}
+
+function gbRepeatSectionHtml(n) {
+  var rc = n.repeatConfig || {};
+  return '<div class="sf-field"><label class="sf-label"><input type="checkbox" id="gbRepeatEnabled" ' + (rc.enabled ? 'checked' : '') + ' /> 반복 사용</label></div>' +
+    '<div class="sf-field"><label class="sf-label">source (위저드 답변 배열 키)</label><input class="sf-input" id="gbRepeatSource" value="' + esc(rc.source || '') + '" /></div>' +
+    '<div class="sf-field"><label class="sf-label">max</label><input class="sf-input" type="number" id="gbRepeatMax" value="' + (rc.max || '') + '" /></div>';
+}
+function gbWireRepeatSection(node) {
+  function patch(key, value) {
+    var rc = Object.assign({}, node.repeatConfig || {});
+    rc[key] = value;
+    gbPatchNode(node.id, { repeatConfig: rc });
+  }
+  document.getElementById('gbRepeatEnabled').addEventListener('change', function () { patch('enabled', this.checked); });
+  document.getElementById('gbRepeatSource').addEventListener('change', function () { patch('source', this.value); });
+  document.getElementById('gbRepeatMax').addEventListener('change', function () { patch('max', this.valueAsNumber); });
+}
+
+function gbConditionSectionHtml(n) {
+  var cc = n.conditionConfig || {};
+  return '<div class="sf-field"><label class="sf-label"><input type="checkbox" id="gbCondEnabled" ' + (cc.enabled ? 'checked' : '') + ' /> 조건 사용</label></div>' +
+    '<div class="sf-field"><label class="sf-label">when (답변 키)</label><input class="sf-input" id="gbCondWhen" value="' + esc(cc.when || '') + '" /></div>' +
+    '<div class="sf-field"><label class="sf-label">value</label><input class="sf-input" id="gbCondValue" value="' + esc(cc.value || '') + '" /></div>';
+}
+function gbWireConditionSection(node) {
+  function patch(key, value) {
+    var cc = Object.assign({}, node.conditionConfig || {});
+    cc[key] = value;
+    gbPatchNode(node.id, { conditionConfig: cc });
+  }
+  document.getElementById('gbCondEnabled').addEventListener('change', function () { patch('enabled', this.checked); });
+  document.getElementById('gbCondWhen').addEventListener('change', function () { patch('when', this.value); });
+  document.getElementById('gbCondValue').addEventListener('change', function () { patch('value', this.value); });
+}
+
+// ── 페이로드 필드 편집(서버가 내려준 SchemaForm HTML의 onchange가 이 전역 함수들을 호출) ──
+function gsFieldChange(idPrefix, fieldKey, value) {
+  var node = gbNodes.find(function (n) { return n.id === idPrefix; });
+  if (!node) return;
+  var payload = Object.assign({}, node.payload || {});
+  payload[fieldKey] = value;
+  gbPatchNode(idPrefix, { payload: payload });
+}
+function gsFieldChangeListAdd(idPrefix, fieldKey) {
+  var node = gbNodes.find(function (n) { return n.id === idPrefix; });
+  if (!node) return;
+  var payload = Object.assign({}, node.payload || {});
+  var items = (payload[fieldKey] || []).slice(); items.push('');
+  payload[fieldKey] = items;
+  gbPatchNode(idPrefix, { payload: payload }, true);
+}
+function gsFieldChangeListRemove(idPrefix, fieldKey, index) {
+  var node = gbNodes.find(function (n) { return n.id === idPrefix; });
+  if (!node) return;
+  var payload = Object.assign({}, node.payload || {});
+  var items = (payload[fieldKey] || []).slice(); items.splice(index, 1);
+  payload[fieldKey] = items;
+  gbPatchNode(idPrefix, { payload: payload }, true);
+}
+function gsFieldChangeListSet(idPrefix, fieldKey, index, value) {
+  var node = gbNodes.find(function (n) { return n.id === idPrefix; });
+  if (!node) return;
+  var payload = Object.assign({}, node.payload || {});
+  var items = (payload[fieldKey] || []).slice(); items[index] = value;
+  payload[fieldKey] = items;
+  gbPatchNode(idPrefix, { payload: payload });
+}
+
+// ── 저장 — 전부 PUT .../structure를 거친다(동시편집 409가 그대로 적용됨) ──
+function gbPatchNode(id, patch, immediate) {
+  var node = gbNodes.find(function (n) { return n.id === id; });
+  if (!node) return;
+  gbQueueSnapshotIfNeeded();
+  Object.assign(node, patch);
+  gbPendingUpserts[id] = Object.assign({}, gbPendingUpserts[id] || { id: id }, patch);
+  clearTimeout(gbSaveTimer);
+  if (immediate) { gbFlushSave(); } else { gbSaveTimer = setTimeout(gbFlushSave, 800); }
+}
+function gbQueueSnapshotIfNeeded() {
+  if (gbSnapshotPushedThisBatch) return;
+  gbPushUndoSnapshot();
+  gbSnapshotPushedThisBatch = true;
+  clearTimeout(window.__gbSnapshotResetTimer);
+  window.__gbSnapshotResetTimer = setTimeout(function () { gbSnapshotPushedThisBatch = false; }, 1000);
+}
+async function gbFlushSave() {
+  var upserts = Object.keys(gbPendingUpserts).map(function (k) { return gbPendingUpserts[k]; });
+  if (!upserts.length) return;
+  gbPendingUpserts = {};
+  await gbSendStructureUpdate({ upsert: upserts });
+}
+async function gbSendStructureUpdate(body, isForce) {
+  var statusEl = document.getElementById('gbSaveStatus');
+  statusEl.textContent = '저장 중…'; statusEl.className = 'gb-save-status saving';
+  var payload = Object.assign({}, body);
+  if (!isForce) payload.baseUpdatedAt = gbUpdatedAt;
+  try {
+    var res = await fetch('/api/admin/gov/programs/' + GB_PROGRAM_ID + '/structure', {
+      method: 'PUT', headers: authHeaders(true), body: JSON.stringify(payload)
+    });
+    var data = await res.json();
+    if (res.status === 409) {
+      gbPendingForceBody = body;
+      document.getElementById('gbConflictModal').style.display = 'flex';
+      statusEl.textContent = '저장 실패 · 충돌'; statusEl.className = 'gb-save-status err';
+      return;
+    }
+    if (!data.ok) { statusEl.textContent = '저장 실패 · 재시도'; statusEl.className = 'gb-save-status err'; return; }
+    gbUpdatedAt = data.updatedAt;
+    var now = new Date();
+    var hh = ('0' + now.getHours()).slice(-2), mm = ('0' + now.getMinutes()).slice(-2);
+    statusEl.textContent = '저장됨 · ' + hh + ':' + mm;
+    statusEl.className = 'gb-save-status';
+    await gbLoadTree();
+  } catch (e) {
+    statusEl.textContent = '저장 실패 · 재시도'; statusEl.className = 'gb-save-status err';
+  }
+}
+function gbConflictReload() {
+  document.getElementById('gbConflictModal').style.display = 'none';
+  gbPendingForceBody = null;
+  gbLoadTree();
+}
+function gbConflictForce() {
+  document.getElementById('gbConflictModal').style.display = 'none';
+  var body = gbPendingForceBody; gbPendingForceBody = null;
+  if (body) gbSendStructureUpdate(body, true);
+}
+
+// ── 실행취소/재실행 (50스텝, 전체 트리 스냅샷) ──
+function gbPushUndoSnapshot() {
+  gbUndoStack.push(JSON.stringify(gbNodes));
+  if (gbUndoStack.length > 50) gbUndoStack.shift();
+  gbRedoStack = [];
+}
+async function gbUndo() {
+  if (!gbUndoStack.length) return;
+  gbRedoStack.push(JSON.stringify(gbNodes));
+  var snap = JSON.parse(gbUndoStack.pop());
+  await gbRestoreSnapshot(snap);
+}
+async function gbRedo() {
+  if (!gbRedoStack.length) return;
+  gbUndoStack.push(JSON.stringify(gbNodes));
+  var snap = JSON.parse(gbRedoStack.pop());
+  await gbRestoreSnapshot(snap);
+}
+async function gbRestoreSnapshot(snapshotNodes) {
+  var currentIds = gbNodes.map(function (n) { return n.id; });
+  var snapIds = snapshotNodes.map(function (n) { return n.id; });
+  var toDelete = currentIds.filter(function (id) { return snapIds.indexOf(id) === -1; });
+  await gbSendStructureUpdate({ upsert: snapshotNodes, delete: toDelete });
+}
+
+// ── 추가/복제/삭제 ──
+async function gbAddNode(level, parentId) {
+  gbPushUndoSnapshot();
+  var body = {
+    programId: GB_PROGRAM_ID, parentId: parentId, level: level,
+    expressionType: level === 1 ? 'categoryHeader' : 'paragraph',
+    title: level === 1 ? '새 대분류' : '새 카드', binding: level === 1 ? 'static' : 'ai'
+  };
+  var res = await fetch('/api/admin/gov/nodes', { method: 'POST', headers: authHeaders(true), body: JSON.stringify(body) });
+  var data = await res.json();
+  if (!data.success) { alert(data.message || '추가 실패'); return; }
+  await gbLoadTree();
+  gbSelectAndScroll(data.id);
+}
+function gbAddNodeUnderSelected(level) {
+  if (!gbSelectedId) { alert('먼저 카드를 선택하세요.'); return; }
+  var node = gbNodes.find(function (n) { return n.id === gbSelectedId; });
+  if (!node) return;
+  var parentId = (level === node.level + 1) ? node.id : node.parentId;
+  gbAddNode(level, parentId);
+}
+async function gbDuplicate(id) {
+  gbPushUndoSnapshot();
+  var res = await fetch('/api/admin/gov/nodes/' + id + '/duplicate', { method: 'POST', headers: authHeaders(false) });
+  var data = await res.json();
+  if (!data.success) { alert(data.message || '복제 실패'); return; }
+  await gbLoadTree();
+  gbSelectAndScroll(data.newRootId);
+}
+async function gbDelete(id) {
+  var node = gbNodes.find(function (n) { return n.id === id; });
+  if (!node) return;
+  var descCount = gbDescendantIds(id).length;
+  var msg = descCount > 0 ? ('이 카드와 하위 ' + descCount + '개 카드를 삭제할까요?') : '이 카드를 삭제할까요?';
+  if (!confirm(msg)) return;
+  gbPushUndoSnapshot();
+  var backupIds = [id].concat(gbDescendantIds(id));
+  var backupNodes = gbNodes.filter(function (n) { return backupIds.indexOf(n.id) !== -1; }).map(function (n) { return Object.assign({}, n); });
+  var res = await fetch('/api/admin/gov/nodes/' + id, { method: 'DELETE', headers: authHeaders(false) });
+  var data = await res.json();
+  if (!data.success) { alert(data.message || '삭제 실패'); return; }
+  if (gbSelectedId === id) gbSelectedId = null;
+  await gbLoadTree();
+  gbShowUndoToast('삭제했어요.', function () { gbSendStructureUpdate({ upsert: backupNodes }); });
+}
+function gbShowUndoToast(message, onUndo) {
+  var wrap = document.getElementById('gbToastWrap');
+  var id = 'gbToast' + Date.now();
+  var el = document.createElement('div');
+  el.className = 'gb-toast'; el.id = id;
+  el.innerHTML = '<span>' + esc(message) + '</span><button>되돌리기</button>';
+  el.querySelector('button').addEventListener('click', function () { onUndo(); el.remove(); });
+  wrap.appendChild(el);
+  setTimeout(function () { var e = document.getElementById(id); if (e) e.remove(); }, 10000);
+}
+
+// ── 표현방법 전환 (경고 → 백업 → 초기화 → 30초 되돌리기) ──
+async function gbSwitchType(id, newType) {
+  var node = gbNodes.find(function (n) { return n.id === id; });
+  if (!node || node.expressionType === newType) return;
+  if (!confirm('표현방법을 바꾸면 현재 입력된 내용이 초기화돼요. 계속할까요? (바뀐 뒤 30초 안에는 되돌릴 수 있어요)')) { gbRenderCanvas(); gbRenderInspector(); return; }
+  gbPushUndoSnapshot();
+  var backup = { expressionType: node.expressionType, payload: Object.assign({}, node.payload) };
+  var def = gbTypes[newType];
+  var newPayload = def ? Object.assign({}, def.defaultPayload) : {};
+  gbPatchNode(id, { expressionType: newType, payload: newPayload }, true);
+  gbShowUndoToast('표현방법을 바꿨어요.', function () {
+    gbPatchNode(id, { expressionType: backup.expressionType, payload: backup.payload }, true);
+  });
+}
+
+// ── 드래그 이동 (레벨 규칙 위반 시 거부 + 사유 툴팁) ──
+function gbHandleDragOver(cardEl, targetId) {
+  if (!gbDragId || gbDragId === targetId) return;
+  var dragged = gbNodes.find(function (n) { return n.id === gbDragId; });
+  var target = gbNodes.find(function (n) { return n.id === targetId; });
+  var ok = !!(dragged && target && target.level + 1 === dragged.level);
+  cardEl.classList.toggle('drop-ok', ok);
+  cardEl.classList.toggle('drop-reject', !ok);
+  cardEl.title = ok ? '여기 아래로 이동' :
+    ('레벨 규칙 위반 — L' + (target ? target.level : '?') + ' 아래엔 L' + (target ? target.level + 1 : '?') +
+     '만 올 수 있어요 (이 카드는 L' + (dragged ? dragged.level : '?') + ')');
+}
+async function gbHandleDrop(targetId) {
+  var draggedId = gbDragId; gbDragId = null;
+  if (!draggedId || draggedId === targetId) return;
+  var dragged = gbNodes.find(function (n) { return n.id === draggedId; });
+  var target = gbNodes.find(function (n) { return n.id === targetId; });
+  if (!dragged || !target || target.level + 1 !== dragged.level) return;
+  gbPushUndoSnapshot();
+  var res = await fetch('/api/admin/gov/nodes/move', { method: 'POST', headers: authHeaders(true), body: JSON.stringify({ nodeId: draggedId, newParentId: targetId }) });
+  var data = await res.json();
+  if (!data.success) { alert(data.message || '이동 실패'); return; }
+  await gbLoadTree();
+}
+
+// ── 검증/게시 ──
+async function gbLoadValidation() {
+  var res = await fetch('/api/admin/gov/programs/' + GB_PROGRAM_ID + '/validate', { headers: authHeaders(false) });
+  var data = await res.json();
+  var bar = document.getElementById('gbValidationBar');
+  var summary = document.getElementById('gbValidationSummary');
+  var detail = document.getElementById('gbValidationDetail');
+  if (!data.success) { summary.textContent = '검증 결과를 불러오지 못했어요.'; return; }
+  var errorCount = data.errorCount;
+  var warnCount = data.issues.filter(function (i) { return i.level === 'warn'; }).length;
+  bar.classList.toggle('has-error', errorCount > 0);
+  summary.textContent = '검증 — 오류 ' + errorCount + '건 · 경고 ' + warnCount + '건 (클릭해서 자세히 보기)';
+  detail.innerHTML = data.issues.map(function (i) {
+    return '<div class="gb-validation-issue ' + i.level + '"' + (i.nodeId ? (' data-node-id="' + i.nodeId + '"') : '') + '>[' + i.code + '] ' + esc(i.message) + '</div>';
+  }).join('');
+  document.getElementById('gbPublishBtn').disabled = false;
+}
+async function gbPublish() {
+  var res = await fetch('/api/admin/gov/programs/' + GB_PROGRAM_ID + '/publish', { method: 'POST', headers: authHeaders(false) });
+  var data = await res.json();
+  if (!data.success) {
+    alert('검증 오류가 있어 게시할 수 없어요. 오류 ' + (data.issues || []).length + '건을 먼저 고쳐주세요.');
+    gbLoadValidation();
+    document.getElementById('gbValidationDetail').classList.add('open');
+    return;
+  }
+  alert('게시했어요 (' + data.publishedVersion + ').');
+  gbLoadProgramStatus();
+}
+
+// ── 키보드 단축키 ──
+function gbKeyHandler(ev) {
+  var tag = (ev.target.tagName || '').toLowerCase();
+  var isCtrlZ = (ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z';
+  if ((tag === 'input' || tag === 'textarea' || tag === 'select') && !isCtrlZ) return;
+  if (isCtrlZ && !ev.shiftKey) { ev.preventDefault(); gbUndo(); return; }
+  if (isCtrlZ && ev.shiftKey) { ev.preventDefault(); gbRedo(); return; }
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'd') { if (gbSelectedId) { ev.preventDefault(); gbDuplicate(gbSelectedId); } return; }
+  if (ev.key === 'Delete' && gbSelectedId) { gbDelete(gbSelectedId); return; }
+}
+
+// ── 이벤트 위임 바인딩 (한 번만 등록) ──
+document.getElementById('gbPwInput').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') gbDoLogin(); });
+document.getElementById('gbLoginBtn').addEventListener('click', gbDoLogin);
+document.getElementById('gbUndoBtn').addEventListener('click', gbUndo);
+document.getElementById('gbRedoBtn').addEventListener('click', gbRedo);
+document.getElementById('gbPublishBtn').addEventListener('click', gbPublish);
+document.getElementById('gbSearchInput').addEventListener('input', gbFilterTree);
+document.getElementById('gbAddL1Btn').addEventListener('click', function () { gbAddNode(1, null); });
+document.getElementById('gbAddL2Btn').addEventListener('click', function () { gbAddNodeUnderSelected(2); });
+document.getElementById('gbAddL3Btn').addEventListener('click', function () { gbAddNodeUnderSelected(3); });
+document.getElementById('gbConflictReloadBtn').addEventListener('click', gbConflictReload);
+document.getElementById('gbConflictForceBtn').addEventListener('click', gbConflictForce);
+document.getElementById('gbValidationSummary').addEventListener('click', function () { document.getElementById('gbValidationDetail').classList.toggle('open'); });
+document.getElementById('gbValidationDetail').addEventListener('click', function (ev) {
+  var issue = ev.target.closest('[data-node-id]');
+  if (issue) gbSelectAndScroll(issue.getAttribute('data-node-id'));
+});
+document.getElementById('gbTreeList').addEventListener('click', function (ev) {
+  var row = ev.target.closest('.gb-tree-row');
+  if (row) gbSelectAndScroll(row.getAttribute('data-id'));
+});
+document.getElementById('gbCards').addEventListener('click', function (ev) {
+  var actionBtn = ev.target.closest('[data-action]');
+  if (actionBtn) {
+    ev.stopPropagation();
+    var id = actionBtn.getAttribute('data-id');
+    var action = actionBtn.getAttribute('data-action');
+    if (action === 'duplicate') gbDuplicate(id);
+    else if (action === 'delete') gbDelete(id);
+    return;
+  }
+  var card = ev.target.closest('.gb-card');
+  if (card) gbSelect(card.getAttribute('data-id'));
+});
+document.getElementById('gbCards').addEventListener('change', function (ev) {
+  if (ev.target.classList.contains('gb-type-select')) {
+    var card = ev.target.closest('.gb-card');
+    gbSwitchType(card.getAttribute('data-id'), ev.target.value);
+  }
+});
+document.getElementById('gbCards').addEventListener('dragstart', function (ev) {
+  var card = ev.target.closest('.gb-card');
+  if (card) { gbDragId = card.getAttribute('data-id'); ev.dataTransfer.effectAllowed = 'move'; }
+});
+document.getElementById('gbCards').addEventListener('dragover', function (ev) {
+  var card = ev.target.closest('.gb-card');
+  if (!card) return;
+  ev.preventDefault();
+  gbHandleDragOver(card, card.getAttribute('data-id'));
+});
+document.getElementById('gbCards').addEventListener('dragleave', function (ev) {
+  var card = ev.target.closest('.gb-card');
+  if (card) card.classList.remove('drop-ok', 'drop-reject');
+});
+document.getElementById('gbCards').addEventListener('drop', function (ev) {
+  var card = ev.target.closest('.gb-card');
+  if (!card) return;
+  ev.preventDefault();
+  card.classList.remove('drop-ok', 'drop-reject');
+  gbHandleDrop(card.getAttribute('data-id'));
+});
+</script>
+</body>
+</html>`
+
+
+app.get('/admin02/gov/:programId/builder', (c) => {
+  const raw = c.req.param('programId')
+  if (!/^[a-zA-Z0-9_-]+$/.test(raw)) return c.text('잘못된 programId', 400)
+  return c.html(GOV_BUILDER_PAGE_HTML.replace('__GB_PROGRAM_ID_JSON__', JSON.stringify(raw)))
+})
+
+// ────────────────────────────────────────────────────
 // Constants
 // ────────────────────────────────────────────────────
 const ATLAS_API_BASE = 'https://api.atlascloud.ai'
@@ -12354,6 +13129,8 @@ app.get('/admin02', (c) => {
         <select id="gsAdminProgramSelect" class="form-input" style="max-width:420px;" onchange="gsAdminLoadStructure()">
           <option value="">불러오는 중...</option>
         </select>
+        <button type="button" class="btn-sm btn-primary-sm" style="margin-top:10px;" onclick="gsOpenNewBuilder()">🧩 새 구조 빌더로 편집 (베타)</button>
+        <div class="section-desc" style="margin-top:6px;">드래그로 카드를 조립하는 새 빌더입니다 — 아직 이 화면과는 별도 데이터(3단계 트리)를 씁니다. yebi는 이미 이관되어 있습니다.</div>
       </div>
 
       <div id="gsAdminSectionsWrap"></div>
@@ -14429,6 +15206,12 @@ async function gsAdminInit() {
   sel.innerHTML = '<option value="">사업을 선택하세요</option>' + data.programs.map(function (p) {
     return '<option value="' + p.id + '">' + p.name + (p.generationReady ? ' ✅ 생성가능' : ' (미설정)') + '</option>'
   }).join('')
+}
+
+function gsOpenNewBuilder() {
+  const programId = document.getElementById('gsAdminProgramSelect').value
+  if (!programId) { alert('먼저 사업을 선택하세요.'); return }
+  window.open('/admin02/gov/' + programId + '/builder', '_blank')
 }
 
 function gsAdminLoadStructure() {
