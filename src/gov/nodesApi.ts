@@ -18,8 +18,9 @@
 
 import { Hono } from 'hono'
 import { validateProgram, type GovNode, type ValidationIssue } from './validate.ts'
-import { isKnownExpressionType, CATEGORY_HEADER_TYPE } from './moduleTypes.ts'
+import { isKnownExpressionType, CATEGORY_HEADER_TYPE, EXPRESSION_TYPES } from './moduleTypes.ts'
 import { between } from './sortKey.ts'
+import { renderSchemaFormHtml } from './schemaForm.ts'
 
 type GovBindings = { LOOKBOOK_DB: D1Database; ADMIN_PASSWORD: string }
 const gov = new Hono<{ Bindings: GovBindings }>()
@@ -124,6 +125,12 @@ function descendantIds(nodes: GovNode[], rootId: string): string[] {
   return out
 }
 
+// ── GET /module-types — 표현방법 14종 카탈로그(빌더 UI의 드롭다운/인스펙터 섹션1용) ──
+
+gov.get('/module-types', async (c) => {
+  return c.json({ success: true, types: EXPRESSION_TYPES })
+})
+
 // ── GET /programs — 프로그램별 구조 상태 + 레벨별 노드 수 ──────────
 
 gov.get('/programs', async (c) => {
@@ -189,6 +196,7 @@ gov.put('/programs/:programId/structure', async (c) => {
   }
 
   const byId = new Map(nodes.map((n) => [n.id, n]))
+  const rowById = new Map(rows.map((r) => [r.id, r]))
   const now = Date.now()
   const conflicts: any[] = []
   let upserted = 0, deleted = 0, moved = 0
@@ -202,32 +210,44 @@ gov.put('/programs/:programId/structure', async (c) => {
     deleted++
   }
 
-  // upsert
+  // upsert — item은 "바뀐 필드만" 보낼 수 있다(빌더 UI는 필드 하나를 고칠 때 노드
+  // 전체를 다시 보내지 않는다). 그래서 모든 필드는 item에 키가 있으면 그 값을,
+  // 없으면(undefined) 기존 행(existingRow, 가공되지 않은 raw row)의 값을 그대로
+  // 유지한다 — item.x ?? existing.x 식으로 "falsy면 기본값"을 쓰면 fillPolicy나
+  // note처럼 의도적으로 빈 값을 넣을 수 있는 필드가 사라지므로, 전부 `!== undefined`
+  // 체크로 바꿨다. existing은 GovNode(가공된 타입, fillPolicy/note 등이 없음)가 아니라
+  // raw row를 써야 그 필드들에 접근할 수 있다.
   for (const item of body.upsert || []) {
-    const expressionType = item.level === 1 ? CATEGORY_HEADER_TYPE : item.expressionType
-    if (!isKnownExpressionType(expressionType)) {
+    const existingRow = item.id ? rowById.get(item.id) : undefined
+    const expressionType = item.level === 1 ? CATEGORY_HEADER_TYPE : (item.expressionType ?? existingRow?.expression_type)
+    if (!expressionType || !isKnownExpressionType(expressionType)) {
       conflicts.push({ reason: 'UNKNOWN_EXPRESSION_TYPE', nodeId: item.id, expressionType })
       continue
     }
-    const existing = item.id ? byId.get(item.id) : undefined
     const id = item.id || crypto.randomUUID()
-    const payload = JSON.stringify(item.payload ?? {})
-    const repeatConfig = item.repeatConfig != null ? JSON.stringify(item.repeatConfig) : null
-    const conditionConfig = item.conditionConfig != null ? JSON.stringify(item.conditionConfig) : null
+    const payload = item.payload !== undefined ? JSON.stringify(item.payload) : (existingRow?.payload ?? '{}')
+    const repeatConfig = item.repeatConfig !== undefined
+      ? (item.repeatConfig != null ? JSON.stringify(item.repeatConfig) : null)
+      : (existingRow?.repeat_config ?? null)
+    const conditionConfig = item.conditionConfig !== undefined
+      ? (item.conditionConfig != null ? JSON.stringify(item.conditionConfig) : null)
+      : (existingRow?.condition_config ?? null)
 
-    if (existing) {
+    if (existingRow) {
       await db.prepare(
         `UPDATE gov_support_nodes SET parent_id=?, level=?, sort_key=?, expression_type=?, title=?, payload=?,
           binding=?, binding_key=?, fill_policy=?, target_chars=?, repeat_config=?, condition_config=?, note=?, updated_at=?
          WHERE id = ?`
       ).bind(
-        item.parentId ?? existing.parentId, item.level ?? existing.level, item.sortKey ?? existing.sortKey,
-        expressionType, item.title ?? existing.title, payload,
-        item.binding ?? existing.binding, item.bindingKey ?? existing.bindingKey ?? null,
-        item.fillPolicy ?? 'aiFill', item.targetChars ?? existing.targetChars ?? null,
-        repeatConfig, conditionConfig, item.note ?? null, now, id
+        item.parentId !== undefined ? item.parentId : existingRow.parent_id,
+        item.level ?? existingRow.level, item.sortKey ?? existingRow.sort_key,
+        expressionType, item.title !== undefined ? item.title : existingRow.title, payload,
+        item.binding ?? existingRow.binding, item.bindingKey !== undefined ? item.bindingKey : existingRow.binding_key,
+        item.fillPolicy ?? existingRow.fill_policy,
+        item.targetChars !== undefined ? item.targetChars : existingRow.target_chars,
+        repeatConfig, conditionConfig, item.note !== undefined ? item.note : existingRow.note, now, id
       ).run()
-      await writeAuditLog(db, programId, id, 'update', existing, item, null)
+      await writeAuditLog(db, programId, id, 'update', existingRow, item, null)
     } else {
       await db.prepare(
         `INSERT INTO gov_support_nodes
@@ -563,6 +583,21 @@ gov.get('/audit-log', async (c) => {
     `SELECT * FROM gov_support_audit_log ${where} ORDER BY created_at DESC LIMIT ?`
   ).bind(...params, limit).all()).results
   return c.json({ success: true, entries: rows })
+})
+
+// ── GET /nodes/:id/inspector — P3(빌더 UI)용. 인스펙터 패널의 "페이로드" 섹션
+// HTML을 서버에서 렌더해 그대로 돌려준다 — schemaForm.ts의 renderSchemaFormHtml()을
+// 클라이언트에 재구현해 중복시키지 않고 그대로 재사용하기 위함. L1(categoryHeader)은
+// 편집 가능한 payload가 없으므로 빈 문자열을 반환한다.
+gov.get('/nodes/:id/inspector', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const id = c.req.param('id')
+  const row = await db.prepare(`SELECT * FROM gov_support_nodes WHERE id = ?`).bind(id).first() as any
+  if (!row) return c.json({ success: false, message: '노드를 찾을 수 없습니다.' }, 404)
+  const node = rowToGovNode(row)
+  if (node.level === 1) return c.json({ success: true, html: '' })
+  const html = renderSchemaFormHtml(node.expressionType, node.payload, { idPrefix: node.id, onChangeFnName: 'gsFieldChange' })
+  return c.json({ success: true, html })
 })
 
 export default gov
