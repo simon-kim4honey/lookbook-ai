@@ -5734,15 +5734,19 @@ function gsBuildEmptyCategorySection(cat: CategoryTree, how: string) {
   return { sectionId: cat.node.id, headline: cat.node.title, lead: '', blocks: [{ type: 'evidenceGap', need: 'AI 초안 생성', how }] }
 }
 
-// 실패한 그룹만 저온도(0.2)로 1회 재시도한다 — §11-4 "대분류 단위 재시도".
+// 실패한 그룹만 1회 재시도한다 — §11-4 "대분류 단위 재시도".
+// 2026-10-23: 저온도(0.2) 재시도를 시도했으나 claude-sonnet-5가 temperature
+// 파라미터 자체를 지원 중단(400 "temperature is deprecated for this model")해
+// 재시도가 항상 즉시 실패했다(스테이징에서 error_logs로 실제 확인). temperature
+// 인자를 아예 넘기지 않는 동일 설정 재시도로 되돌린다.
 async function gsCallGroupWithRetry(
   apiKey: string, prompt: string, schema: any, expectCount: number, maxTokens: number, timeoutMs: number,
   env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string
 ): Promise<any[] | null> {
   const first = await gsCallClaudeWithSchema(apiKey, prompt, schema, expectCount, maxTokens, timeoutMs, env, label)
   if (first) return first
-  console.error(`gov-support(nodes) ${label} 1차 실패 — 저온도 재시도`)
-  return gsCallClaudeWithSchema(apiKey, prompt, schema, expectCount, maxTokens, timeoutMs, env, `${label}(재시도)`, 0.2)
+  console.error(`gov-support(nodes) ${label} 1차 실패 — 재시도`)
+  return gsCallClaudeWithSchema(apiKey, prompt, schema, expectCount, maxTokens, timeoutMs, env, `${label}(재시도)`)
 }
 
 // 서버 계산값(finance)을 binding=computed 모듈이 인용할 수 있게 bindingKey→값으로 변환한다.
