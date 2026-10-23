@@ -428,6 +428,134 @@ app.delete('/api/admin/gov-support/items/:id', adminAuth, async (c) => {
 })
 
 // ────────────────────────────────────────────────────
+// 지원사업 구조 — 모듈 빌더 개편 P0: 2단계(섹션/항목) → 3단계 단일 트리 이관
+// (기획서 "정부지원사업 사업계획서 자동화 — 어드민 모듈 빌더 개편" §12-1)
+//
+// gov_support_sections/items는 DROP하지 않고 그대로 둔다(운영 중 롤백 여지 — §10-3,
+// 6개월 병행 후 정리 예정). doMigrateGovStructure()는 이 두 테이블을 읽어
+// gov_support_nodes(level 1~3 단일 트리, 0037 마이그레이션에서 신설)로 변환한다.
+// 이번 단계는 section→L1(categoryHeader), item→L2로 1:1 평면 이관만 한다 — "1-1" 같은
+// 중간 그룹으로 똑똑하게 재구성하지 않는다(그건 빌더 UI가 만들어진 뒤 관리자가 직접 할 일).
+// 이미 이관된 program_id는 멱등적으로 건너뛴다(gov_support_nodes에 해당 program_id 행이
+// 하나라도 있으면 스킵 — 재실행해도 중복 생성되지 않음).
+// ────────────────────────────────────────────────────
+function gsNodeSortKey(index: number): string {
+  // lexicographic 정렬키 — 두 키 사이에 새 노드를 끼워 넣는 로직(빌더 API, 다음 단계)은
+  // 이 포맷과 무관하게 임의의 중간 문자열을 만들 수 있다. 이관 시점엔 'a'+3자리 인덱스로 충분하다.
+  return 'a' + String(index).padStart(3, '0')
+}
+
+// 기존 8종 표현방법의 item.notes(자유 텍스트 지시문)를 14종 체계의 payload 필드로 옮긴다.
+// table/iconStats는 구조화된 payload가 없었으므로(원래도 자유 텍스트 지시문뿐이었음) payload는
+// 비워두고 원문을 note에 보존 — 관리자가 빌더에서 표/타일을 직접 채울 때까지의 임시 상태다.
+function gsMigrateItemPayload(expressionType: string, notes: string | null): { payload: Record<string, any>; note: string | null } {
+  const n = notes || ''
+  switch (expressionType) {
+    case 'headlineBox':
+    case 'paragraph':
+      return { payload: { text: n }, note: null }
+    case 'subhead':
+    case 'subhead2':
+      return { payload: { text: n, autoNumber: true }, note: null }
+    case 'bullets':
+      return { payload: { items: n ? [n] : [] }, note: null }
+    case 'visual':
+      return { payload: { kind: 'placeholder', caption: n }, note: null }
+    case 'table':
+    case 'iconStats':
+    default:
+      return { payload: {}, note: n || null }
+  }
+}
+
+async function doMigrateGovStructure(db: D1Database): Promise<{ migrated: string[]; skipped: string[] }> {
+  const migrated: string[] = []
+  const skipped: string[] = []
+  const sectionRows = (await db.prepare(
+    `SELECT id, program_id, title, display_order, target_chars FROM gov_support_sections ORDER BY program_id, display_order`
+  ).all()).results as any[]
+
+  const byProgram = new Map<string, any[]>()
+  for (const s of sectionRows || []) {
+    if (!byProgram.has(s.program_id)) byProgram.set(s.program_id, [])
+    byProgram.get(s.program_id)!.push(s)
+  }
+
+  for (const [programId, sections] of byProgram) {
+    const already = await db.prepare(`SELECT 1 FROM gov_support_nodes WHERE program_id = ? LIMIT 1`).bind(programId).first()
+    if (already) { skipped.push(programId); continue }
+
+    const now = Date.now()
+    let l1Index = 0
+    for (const section of sections as any[]) {
+      const l1Id = crypto.randomUUID()
+      await db.prepare(
+        `INSERT INTO gov_support_nodes (id, program_id, parent_id, level, sort_key, expression_type, title, payload, binding, target_chars, status, created_at, updated_at)
+         VALUES (?, ?, NULL, 1, ?, 'categoryHeader', ?, '{}', 'static', ?, 'published', ?, ?)`
+      ).bind(l1Id, programId, gsNodeSortKey(l1Index++), section.title, section.target_chars || null, now, now).run()
+
+      const itemRows = (await db.prepare(
+        `SELECT expression_type, label, notes FROM gov_support_items WHERE section_id = ? ORDER BY item_order`
+      ).bind(section.id).all()).results as any[]
+
+      let l2Index = 0
+      for (const item of (itemRows || []) as any[]) {
+        const { payload, note } = gsMigrateItemPayload(item.expression_type, item.notes)
+        const l2Id = crypto.randomUUID()
+        await db.prepare(
+          `INSERT INTO gov_support_nodes (id, program_id, parent_id, level, sort_key, expression_type, title, payload, binding, note, status, created_at, updated_at)
+           VALUES (?, ?, ?, 2, ?, ?, ?, ?, 'ai', ?, 'published', ?, ?)`
+        ).bind(l2Id, programId, l1Id, gsNodeSortKey(l2Index++), item.expression_type, item.label, JSON.stringify(payload), note, now, now).run()
+      }
+    }
+
+    await db.prepare(
+      `INSERT INTO gov_support_config (program_id, structure_status, published_at, published_version, updated_at) VALUES (?, 'published', ?, 'v1', ?)
+       ON CONFLICT(program_id) DO UPDATE SET structure_status = 'published', published_at = excluded.published_at, published_version = 'v1', updated_at = excluded.updated_at`
+    ).bind(programId, now, now).run()
+
+    migrated.push(programId)
+  }
+
+  return { migrated, skipped }
+}
+
+// 운영에서 실수로 돌지 않도록 body에 {"confirm":"MIGRATE"}가 있어야 동작한다.
+app.post('/api/admin/gov/migrate', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const body = await c.req.json().catch(() => ({}))
+    if (body.confirm !== 'MIGRATE') {
+      return c.json({ success: false, message: '안전장치 — body에 {"confirm":"MIGRATE"}를 포함해야 실행됩니다.' }, 400)
+    }
+    const result = await doMigrateGovStructure(db)
+    return c.json({ success: true, ...result })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// 검증용 — 프로그램별 L1/L2 노드 수, 이관 전 items 총수(비교용), payload가 비어 관리자
+// 검수가 필요한 노드(table/iconStats) 목록을 한 번에 보여준다.
+app.get('/api/admin/gov/migrate/verify', adminAuth, async (c) => {
+  try {
+    const db: D1Database = c.env.LOOKBOOK_DB
+    const counts = (await db.prepare(
+      `SELECT program_id, level, COUNT(*) as cnt FROM gov_support_nodes GROUP BY program_id, level ORDER BY program_id, level`
+    ).all()).results as any[]
+    const itemTotalsBeforeMigration = (await db.prepare(
+      `SELECT s.program_id, COUNT(i.id) as item_count FROM gov_support_sections s LEFT JOIN gov_support_items i ON i.section_id = s.id GROUP BY s.program_id`
+    ).all()).results as any[]
+    const needsReviewNodes = (await db.prepare(
+      `SELECT id, program_id, level, expression_type, title FROM gov_support_nodes WHERE level = 2 AND (payload = '{}' OR payload IS NULL) AND expression_type IN ('table','iconStats')`
+    ).all()).results as any[]
+    return c.json({ success: true, counts, itemTotalsBeforeMigration, needsReviewNodes })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// ────────────────────────────────────────────────────
 // Admin Prompt Store  (Cloudflare Workers 메모리 싱글톤)
 // Workers는 요청마다 재사용되는 isolate를 공유하므로
 // 모듈 스코프 변수가 인스턴스 내에서 유지됩니다.
