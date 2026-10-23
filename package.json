@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "vite",
     "verify-prompts": "node scripts/verify-critical-prompts.mjs",
-    "test:gov": "node --test src/gov/moduleTypes.test.ts src/gov/validate.test.ts src/gov/schemaForm.test.ts",
+    "test:gov": "node --test src/gov/moduleTypes.test.ts src/gov/validate.test.ts src/gov/schemaForm.test.ts src/gov/sortKey.test.ts",
     "build": "npm run verify-prompts && vite build",
     "preview": "wrangler pages dev",
     "deploy": "npm run build && wrangler pages deploy",
