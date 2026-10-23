@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   buildCategoryTrees, expandRepeat, moduleIdFor, flattenCategory, formatAutoNumber,
   buildGroupResponseSchema, buildCategoryStructureText, mergeCategoryBlocks, isAiGeneratedNode,
+  decodeTableRows,
 } from './generationAssembly.ts'
 import type { GovNode } from './validate.ts'
 
@@ -183,4 +184,31 @@ test('mergeCategoryBlocks — ai 바인딩 visual의 관리자 설정(visualId �
   assert.equal(b.kind, 'generated')
   assert.equal(b.caption, 'AI가 쓴 캡션') // AI 필드는 정상적으로 덮어씀
   assert.equal(b.alt, 'AI가 쓴 대체텍스트')
+})
+
+test('decodeTableRows — JSON 배열 문자열 행을 string[][]로 되돌린다', () => {
+  assert.deepEqual(decodeTableRows(['["a","b"]', '["c","d"]']), [['a', 'b'], ['c', 'd']])
+})
+
+test('decodeTableRows — 깨진 JSON이나 비문자열 행은 원문을 1칸짜리 행으로 안전하게 감싼다', () => {
+  assert.deepEqual(decodeTableRows(['not json', 123 as any]), [['not json'], ['123']])
+})
+
+test('decodeTableRows — 이미 배열(구형 응답)로 온 행은 그대로 문자열화해 받아들인다', () => {
+  assert.deepEqual(decodeTableRows([['a', 1 as any]]), [['a', '1']])
+})
+
+test('decodeTableRows — 입력이 배열이 아니면 빈 배열', () => {
+  assert.deepEqual(decodeTableRows(null), [])
+  assert.deepEqual(decodeTableRows(undefined), [])
+})
+
+test('mergeCategoryBlocks — ai 바인딩 table의 rows는 JSON 문자열 행에서 string[][]로 디코드된다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', binding: 'static' })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', binding: 'static' })
+  const l3 = node({ id: 'l3', level: 3, parentId: 'l2', expressionType: 'table', binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, l3])[0]
+  const { blocks } = mergeCategoryBlocks(cat, new Map([['l3', { moduleId: 'l3', rows: ['["구분","금액"]', '["1단계","100"]'] }]]), {}, () => null, 1)
+  const b = blocks.find((x) => x.type === 'table')!
+  assert.deepEqual(b.rows, [['구분', '금액'], ['1단계', '100']])
 })

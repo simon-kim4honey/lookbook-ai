@@ -112,6 +112,27 @@ export function formatAutoNumber(numberStyle: string | undefined, l1Index: numbe
 // static/answer/computed 모듈은 스키마에서 완전히 제외 — 토큰 절약 + 환각 원천 차단.
 // 타입별로 "AI가 실제로 채울 필드"만 노출한다(관리자가 설정하는 톤/정렬/아이콘종류 등은
 // 스키마에 넣지 않는다 — 그런 설정은 admin payload에 이미 있고 렌더 시 그대로 쓴다).
+// 2026-10-23: table/timeline의 rows는 원래 array<array<string>>(행 안에 셀 배열)이었다.
+// 중첩 배열이 blocks 배열(moduleId별 anyOf) 안에, 다시 sections 배열 안에 들어가
+// 총 4단계 배열 중첩이 되면서 Anthropic 구조화 출력이 400 "Schema is too complex
+// for compilation"으로 거부했다(기존 gsSectionsSchema에서 스테이징 실측으로 확인된
+// 동일 문제 — 공식 문서가 권장하는 대응은 "중첩 구조를 평탄화"). 한 단계를 줄이기
+// 위해 각 행을 JSON 배열 문자열로 직렬화한 array<string>으로 바꾸고, decodeTableRows()로
+// 원래 형태(string[][])로 되돌려서 저장한다 — 렌더러·기존 저장 데이터는 전혀 바뀌지 않는다.
+export function decodeTableRows(raw: any): string[][] {
+  if (!Array.isArray(raw)) return []
+  return raw.map((r) => {
+    if (Array.isArray(r)) return r.map(String) // 혹시 모델이 예전 형태(중첩 배열)로 주면 그대로 수용
+    if (typeof r !== 'string') return [String(r)]
+    try {
+      const parsed = JSON.parse(r)
+      return Array.isArray(parsed) ? parsed.map(String) : [r]
+    } catch {
+      return [r]
+    }
+  })
+}
+
 const AI_FIELD_SCHEMA: Record<string, { properties: Record<string, any>; required: string[] }> = {
   headlineBox: { properties: { text: { type: 'string' } }, required: ['text'] },
   subhead: { properties: { text: { type: 'string' } }, required: ['text'] },
@@ -119,7 +140,10 @@ const AI_FIELD_SCHEMA: Record<string, { properties: Record<string, any>; require
   paragraph: { properties: { text: { type: 'string' } }, required: ['text'] },
   bullets: { properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },
   bulletsSummary: { properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },
-  table: { properties: { rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } } }, required: ['rows'] },
+  table: {
+    properties: { rows: { type: 'array', items: { type: 'string', description: '한 행의 셀들을 담은 JSON 배열을 문자열로 직렬화. 예: "[\\"셀1\\",\\"셀2\\"]"' } } },
+    required: ['rows'],
+  },
   compareTable: {
     properties: { rows: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, values: { type: 'object' } }, required: ['label', 'values'], additionalProperties: false } } },
     required: ['rows'],
@@ -131,7 +155,10 @@ const AI_FIELD_SCHEMA: Record<string, { properties: Record<string, any>; require
     },
     required: ['nodes', 'edges'],
   },
-  timeline: { properties: { rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } } }, required: ['rows'] },
+  timeline: {
+    properties: { rows: { type: 'array', items: { type: 'string', description: '한 행의 셀들을 담은 JSON 배열을 문자열로 직렬화. 예: "[\\"셀1\\",\\"셀2\\"]"' } } },
+    required: ['rows'],
+  },
   iconStats: {
     properties: { tiles: { type: 'array', items: { type: 'object', properties: { icon: { type: 'string' }, value: { type: 'string' }, label: { type: 'string' } }, required: ['icon', 'value', 'label'], additionalProperties: false } } },
     required: ['tiles'],
@@ -292,6 +319,9 @@ function buildOneBlock(
   }
   const spec = AI_FIELD_SCHEMA[node.expressionType]
   if (spec) for (const key of Object.keys(spec.properties)) if (ai[key] !== undefined) base[key] = ai[key]
+  if ((node.expressionType === 'table' || node.expressionType === 'timeline') && base.rows !== undefined) {
+    base.rows = decodeTableRows(base.rows)
+  }
 
   // §11-5 item6 — bullets/bulletsSummary 최소 요건, iconStats 4개 절단
   if ((node.expressionType === 'bullets' || node.expressionType === 'bulletsSummary') && Array.isArray(base.items)) {
