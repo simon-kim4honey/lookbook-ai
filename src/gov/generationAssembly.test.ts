@@ -1,0 +1,186 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import {
+  buildCategoryTrees, expandRepeat, moduleIdFor, flattenCategory, formatAutoNumber,
+  buildGroupResponseSchema, buildCategoryStructureText, mergeCategoryBlocks, isAiGeneratedNode,
+} from './generationAssembly.ts'
+import type { GovNode } from './validate.ts'
+
+let seq = 0
+function node(partial: Partial<GovNode>): GovNode {
+  seq++
+  return {
+    id: partial.id || `n${seq}`, programId: 'test', parentId: null, level: 3, sortKey: `a${seq}`,
+    expressionType: 'bullets', title: null, payload: {}, binding: 'ai', bindingKey: null,
+    targetChars: null, repeatConfig: null, conditionConfig: null, ...partial,
+  }
+}
+
+function sampleTree() {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '1. 문제 인식', payload: {}, binding: 'static', targetChars: 1000 })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', title: '가. 배경', payload: { text: '가. 배경', autoNumber: true, numberStyle: 'korean' }, binding: 'static' })
+  const l3headline = node({ id: 'l3h', level: 3, parentId: 'l2', expressionType: 'headlineBox', title: '헤드카피', payload: { text: '힌트 문장' }, binding: 'ai' })
+  const l3bullets = node({ id: 'l3b', level: 3, parentId: 'l2', expressionType: 'bullets', title: '불릿', payload: {}, binding: 'ai' })
+  const l3table = node({ id: 'l3t', level: 3, parentId: 'l2', expressionType: 'table', title: '집행계획', payload: { columns: [{ key: 'item', label: '비목' }] }, binding: 'computed', bindingKey: 'fundUse.stage1' })
+  const l3answer = node({ id: 'l3a', level: 3, parentId: 'l2', expressionType: 'paragraph', title: '브랜드명', payload: {}, binding: 'answer', bindingKey: 'brandName' })
+  const nodes = [l1, l2, l3headline, l3bullets, l3table, l3answer]
+  return buildCategoryTrees(nodes)[0]
+}
+
+test('buildCategoryTrees는 L1>L2>L3 3단계로 조립한다', () => {
+  const cat = sampleTree()
+  assert.equal(cat.node.id, 'l1')
+  assert.equal(cat.children.length, 1)
+  assert.equal(cat.children[0].children.length, 4)
+})
+
+test('expandRepeat — repeat 미사용이면 원본 그대로 1개', () => {
+  const n = node({ repeatConfig: null })
+  const out = expandRepeat(n, {})
+  assert.equal(out.length, 1)
+  assert.equal(out[0].repeatIndex, null)
+})
+
+test('expandRepeat — repeat 사용 시 답변 배열 길이만큼 전개', () => {
+  const n = node({ repeatConfig: { enabled: true, source: 'products' } })
+  const out = expandRepeat(n, { products: ['a', 'b', 'c'] })
+  assert.equal(out.length, 3)
+  assert.deepEqual(out.map((o) => o.repeatIndex), [0, 1, 2])
+})
+
+test('expandRepeat — max가 배열 길이보다 작으면 max만큼만', () => {
+  const n = node({ repeatConfig: { enabled: true, source: 'products', max: 2 } })
+  const out = expandRepeat(n, { products: ['a', 'b', 'c'] })
+  assert.equal(out.length, 2)
+})
+
+test('moduleIdFor — 반복 아니면 원본id, 반복이면 id#index', () => {
+  assert.equal(moduleIdFor('x', null), 'x')
+  assert.equal(moduleIdFor('x', 2), 'x#2')
+})
+
+test('isAiGeneratedNode — binding=ai이고 promptFragment가 있는 타입만 true', () => {
+  assert.equal(isAiGeneratedNode(node({ binding: 'ai', expressionType: 'bullets' })), true)
+  assert.equal(isAiGeneratedNode(node({ binding: 'ai', expressionType: 'chart' })), false) // promptFragment null
+  assert.equal(isAiGeneratedNode(node({ binding: 'static', expressionType: 'bullets' })), false)
+})
+
+test('flattenCategory는 L2+L3를 트리(깊이우선) 순서로 평면화한다', () => {
+  const cat = sampleTree()
+  const flat = flattenCategory(cat, {})
+  assert.deepEqual(flat.map((f) => f.node.id), ['l2', 'l3h', 'l3b', 'l3t', 'l3a'])
+})
+
+test('formatAutoNumber — numeric/korean/paren/circled', () => {
+  assert.equal(formatAutoNumber('numeric', 1, 0), '1-1.')
+  assert.equal(formatAutoNumber('numeric', 2, 2), '2-3.')
+  assert.equal(formatAutoNumber('korean', 0, 0), '가.')
+  assert.equal(formatAutoNumber('korean', 0, 2), '다.')
+  assert.equal(formatAutoNumber('paren', 0, 0), '1)')
+  assert.equal(formatAutoNumber('circled', 0, 1), '②')
+})
+
+test('buildGroupResponseSchema — static/answer/computed 모듈은 스키마에서 제외된다', () => {
+  const cat = sampleTree()
+  const schema: any = buildGroupResponseSchema([cat], {})
+  const anyOf = schema.properties.sections.items.properties.blocks.items.anyOf
+  const moduleIds = anyOf.map((s: any) => s.properties.moduleId.const)
+  assert.deepEqual(moduleIds.sort(), ['l3b', 'l3h']) // ai 바인딩인 headlineBox/bullets만
+  assert.ok(!moduleIds.includes('l3t')) // computed table 제외
+  assert.ok(!moduleIds.includes('l3a')) // answer paragraph 제외
+  assert.ok(!moduleIds.includes('l2'))  // static subhead 제외
+})
+
+test('buildGroupResponseSchema — 반복 모듈은 인덱스별로 전개된 moduleId를 갖는다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', binding: 'static' })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', binding: 'static' })
+  const l3 = node({ id: 'l3', level: 3, parentId: 'l2', expressionType: 'bullets', binding: 'ai', repeatConfig: { enabled: true, source: 'products' } })
+  const cat = buildCategoryTrees([l1, l2, l3])[0]
+  const schema: any = buildGroupResponseSchema([cat], { products: ['a', 'b'] })
+  const moduleIds = schema.properties.sections.items.properties.blocks.items.anyOf.map((s: any) => s.properties.moduleId.const)
+  assert.deepEqual(moduleIds.sort(), ['l3#0', 'l3#1'])
+})
+
+test('buildCategoryStructureText는 moduleId와 바인딩 지시문을 포함한다', () => {
+  const cat = sampleTree()
+  const text = buildCategoryStructureText(cat, {})
+  assert.match(text, /moduleId="l3h"/)
+  assert.match(text, /재계산 절대 금지/) // computed 지시
+  assert.match(text, /생성 금지/) // answer 지시
+})
+
+test('mergeCategoryBlocks — computed 모듈은 AI 응답과 무관하게 서버 계산값으로 강제된다', () => {
+  const cat = sampleTree()
+  const aiBlocks = new Map<string, any>([
+    ['l3t', { moduleId: 'l3t', rows: [['조작됨', '999']] }], // AI가 혹시 computed 모듈을 채워 보내도
+  ])
+  const { blocks } = mergeCategoryBlocks(cat, aiBlocks, {}, (key) => (key === 'fundUse.stage1' ? { rows: [['소재비', '10000000']] } : null), 1)
+  const tableBlock = blocks.find((b) => b.type === 'table')!
+  assert.deepEqual(tableBlock.rows, [['소재비', '10000000']]) // AI가 보낸 값이 아니라 서버 계산값
+})
+
+test('mergeCategoryBlocks — answer 모듈은 사용자 답변값을 그대로 쓴다(AI 응답 무시)', () => {
+  const cat = sampleTree()
+  const aiBlocks = new Map<string, any>()
+  const { blocks } = mergeCategoryBlocks(cat, aiBlocks, { brandName: { text: '진짜브랜드' } }, () => null, 1)
+  const idx = flattenIndexOfParagraph(cat)
+  assert.deepEqual(blocks[idx], { type: 'paragraph', text: '진짜브랜드' })
+})
+function flattenIndexOfParagraph(cat: any): number {
+  // mergeCategoryBlocks의 순회 순서(그룹 L2 먼저, 그다음 L3들)와 동일하게 계산
+  let i = 0
+  for (const group of cat.children) {
+    i++ // L2 자신
+    for (const leaf of group.children) {
+      if (leaf.expressionType === 'paragraph') return i
+      i++
+    }
+  }
+  return -1
+}
+
+test('mergeCategoryBlocks — ai 모듈은 응답을 그대로 반영하고, subhead는 자동번호가 붙는다', () => {
+  const cat = sampleTree()
+  const aiBlocks = new Map<string, any>([['l3h', { moduleId: 'l3h', text: 'AI가 쓴 헤드카피' }]])
+  const { blocks } = mergeCategoryBlocks(cat, aiBlocks, {}, () => null, 1)
+  const subheadBlock = blocks[0]
+  assert.equal(subheadBlock.type, 'subhead')
+  assert.equal(subheadBlock.number, '가.')
+  const headlineBlock = blocks.find((b) => b.type === 'headlineBox')!
+  assert.equal(headlineBlock.text, 'AI가 쓴 헤드카피')
+})
+
+test('mergeCategoryBlocks — AI 응답에 moduleId가 없으면 경고를 남기고 관리자 힌트로 대체한다', () => {
+  const cat = sampleTree()
+  const { blocks, warnings } = mergeCategoryBlocks(cat, new Map(), {}, () => null, 1)
+  const headlineBlock = blocks.find((b) => b.type === 'headlineBox')!
+  assert.equal(headlineBlock.text, '힌트 문장') // node.payload.text로 폴백
+  assert.ok(warnings.some((w) => w.moduleId === 'l3h'))
+})
+
+test('mergeCategoryBlocks — iconStats 타일은 4개로 절단된다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', binding: 'static' })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', binding: 'static' })
+  const l3 = node({ id: 'l3', level: 3, parentId: 'l2', expressionType: 'iconStats', binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, l3])[0]
+  const tiles = [1, 2, 3, 4, 5].map((i) => ({ icon: '📌', value: String(i), label: 'x' }))
+  const { blocks } = mergeCategoryBlocks(cat, new Map([['l3', { moduleId: 'l3', tiles }]]), {}, () => null, 1)
+  const b = blocks.find((x) => x.type === 'iconStats')!
+  assert.equal(b.tiles.length, 4)
+})
+
+test('mergeCategoryBlocks — ai 바인딩 visual의 관리자 설정(visualId 등)은 AI 응답과 무관하게 보존된다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', binding: 'static' })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', binding: 'static' })
+  const l3 = node({
+    id: 'l3', level: 3, parentId: 'l2', expressionType: 'visual', binding: 'ai',
+    payload: { kind: 'generated', visualId: 'process-flow', caption: '', alt: '' },
+  })
+  const cat = buildCategoryTrees([l1, l2, l3])[0]
+  const { blocks } = mergeCategoryBlocks(cat, new Map([['l3', { moduleId: 'l3', caption: 'AI가 쓴 캡션', alt: 'AI가 쓴 대체텍스트' }]]), {}, () => null, 1)
+  const b = blocks.find((x) => x.type === 'visual')!
+  assert.equal(b.visualId, 'process-flow') // 관리자 설정 — AI 응답에 없어도 유지
+  assert.equal(b.kind, 'generated')
+  assert.equal(b.caption, 'AI가 쓴 캡션') // AI 필드는 정상적으로 덮어씀
+  assert.equal(b.alt, 'AI가 쓴 대체텍스트')
+})

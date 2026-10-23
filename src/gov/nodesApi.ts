@@ -49,7 +49,7 @@ function safeJsonParse<T>(text: any, fallback: T): T {
   }
 }
 
-function rowToGovNode(r: any): GovNode {
+export function rowToGovNode(r: any): GovNode {
   return {
     id: r.id,
     programId: r.program_id,
@@ -67,7 +67,7 @@ function rowToGovNode(r: any): GovNode {
   }
 }
 
-async function loadProgramNodes(db: D1Database, programId: string): Promise<{ rows: any[]; nodes: GovNode[] }> {
+export async function loadProgramNodes(db: D1Database, programId: string): Promise<{ rows: any[]; nodes: GovNode[] }> {
   const rows = ((await db.prepare(
     `SELECT * FROM gov_support_nodes WHERE program_id = ? ORDER BY level, sort_key`
   ).bind(programId).all()).results || []) as any[]
