@@ -5538,21 +5538,27 @@ function gsBlockVariant(type: string, props: Record<string, any>, required: stri
   }
 }
 
+// 2026-10-23: 배열에 상한(maxItems)이 없으면 Anthropic API가 구조화 출력용으로
+// 컴파일하는 문법(grammar)이 너무 커져 400 "The compiled grammar is too large"로
+// 거부된다(스테이징에서 실측 확인 — 운영의 동일 스키마도 같은 위험을 안고 있음).
+// 실제 콘텐츠 분량을 넉넉히 덮는 선에서 각 배열에 상한을 둔다. 프롬프트 문구는
+// 변경하지 않았다 — 순수 JSON 스키마 구조 조정.
 const GS_BLOCK_SCHEMA = {
   anyOf: [
     gsBlockVariant('headlineBox', { text: { type: 'string' } }, ['text']),
     gsBlockVariant('subhead', { text: { type: 'string' } }, ['text']),
     gsBlockVariant('subhead2', { text: { type: 'string' } }, ['text']),
     gsBlockVariant('paragraph', { text: { type: 'string' } }, ['text']),
-    gsBlockVariant('bullets', { items: { type: 'array', items: { type: 'string' } } }, ['items']),
+    gsBlockVariant('bullets', { items: { type: 'array', items: { type: 'string' }, maxItems: 15 } }, ['items']),
     gsBlockVariant('table', {
-      headers: { type: 'array', items: { type: 'string' } },
-      rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+      headers: { type: 'array', items: { type: 'string' }, maxItems: 8 },
+      rows: { type: 'array', items: { type: 'array', items: { type: 'string' }, maxItems: 10 }, maxItems: 30 },
     }, ['headers', 'rows']),
     gsBlockVariant('visual', { visualId: { type: 'string' }, caption: { type: 'string' } }, ['visualId', 'caption']),
     gsBlockVariant('iconStats', {
       items: {
         type: 'array',
+        maxItems: 8,
         items: {
           type: 'object',
           properties: { icon: { type: 'string' }, value: { type: 'string' }, label: { type: 'string' } },
@@ -5571,13 +5577,14 @@ function gsSectionsSchema(sectionIds: string[]) {
       sections: {
         type: 'array',
         minItems: 1,
+        maxItems: sectionIds.length,
         items: {
           type: 'object',
           properties: {
             sectionId: { type: 'string', enum: sectionIds },
             headline: { type: 'string' },
             lead: { type: 'string' },
-            blocks: { type: 'array', items: GS_BLOCK_SCHEMA },
+            blocks: { type: 'array', items: GS_BLOCK_SCHEMA, maxItems: 20 },
           },
           required: ['sectionId', 'headline', 'lead', 'blocks'],
           additionalProperties: false,

@@ -112,28 +112,33 @@ export function formatAutoNumber(numberStyle: string | undefined, l1Index: numbe
 // static/answer/computed 모듈은 스키마에서 완전히 제외 — 토큰 절약 + 환각 원천 차단.
 // 타입별로 "AI가 실제로 채울 필드"만 노출한다(관리자가 설정하는 톤/정렬/아이콘종류 등은
 // 스키마에 넣지 않는다 — 그런 설정은 admin payload에 이미 있고 렌더 시 그대로 쓴다).
+// 2026-10-23: 배열에 maxItems 상한이 없으면 Anthropic API가 구조화 출력용으로
+// 컴파일하는 문법(grammar)이 너무 커져 400 "The compiled grammar is too large"로
+// 거부될 수 있다(기존 gsSectionsSchema/GS_BLOCK_SCHEMA에서 스테이징 실측으로 확인된
+// 동일 문제 — 여기도 같은 패턴이라 선제적으로 상한을 둔다). 실제 콘텐츠 분량을
+// 넉넉히 덮는 선에서만 제한했다.
 const AI_FIELD_SCHEMA: Record<string, { properties: Record<string, any>; required: string[] }> = {
   headlineBox: { properties: { text: { type: 'string' } }, required: ['text'] },
   subhead: { properties: { text: { type: 'string' } }, required: ['text'] },
   subhead2: { properties: { text: { type: 'string' } }, required: ['text'] },
   paragraph: { properties: { text: { type: 'string' } }, required: ['text'] },
-  bullets: { properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },
-  bulletsSummary: { properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },
-  table: { properties: { rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } } }, required: ['rows'] },
+  bullets: { properties: { items: { type: 'array', items: { type: 'string' }, maxItems: 15 } }, required: ['items'] },
+  bulletsSummary: { properties: { items: { type: 'array', items: { type: 'string' }, maxItems: 15 } }, required: ['items'] },
+  table: { properties: { rows: { type: 'array', items: { type: 'array', items: { type: 'string' }, maxItems: 10 }, maxItems: 30 } }, required: ['rows'] },
   compareTable: {
-    properties: { rows: { type: 'array', items: { type: 'object', properties: { label: { type: 'string' }, values: { type: 'object' } }, required: ['label', 'values'], additionalProperties: false } } },
+    properties: { rows: { type: 'array', maxItems: 20, items: { type: 'object', properties: { label: { type: 'string' }, values: { type: 'object' } }, required: ['label', 'values'], additionalProperties: false } } },
     required: ['rows'],
   },
   diagram: {
     properties: {
-      nodes: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, label: { type: 'string' } }, required: ['id', 'label'], additionalProperties: false } },
-      edges: { type: 'array', items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' } }, required: ['from', 'to'], additionalProperties: false } },
+      nodes: { type: 'array', maxItems: 20, items: { type: 'object', properties: { id: { type: 'string' }, label: { type: 'string' } }, required: ['id', 'label'], additionalProperties: false } },
+      edges: { type: 'array', maxItems: 30, items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' } }, required: ['from', 'to'], additionalProperties: false } },
     },
     required: ['nodes', 'edges'],
   },
-  timeline: { properties: { rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } } }, required: ['rows'] },
+  timeline: { properties: { rows: { type: 'array', items: { type: 'array', items: { type: 'string' }, maxItems: 10 }, maxItems: 20 } }, required: ['rows'] },
   iconStats: {
-    properties: { tiles: { type: 'array', items: { type: 'object', properties: { icon: { type: 'string' }, value: { type: 'string' }, label: { type: 'string' } }, required: ['icon', 'value', 'label'], additionalProperties: false } } },
+    properties: { tiles: { type: 'array', maxItems: 8, items: { type: 'object', properties: { icon: { type: 'string' }, value: { type: 'string' }, label: { type: 'string' } }, required: ['icon', 'value', 'label'], additionalProperties: false } } },
     required: ['tiles'],
   },
   visual: { properties: { caption: { type: 'string' }, alt: { type: 'string' } }, required: ['caption', 'alt'] },
@@ -163,11 +168,16 @@ export function buildGroupResponseSchema(categories: CategoryTree[], answers: Re
       sections: {
         type: 'array',
         minItems: 1,
+        maxItems: categoryIds.length,
         items: {
           type: 'object',
           properties: {
             categoryId: { type: 'string', enum: categoryIds },
-            blocks: { type: 'array', items: allModuleSchemas.length ? { anyOf: allModuleSchemas } : { type: 'object' } },
+            blocks: {
+              type: 'array',
+              maxItems: Math.max(allModuleSchemas.length, 1),
+              items: allModuleSchemas.length ? { anyOf: allModuleSchemas } : { type: 'object' },
+            },
           },
           required: ['categoryId', 'blocks'],
           additionalProperties: false,
