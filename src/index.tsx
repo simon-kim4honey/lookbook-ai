@@ -5518,7 +5518,7 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 4. 재무 숫자는 [재무 계산 결과]에 제공된 값(budgetStages.stage1Split/stage2Split 포함)만 그대로 인용한다 — 재계산·변형 절대 금지.
 5. 문체: 정부지원사업 컨설턴트가 직접 쓴 것처럼 자연스럽고 전문적인 문장. 개조식("~한다/~이다")과 서술형을 섞어 쓰고 같은 유형을 3개 이상 연속하지 않는다. 1인칭 "본 브랜드" 사용.
 6. 구조(반드시 지킬 것): 아래 [섹션별 필수 구조]에 지정된 항목·순서·블록 타입을 절대 바꾸지 않는다 — 항목을 생략하거나 추가하거나 순서를 바꾸지 말 것("위 항목과 작성방법 변경금지").
-7. blocks의 type: "headlineBox"(text) | "subhead"(text) | "subhead2"(text) | "paragraph"(text) | "bullets"(items:string[]) | "table"(headers:string[],rows:string[][]) | "visual"(visualId,caption) | "iconStats"(items:[{icon:string(이모지 1개),value:string,label:string}], 2~4개). evidenceGap은 사용하지 않는다.
+7. blocks의 type: "headlineBox"(text) | "subhead"(text) | "subhead2"(text) | "paragraph"(text) | "bullets"(items:string[]) | "table"(headers:string[], rows: 각 행의 셀 배열을 JSON 문자열로 직렬화한 string[]) | "visual"(visualId,caption) | "iconStats"(tiles:[{icon:string(이모지 1개),value:string,label:string}], 2~4개). evidenceGap은 사용하지 않는다.
 8. 경쟁사 비교표의 competitorsUnknown이 true면 사용자가 실제 경쟁 브랜드를 모른다는 뜻이다 — 특정 브랜드명을 지어내지 말고 카테고리/컨셉에 맞는 "경쟁 유형"을 일반 명사로 제시한다(예: "대형 SPA 브랜드" 등 — 실존 브랜드명 금지).
 9. 사용자 답변의 processSteps는 선택한 제작 공정 단계, differentiationTypes는 선택한 차별점 유형이다 — 이 선택값을 중심으로 구체화하고, differentiation 텍스트가 비어있으면 선택한 유형에 대해 패션 업계 일반적인 모범 사례를 제안 형태로 쓰되 단정하지 않는다.
 10. teamMembers(팀원)·partners(협력기관) 답변이 비어있으면 지어내지 말고 "4-1-1 나.조직현황" 표에 각각 "대표자 단독 창업"/"협력기관 추후 발굴 예정" 한 줄로 명시한다(원칙 3의 예외 — 빈 팀/협력사를 꾸며내는 것은 사실 왜곡 위험이 커서 허용하지 않는다).
@@ -5528,43 +5528,64 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 // 2026-10-22: 프롬프트 지시만으로는 "JSON만 응답할 것"을 강제할 수 없어 입력이 비어있을 때
 // 모델이 설명 문장을 먼저 쓰다 파싱이 깨지는 사례가 반복됐다 — output_config.format(structured
 // outputs)으로 응답 자체를 JSON 스키마에 문법적으로 맞춰 생성하게 해 이 실패 유형을 구조적으로
-// 막는다. blocks는 타입별로 필드가 다른 polymorphic 배열이라 anyOf + const 판별자로 표현한다.
-function gsBlockVariant(type: string, props: Record<string, any>, required: string[]) {
-  return {
-    type: 'object',
-    properties: { type: { type: 'string', const: type }, ...props },
-    required: ['type', ...required],
-    additionalProperties: false,
-  }
+// 막는다.
+//
+// 2026-10-23: blocks를 "타입별로 필드가 다른 polymorphic 배열"로 표현하려고 anyOf(8종
+// 변형) + const 판별자를 썼었는데, Anthropic 구조화 출력 문서가 "union 타입(anyOf)은
+// 컴파일 비용이 지수적으로 커진다"고 명시한 대로 실제로 400 "Schema is too complex for
+// compilation"에 걸렸다(table.rows 평탄화만으로는 해결 안 됨 — 스테이징 실측 확인).
+// anyOf를 완전히 없애고 모든 타입의 필드를 하나의 평평한 객체에 전부 선택필드로 모았다
+// (타입마다 안 쓰는 필드는 그냥 비워둠 — type이 실제 사용 필드를 결정). gsNormalizeGsBlock()이
+// 응답을 받은 뒤 타입별로 필요한 필드만 골라 기존과 동일한 블록 형태로 재조립해 저장하므로
+// 렌더러(rsRenderBlock)와 기존에 이미 생성·저장된 사업계획서 데이터는 전혀 바뀌지 않는다.
+const GS_BLOCK_SCHEMA = {
+  type: 'object',
+  properties: {
+    type: { type: 'string', enum: ['headlineBox', 'subhead', 'subhead2', 'paragraph', 'bullets', 'table', 'visual', 'iconStats'] },
+    text: { type: 'string', description: 'type이 headlineBox/subhead/subhead2/paragraph일 때만 사용' },
+    items: { type: 'array', items: { type: 'string' }, description: 'type이 bullets일 때만 사용' },
+    headers: { type: 'array', items: { type: 'string' }, description: 'type이 table일 때만 사용' },
+    rows: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'type이 table일 때만 사용. 각 원소는 그 행의 셀 배열을 JSON 배열 문자열로 직렬화. 예: "[\\"셀1\\",\\"셀2\\"]"',
+    },
+    visualId: { type: 'string', description: 'type이 visual일 때만 사용' },
+    caption: { type: 'string', description: 'type이 visual일 때만 사용' },
+    tiles: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { icon: { type: 'string' }, value: { type: 'string' }, label: { type: 'string' } },
+        required: ['icon', 'value', 'label'],
+        additionalProperties: false,
+      },
+      description: 'type이 iconStats일 때만 사용(2~4개)',
+    },
+  },
+  required: ['type'],
+  additionalProperties: false,
 }
 
-const GS_BLOCK_SCHEMA = {
-  anyOf: [
-    gsBlockVariant('headlineBox', { text: { type: 'string' } }, ['text']),
-    gsBlockVariant('subhead', { text: { type: 'string' } }, ['text']),
-    gsBlockVariant('subhead2', { text: { type: 'string' } }, ['text']),
-    gsBlockVariant('paragraph', { text: { type: 'string' } }, ['text']),
-    gsBlockVariant('bullets', { items: { type: 'array', items: { type: 'string' } } }, ['items']),
-    // rows는 행마다 셀 배열을 JSON 문자열로 직렬화한 array<string> — 중첩 배열을
-    // 쓰면 400 "Schema is too complex for compilation"에 걸린다(gsCallClaudeSections
-    // 호출부에서 decodeTableRows()로 원래 형태(string[][])로 되돌려 저장한다).
-    gsBlockVariant('table', {
-      headers: { type: 'array', items: { type: 'string' } },
-      rows: { type: 'array', items: { type: 'string', description: '한 행의 셀들을 담은 JSON 배열을 문자열로 직렬화. 예: "[\\"셀1\\",\\"셀2\\"]"' } },
-    }, ['headers', 'rows']),
-    gsBlockVariant('visual', { visualId: { type: 'string' }, caption: { type: 'string' } }, ['visualId', 'caption']),
-    gsBlockVariant('iconStats', {
-      items: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: { icon: { type: 'string' }, value: { type: 'string' }, label: { type: 'string' } },
-          required: ['icon', 'value', 'label'],
-          additionalProperties: false,
-        },
-      },
-    }, ['items']),
-  ],
+// GS_BLOCK_SCHEMA(평평한 선택필드 객체)로 받은 응답을 타입별 필요한 필드만 골라
+// 기존 블록 형태(렌더러·저장 형식과 동일)로 재조립한다. table은 rows를 JSON 문자열에서
+// string[][]로 복원, iconStats는 tiles→items로 이름을 되돌린다.
+function gsNormalizeGsBlock(raw: any): any {
+  const type = raw?.type
+  switch (type) {
+    case 'headlineBox': case 'subhead': case 'subhead2': case 'paragraph':
+      return { type, text: raw.text }
+    case 'bullets':
+      return { type, items: raw.items || [] }
+    case 'table':
+      return { type, headers: raw.headers || [], rows: decodeTableRows(raw.rows) }
+    case 'visual':
+      return { type, visualId: raw.visualId, caption: raw.caption }
+    case 'iconStats':
+      return { type, items: raw.tiles || [] }
+    default:
+      return raw
+  }
 }
 
 function gsSectionsSchema(sectionIds: string[]) {
@@ -5699,9 +5720,7 @@ async function gsCallClaudeSections(
   const sections = await gsCallClaudeWithSchema(apiKey, prompt, gsSectionsSchema(sectionIds), sectionIds.length, maxTokens, timeoutMs, env, label)
   if (!sections) return null
   for (const section of sections) {
-    for (const block of section?.blocks || []) {
-      if (block?.type === 'table' && block.rows !== undefined) block.rows = decodeTableRows(block.rows)
-    }
+    section.blocks = (section?.blocks || []).map(gsNormalizeGsBlock)
   }
   return sections
 }
