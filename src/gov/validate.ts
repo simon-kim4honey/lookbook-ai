@@ -36,7 +36,7 @@ export interface GovNode {
   binding: 'static' | 'answer' | 'computed' | 'ai'
   bindingKey?: string | null
   targetChars?: number | null
-  repeatConfig?: { enabled?: boolean; source?: string } | null
+  repeatConfig?: { enabled?: boolean; source?: string; max?: number } | null
   conditionConfig?: { enabled?: boolean; when?: string } | null
 }
 

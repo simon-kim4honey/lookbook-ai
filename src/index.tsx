@@ -5,7 +5,12 @@ import { setCookie } from 'hono/cookie'
 import leadsApp from './leads'
 import bizLeadsApp from './bizleads'
 import contentDigestApp from './content-digest'
-import govNodesApp from './gov/nodesApi.ts'
+import govNodesApp, { loadProgramNodes } from './gov/nodesApi.ts'
+import { validateProgram } from './gov/validate.ts'
+import {
+  buildCategoryTrees, buildGroupResponseSchema, buildCategoryStructureText, mergeCategoryBlocks,
+  isAiGeneratedNode, flattenCategory, type CategoryTree,
+} from './gov/generationAssembly.ts'
 import { rewriteForCardNews, renderCardSvg } from './card-image'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
@@ -5197,10 +5202,22 @@ const GS_GENERATION_READY_IDS = ['yebi']
 // 2026-10-22(어드민 구조 관리): 'yebi'는 하드코딩 폴백(GS_YEBI_SECTIONS/STRUCTURE)이 있어
 // 항상 생성 가능하고, 그 외 프로그램은 어드민에서 gov_support_sections에 섹션을 하나라도
 // 등록하면(코드 배포 없이) 바로 생성 가능해진다.
+// 2026-10-23(P4, 모듈 빌더 생성 파이프라인 전환): gov_support_nodes가 게시(published)
+// 상태이고 검증 오류가 0건이면 그것도 생성 가능으로 본다 — 실제 generateGovSupportSections()가
+// 이 조건일 때 새 노드 트리 경로를 타기 때문에(§11-1), "생성 가능" 표시가 실제 동작과
+// 어긋나지 않게 하려면 여기서도 같은 조건(게시 + 검증 통과)을 확인해야 한다. yebi처럼
+// 하드코딩 폴백이 있는 프로그램은 노드 쪽에 오류가 있어도 어차피 폴백으로 생성되므로
+// 이미 true이고, 이 조건은 그 외 프로그램에만 실질적으로 영향을 준다.
 async function gsIsGenerationReady(db: D1Database, programId: string): Promise<boolean> {
   if (GS_GENERATION_READY_IDS.includes(programId)) return true
   const row = await db.prepare(`SELECT 1 FROM gov_support_sections WHERE program_id = ? LIMIT 1`).bind(programId).first()
-  return !!row
+  if (row) return true
+  const config = await db.prepare(`SELECT structure_status FROM gov_support_config WHERE program_id = ?`).bind(programId).first() as any
+  if (config?.structure_status !== 'published') return false
+  const { nodes } = await loadProgramNodes(db, programId)
+  if (!nodes.length) return false
+  const issues = validateProgram(nodes)
+  return !issues.some((i) => i.level === 'error')
 }
 
 const GS_DOMAIN_KB = `[원가 구조] 소매원가 = 소재비(원단+부자재) + 임가공비(패턴·샘플·봉제·마감) + 라벨/택 + 포장 + 검사·기획비.
@@ -5568,11 +5585,15 @@ function gsSectionsSchema(sectionIds: string[]) {
   }
 }
 
-async function gsCallClaudeSections(
-  apiKey: string, prompt: string, sectionIds: string[], maxTokens: number, timeoutMs: number,
-  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string
+// 2026-10-23(P4): HTTP 호출·파싱·에러로깅 "코어"를 스키마 인자로 분리했다 — 기존
+// gsCallClaudeSections(섹션ID 기반 GS_BLOCK_SCHEMA)는 그대로 쓰고, 새 노드 트리
+// 기반 생성(generateGovSupportSectionsFromNodes)은 §11-3에서 동적으로 만든 스키마를
+// 넘겨 같은 코어를 재사용한다. gsCallClaudeSections의 동작은 전혀 바뀌지 않았다 —
+// 단순히 자기 안에서 만들던 스키마를 인자로 받는 것으로만 바꿨다(동일 값 전달).
+async function gsCallClaudeWithSchema(
+  apiKey: string, prompt: string, schema: any, expectCount: number, maxTokens: number, timeoutMs: number,
+  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string, temperature?: number
 ): Promise<any[] | null> {
-  const expectCount = sectionIds.length
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -5580,9 +5601,10 @@ async function gsCallClaudeSections(
       body: JSON.stringify({
         model: 'claude-sonnet-5',
         thinking: { type: 'disabled' },
+        ...(temperature !== undefined ? { temperature } : {}),
         max_tokens: maxTokens,
         messages: [{ role: 'user', content: prompt }],
-        output_config: { format: { type: 'json_schema', schema: gsSectionsSchema(sectionIds) } },
+        output_config: { format: { type: 'json_schema', schema } },
       }),
       signal: AbortSignal.timeout(timeoutMs),
     })
@@ -5631,6 +5653,13 @@ async function gsCallClaudeSections(
   }
 }
 
+async function gsCallClaudeSections(
+  apiKey: string, prompt: string, sectionIds: string[], maxTokens: number, timeoutMs: number,
+  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string
+): Promise<any[] | null> {
+  return gsCallClaudeWithSchema(apiKey, prompt, gsSectionsSchema(sectionIds), sectionIds.length, maxTokens, timeoutMs, env, label)
+}
+
 function gsBuildGroupPrompt(sectionIds: string[], sharedContext: string, intro: string, sectionsMeta: GsSectionMeta[], structureText: Record<string, string>): string {
   const spec = JSON.stringify(sectionsMeta.filter((s) => sectionIds.includes(s.id)).map((s) => ({ id: s.id, title: s.title, targetChars: s.targetChars })))
   const structure = sectionIds.map((id) => `[${id}] ${structureText[id] || ''}`).join('\n\n')
@@ -5648,10 +5677,168 @@ ${structure}
 응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것. 입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 ${sectionIds.join(', ')} 섹션 전부(이 순서로) 완전하게 작성한다.`
 }
 
+// ────────────────────────────────────────────────────
+// 2026-10-23(P4) — 지원사업 구조 모듈 빌더(P0~P3, gov_support_nodes)로 등록된
+// 3단계 트리를 생성 파이프라인에 연결한다. 기획서 §11-1은 "노드 검증 실패 시
+// 생성 차단 + 준비중 안내"를 요구하지만, 여기서는 더 보수적으로 설계했다:
+// 노드가 없거나 검증 오류가 있으면 null을 반환해 호출부(generateGovSupportSections)가
+// 기존 경로(gov_support_sections/items → yebi 하드코딩)로 그대로 폴백하게 한다.
+// 이렇게 해야 "운영 중인 생성이 새 기능 배포 때문에 끊기는" 일이 없다 — 실제로
+// yebi는 이관된 노드에 아직 검증 오류가 19건 있어(테이블 컬럼 미정의 등, 관리자가
+// 새 빌더에서 채워야 함), 이 함수는 당분간 yebi에 대해 계속 null을 반환하고 yebi는
+// 기존 경로로 생성된다 — 즉 이번 배포는 yebi 실제 생성 결과를 전혀 바꾸지 않는다.
+// ────────────────────────────────────────────────────
+async function gsLoadPublishedNodesTree(db: D1Database, programId: string): Promise<CategoryTree[] | null> {
+  const config = await db.prepare(`SELECT structure_status FROM gov_support_config WHERE program_id = ?`).bind(programId).first() as any
+  if (config?.structure_status !== 'published') return null
+  const { nodes } = await loadProgramNodes(db, programId)
+  if (!nodes.length) return null
+  const issues = validateProgram(nodes)
+  if (issues.some((i) => i.level === 'error')) return null
+  return buildCategoryTrees(nodes)
+}
+
+function gsBuildEmptyCategorySection(cat: CategoryTree, how: string) {
+  return { sectionId: cat.node.id, headline: cat.node.title, lead: '', blocks: [{ type: 'evidenceGap', need: 'AI 초안 생성', how }] }
+}
+
+// 실패한 그룹만 저온도(0.2)로 1회 재시도한다 — §11-4 "대분류 단위 재시도".
+async function gsCallGroupWithRetry(
+  apiKey: string, prompt: string, schema: any, expectCount: number, maxTokens: number, timeoutMs: number,
+  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string
+): Promise<any[] | null> {
+  const first = await gsCallClaudeWithSchema(apiKey, prompt, schema, expectCount, maxTokens, timeoutMs, env, label)
+  if (first) return first
+  console.error(`gov-support(nodes) ${label} 1차 실패 — 저온도 재시도`)
+  return gsCallClaudeWithSchema(apiKey, prompt, schema, expectCount, maxTokens, timeoutMs, env, `${label}(재시도)`, 0.2)
+}
+
+// 서버 계산값(finance)을 binding=computed 모듈이 인용할 수 있게 bindingKey→값으로 변환한다.
+// 부록 B 화이트리스트와 1:1 대응 — 이 목록 밖의 키는 validateNode()의 V005에서 이미 걸러진다.
+function gsResolveComputedValue(bindingKey: string | null | undefined, finance: any): any {
+  if (!bindingKey) return null
+  switch (bindingKey) {
+    case 'fundUse.stage1':
+      return finance?.budgetStages?.stage1Split ? { rows: finance.budgetStages.stage1Split.map((s: any) => [s.item, String(s.amount)]) } : null
+    case 'fundUse.stage2':
+      return finance?.budgetStages?.stage2Split ? { rows: finance.budgetStages.stage2Split.map((s: any) => [s.item, String(s.amount)]) } : null
+    case 'costBreakdown':
+      return { cost: finance?.cost, price: finance?.price, margin: finance?.margin, marginRate: finance?.marginRate }
+    case 'channelMargin':
+      return { channelMargins: finance?.channelMargins }
+    case 'revenueScenario':
+      return finance?.scenario
+    default:
+      return null
+  }
+}
+
+async function generateGovSupportSectionsFromNodes(
+  apiKey: string, programName: string, categories: CategoryTree[], answers: any, finance: any,
+  competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string }
+): Promise<any[]> {
+  const sharedContext = gsBuildSharedContext(answers, finance, competitorTable, selfMallExcerpt)
+  const intro = `당신은 한국 정부지원사업(${programName}) 심사 경험이 10년 이상인 패션 제조 전문 컨설턴트다. 실제로 선정된 사업계획서를 여러 건 써온 사람처럼, 자연스럽고 전문적인 문장으로 아래 소상공인의 답변을 바탕으로 공식 사업계획서 양식의 섹션을 작성한다.`
+
+  // summary 판정 — 작업D 지시: "L1 제목에 '요약' 포함 또는 별도 플래그". 별도 플래그
+  // 컬럼은 아직 없어(어드민 빌더 UI에도 그런 설정이 없다) 제목 매칭만 사용한다.
+  const isSummaryCat = (c: CategoryTree) => /요약/.test(c.node.title || '')
+  const summaryCat = categories.find(isSummaryCat)
+  const mainCats = categories.filter((c) => !isSummaryCat(c))
+  const groups = gsChunk(mainCats, 2)
+  const l1IndexById = new Map(mainCats.map((c, i) => [c.node.id, i + 1]))
+
+  const groupResults = await Promise.all(groups.map(async (group) => {
+    const ids = group.map((c) => c.node.id)
+    const label = group.map((c) => c.node.title).join('·')
+    const hasAiNode = group.some((c) => flattenCategory(c, answers).some((e) => isAiGeneratedNode(e.node)))
+    if (!hasAiNode) return group.map((c) => ({ categoryId: c.node.id, blocks: [] })) // AI 모듈이 없으면 호출 자체 생략
+
+    const schema = buildGroupResponseSchema(group, answers)
+    const structureBlock = group.map((c) => buildCategoryStructureText(c, answers)).join('\n\n')
+    const prompt = `${intro}
+
+${GS_WRITING_PRINCIPLES}
+
+${sharedContext}
+[대분류 구조 — moduleId별로 지정된 표현방법·바인딩·지시를 그대로 따를 것]
+${structureBlock}
+
+응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것. 입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 ${ids.join(', ')} 전부(이 순서로) 완전하게 작성한다.`
+    return gsCallGroupWithRetry(apiKey, prompt, schema, group.length, 16000, 100000, env, label)
+  }))
+
+  const mainSections = groups.flatMap((group, i) => {
+    const result = groupResults[i]
+    if (!result) {
+      return group.map((c) => gsBuildEmptyCategorySection(c, `AI 초안 생성 실패(${group.map((x) => x.node.title).join('·')}) — 관리자에게 문의해주세요.`))
+    }
+    const aiByCategoryId = new Map(result.map((r: any) => [r.categoryId, r]))
+    return group.map((c) => {
+      const aiResult: any = aiByCategoryId.get(c.node.id)
+      const aiBlocksByModuleId = new Map<string, any>((aiResult?.blocks || []).map((b: any) => [b.moduleId, b]))
+      const l1Index = l1IndexById.get(c.node.id) || 1
+      const { blocks, warnings } = mergeCategoryBlocks(c, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance), l1Index)
+      if (warnings.length) console.error(`gov-support(nodes) "${c.node.title}" 병합 경고:`, JSON.stringify(warnings).slice(0, 500))
+      return { sectionId: c.node.id, headline: c.node.title, lead: '', blocks }
+    })
+  })
+
+  if (!summaryCat) return mainSections
+
+  let summarySection: any
+  if (groupResults.every((r) => r !== null)) {
+    const summaryHasAi = flattenCategory(summaryCat, answers).some((e) => isAiGeneratedNode(e.node))
+    if (!summaryHasAi) {
+      const { blocks } = mergeCategoryBlocks(summaryCat, new Map(), answers, (key) => gsResolveComputedValue(key, finance), 0)
+      summarySection = { sectionId: summaryCat.node.id, headline: summaryCat.node.title, lead: '', blocks }
+    } else {
+      const schema = buildGroupResponseSchema([summaryCat], answers)
+      const structureBlock = buildCategoryStructureText(summaryCat, answers)
+      const promptC = `${intro}
+
+${GS_WRITING_PRINCIPLES}
+
+${sharedContext}
+[이미 작성된 다른 섹션 전체 — 아래 내용만 압축 요약할 것, 새로 지어내지 말 것]
+${JSON.stringify(mainSections)}
+
+[대분류 구조]
+${structureBlock}
+
+응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것.`
+      const result = await gsCallGroupWithRetry(apiKey, promptC, schema, 1, 4000, 60000, env, summaryCat.node.title || '요약')
+      if (!result) {
+        summarySection = gsBuildEmptyCategorySection(summaryCat, 'AI 초안 생성 실패(요약) — 관리자에게 문의해주세요.')
+      } else {
+        const aiResult: any = result[0]
+        const aiBlocksByModuleId = new Map<string, any>((aiResult?.blocks || []).map((b: any) => [b.moduleId, b]))
+        const { blocks } = mergeCategoryBlocks(summaryCat, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance), 0)
+        summarySection = { sectionId: summaryCat.node.id, headline: summaryCat.node.title, lead: '', blocks }
+      }
+    }
+  } else {
+    summarySection = gsBuildEmptyCategorySection(summaryCat, '다른 섹션 생성이 실패해 요약을 만들 수 없습니다 — 관리자에게 문의해주세요.')
+  }
+
+  return [...mainSections, summarySection]
+}
+
 async function generateGovSupportSections(
   apiKey: string | undefined, programId: string, programName: string, answers: any, finance: any,
   competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string }
 ): Promise<any[]> {
+  // 2026-10-23(P4, 모듈 빌더 생성 파이프라인 전환): 새 3단계 노드 트리(gov_support_nodes,
+  // P0~P3)가 게시+검증통과 상태면 최우선으로 그걸 쓴다. 안 되면(미게시/오류/노드없음)
+  // 아래 기존 경로(gov_support_sections/items → yebi 하드코딩)로 그대로 내려간다 —
+  // gsLoadPublishedNodesTree 주석 참고, 의도적으로 스펙보다 보수적인 폴백 체인이다.
+  if (apiKey && env) {
+    const categories = await gsLoadPublishedNodesTree(env.LOOKBOOK_DB, programId).catch(() => null)
+    if (categories) {
+      return generateGovSupportSectionsFromNodes(apiKey, programName, categories, answers, finance, competitorTable, selfMallExcerpt, env)
+    }
+  }
+
   // 2026-10-22(어드민 구조 관리): program_id의 구조를 DB(gov_support_sections/items,
   // 어드민에서 직접 편집)에서 먼저 읽고, 없으면 예비창업패키지 하드코딩(GS_YEBI_SECTIONS/
   // STRUCTURE)으로 폴백한다 — 마이그레이션 직후나 관리자가 아직 설정하지 않은 프로그램도
@@ -5824,6 +6011,9 @@ app.get('/gov-support/result/:id', (c) => {
       .rs-wrap { padding: 0; }
       .rs-doc { box-shadow: none; border-radius: 0; padding: 0; }
       .rs-section { page-break-inside: avoid; }
+      /* §11-6 — 14종 블록 전부 페이지 경계에서 잘리지 않게(표·도식 포함) */
+      .rs-headline-box, .rs-subhead2, .rs-icon-stats, .rs-table, .rs-bullets,
+      .rs-visual-img, .rs-chart, .rs-evidence-gap { break-inside: avoid; page-break-inside: avoid; }
     }
   </style>
 
@@ -5883,8 +6073,52 @@ app.get('/gov-support/result/:id', (c) => {
 
     function rsRenderBlock(b) {
       if (b.type === 'headlineBox') return '<div class="rs-headline-box">' + rsEsc(b.text) + '</div>';
-      if (b.type === 'subhead') return '<div class="rs-subhead">' + rsEsc(b.text) + '</div>';
-      if (b.type === 'subhead2') return '<div class="rs-subhead2">' + rsEsc(b.text) + '</div>';
+      // b.number는 AI가 아니라 서버가 트리 형제 순서로 계산해 붙인다(§11-6) — 있으면
+      // 앞에 붙이고, 없으면(구버전 생성 결과 등) 번호 없이 그대로 렌더한다.
+      if (b.type === 'subhead') return '<div class="rs-subhead">' + (b.number ? rsEsc(b.number) + ' ' : '') + rsEsc(b.text) + '</div>';
+      if (b.type === 'subhead2') return '<div class="rs-subhead2">' + (b.number ? rsEsc(b.number) + ' ' : '') + rsEsc(b.text) + '</div>';
+      if (b.type === 'bulletsSummary') {
+        return (b.label ? '<div class="rs-subhead2">' + rsEsc(b.label) + '</div>' : '') +
+          '<ul class="rs-bullets">' + (b.items||[]).map(function(i){ return '<li>' + rsEsc(i) + '</li>'; }).join('') + '</ul>';
+      }
+      if (b.type === 'compareTable') {
+        var subjects = b.subjects || [];
+        var head = '<tr><th>' + rsEsc(b.criteriaLabel || '비교 항목') + '</th>' + subjects.map(function(s){
+          return '<th' + (b.highlightSelf && s.isSelf ? ' style="color:#3182F6;"' : '') + '>' + rsEsc(s.labelKo || s.label || s.key) + '</th>';
+        }).join('') + '</tr>';
+        var rows = (b.rows||[]).map(function(r){
+          return '<tr><td>' + rsEsc(r.label) + '</td>' + subjects.map(function(s){
+            var v = (r.values || {})[s.key];
+            return '<td' + (b.highlightSelf && s.isSelf ? ' style="color:#3182F6;font-weight:700;"' : '') + '>' + rsEsc(v == null ? '-' : v) + '</td>';
+          }).join('') + '</tr>';
+        }).join('');
+        return '<table class="rs-table">' + head + rows + '</table>';
+      }
+      if (b.type === 'diagram') {
+        // flow만 실제 흐름도(박스+화살표)로 그리고, 나머지 레이아웃(hierarchy/matrix/cycle)은
+        // 범위를 좁혀 노드 목록으로 대체한다(§11-6 — 이번 단계에서는 flow만 전용 구현).
+        var nodes = b.nodes || [];
+        if (b.diagramType === 'flow' && nodes.length) {
+          var boxes = nodes.map(function(n, i){
+            return '<div style="display:inline-block;padding:8px 12px;border:1px solid #D1D6DB;border-radius:8px;background:#F8F9FA;font-size:12.5px;white-space:nowrap;">' + rsEsc(n.label) + '</div>' +
+              (i < nodes.length - 1 ? '<span style="margin:0 6px;color:#8B95A1;">→</span>' : '');
+          }).join('');
+          return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 14px;">' + boxes + '</div>' +
+            (b.title ? '<div class="rs-visual-caption">' + rsEsc(b.title) + '</div>' : '');
+        }
+        return '<ul class="rs-bullets">' + nodes.map(function(n){ return '<li>' + rsEsc(n.label) + '</li>'; }).join('') + '</ul>';
+      }
+      if (b.type === 'timeline') {
+        var cols = b.columns || ['구분', '추진 내용', '추진 기간', '세부 내용'];
+        var thead = '<tr>' + cols.map(function(c){ return '<th>' + rsEsc(c) + '</th>'; }).join('') + '</tr>';
+        var trows = (b.rows||[]).map(function(r){ return '<tr>' + r.map(function(cell){ return '<td>' + rsEsc(cell) + '</td>'; }).join('') + '</tr>'; }).join('');
+        return (b.title ? '<div class="rs-subhead2">' + rsEsc(b.title) + '</div>' : '') + '<table class="rs-table">' + thead + trows + '</table>';
+      }
+      if (b.type === 'callout') {
+        var toneColor = b.tone === 'legal' ? '#B91C1C' : b.tone === 'warning' ? '#8A6D1D' : '#1B64DA';
+        var toneBg = b.tone === 'legal' ? '#FFF5F5' : b.tone === 'warning' ? '#FFF8E1' : '#EAF2FF';
+        return '<div style="background:' + toneBg + ';border-radius:10px;padding:12px 14px;font-size:12.5px;color:' + toneColor + ';line-height:1.6;margin:0 0 14px;">' + rsEsc(b.text) + '</div>';
+      }
       if (b.type === 'iconStats') {
         return '<div class="rs-icon-stats">' + (b.items||[]).slice(0,4).map(function(it){
           return '<div class="rs-icon-stat"><div class="rs-icon-stat-icon">' + rsEsc(it.icon||'📌') + '</div><div class="rs-icon-stat-value">' + rsEsc(it.value) + '</div><div class="rs-icon-stat-label">' + rsEsc(it.label) + '</div></div>';
@@ -5913,7 +6147,8 @@ app.get('/gov-support/result/:id', (c) => {
         return '<div class="rs-evidence-gap"><b>📊 시각화: ' + rsEsc(b.caption || b.visualId || '') + '</b>다음 업데이트에서 자동으로 그려드릴게요. 지금은 직접 표/그래프로 채워주세요.</div>';
       }
       if (b.type === 'evidenceGap') return '<div class="rs-evidence-gap"><b>⚠️ 근거 필요: ' + rsEsc(b.need) + '</b>' + rsEsc(b.how) + '</div>';
-      return '';
+      // 알 수 없는 표현방법(AC-18) — 크래시 없이 회색 플레이스홀더로 렌더한다.
+      return '<div style="background:#F2F4F6;border-radius:10px;padding:10px 14px;font-size:12px;color:#8B95A1;margin:0 0 14px;">지원하지 않는 표현방법입니다' + (b.type ? ' (' + rsEsc(b.type) + ')' : '') + '</div>';
     }
 
     async function rsLoad() {
