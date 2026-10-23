@@ -5615,11 +5615,27 @@ async function gsCallClaudeWithSchema(
     if (!res.ok) {
       const bodyText = await res.text().catch(() => '')
       console.error(`gov-support 섹션 생성(${label}) HTTP 실패:`, res.status, bodyText.slice(0, 500))
+      if (env) {
+        await logError(env, {
+          source: 'server',
+          message: `gov-support 섹션 생성(${label}) HTTP 실패: ${res.status}`,
+          route: '/api/gov-support/projects/:id/generate',
+          extra: { status: res.status, bodyHead: bodyText.slice(0, 800) },
+        })
+      }
       return null
     }
     const data = await res.json<any>()
     if (data?.stop_reason === 'refusal') {
       console.error(`gov-support 섹션 생성(${label}) 거절됨:`, JSON.stringify(data?.stop_details || {}).slice(0, 300))
+      if (env) {
+        await logError(env, {
+          source: 'server',
+          message: `gov-support 섹션 생성(${label}) 거절됨`,
+          route: '/api/gov-support/projects/:id/generate',
+          extra: { stopDetails: data?.stop_details || {} },
+        })
+      }
       return null
     }
     if (data?.stop_reason === 'max_tokens') console.error(`gov-support 섹션 생성(${label}) max_tokens로 잘림`)
@@ -5648,11 +5664,27 @@ async function gsCallClaudeWithSchema(
     const sections = parsed?.sections
     if (!Array.isArray(sections) || sections.length < expectCount) {
       console.error(`gov-support 섹션 생성(${label}) 결과 개수 부족:`, Array.isArray(sections) ? sections.length : typeof sections)
+      if (env) {
+        await logError(env, {
+          source: 'server',
+          message: `gov-support 섹션 생성(${label}) 결과 개수 부족: ${Array.isArray(sections) ? sections.length : typeof sections} (기대 ${expectCount})`,
+          route: '/api/gov-support/projects/:id/generate',
+          extra: { textHead: text.slice(0, 800) },
+        })
+      }
       return null
     }
     return sections
   } catch (e) {
     console.error(`gov-support 섹션 생성(${label}) 실패:`, e)
+    if (env) {
+      await logError(env, {
+        source: 'server',
+        message: `gov-support 섹션 생성(${label}) 실패: ` + (e instanceof Error ? `${e.name}: ${e.message}` : String(e)),
+        route: '/api/gov-support/projects/:id/generate',
+        extra: { errorName: e instanceof Error ? e.name : typeof e },
+      }).catch(() => {})
+    }
     return null
   }
 }
