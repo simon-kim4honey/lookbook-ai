@@ -5,6 +5,7 @@ import { setCookie } from 'hono/cookie'
 import leadsApp from './leads'
 import bizLeadsApp from './bizleads'
 import contentDigestApp from './content-digest'
+import govNodesApp from './gov/nodesApi.ts'
 import { rewriteForCardNews, renderCardSvg } from './card-image'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
@@ -159,6 +160,11 @@ app.route('/api/admin/bizleads', bizLeadsApp)
 
 // 패션 콘텐츠 다이제스트 — 주간 RSS 수집 → AI 요약 → 카톡채널 발행용 (관리자 전용)
 app.route('/api/admin/content-digest', contentDigestApp)
+
+// 지원사업 구조 모듈 빌더 — 3단계 노드 트리 CRUD API (관리자 전용, P2)
+// 기존 /api/admin/gov-support/*(2단계 section/item)와 당분간 공존한다 — P3에서
+// admin02 UI가 교체되기 전까지는 두 API가 각자 다른 테이블을 보고 서로 침범하지 않는다.
+app.route('/api/admin/gov', govNodesApp)
 
 // ────────────────────────────────────────────────────
 // Constants
