@@ -151,6 +151,19 @@ test('mergeCategoryBlocks — ai 모듈은 응답을 그대로 반영하고, sub
   assert.equal(headlineBlock.text, 'AI가 쓴 헤드카피')
 })
 
+test('mergeCategoryBlocks — 번호 없는 형제(headlineBox/iconStats 등)가 사이에 끼어도 자동번호는 건너뛰지 않고 연속된다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', binding: 'static' })
+  const a = node({ id: 'a', level: 2, parentId: 'l1', expressionType: 'headlineBox', binding: 'static' }) // 번호 없음
+  const b = node({ id: 'b', level: 2, parentId: 'l1', expressionType: 'subhead', payload: { autoNumber: true }, binding: 'static' })
+  const c = node({ id: 'c', level: 2, parentId: 'l1', expressionType: 'subhead2', payload: { autoNumber: true }, binding: 'static' })
+  const d = node({ id: 'd', level: 2, parentId: 'l1', expressionType: 'iconStats', binding: 'static' }) // 번호 없음
+  const e = node({ id: 'e', level: 2, parentId: 'l1', expressionType: 'subhead', payload: { autoNumber: true }, binding: 'static' })
+  const cat = buildCategoryTrees([l1, a, b, c, d, e])[0]
+  const { blocks } = mergeCategoryBlocks(cat, new Map(), {}, () => null, 1)
+  const numbered = blocks.filter((x) => x.number).map((x) => x.number)
+  assert.deepEqual(numbered, ['1-1.', '1-2.', '1-3.']) // 1-1,1-3,1-5처럼 건너뛰지 않는다
+})
+
 test('mergeCategoryBlocks — AI 응답에 moduleId가 없으면 경고를 남기고 관리자 힌트로 대체한다', () => {
   const cat = sampleTree()
   const { blocks, warnings } = mergeCategoryBlocks(cat, new Map(), {}, () => null, 1)

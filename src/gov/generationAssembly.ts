@@ -280,22 +280,22 @@ function staticOrAnswerValue(node: GovNode, answers: Record<string, any>, repeat
 }
 
 // aiBlocksByModuleId: Claude가 돌려준 blocks를 moduleId로 색인한 Map (호출부가 만든다)
+//
+// 2026-10-24: 자동 번호(subhead/subhead2의 autoNumber)를 "같은 부모 아래 몇 번째인지"
+// (groupIdx/leafIdx, 번호 없는 형제도 그대로 센다)로 매겼더니, 번호 없는 headlineBox/
+// iconStats/bullets 등이 사이에 끼어있을 때마다 보이는 번호가 1-2,1-3,1-4,1-5,1-7,
+// 1-16... 처럼 듬성듬성 건너뛰었다(스테이징 실제 생성으로 확인). 실제 번호가 붙는
+// 노드만 세는 별도 카운터로 바꿔 1-1,1-2,1-3...처럼 끊기지 않게 한다.
 export function mergeCategoryBlocks(
   cat: CategoryTree, aiBlocksByModuleId: Map<string, any>, answers: Record<string, any>,
   resolveComputed: ComputedResolver, l1Index: number
 ): { blocks: MergedBlock[]; warnings: MergeWarning[] } {
-  const blocks: MergedBlock[] = []
   const warnings: MergeWarning[] = []
-
-  cat.children.forEach((group, groupIdx) => {
-    for (const { node, repeatIndex, moduleId } of expandRepeat(group.node, answers)) {
-      blocks.push(buildOneBlock(node, moduleId, repeatIndex, aiBlocksByModuleId, answers, resolveComputed, warnings, l1Index, groupIdx))
-    }
-    group.children.forEach((leaf, leafIdx) => {
-      for (const { node, repeatIndex, moduleId } of expandRepeat(leaf, answers)) {
-        blocks.push(buildOneBlock(node, moduleId, repeatIndex, aiBlocksByModuleId, answers, resolveComputed, warnings, l1Index, leafIdx))
-      }
-    })
+  let autoNumberCounter = 0
+  const blocks = flattenCategory(cat, answers).map((entry) => {
+    const isNumbered = (entry.node.expressionType === 'subhead' || entry.node.expressionType === 'subhead2') && !!entry.node.payload?.autoNumber
+    const autoNumberIndex = isNumbered ? autoNumberCounter++ : -1
+    return buildOneBlock(entry.node, entry.moduleId, entry.repeatIndex, aiBlocksByModuleId, answers, resolveComputed, warnings, l1Index, autoNumberIndex)
   })
   return { blocks: blocks.filter((b): b is MergedBlock => !!b), warnings }
 }
