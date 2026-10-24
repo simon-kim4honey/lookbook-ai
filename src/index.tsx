@@ -8,7 +8,7 @@ import contentDigestApp from './content-digest'
 import govNodesApp, { loadProgramNodes } from './gov/nodesApi.ts'
 import { validateProgram } from './gov/validate.ts'
 import {
-  buildCategoryTrees, buildGroupResponseSchema, buildCategoryStructureText, mergeCategoryBlocks,
+  buildCategoryTrees, buildCategoryStructureText, mergeCategoryBlocks,
   isAiGeneratedNode, flattenCategory, buildAiBlocksByModuleId, type CategoryTree,
 } from './gov/generationAssembly.ts'
 import { rewriteForCardNews, renderCardSvg } from './card-image'
@@ -5781,11 +5781,28 @@ function gsResolveComputedValue(bindingKey: string | null | undefined, finance: 
   }
 }
 
-// 2026-10-24: anthropic-version이 구버전(2023-06-01)으로 고정돼 있던 게 "Schema is too
-// complex for compilation" 400의 실제 원인이었다(Playground cURL 내보내기로 실제 버전
-// 2026-10-21 확인 후 맞춰서 해결). output_config.format(structured outputs)을 다시
-// 쓴다 — moduleId를 const로 강제해 AI 응답이 모듈을 정확히 지칭하도록 보장한다.
-// buildAiBlocksByModuleId()는 혹시 모를 불일치에 대비한 방어적 안전장치로 남겨둔다.
+const GS_NODES_JSON_FORMAT = `반드시 아래 형식의 JSON "객체" 하나만 응답할 것 — 설명 문장, 코드펜스(\`\`\`), 그 어떤 다른 텍스트도 앞뒤에 붙이지 않는다:
+{"sections":[{"categoryId":"<대분류 id>","blocks":[{"moduleId":"<위 구조에 지정된 moduleId>", ...그 타입의 필드}]}]}
+blocks의 각 원소는 moduleId와 함께, 그 모듈의 표현방법(타입)에 맞는 필드만 포함한다:
+- headlineBox/subhead/subhead2/paragraph: {moduleId, text}
+- bullets/bulletsSummary: {moduleId, items:string[]}
+- table/timeline: {moduleId, rows:string[][]} (rows는 행마다 셀 문자열 배열)
+- compareTable: {moduleId, rows:[{label:string, values:object}]}
+- diagram: {moduleId, nodes:[{id,label}], edges:[{from,to}]}
+- iconStats: {moduleId, tiles:[{icon:string(이모지 1개), value:string, label:string}]}
+- visual: {moduleId, caption:string, alt:string}
+"생성 대상"이 아닌(고정값/답변값/서버계산값) 모듈은 blocks에 포함하지 말 것 — 위 구조에 생성 대상이라고 표시된 moduleId만 작성한다.`
+
+// 2026-10-24: anthropic-version 구버전 고정이 "Schema is too complex for compilation"의
+// 원인 중 하나였던 건 맞다(스키마 없음/단순 스키마는 헤더만 고치니 바로 해결됨 — 스테이징
+// 실측). 그래서 output_config.format을 다시 켰었는데, 이 경로(그룹 내 AI 생성 모듈마다
+// 서로 다른 object 스키마를 anyOf로 묶는 buildGroupResponseSchema)는 헤더를 고친 뒤에도
+// 여전히 400으로 거부됐다 — 모듈 수만큼 늘어나는 anyOf 자체가 진짜 복잡도 문제였던
+// 셈이다(기존 gsCallClaudeSections의 고정 8종 anyOf는 상대적으로 단순해 구조화 출력을
+// 유지함). 이 경로만 다시 프롬프트 기반 JSON으로 되돌린다. moduleId가 구조화 강제
+// 없이는 정확히 안 베껴질 수 있어 buildAiBlocksByModuleId()(정확 일치 우선, 실패하면
+// 구조 순서대로 배정)로 매칭한다 — 이 조합(프롬프트 기반 + 순서 보정)은 아직 실제
+// 생성으로 검증 전이니 스테이징에서 다시 확인 필요.
 async function generateGovSupportSectionsFromNodes(
   apiKey: string, programName: string, categories: CategoryTree[], answers: any, finance: any,
   competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string }
@@ -5807,7 +5824,6 @@ async function generateGovSupportSectionsFromNodes(
     const hasAiNode = group.some((c) => flattenCategory(c, answers).some((e) => isAiGeneratedNode(e.node)))
     if (!hasAiNode) return group.map((c) => ({ categoryId: c.node.id, blocks: [] })) // AI 모듈이 없으면 호출 자체 생략
 
-    const schema = buildGroupResponseSchema(group, answers)
     const structureBlock = group.map((c) => buildCategoryStructureText(c, answers)).join('\n\n')
     const prompt = `${intro}
 
@@ -5817,8 +5833,10 @@ ${sharedContext}
 [대분류 구조 — moduleId별로 지정된 표현방법·바인딩·지시를 그대로 따를 것]
 ${structureBlock}
 
-응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것. 입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 ${ids.join(', ')} 전부(이 순서로) 완전하게 작성한다.`
-    return gsCallGroupWithRetry(apiKey, prompt, schema, group.length, 16000, 100000, env, label)
+${GS_NODES_JSON_FORMAT}
+
+입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 ${ids.join(', ')} 전부(이 순서로) 완전하게 작성한다.`
+    return gsCallGroupWithRetry(apiKey, prompt, null, group.length, 16000, 100000, env, label)
   }))
 
   const mainSections = groups.flatMap((group, i) => {
@@ -5846,7 +5864,6 @@ ${structureBlock}
       const { blocks } = mergeCategoryBlocks(summaryCat, new Map(), answers, (key) => gsResolveComputedValue(key, finance), 0)
       summarySection = { sectionId: summaryCat.node.id, headline: summaryCat.node.title, lead: '', blocks }
     } else {
-      const schema = buildGroupResponseSchema([summaryCat], answers)
       const structureBlock = buildCategoryStructureText(summaryCat, answers)
       const promptC = `${intro}
 
@@ -5859,8 +5876,8 @@ ${JSON.stringify(mainSections)}
 [대분류 구조]
 ${structureBlock}
 
-응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것.`
-      const result = await gsCallGroupWithRetry(apiKey, promptC, schema, 1, 4000, 60000, env, summaryCat.node.title || '요약')
+${GS_NODES_JSON_FORMAT}`
+      const result = await gsCallGroupWithRetry(apiKey, promptC, null, 1, 4000, 60000, env, summaryCat.node.title || '요약')
       if (!result) {
         summarySection = gsBuildEmptyCategorySection(summaryCat, 'AI 초안 생성 실패(요약) — 관리자에게 문의해주세요.')
       } else {
