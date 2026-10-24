@@ -28,7 +28,7 @@ export interface GovNode {
   id: string
   programId: string
   parentId: string | null
-  level: 1 | 2 | 3
+  level: 1 | 2 | 3 | 4
   sortKey: string
   expressionType: string
   title?: string | null
@@ -188,6 +188,9 @@ export function validateProgram(nodes: GovNode[]): ValidationIssue[] {
     if (n.parentId && !byId.has(n.parentId)) {
       issues.push({ code: 'STRUCT_NO_PARENT', level: 'error', message: `부모 노드(${n.parentId})가 존재하지 않습니다.`, nodeId: n.id })
     }
+    if (n.level < 1 || n.level > 4) {
+      issues.push({ code: 'STRUCT_LEVEL', level: 'error', message: `level은 1~4 사이여야 합니다 (현재 ${n.level}).`, nodeId: n.id })
+    }
     if (n.level === 1 && n.parentId) {
       issues.push({ code: 'STRUCT_LEVEL', level: 'error', message: `대분류(L1)는 부모가 없어야 합니다.`, nodeId: n.id })
     }
@@ -292,14 +295,17 @@ export function validateProgram(nodes: GovNode[]): ValidationIssue[] {
       }
     }
 
-    // V008 — headlineBox가 한 중분류에 2개 이상 (L2 노드 자신 + 그 L3 자식 기준)
-    const l2Children = (childrenOf.get(l1.id) || []).filter((c) => c.level === 2)
-    for (const l2 of l2Children) {
-      const l3Children = childrenOf.get(l2.id) || []
-      const headlineCount = (l2.expressionType === 'headlineBox' ? 1 : 0) + l3Children.filter((c) => c.expressionType === 'headlineBox').length
-      if (headlineCount >= 2) {
-        issues.push({ code: 'V008', level: 'warn', message: `중분류 "${l2.title}"에 headlineBox가 ${headlineCount}개 있습니다.`, nodeId: l2.id })
-      }
+  }
+
+  // V008 — headlineBox가 한 그룹(아무 레벨이든, 자신+직속 자식 기준)에 2개 이상 —
+  // level 2(중분류)/3(소분류)/4(소소분류) 구분 없이 "자식을 가진 노드"마다 체크한다
+  // (3→4단계 확장에서 어느 깊이든 그룹 역할을 할 수 있으므로 레벨 번호에 의존하지 않음).
+  for (const [parentId, children] of childrenOf) {
+    const parent = byId.get(parentId)
+    if (!parent) continue
+    const headlineCount = (parent.expressionType === 'headlineBox' ? 1 : 0) + children.filter((c) => c.expressionType === 'headlineBox').length
+    if (headlineCount >= 2) {
+      issues.push({ code: 'V008', level: 'warn', message: `그룹 "${parent.title}"에 headlineBox가 ${headlineCount}개 있습니다.`, nodeId: parent.id })
     }
   }
 

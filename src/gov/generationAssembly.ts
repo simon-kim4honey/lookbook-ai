@@ -16,14 +16,21 @@
 import { getExpressionType, CATEGORY_HEADER_TYPE, type ExpressionTypeDef } from './moduleTypes.ts'
 import type { GovNode } from './validate.ts'
 
+// 2026-10-24(4단계 확장): 대분류(L1)/중분류(L2)/소분류(L3)/소소분류(L4) — L1 아래로는
+// 임의 깊이(최대 4)로 재귀 중첩된다. CategoryTree.node가 L1, 그 아래 NodeTree가
+// L2~L4를 전부 표현한다(어느 깊이든 "그룹(자식 보유)" 역할과 "콘텐츠(리프)" 역할을
+// 동시에 또는 둘 중 하나만 가질 수 있다 — 기존 L2가 그랬던 것과 동일한 유연성을
+// 한 단계 더 유지한다). GroupTree는 과거 이름을 그대로 쓰는 외부 참조가 있을 수 있어
+// NodeTree의 별칭으로 남겨둔다.
 export interface CategoryTree {
   node: GovNode // level 1
-  children: GroupTree[]
+  children: NodeTree[]
 }
-export interface GroupTree {
-  node: GovNode // level 2
-  children: GovNode[] // level 3 (leaf)
+export interface NodeTree {
+  node: GovNode // level 2~4
+  children: NodeTree[]
 }
+export type GroupTree = NodeTree
 
 // ── 트리 조립 ──────────────────────────────────────
 export function buildCategoryTrees(nodes: GovNode[]): CategoryTree[] {
@@ -35,14 +42,11 @@ export function buildCategoryTrees(nodes: GovNode[]): CategoryTree[] {
   }
   for (const list of byParent.values()) list.sort((a, b) => (a.sortKey < b.sortKey ? -1 : a.sortKey > b.sortKey ? 1 : 0))
 
+  function attach(n: GovNode): NodeTree {
+    return { node: n, children: (byParent.get(n.id) || []).map(attach) }
+  }
   const l1s = byParent.get(null) || []
-  return l1s.map((l1) => ({
-    node: l1,
-    children: (byParent.get(l1.id) || []).map((l2) => ({
-      node: l2,
-      children: byParent.get(l2.id) || [],
-    })),
-  }))
+  return l1s.map((l1) => ({ node: l1, children: (byParent.get(l1.id) || []).map(attach) }))
 }
 
 // ── 반복(repeat) 확장 — repeat.source 배열 길이만큼 노드를 복제한다. §11-3 ──
@@ -70,26 +74,26 @@ export function isAiGeneratedNode(node: GovNode): boolean {
   return !!def && def.promptFragment !== null
 }
 
-// 대분류(L1) 하나 아래의 L2+L3를 트리 순서(깊이우선)로 평면화하고, 반복 모듈은 전개한다.
+// 대분류(L1) 하나 아래의 L2~L4를 트리 순서(깊이우선)로 평면화하고, 반복 모듈은 전개한다.
+// 깊이는 더 이상 고정 2단계가 아니라 재귀로 임의 깊이(최대 4)를 그대로 따라간다.
 export interface FlatEntry {
   node: GovNode
   repeatIndex: number | null
   moduleId: string
-  depth: 2 | 3
+  depth: 2 | 3 | 4
   siblingIndex: number // 같은 부모 아래에서 몇 번째인지(0-base) — 자동 번호 매김용
 }
 export function flattenCategory(cat: CategoryTree, answers: Record<string, any>): FlatEntry[] {
   const out: FlatEntry[] = []
-  cat.children.forEach((group, groupIdx) => {
-    for (const { node, repeatIndex } of expandRepeat(group.node, answers)) {
-      out.push({ node, repeatIndex, moduleId: moduleIdFor(node.id, repeatIndex), depth: 2, siblingIndex: groupIdx })
-    }
-    group.children.forEach((leaf, leafIdx) => {
-      for (const { node, repeatIndex } of expandRepeat(leaf, answers)) {
-        out.push({ node, repeatIndex, moduleId: moduleIdFor(leaf.id, repeatIndex), depth: 3, siblingIndex: leafIdx })
+  function walk(trees: NodeTree[], depth: 2 | 3 | 4) {
+    trees.forEach((t, idx) => {
+      for (const { node, repeatIndex } of expandRepeat(t.node, answers)) {
+        out.push({ node, repeatIndex, moduleId: moduleIdFor(t.node.id, repeatIndex), depth, siblingIndex: idx })
       }
+      if (depth < 4) walk(t.children, (depth + 1) as 3 | 4)
     })
-  })
+  }
+  walk(cat.children, 2)
   return out
 }
 
@@ -215,23 +219,34 @@ function bindingInstruction(node: GovNode): string {
   }
 }
 
+// 2026-10-24(4단계 확장): 고정 2단계(그룹/리프) 순회를 재귀로 바꾼다. "그룹처럼
+// 자식을 가진 노드"는 moduleId 없이 제목·바인딩·지시만 보여주고(기존 L2와 동일 동작),
+// "자식이 없는 노드(실제 리프)"만 moduleId를 보여준다 — 깊이 번호(2/3/4)가 아니라
+// "자식 보유 여부"로 그룹/리프를 가른다. 기존 3단계 트리에서는 이 두 기준이 항상
+// 일치했으므로(L2=그룹, L3=리프) 동작이 그대로 보존되고, 4단계 트리에서는 어느
+// 깊이에서 가지가 끝나든 올바르게 moduleId가 노출된다.
 export function buildCategoryStructureText(cat: CategoryTree, answers: Record<string, any>): string {
   const lines: string[] = [`[${cat.node.title}] (목표 ${cat.node.targetChars || '제한없음'}자)`]
-  cat.children.forEach((group) => {
-    const def = getExpressionType(group.node.expressionType)
-    lines.push(`- (중분류) "${group.node.title}" [${def?.labelKo || group.node.expressionType}] — ${bindingInstruction(group.node)}`)
-    if (isAiGeneratedNode(group.node) && def?.promptFragment) lines.push(`  지시: ${def.promptFragment}`)
-    group.children.forEach((leaf) => {
-      const leafDef = getExpressionType(leaf.expressionType)
-      const entries = expandRepeat(leaf, answers)
-      entries.forEach(({ repeatIndex }) => {
-        const idSuffix = repeatIndex == null ? '' : ` (반복 ${repeatIndex + 1}번째)`
-        lines.push(`  - (소분류, moduleId="${moduleIdFor(leaf.id, repeatIndex)}") "${leaf.title || ''}"${idSuffix} [${leafDef?.labelKo || leaf.expressionType}] — ${bindingInstruction(leaf)}`)
-        if (isAiGeneratedNode(leaf) && leafDef?.promptFragment) lines.push(`    지시: ${leafDef.promptFragment}`)
-        if (leaf.payload?.text) lines.push(`    참고(관리자가 적어둔 힌트/제목): ${leaf.payload.text}`)
-      })
+  function walk(trees: NodeTree[], indent: string) {
+    trees.forEach((t) => {
+      const n = t.node
+      const def = getExpressionType(n.expressionType)
+      if (t.children.length === 0) {
+        const entries = expandRepeat(n, answers)
+        entries.forEach(({ repeatIndex }) => {
+          const idSuffix = repeatIndex == null ? '' : ` (반복 ${repeatIndex + 1}번째)`
+          lines.push(`${indent}- (moduleId="${moduleIdFor(n.id, repeatIndex)}") "${n.title || ''}"${idSuffix} [${def?.labelKo || n.expressionType}] — ${bindingInstruction(n)}`)
+          if (isAiGeneratedNode(n) && def?.promptFragment) lines.push(`${indent}  지시: ${def.promptFragment}`)
+          if (n.payload?.text) lines.push(`${indent}  참고(관리자가 적어둔 힌트/제목): ${n.payload.text}`)
+        })
+      } else {
+        lines.push(`${indent}- "${n.title || ''}" [${def?.labelKo || n.expressionType}] — ${bindingInstruction(n)}`)
+        if (isAiGeneratedNode(n) && def?.promptFragment) lines.push(`${indent}  지시: ${def.promptFragment}`)
+      }
+      walk(t.children, indent + '  ')
     })
-  })
+  }
+  walk(cat.children, '')
   return lines.join('\n')
 }
 

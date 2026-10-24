@@ -131,7 +131,16 @@ gov.get('/module-types', async (c) => {
   return c.json({ success: true, types: EXPRESSION_TYPES })
 })
 
-// ── GET /programs — 프로그램별 구조 상태 + 레벨별 노드 수 ──────────
+// 레벨별 이름(대분류/중분류/소분류/소소분류) — 프로그램마다 어드민이 바꿀 수 있다
+// (gov_support_config.level1_label~level4_label, 0039 마이그레이션). 행이 아예
+// 없는 프로그램(한 번도 게시하지 않은 draft)도 기본값을 그대로 쓸 수 있어야 한다.
+export const DEFAULT_LEVEL_LABELS = ['대분류', '중분류', '소분류', '소소분류'] as const
+
+function levelLabelsFromConfigRow(row: any): string[] {
+  return [1, 2, 3, 4].map((i) => row?.[`level${i}_label`] || DEFAULT_LEVEL_LABELS[i - 1])
+}
+
+// ── GET /programs — 프로그램별 구조 상태 + 레벨별 노드 수 + 레벨 이름 ──────────
 
 gov.get('/programs', async (c) => {
   const db = c.env.LOOKBOOK_DB
@@ -139,7 +148,7 @@ gov.get('/programs', async (c) => {
     `SELECT program_id, level, COUNT(*) as cnt FROM gov_support_nodes GROUP BY program_id, level`
   ).all()).results || []) as any[]
   const configRows = ((await db.prepare(
-    `SELECT program_id, structure_status, published_at, published_version FROM gov_support_config`
+    `SELECT program_id, structure_status, published_at, published_version, level1_label, level2_label, level3_label, level4_label FROM gov_support_config`
   ).all()).results || []) as any[]
 
   const byProgram = new Map<string, { nodeCounts: Record<string, number> }>()
@@ -156,8 +165,26 @@ gov.get('/programs', async (c) => {
     structureStatus: configByProgram.get(programId)?.structure_status || 'draft',
     publishedAt: configByProgram.get(programId)?.published_at || null,
     publishedVersion: configByProgram.get(programId)?.published_version || null,
+    levelLabels: levelLabelsFromConfigRow(configByProgram.get(programId)),
   }))
   return c.json({ success: true, programs })
+})
+
+// ── PUT /programs/:programId/level-labels — 레벨 이름(대/중/소/소소분류) 변경 ──
+
+gov.put('/programs/:programId/level-labels', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const programId = c.req.param('programId')
+  const body = await c.req.json().catch(() => ({})) as { labels?: string[] }
+  const labels = [1, 2, 3, 4].map((i) => (body.labels?.[i - 1] || DEFAULT_LEVEL_LABELS[i - 1]).trim() || DEFAULT_LEVEL_LABELS[i - 1])
+  const now = Date.now()
+  await db.prepare(
+    `INSERT INTO gov_support_config (program_id, structure_status, level1_label, level2_label, level3_label, level4_label, updated_at)
+     VALUES (?, 'draft', ?, ?, ?, ?, ?)
+     ON CONFLICT(program_id) DO UPDATE SET level1_label=excluded.level1_label, level2_label=excluded.level2_label,
+       level3_label=excluded.level3_label, level4_label=excluded.level4_label, updated_at=excluded.updated_at`
+  ).bind(programId, labels[0], labels[1], labels[2], labels[3], now).run()
+  return c.json({ success: true, labels })
 })
 
 // ── GET /programs/:programId/structure — 전체 3단계 트리 ──────────

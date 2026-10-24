@@ -28,7 +28,7 @@ export interface ExpressionTypeDef {
   key: string
   labelKo: string
   icon: string
-  levelAllow: (1 | 2 | 3)[]
+  levelAllow: (1 | 2 | 3 | 4)[]
   payloadSchema: FieldSchema[]
   // AI 호출 대상이 아닌 타입(chart/callout)은 null — §5-4
   promptFragment: string | null
@@ -70,7 +70,7 @@ const toneOptions = [
 
 export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
   {
-    key: 'headlineBox', labelKo: '박스형 헤드카피', icon: '🔷', levelAllow: [2, 3],
+    key: 'headlineBox', labelKo: '박스형 헤드카피', icon: '🔷', levelAllow: [2, 3, 4],
     payloadSchema: [
       { key: 'text', labelKo: '리드 문장', type: 'textarea', required: true, helpText: '1~3문장' },
       { key: 'tone', labelKo: '톤', type: 'select', options: toneOptions },
@@ -80,7 +80,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { text: '', tone: 'info', align: 'left' },
   },
   {
-    key: 'subhead', labelKo: '중제목', icon: '🔠', levelAllow: [2, 3],
+    key: 'subhead', labelKo: '중제목', icon: '🔠', levelAllow: [2, 3, 4],
     payloadSchema: [
       { key: 'text', labelKo: '제목', type: 'text', required: true },
       { key: 'autoNumber', labelKo: '번호 자동 부여', type: 'toggle' },
@@ -93,7 +93,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { text: '', autoNumber: true, numberStyle: 'numeric' },
   },
   {
-    key: 'subhead2', labelKo: '소제목', icon: '🔡', levelAllow: [3],
+    key: 'subhead2', labelKo: '소제목', icon: '🔡', levelAllow: [3, 4],
     payloadSchema: [
       { key: 'text', labelKo: '제목', type: 'text', required: true },
       { key: 'autoNumber', labelKo: '번호 자동 부여', type: 'toggle' },
@@ -106,7 +106,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { text: '', autoNumber: true, numberStyle: 'paren' },
   },
   {
-    key: 'paragraph', labelKo: '서술형 본문', icon: '📝', levelAllow: [3],
+    key: 'paragraph', labelKo: '서술형 본문', icon: '📝', levelAllow: [3, 4],
     payloadSchema: [
       { key: 'text', labelKo: '본문', type: 'textarea', required: true },
       { key: 'maxChars', labelKo: '목표 글자수', type: 'number', helpText: '소프트 상한 — 초과해도 저장은 허용' },
@@ -115,7 +115,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { text: '', maxChars: 400 },
   },
   {
-    key: 'bullets', labelKo: '개조식 상세 설명', icon: '•', levelAllow: [3],
+    key: 'bullets', labelKo: '개조식 상세 설명', icon: '•', levelAllow: [3, 4],
     payloadSchema: [
       { key: 'items', labelKo: '불릿 목록', type: 'list', maxItems: 6 },
       {
@@ -129,7 +129,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { items: [], marker: 'dot', maxItems: 6, hintToAI: '' },
   },
   {
-    key: 'bulletsSummary', labelKo: '개조식 요약 설명', icon: '≡', levelAllow: [2, 3],
+    key: 'bulletsSummary', labelKo: '개조식 요약 설명', icon: '≡', levelAllow: [2, 3, 4],
     payloadSchema: [
       { key: 'items', labelKo: '요약 불릿', type: 'list', maxItems: 3 },
       { key: 'maxItems', labelKo: '최대 항목 수', type: 'number' },
@@ -140,7 +140,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { items: [], maxItems: 3, label: '핵심 요약', hintToAI: '' },
   },
   {
-    key: 'table', labelKo: '표', icon: '▦', levelAllow: [3],
+    key: 'table', labelKo: '표', icon: '▦', levelAllow: [3, 4],
     payloadSchema: [
       { key: 'columns', labelKo: '컬럼', type: 'table', required: true, helpText: 'key/label/width/align' },
       { key: 'rows', labelKo: '정적 행(선택)', type: 'table' },
@@ -152,7 +152,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { columns: [], rows: [], repeatSource: null, computedSource: null, showTotalRow: false },
   },
   {
-    key: 'compareTable', labelKo: '비교표', icon: '⇄', levelAllow: [3],
+    key: 'compareTable', labelKo: '비교표', icon: '⇄', levelAllow: [3, 4],
     payloadSchema: [
       { key: 'criteriaLabel', labelKo: '비교 항목 라벨', type: 'text' },
       { key: 'subjects', labelKo: '비교 대상', type: 'list' },
@@ -167,7 +167,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { criteriaLabel: '비교 항목', subjects: [{ key: 'self', labelKo: '본 브랜드', isSelf: true }], rows: [], cellRender: 'text', highlightSelf: true },
   },
   {
-    key: 'chart', labelKo: '도표/그래프', icon: '📊', levelAllow: [3],
+    key: 'chart', labelKo: '도표/그래프', icon: '📊', levelAllow: [3, 4],
     payloadSchema: [
       {
         key: 'chartType', labelKo: '차트 종류', type: 'select',
@@ -186,7 +186,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { chartType: 'bar', title: '', computedSource: CHART_COMPUTED_SOURCES[0], showLegend: true, showDataLabels: true },
   },
   {
-    key: 'diagram', labelKo: '도식화', icon: '🔀', levelAllow: [3],
+    key: 'diagram', labelKo: '도식화', icon: '🔀', levelAllow: [3, 4],
     payloadSchema: [
       {
         key: 'diagramType', labelKo: '도식 종류', type: 'select',
@@ -205,7 +205,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { diagramType: 'flow', title: '', nodes: [], edges: [], source: 'answer', sourceKey: 'processSteps' },
   },
   {
-    key: 'timeline', labelKo: '일정/로드맵', icon: '📅', levelAllow: [3],
+    key: 'timeline', labelKo: '일정/로드맵', icon: '📅', levelAllow: [3, 4],
     payloadSchema: [
       { key: 'title', labelKo: '제목', type: 'text' },
       {
@@ -222,7 +222,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { title: '사업추진 일정', scope: 'agreement', columns: ['구분', '추진 내용', '추진 기간', '세부 내용'], source: 'ai' },
   },
   {
-    key: 'visual', labelKo: '이미지', icon: '🖼️', levelAllow: [3],
+    key: 'visual', labelKo: '이미지', icon: '🖼️', levelAllow: [3, 4],
     payloadSchema: [
       {
         key: 'kind', labelKo: '종류', type: 'select',
@@ -237,7 +237,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { kind: 'placeholder', assetId: '', caption: '', alt: '', generateHint: '' },
   },
   {
-    key: 'iconStats', labelKo: '아이콘형 시각화', icon: '🔢', levelAllow: [3],
+    key: 'iconStats', labelKo: '아이콘형 시각화', icon: '🔢', levelAllow: [3, 4],
     payloadSchema: [
       { key: 'caption', labelKo: '상단 캡션(선택)', type: 'text' },
       { key: 'tiles', labelKo: '타일(2~4개)', type: 'list', maxItems: 4 },
@@ -247,7 +247,7 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
     defaultPayload: { caption: '', tiles: [], maxTiles: 4 },
   },
   {
-    key: 'callout', labelKo: '강조 박스', icon: '⚠️', levelAllow: [3],
+    key: 'callout', labelKo: '강조 박스', icon: '⚠️', levelAllow: [3, 4],
     payloadSchema: [
       { key: 'text', labelKo: '문구', type: 'textarea', required: true },
       {
