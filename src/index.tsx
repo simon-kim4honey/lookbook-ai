@@ -5546,7 +5546,12 @@ async function gsCallClaudeWithSchema(
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      // 2026-10-24: anthropic-version을 2023-06-01(3년 전)로 고정해뒀던 게 진짜 원인이었다 —
+      // 스키마를 완전히 제거해도 재현되던 400 "compiled grammar is too large"가, Anthropic
+      // Console Playground(cURL 내보내기로 실제 anthropic-version: 2026-10-21 확인)와 동일하게
+      // 맞추니 더 이상 재현되지 않았다. 구버전 헤더가 claude-sonnet-5 같은 신규 모델에서 레거시
+      // 경로로 라우팅되며 생긴 문제로 추정.
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21' },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
         thinking: { type: 'disabled' },
