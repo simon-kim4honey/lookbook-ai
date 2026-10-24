@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {
   buildCategoryTrees, expandRepeat, moduleIdFor, flattenCategory, formatAutoNumber,
   buildGroupResponseSchema, buildCategoryStructureText, mergeCategoryBlocks, isAiGeneratedNode,
-  decodeTableRows,
+  decodeTableRows, buildAiBlocksByModuleId,
 } from './generationAssembly.ts'
 import type { GovNode } from './validate.ts'
 
@@ -211,4 +211,39 @@ test('mergeCategoryBlocks — ai 바인딩 table의 rows는 JSON 문자열 행�
   const { blocks } = mergeCategoryBlocks(cat, new Map([['l3', { moduleId: 'l3', rows: ['["구분","금액"]', '["1단계","100"]'] }]]), {}, () => null, 1)
   const b = blocks.find((x) => x.type === 'table')!
   assert.deepEqual(b.rows, [['구분', '금액'], ['1단계', '100']])
+})
+
+test('buildAiBlocksByModuleId — moduleId가 정확히 일치하면 그대로 매칭된다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', binding: 'static' })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', binding: 'static' })
+  const a = node({ id: 'a', level: 3, parentId: 'l2', expressionType: 'headlineBox', binding: 'ai' })
+  const b = node({ id: 'b', level: 3, parentId: 'l2', expressionType: 'paragraph', binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, a, b])[0]
+  const map = buildAiBlocksByModuleId(cat, {}, [{ moduleId: 'b', text: 'B' }, { moduleId: 'a', text: 'A' }])
+  assert.equal(map.get('a').text, 'A')
+  assert.equal(map.get('b').text, 'B')
+})
+
+test('buildAiBlocksByModuleId — moduleId가 하나도 안 맞으면(구조화 출력 없이 모델이 잘못 베껴씀) 순서대로 배정한다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', binding: 'static' })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', binding: 'static' })
+  const a = node({ id: 'a', level: 3, parentId: 'l2', expressionType: 'headlineBox', binding: 'ai' })
+  const b = node({ id: 'b', level: 3, parentId: 'l2', expressionType: 'paragraph', binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, a, b])[0]
+  const map = buildAiBlocksByModuleId(cat, {}, [{ moduleId: 'wrong-id-1', text: 'first' }, { moduleId: 'wrong-id-2', text: 'second' }])
+  assert.equal(map.get('a').text, 'first')
+  assert.equal(map.get('b').text, 'second')
+})
+
+test('buildAiBlocksByModuleId — 일부만 정확히 일치하면 나머지만 순서대로 채운다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', binding: 'static' })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', binding: 'static' })
+  const a = node({ id: 'a', level: 3, parentId: 'l2', expressionType: 'headlineBox', binding: 'ai' })
+  const b = node({ id: 'b', level: 3, parentId: 'l2', expressionType: 'paragraph', binding: 'ai' })
+  const c = node({ id: 'c', level: 3, parentId: 'l2', expressionType: 'bullets', binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, a, b, c])[0]
+  const map = buildAiBlocksByModuleId(cat, {}, [{ moduleId: 'wrong', items: ['x'] }, { moduleId: 'b', text: 'exact B' }, { moduleId: 'also-wrong', text: 'leftover' }])
+  assert.equal(map.get('b').text, 'exact B') // 정확히 일치하는 건 그대로
+  assert.equal(map.get('a').items.length, 1) // 남은 블록은 순서대로
+  assert.equal(map.get('c').text, 'leftover')
 })

@@ -112,13 +112,12 @@ export function formatAutoNumber(numberStyle: string | undefined, l1Index: numbe
 // static/answer/computed 모듈은 스키마에서 완전히 제외 — 토큰 절약 + 환각 원천 차단.
 // 타입별로 "AI가 실제로 채울 필드"만 노출한다(관리자가 설정하는 톤/정렬/아이콘종류 등은
 // 스키마에 넣지 않는다 — 그런 설정은 admin payload에 이미 있고 렌더 시 그대로 쓴다).
-// 2026-10-23: table/timeline의 rows는 원래 array<array<string>>(행 안에 셀 배열)이었다.
-// 중첩 배열이 blocks 배열(moduleId별 anyOf) 안에, 다시 sections 배열 안에 들어가
-// 총 4단계 배열 중첩이 되면서 Anthropic 구조화 출력이 400 "Schema is too complex
-// for compilation"으로 거부했다(기존 gsSectionsSchema에서 스테이징 실측으로 확인된
-// 동일 문제 — 공식 문서가 권장하는 대응은 "중첩 구조를 평탄화"). 한 단계를 줄이기
-// 위해 각 행을 JSON 배열 문자열로 직렬화한 array<string>으로 바꾸고, decodeTableRows()로
-// 원래 형태(string[][])로 되돌려서 저장한다 — 렌더러·기존 저장 데이터는 전혀 바뀌지 않는다.
+// 2026-10-23~24: table/timeline.rows(원래 array<array<string>>)가 400 "Schema is too
+// complex for compilation"에 걸려 한때 행마다 JSON 문자열로 직렬화하는 우회를 썼었다.
+// 진짜 원인은 스키마가 아니라 anthropic-version 헤더가 구버전으로 고정돼 있던 것으로
+// 밝혀져(gsCallClaudeWithSchema 쪽 주석 참고) rows는 다시 자연스러운 string[][]로
+// 되돌렸다. decodeTableRows()는 혹시 모를 과거 형태(JSON 문자열 행) 응답도 안전하게
+// 수용하는 방어적 변환으로 남겨둔다 — 정상 응답(중첩 배열)은 그대로 통과시킨다.
 export function decodeTableRows(raw: any): string[][] {
   if (!Array.isArray(raw)) return []
   return raw.map((r) => {
@@ -141,7 +140,7 @@ const AI_FIELD_SCHEMA: Record<string, { properties: Record<string, any>; require
   bullets: { properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },
   bulletsSummary: { properties: { items: { type: 'array', items: { type: 'string' } } }, required: ['items'] },
   table: {
-    properties: { rows: { type: 'array', items: { type: 'string', description: '한 행의 셀들을 담은 JSON 배열을 문자열로 직렬화. 예: "[\\"셀1\\",\\"셀2\\"]"' } } },
+    properties: { rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } } },
     required: ['rows'],
   },
   compareTable: {
@@ -156,7 +155,7 @@ const AI_FIELD_SCHEMA: Record<string, { properties: Record<string, any>; require
     required: ['nodes', 'edges'],
   },
   timeline: {
-    properties: { rows: { type: 'array', items: { type: 'string', description: '한 행의 셀들을 담은 JSON 배열을 문자열로 직렬화. 예: "[\\"셀1\\",\\"셀2\\"]"' } } },
+    properties: { rows: { type: 'array', items: { type: 'array', items: { type: 'string' } } } },
     required: ['rows'],
   },
   iconStats: {
@@ -234,6 +233,31 @@ export function buildCategoryStructureText(cat: CategoryTree, answers: Record<st
     })
   })
   return lines.join('\n')
+}
+
+// 2026-10-24: structured outputs(그룹 응답을 moduleId별 anyOf로 강제)를 걷어내고
+// 프롬프트 기반 JSON으로 되돌리면서, 모델이 UUID 형태인 moduleId 문자열을 응답에
+// 정확히 그대로 베껴 쓰지 못해(살짝 다르게 쓰거나 생략) blocks가 전부 "AI 응답에
+// 해당 moduleId가 없음"으로 빠지는 사례가 생겼다(스테이징 실측 — 관리자 힌트
+// 텍스트만 그대로 나옴). moduleId가 정확히 일치하는 것만 먼저 매칭하고, 남는
+// 것은 프롬프트에 나열한 순서(=flattenCategory 순서, buildCategoryStructureText와
+// 동일 순회)대로 AI 응답의 남은 블록을 순서대로 배정하는 보정을 추가한다.
+export function buildAiBlocksByModuleId(cat: CategoryTree, answers: Record<string, any>, aiBlocks: any[]): Map<string, any> {
+  const expectedIds = flattenCategory(cat, answers).filter((e) => isAiGeneratedNode(e.node)).map((e) => e.moduleId)
+  const blocks = Array.isArray(aiBlocks) ? aiBlocks : []
+  const map = new Map<string, any>()
+  const usedIdx = new Set<number>()
+  for (const id of expectedIds) {
+    const idx = blocks.findIndex((b: any, i: number) => b?.moduleId === id && !usedIdx.has(i))
+    if (idx !== -1) { map.set(id, blocks[idx]); usedIdx.add(idx) }
+  }
+  const leftover = blocks.filter((_: any, i: number) => !usedIdx.has(i))
+  let li = 0
+  for (const id of expectedIds) {
+    if (map.has(id)) continue
+    if (li < leftover.length) map.set(id, leftover[li++])
+  }
+  return map
 }
 
 // ── 작업 E(일부): 후처리 — AI 블록을 moduleId로 찾아 merge, 없으면 생략/경고 ──
