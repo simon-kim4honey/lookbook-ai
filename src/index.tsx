@@ -8,7 +8,7 @@ import contentDigestApp from './content-digest'
 import govNodesApp, { loadProgramNodes } from './gov/nodesApi.ts'
 import { validateProgram } from './gov/validate.ts'
 import {
-  buildCategoryTrees, buildGroupResponseSchema, buildCategoryStructureText, mergeCategoryBlocks,
+  buildCategoryTrees, buildCategoryStructureText, mergeCategoryBlocks,
   isAiGeneratedNode, flattenCategory, type CategoryTree,
 } from './gov/generationAssembly.ts'
 import { rewriteForCardNews, renderCardSvg } from './card-image'
@@ -5719,6 +5719,24 @@ function gsResolveComputedValue(bindingKey: string | null | undefined, finance: 
   }
 }
 
+// 2026-10-24: buildGroupResponseSchema(moduleId별 anyOf)로 구조화 출력을 강제했더니
+// 그룹에 모듈이 많을수록(모듈마다 서로 다른 object 스키마가 anyOf로 합쳐짐) 400
+// "Schema is too complex for compilation"에 걸렸다(gsSectionsSchema 쪽과 동일 증상,
+// 스테이징 실측 확인). 기존 경로와 동일하게 output_config.format을 걷어내고 프롬프트로
+// 형식을 명시 지시하는 방식으로 되돌린다 — AI_FIELD_SCHEMA(generationAssembly.ts)가
+// 정의하는 타입별 필드를 그대로 텍스트로 옮겼다.
+const GS_NODES_JSON_FORMAT = `반드시 아래 형식의 JSON "객체" 하나만 응답할 것 — 설명 문장, 코드펜스(\`\`\`), 그 어떤 다른 텍스트도 앞뒤에 붙이지 않는다:
+{"sections":[{"categoryId":"<대분류 id>","blocks":[{"moduleId":"<위 구조에 지정된 moduleId>", ...그 타입의 필드}]}]}
+blocks의 각 원소는 moduleId와 함께, 그 모듈의 표현방법(타입)에 맞는 필드만 포함한다:
+- headlineBox/subhead/subhead2/paragraph: {moduleId, text}
+- bullets/bulletsSummary: {moduleId, items:string[]}
+- table/timeline: {moduleId, rows:string[][]} (rows는 행마다 셀 문자열 배열)
+- compareTable: {moduleId, rows:[{label:string, values:object}]}
+- diagram: {moduleId, nodes:[{id,label}], edges:[{from,to}]}
+- iconStats: {moduleId, tiles:[{icon:string(이모지 1개), value:string, label:string}]}
+- visual: {moduleId, caption:string, alt:string}
+"생성 대상"이 아닌(고정값/답변값/서버계산값) 모듈은 blocks에 포함하지 말 것 — 위 구조에 생성 대상이라고 표시된 moduleId만 작성한다.`
+
 async function generateGovSupportSectionsFromNodes(
   apiKey: string, programName: string, categories: CategoryTree[], answers: any, finance: any,
   competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string }
@@ -5740,7 +5758,6 @@ async function generateGovSupportSectionsFromNodes(
     const hasAiNode = group.some((c) => flattenCategory(c, answers).some((e) => isAiGeneratedNode(e.node)))
     if (!hasAiNode) return group.map((c) => ({ categoryId: c.node.id, blocks: [] })) // AI 모듈이 없으면 호출 자체 생략
 
-    const schema = buildGroupResponseSchema(group, answers)
     const structureBlock = group.map((c) => buildCategoryStructureText(c, answers)).join('\n\n')
     const prompt = `${intro}
 
@@ -5750,8 +5767,10 @@ ${sharedContext}
 [대분류 구조 — moduleId별로 지정된 표현방법·바인딩·지시를 그대로 따를 것]
 ${structureBlock}
 
-응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것. 입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 ${ids.join(', ')} 전부(이 순서로) 완전하게 작성한다.`
-    return gsCallGroupWithRetry(apiKey, prompt, schema, group.length, 16000, 100000, env, label)
+${GS_NODES_JSON_FORMAT}
+
+입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "(임의 작성)" 표기와 함께 내용을 채워서라도 ${ids.join(', ')} 전부(이 순서로) 완전하게 작성한다.`
+    return gsCallGroupWithRetry(apiKey, prompt, null, group.length, 16000, 100000, env, label)
   }))
 
   const mainSections = groups.flatMap((group, i) => {
@@ -5779,7 +5798,6 @@ ${structureBlock}
       const { blocks } = mergeCategoryBlocks(summaryCat, new Map(), answers, (key) => gsResolveComputedValue(key, finance), 0)
       summarySection = { sectionId: summaryCat.node.id, headline: summaryCat.node.title, lead: '', blocks }
     } else {
-      const schema = buildGroupResponseSchema([summaryCat], answers)
       const structureBlock = buildCategoryStructureText(summaryCat, answers)
       const promptC = `${intro}
 
@@ -5792,8 +5810,8 @@ ${JSON.stringify(mainSections)}
 [대분류 구조]
 ${structureBlock}
 
-응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것.`
-      const result = await gsCallGroupWithRetry(apiKey, promptC, schema, 1, 4000, 60000, env, summaryCat.node.title || '요약')
+${GS_NODES_JSON_FORMAT}`
+      const result = await gsCallGroupWithRetry(apiKey, promptC, null, 1, 4000, 60000, env, summaryCat.node.title || '요약')
       if (!result) {
         summarySection = gsBuildEmptyCategorySection(summaryCat, 'AI 초안 생성 실패(요약) — 관리자에게 문의해주세요.')
       } else {
