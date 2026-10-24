@@ -128,12 +128,13 @@ test('mergeCategoryBlocks — answer 모듈은 사용자 답변값을 그대로 
   assert.deepEqual(blocks[idx], { type: 'paragraph', text: '진짜브랜드' })
 })
 function flattenIndexOfParagraph(cat: any): number {
-  // mergeCategoryBlocks의 순회 순서(그룹 L2 먼저, 그다음 L3들)와 동일하게 계산
+  // mergeCategoryBlocks의 순회 순서(그룹 L2 먼저, 그다음 L3들)와 동일하게 계산.
+  // children은 이제 NodeTree({node, children})이므로 leaf.node로 접근한다(4단계 확장).
   let i = 0
   for (const group of cat.children) {
     i++ // L2 자신
     for (const leaf of group.children) {
-      if (leaf.expressionType === 'paragraph') return i
+      if (leaf.node.expressionType === 'paragraph') return i
       i++
     }
   }
@@ -246,6 +247,50 @@ test('buildAiBlocksByModuleId — moduleId가 하나도 안 맞으면(구조화 
   const map = buildAiBlocksByModuleId(cat, {}, [{ moduleId: 'wrong-id-1', text: 'first' }, { moduleId: 'wrong-id-2', text: 'second' }])
   assert.equal(map.get('a').text, 'first')
   assert.equal(map.get('b').text, 'second')
+})
+
+// ── 4단계 확장(대분류/중분류/소분류/소소분류) ──────────────────────
+function sample4LevelTree() {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '1. 문제인식', payload: {}, binding: 'static', targetChars: 1000 })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', title: '1-1. 창업아이템 배경', payload: { text: '1-1. 창업아이템 배경', autoNumber: true }, binding: 'static' })
+  const l3 = node({ id: 'l3', level: 3, parentId: 'l2', expressionType: 'subhead2', title: '가. 창업아이템 배경', payload: { text: '가. 창업아이템 배경', autoNumber: true, numberStyle: 'paren' }, binding: 'static' })
+  const l4a = node({ id: 'l4a', level: 4, parentId: 'l3', expressionType: 'headlineBox', title: '외부적 배경', payload: { text: '힌트' }, binding: 'ai' })
+  const l4b = node({ id: 'l4b', level: 4, parentId: 'l3', expressionType: 'paragraph', title: '동기', payload: {}, binding: 'ai' })
+  const nodes = [l1, l2, l3, l4a, l4b]
+  return buildCategoryTrees(nodes)[0]
+}
+
+test('buildCategoryTrees — L1>L2>L3>L4 4단계까지 재귀로 조립한다', () => {
+  const cat = sample4LevelTree()
+  assert.equal(cat.node.id, 'l1')
+  assert.equal(cat.children.length, 1)
+  assert.equal(cat.children[0].node.id, 'l2')
+  assert.equal(cat.children[0].children.length, 1)
+  assert.equal(cat.children[0].children[0].node.id, 'l3')
+  assert.equal(cat.children[0].children[0].children.length, 2)
+})
+
+test('flattenCategory — 4단계 트리도 깊이우선 순서로 전부 평면화된다', () => {
+  const cat = sample4LevelTree()
+  const flat = flattenCategory(cat, {})
+  assert.deepEqual(flat.map((f) => f.node.id), ['l2', 'l3', 'l4a', 'l4b'])
+  assert.deepEqual(flat.map((f) => f.depth), [2, 3, 4, 4])
+})
+
+test('buildCategoryStructureText — 4단계에서는 자식 없는 노드(어느 깊이든)에만 moduleId가 붙는다', () => {
+  const cat = sample4LevelTree()
+  const text = buildCategoryStructureText(cat, {})
+  assert.match(text, /moduleId="l4a"/)
+  assert.match(text, /moduleId="l4b"/)
+  assert.doesNotMatch(text, /moduleId="l2"/)
+  assert.doesNotMatch(text, /moduleId="l3"/)
+})
+
+test('mergeCategoryBlocks — 4단계 트리에서도 subhead/subhead2 자동번호가 깊이와 무관하게 끊기지 않는다', () => {
+  const cat = sample4LevelTree()
+  const { blocks } = mergeCategoryBlocks(cat, new Map(), {}, () => null, 1)
+  const numbered = blocks.filter((b) => b.number).map((b) => b.number)
+  assert.deepEqual(numbered, ['1-1.', '2)']) // l2(subhead,numeric)·l3(subhead2,paren) 둘 다 번호 부여, 끊기지 않음
 })
 
 test('buildAiBlocksByModuleId — 일부만 정확히 일치하면 나머지만 순서대로 채운다', () => {

@@ -256,6 +256,9 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:
 .gb-badge.l1{background:#8b5cf6;}
 .gb-badge.l2{background:#3182F6;}
 .gb-badge.l3{background:#6b7280;}
+.gb-badge.l4{background:#10b981;}
+.gb-level-labels{display:flex;align-items:center;gap:6px;margin-bottom:10px;font-size:12px;color:#a0a0c0;flex-wrap:wrap;}
+.gb-level-label-input{width:90px;background:#1a1a2e;border:1px solid #3a3a60;color:#e0e0f0;border-radius:6px;padding:4px 8px;font-size:12px;}
 .gb-type-label{font-size:12px;color:#a0a0c0;flex:1;}
 .gb-binding-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .gb-card-head select{background:#252540;border:1px solid #3a3a60;color:#e0e0f0;font-size:11px;border-radius:6px;padding:3px 6px;}
@@ -323,10 +326,19 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:
         <div class="gb-validation-summary" id="gbValidationSummary">검증 결과 불러오는 중…</div>
         <div class="gb-validation-detail" id="gbValidationDetail"></div>
       </div>
+      <div class="gb-level-labels" id="gbLevelLabelsRow">
+        <span>레벨 이름:</span>
+        <input class="gb-level-label-input" id="gbLevelLabel1" placeholder="대분류" />
+        <input class="gb-level-label-input" id="gbLevelLabel2" placeholder="중분류" />
+        <input class="gb-level-label-input" id="gbLevelLabel3" placeholder="소분류" />
+        <input class="gb-level-label-input" id="gbLevelLabel4" placeholder="소소분류" />
+        <button class="gb-btn" id="gbSaveLevelLabelsBtn">저장</button>
+      </div>
       <div class="gb-canvas-toolbar">
         <button class="gb-btn" id="gbAddL1Btn">+ 대분류</button>
         <button class="gb-btn" id="gbAddL2Btn">+ 중분류(선택한 카드 아래)</button>
         <button class="gb-btn" id="gbAddL3Btn">+ 소분류(선택한 카드 아래)</button>
+        <button class="gb-btn" id="gbAddL4Btn">+ 소소분류(선택한 카드 아래)</button>
       </div>
       <div id="gbCards"></div>
     </div>
@@ -365,6 +377,7 @@ var gbSaveTimer = null;
 var gbPendingUpserts = {};
 var gbDragId = null;
 var gbPendingForceBody = null;
+var gbLevelLabels = ['대분류', '중분류', '소분류', '소소분류'];
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -428,7 +441,32 @@ async function gbLoadProgramStatus() {
   if (p) {
     badge.textContent = p.structureStatus === 'published' ? ('게시됨 · ' + (p.publishedVersion || '')) : '초안';
     badge.className = 'gb-status-badge' + (p.structureStatus === 'published' ? ' published' : '');
+    if (p.levelLabels && p.levelLabels.length === 4) { gbLevelLabels = p.levelLabels; }
   }
+  gbApplyLevelLabels();
+}
+
+// ── 레벨 이름(대/중/소/소소분류) — 프로그램별로 어드민이 바꿀 수 있다 ──
+function gbApplyLevelLabels() {
+  [1, 2, 3, 4].forEach(function (i) {
+    var input = document.getElementById('gbLevelLabel' + i);
+    if (input && document.activeElement !== input) input.value = gbLevelLabels[i - 1];
+  });
+  document.getElementById('gbAddL1Btn').textContent = '+ ' + gbLevelLabels[0];
+  document.getElementById('gbAddL2Btn').textContent = '+ ' + gbLevelLabels[1] + '(선택한 카드 아래)';
+  document.getElementById('gbAddL3Btn').textContent = '+ ' + gbLevelLabels[2] + '(선택한 카드 아래)';
+  document.getElementById('gbAddL4Btn').textContent = '+ ' + gbLevelLabels[3] + '(선택한 카드 아래)';
+  gbRenderAll();
+}
+async function gbSaveLevelLabels() {
+  var labels = [1, 2, 3, 4].map(function (i) { return document.getElementById('gbLevelLabel' + i).value || gbLevelLabels[i - 1]; });
+  var res = await fetch('/api/admin/gov/programs/' + GB_PROGRAM_ID + '/level-labels', {
+    method: 'PUT', headers: authHeaders(true), body: JSON.stringify({ labels: labels })
+  });
+  var data = await res.json();
+  if (!data.success) { alert('저장 실패'); return; }
+  gbLevelLabels = data.labels;
+  gbApplyLevelLabels();
 }
 
 function gbRenderAll() { gbRenderTree(); gbRenderCanvas(); gbRenderInspector(); }
@@ -462,9 +500,11 @@ function gbRenderTree() {
   walk(null, 0);
   document.getElementById('gbTreeList').innerHTML = html;
 
-  var l1 = 0, l2 = 0, l3 = 0;
-  gbNodes.forEach(function (n) { if (n.level === 1) l1++; else if (n.level === 2) l2++; else l3++; });
-  document.getElementById('gbTreeSummary').textContent = '대분류 ' + l1 + ' / 중분류 ' + l2 + ' / 소분류 ' + l3 + ' / 총 ' + gbNodes.length + '개';
+  var counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  gbNodes.forEach(function (n) { counts[n.level] = (counts[n.level] || 0) + 1; });
+  document.getElementById('gbTreeSummary').textContent =
+    gbLevelLabels[0] + ' ' + counts[1] + ' / ' + gbLevelLabels[1] + ' ' + counts[2] + ' / ' +
+    gbLevelLabels[2] + ' ' + counts[3] + ' / ' + gbLevelLabels[3] + ' ' + counts[4] + ' / 총 ' + gbNodes.length + '개';
 }
 
 function gbFilterTree() {
@@ -474,9 +514,9 @@ function gbFilterTree() {
   });
 }
 
-var GB_LEVEL_CLASS = { 1: 'l1', 2: 'l2', 3: 'l3' };
+var GB_LEVEL_CLASS = { 1: 'l1', 2: 'l2', 3: 'l3', 4: 'l4' };
 var GB_BINDING_COLOR = { static: '#8b8ba0', answer: '#22c55e', computed: '#3182F6', ai: '#f59e0b' };
-var GB_LEVEL_BORDER = { 1: '#8b5cf6', 2: '#3182F6', 3: '#6b7280' };
+var GB_LEVEL_BORDER = { 1: '#8b5cf6', 2: '#3182F6', 3: '#6b7280', 4: '#10b981' };
 
 function gbTypeOptionsHtml(selected) {
   var html = '';
@@ -488,8 +528,8 @@ function gbTypeOptionsHtml(selected) {
 }
 
 function gbCardHtml(n) {
-  var levelClass = GB_LEVEL_CLASS[n.level] || 'l3';
-  var typeLabel = n.level === 1 ? '대분류' : (gbTypes[n.expressionType] ? gbTypes[n.expressionType].labelKo : n.expressionType);
+  var levelClass = GB_LEVEL_CLASS[n.level] || 'l4';
+  var typeLabel = n.level === 1 ? gbLevelLabels[0] : (gbTypes[n.expressionType] ? gbTypes[n.expressionType].labelKo : n.expressionType);
   var bindingColor = GB_BINDING_COLOR[n.binding] || '#8b8ba0';
   var typeSelect = n.level === 1 ? '' :
     '<select class="gb-type-select" data-id="' + n.id + '" aria-label="표현방법">' + gbTypeOptionsHtml(n.expressionType) + '</select>';
@@ -533,7 +573,7 @@ async function gbRenderInspector() {
 
   if (node.level === 1) {
     body.innerHTML =
-      '<h4>대분류</h4>' +
+      '<h4>' + esc(gbLevelLabels[0]) + '</h4>' +
       '<div class="sf-field"><label class="sf-label">제목</label><input class="sf-input" id="gbL1Title" value="' + esc(node.title || '') + '" /></div>' +
       '<div class="sf-field"><label class="sf-label">목표 글자수</label><input class="sf-input" type="number" id="gbL1Chars" value="' + (node.targetChars || '') + '" /></div>' +
       gbNodeInfoHtml(node);
@@ -884,6 +924,8 @@ document.getElementById('gbSearchInput').addEventListener('input', gbFilterTree)
 document.getElementById('gbAddL1Btn').addEventListener('click', function () { gbAddNode(1, null); });
 document.getElementById('gbAddL2Btn').addEventListener('click', function () { gbAddNodeUnderSelected(2); });
 document.getElementById('gbAddL3Btn').addEventListener('click', function () { gbAddNodeUnderSelected(3); });
+document.getElementById('gbAddL4Btn').addEventListener('click', function () { gbAddNodeUnderSelected(4); });
+document.getElementById('gbSaveLevelLabelsBtn').addEventListener('click', gbSaveLevelLabels);
 document.getElementById('gbConflictReloadBtn').addEventListener('click', gbConflictReload);
 document.getElementById('gbConflictForceBtn').addEventListener('click', gbConflictForce);
 document.getElementById('gbValidationSummary').addEventListener('click', function () { document.getElementById('gbValidationDetail').classList.toggle('open'); });
