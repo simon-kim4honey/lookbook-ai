@@ -875,7 +875,7 @@ function gbQuickAddDetailHtml(node) {
   var skip = { categoryHeader: 1, subhead: 1, subhead2: 1 };
   var btns = Object.keys(gbTypes).filter(function (k) { return !skip[k]; }).map(function (k) {
     var t = gbTypes[k];
-    return '<button type="button" class="gb-btn" style="font-size:11px;padding:4px 9px;" onclick="gbQuickAddDetail(\'' + k + '\')">+ ' + esc(t.labelKo) + '</button>';
+    return '<button type="button" class="gb-btn" style="font-size:11px;padding:4px 9px;" onclick="gbQuickAddDetail(&quot;' + k + '&quot;)">+ ' + esc(t.labelKo) + '</button>';
   }).join('');
   return '<h4>+ 세부 내용 추가</h4>' +
     '<div class="gb-node-info" style="margin-bottom:6px;">이 카드 아래에 헤드카피·개조식·표·시각화 등을 바로 추가합니다. "제목만" 두고 싶으면 아무것도 누르지 마세요.</div>' +
