@@ -645,6 +645,8 @@ async function gbRenderInspector() {
   }
 
   body.innerHTML =
+    '<h4>제목</h4>' +
+    '<div class="sf-field"><input class="sf-input" id="gbTitleInput" value="' + esc(node.title || '') + '" /></div>' +
     '<h4>표현방법</h4>' +
     '<select class="sf-select" id="gbInspectorTypeSelect">' + gbTypeOptionsHtml(node.expressionType) + '</select>' +
     '<h4>페이로드</h4><div id="gbPayloadForm">불러오는 중…</div>' +
@@ -655,6 +657,7 @@ async function gbRenderInspector() {
     '<h4>관리자 메모</h4><textarea class="sf-textarea" id="gbNoteInput">' + esc(node.note || '') + '</textarea>' +
     '<h4>이 노드 정보</h4>' + gbNodeInfoHtml(node);
 
+  document.getElementById('gbTitleInput').addEventListener('change', function () { gbPatchNode(node.id, { title: this.value }); gbRenderTree(); gbRenderCanvas(); });
   document.getElementById('gbInspectorTypeSelect').addEventListener('change', function () { gbSwitchType(node.id, this.value); });
   document.getElementById('gbNoteInput').addEventListener('change', function () { gbPatchNode(node.id, { note: this.value }); });
   gbWireBindingSection(node);
