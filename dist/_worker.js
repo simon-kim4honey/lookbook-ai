@@ -204,7 +204,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvnf0t7q`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvnf4iks`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2201,10 +2201,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
             <div class="wz-field-hint" style="margin:0 0 8px;">이 사업으로 기대하는 효과(매출·고용·사회적 가치 등)가 있다면 적어주세요.</div>
             <textarea class="wz-textarea" id="f_expectedImpact" placeholder="예: 연 매출 성장, 지역 봉제업체와의 상생, 친환경 소재 확산"></textarea>
           </div>
-          <div class="wz-field">
-            <div class="wz-field-label">3년 후 목표 (선택)</div>
-            <textarea class="wz-textarea" id="f_threeYearGoal" placeholder="예: 연매출 3억, 자사몰+플랫폼 2곳 입점, 오프라인 쇼룸 1호점 — 자유롭게 적어주세요"></textarea>
-          </div>
         </div>
 
         <div class="wz-step" data-step="11">
@@ -2231,6 +2227,10 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
             <div class="wz-field-hint" style="margin:0 0 8px;">협업 중이거나 협업 예정인 기관이 있다면 입력해주세요.</div>
             <div id="wzPartnerRows"></div>
             <button type="button" class="wz-unknown-btn" id="wzAddPartnerBtn" onclick="wzAddPartnerRow()">+ 협력기관 추가</button>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">3년 후 목표 (선택)</div>
+            <textarea class="wz-textarea" id="f_threeYearGoal" placeholder="예: 연매출 3억, 자사몰+플랫폼 2곳 입점, 오프라인 쇼룸 1호점 — 자유롭게 적어주세요"></textarea>
           </div>
         </div>
 
@@ -2509,12 +2509,12 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         patch.externalBackground = val('f_externalBackground');
         patch.motivation = val('f_motivation');
         patch.expectedImpact = val('f_expectedImpact');
-        patch.threeYearGoal = val('f_threeYearGoal');
       } else if (stepNum === 11) {
         patch.productOutput = val('f_productOutput');
         wzSyncTeamRowsFromDom(); wzSyncPartnerRowsFromDom();
         patch.teamMembers = wzTeamRows.filter(function (r) { return r.position || r.task || r.capability; });
         patch.partners = wzPartnerRows.filter(function (r) { return r.name || r.capability || r.plan; });
+        patch.threeYearGoal = val('f_threeYearGoal');
       }
       var stepEl = document.querySelector('.wz-step[data-step="' + stepNum + '"]');
       if (stepEl) {

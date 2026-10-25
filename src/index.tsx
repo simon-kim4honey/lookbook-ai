@@ -4987,10 +4987,6 @@ app.get('/gov-support/wizard/:id', async (c) => {
             <div class="wz-field-hint" style="margin:0 0 8px;">이 사업으로 기대하는 효과(매출·고용·사회적 가치 등)가 있다면 적어주세요.</div>
             <textarea class="wz-textarea" id="f_expectedImpact" placeholder="예: 연 매출 성장, 지역 봉제업체와의 상생, 친환경 소재 확산"></textarea>
           </div>
-          <div class="wz-field">
-            <div class="wz-field-label">3년 후 목표 (선택)</div>
-            <textarea class="wz-textarea" id="f_threeYearGoal" placeholder="예: 연매출 3억, 자사몰+플랫폼 2곳 입점, 오프라인 쇼룸 1호점 — 자유롭게 적어주세요"></textarea>
-          </div>
         </div>
 
         <div class="wz-step" data-step="11">
@@ -5017,6 +5013,10 @@ app.get('/gov-support/wizard/:id', async (c) => {
             <div class="wz-field-hint" style="margin:0 0 8px;">협업 중이거나 협업 예정인 기관이 있다면 입력해주세요.</div>
             <div id="wzPartnerRows"></div>
             <button type="button" class="wz-unknown-btn" id="wzAddPartnerBtn" onclick="wzAddPartnerRow()">+ 협력기관 추가</button>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">3년 후 목표 (선택)</div>
+            <textarea class="wz-textarea" id="f_threeYearGoal" placeholder="예: 연매출 3억, 자사몰+플랫폼 2곳 입점, 오프라인 쇼룸 1호점 — 자유롭게 적어주세요"></textarea>
           </div>
         </div>
 
@@ -5295,12 +5295,12 @@ app.get('/gov-support/wizard/:id', async (c) => {
         patch.externalBackground = val('f_externalBackground');
         patch.motivation = val('f_motivation');
         patch.expectedImpact = val('f_expectedImpact');
-        patch.threeYearGoal = val('f_threeYearGoal');
       } else if (stepNum === 11) {
         patch.productOutput = val('f_productOutput');
         wzSyncTeamRowsFromDom(); wzSyncPartnerRowsFromDom();
         patch.teamMembers = wzTeamRows.filter(function (r) { return r.position || r.task || r.capability; });
         patch.partners = wzPartnerRows.filter(function (r) { return r.name || r.capability || r.plan; });
+        patch.threeYearGoal = val('f_threeYearGoal');
       }
       var stepEl = document.querySelector('.wz-step[data-step="' + stepNum + '"]');
       if (stepEl) {
