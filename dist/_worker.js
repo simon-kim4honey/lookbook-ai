@@ -204,7 +204,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvnvy97r`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvnwb1ut`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -222,7 +222,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;}
 body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:#e0e0f0;}
-#gbLoginOverlay{position:fixed;inset:0;background:#0f0f1a;display:flex;align-items:center;justify-content:center;z-index:200;}
+#gbLoginOverlay{position:fixed;inset:0;background:#0f0f1a;display:none;align-items:center;justify-content:center;z-index:200;}
 .gb-login-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center;}
 .gb-login-card h2{font-size:18px;font-weight:700;margin-bottom:4px;}
 .gb-login-card p{font-size:12px;color:#8b8ba0;margin-bottom:20px;}
@@ -466,10 +466,12 @@ async function gbDoLogin(pwOverride) {
       return true;
     } else {
       err.textContent = pwOverride ? '자동 로그인 실패 — 비밀번호를 다시 입력해주세요.' : '비밀번호가 올바르지 않습니다.';
+      document.getElementById('gbLoginOverlay').style.display = 'flex';
       return false;
     }
   } catch (e) {
     err.textContent = (pwOverride ? '자동 로그인 중 ' : '') + '서버 오류가 발생했습니다: ' + (e && e.message ? e.message : e);
+    document.getElementById('gbLoginOverlay').style.display = 'flex';
     return false;
   }
 }
@@ -479,8 +481,12 @@ function gbTryAutoLogin() {
   var m = /(?:^|[#&])pw=([^&]*)/.exec(location.hash);
   if (m) { saved = decodeURIComponent(m[1]); history.replaceState(null, '', location.pathname + location.search); }
   if (!saved) { try { saved = sessionStorage.getItem('gsAdminPw'); } catch (e) { saved = null; } }
-  if (saved) gbDoLogin(saved);
-  else gbShowDebug('저장된 비밀번호 없음 — 자동 로그인 생략');
+  if (saved) {
+    gbDoLogin(saved);
+  } else {
+    gbShowDebug('저장된 비밀번호 없음 — 로그인 필요');
+    document.getElementById('gbLoginOverlay').style.display = 'flex';
+  }
 }
 
 async function gbInit() {
