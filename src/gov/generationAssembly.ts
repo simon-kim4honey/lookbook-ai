@@ -237,7 +237,8 @@ export function buildCategoryStructureText(cat: CategoryTree, answers: Record<st
           const idSuffix = repeatIndex == null ? '' : ` (반복 ${repeatIndex + 1}번째)`
           lines.push(`${indent}- (moduleId="${moduleIdFor(n.id, repeatIndex)}") "${n.title || ''}"${idSuffix} [${def?.labelKo || n.expressionType}] — ${bindingInstruction(n)}`)
           if (isAiGeneratedNode(n) && def?.promptFragment) lines.push(`${indent}  지시: ${def.promptFragment}`)
-          if (n.payload?.text) lines.push(`${indent}  참고(관리자가 적어둔 힌트/제목): ${n.payload.text}`)
+          const hint = n.payload?.text || n.payload?.caption
+          if (hint) lines.push(`${indent}  참고(관리자가 적어둔 힌트/제목/캡션): ${hint}`)
         })
       } else {
         lines.push(`${indent}- "${n.title || ''}" [${def?.labelKo || n.expressionType}] — ${bindingInstruction(n)}`)
