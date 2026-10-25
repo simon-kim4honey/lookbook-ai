@@ -212,7 +212,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${qn}" font-size="128" font-weight="800" fill="${Gn(e.statColor||`#ffffff`)}">${Gn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${qn}" font-size="64" font-weight="800" fill="#ffffff">${Gn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${qn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Gn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Yn=`mvnwbb87`;function Xn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Zn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${qn}" font-size="128" font-weight="800" fill="${Gn(e.statColor||`#ffffff`)}">${Gn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${qn}" font-size="64" font-weight="800" fill="#ffffff">${Gn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${qn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Gn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Yn=`mvnwybtw`;function Xn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Zn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -672,6 +672,8 @@ async function gbRenderInspector() {
   }
 
   body.innerHTML =
+    '<h4>제목</h4>' +
+    '<div class="sf-field"><input class="sf-input" id="gbTitleInput" value="' + esc(node.title || '') + '" /></div>' +
     '<h4>표현방법</h4>' +
     '<select class="sf-select" id="gbInspectorTypeSelect">' + gbTypeOptionsHtml(node.expressionType) + '</select>' +
     '<h4>페이로드</h4><div id="gbPayloadForm">불러오는 중…</div>' +
@@ -682,6 +684,7 @@ async function gbRenderInspector() {
     '<h4>관리자 메모</h4><textarea class="sf-textarea" id="gbNoteInput">' + esc(node.note || '') + '</textarea>' +
     '<h4>이 노드 정보</h4>' + gbNodeInfoHtml(node);
 
+  document.getElementById('gbTitleInput').addEventListener('change', function () { gbPatchNode(node.id, { title: this.value }); gbRenderTree(); gbRenderCanvas(); });
   document.getElementById('gbInspectorTypeSelect').addEventListener('change', function () { gbSwitchType(node.id, this.value); });
   document.getElementById('gbNoteInput').addEventListener('change', function () { gbPatchNode(node.id, { note: this.value }); });
   gbWireBindingSection(node);
