@@ -393,9 +393,10 @@ function authHeaders(json) {
 }
 
 // ── 로그인 (admin02와 동일한 /api/admin/auth 재사용) ──
-// admin02에서 이미 로그인한 상태로 "구조 빌더 열기"를 누르면(window.open은 같은
-// 출처 탭 사이에 sessionStorage를 그대로 물려받는다) 비밀번호를 또 묻지 않고
-// 자동으로 들어간다 — 틀렸거나 없으면 평소대로 로그인 화면을 보여준다.
+// admin02에서 이미 로그인한 상태로 "구조 빌더 열기"를 누르면 비밀번호를 또
+// 묻지 않고 자동으로 들어간다 — URL 해시(#pw=...)로 직접 넘겨받는다(같은 출처
+// 새 탭이면 sessionStorage도 물려받지만 브라우저마다 신뢰성이 달라 보조 수단으로만
+// 쓴다). 틀렸거나 둘 다 없으면 평소대로 로그인 화면을 보여준다.
 async function gbDoLogin(pwOverride) {
   var pw = pwOverride != null ? pwOverride : document.getElementById('gbPwInput').value;
   var err = document.getElementById('gbLoginErr');
@@ -411,17 +412,19 @@ async function gbDoLogin(pwOverride) {
       gbInit();
       return true;
     } else {
-      if (!pwOverride) err.textContent = '비밀번호가 올바르지 않습니다.';
+      err.textContent = pwOverride ? '자동 로그인 실패 — 비밀번호를 다시 입력해주세요.' : '비밀번호가 올바르지 않습니다.';
       return false;
     }
   } catch (e) {
-    if (!pwOverride) err.textContent = '서버 오류가 발생했습니다.';
+    err.textContent = (pwOverride ? '자동 로그인 중 ' : '') + '서버 오류가 발생했습니다: ' + (e && e.message ? e.message : e);
     return false;
   }
 }
 function gbTryAutoLogin() {
-  var saved;
-  try { saved = sessionStorage.getItem('gsAdminPw'); } catch (e) { saved = null; }
+  var saved = null;
+  var m = /(?:^|[#&])pw=([^&]*)/.exec(location.hash);
+  if (m) { saved = decodeURIComponent(m[1]); history.replaceState(null, '', location.pathname + location.search); }
+  if (!saved) { try { saved = sessionStorage.getItem('gsAdminPw'); } catch (e) { saved = null; } }
   if (saved) gbDoLogin(saved);
 }
 
@@ -15868,10 +15871,16 @@ async function gsAdminInit() {
   }).join('')
 }
 
+// sessionStorage는 window.open이 같은 출처 새 탭에 그대로 물려주는 걸 전제로
+// 했었는데 브라우저별로 신뢰성이 떨어져(복제가 안 되는 경우가 실제로 보고됨),
+// URL 해시로 비밀번호를 직접 넘기는 방식으로 바꾼다 — 더 확실하게 동작하고,
+// 빌더 쪽에서 받자마자 즉시 주소창에서 지운다(히스토리에 남지 않게).
 function gsOpenBuilder() {
   const programId = document.getElementById('gsAdminProgramSelect').value
   if (!programId) { alert('먼저 사업을 선택하세요.'); return }
-  window.open('/admin02/gov/' + programId + '/builder', '_blank')
+  var url = '/admin02/gov/' + programId + '/builder'
+  if (adminPassword) url += '#pw=' + encodeURIComponent(adminPassword)
+  window.open(url, '_blank')
 }
 </script>
 </body>
