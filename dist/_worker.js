@@ -212,7 +212,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${qn}" font-size="128" font-weight="800" fill="${Gn(e.statColor||`#ffffff`)}">${Gn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${qn}" font-size="64" font-weight="800" fill="#ffffff">${Gn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${qn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Gn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Yn=`mvnses9d`;function Xn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Zn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${qn}" font-size="128" font-weight="800" fill="${Gn(e.statColor||`#ffffff`)}">${Gn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${qn}" font-size="64" font-weight="800" fill="#ffffff">${Gn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${qn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Gn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Yn=`mvnvyi7u`;function Xn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Zn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -902,7 +902,7 @@ function gbQuickAddDetailHtml(node) {
   var skip = { categoryHeader: 1, subhead: 1, subhead2: 1 };
   var btns = Object.keys(gbTypes).filter(function (k) { return !skip[k]; }).map(function (k) {
     var t = gbTypes[k];
-    return '<button type="button" class="gb-btn" style="font-size:11px;padding:4px 9px;" onclick="gbQuickAddDetail('' + k + '')">+ ' + esc(t.labelKo) + '</button>';
+    return '<button type="button" class="gb-btn" style="font-size:11px;padding:4px 9px;" onclick="gbQuickAddDetail(&quot;' + k + '&quot;)">+ ' + esc(t.labelKo) + '</button>';
   }).join('');
   return '<h4>+ 세부 내용 추가</h4>' +
     '<div class="gb-node-info" style="margin-bottom:6px;">이 카드 아래에 헤드카피·개조식·표·시각화 등을 바로 추가합니다. "제목만" 두고 싶으면 아무것도 누르지 마세요.</div>' +
