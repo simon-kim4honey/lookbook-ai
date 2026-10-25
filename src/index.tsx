@@ -576,6 +576,7 @@ async function gbRenderInspector() {
       '<h4>' + esc(gbLevelLabels[0]) + '</h4>' +
       '<div class="sf-field"><label class="sf-label">제목</label><input class="sf-input" id="gbL1Title" value="' + esc(node.title || '') + '" /></div>' +
       '<div class="sf-field"><label class="sf-label">목표 글자수</label><input class="sf-input" type="number" id="gbL1Chars" value="' + (node.targetChars || '') + '" /></div>' +
+      gbQuickAddDetailHtml(node) +
       gbNodeInfoHtml(node);
     document.getElementById('gbL1Title').addEventListener('change', function () { gbPatchNode(node.id, { title: this.value }); });
     document.getElementById('gbL1Chars').addEventListener('change', function () { gbPatchNode(node.id, { targetChars: this.valueAsNumber || null }); });
@@ -589,6 +590,7 @@ async function gbRenderInspector() {
     '<h4>바인딩</h4>' + gbBindingSectionHtml(node) +
     '<h4>반복</h4>' + gbRepeatSectionHtml(node) +
     '<h4>조건</h4>' + gbConditionSectionHtml(node) +
+    gbQuickAddDetailHtml(node) +
     '<h4>관리자 메모</h4><textarea class="sf-textarea" id="gbNoteInput">' + esc(node.note || '') + '</textarea>' +
     '<h4>이 노드 정보</h4>' + gbNodeInfoHtml(node);
 
@@ -778,12 +780,12 @@ async function gbRestoreSnapshot(snapshotNodes) {
 }
 
 // ── 추가/복제/삭제 ──
-async function gbAddNode(level, parentId) {
+async function gbAddNode(level, parentId, exprType, title) {
   gbPushUndoSnapshot();
   var body = {
     programId: GB_PROGRAM_ID, parentId: parentId, level: level,
-    expressionType: level === 1 ? 'categoryHeader' : 'paragraph',
-    title: level === 1 ? '새 대분류' : '새 카드', binding: level === 1 ? 'static' : 'ai'
+    expressionType: exprType || (level === 1 ? 'categoryHeader' : 'paragraph'),
+    title: title || (level === 1 ? '새 대분류' : '새 카드'), binding: level === 1 ? 'static' : 'ai'
   };
   var res = await fetch('/api/admin/gov/nodes', { method: 'POST', headers: authHeaders(true), body: JSON.stringify(body) });
   var data = await res.json();
@@ -797,6 +799,30 @@ function gbAddNodeUnderSelected(level) {
   if (!node) return;
   var parentId = (level === node.level + 1) ? node.id : node.parentId;
   gbAddNode(level, parentId);
+}
+
+// ── "제목만" vs "제목 + 세부 내용 여러 개" — 선택한 카드 아래에 콘텐츠 유형을
+// 한 번의 클릭으로 바로 덧붙인다(기존 "+소소분류"는 매번 레벨을 고르고 표현방법을
+// 다시 드롭다운에서 바꿔야 했다). 같은 카드에 여러 유형을 연속으로 눌러 "헤드카피
+// + 표 + 시각화"처럼 여러 세부 내용을 조합할 수 있다.
+function gbQuickAddDetailHtml(node) {
+  if (node.level >= 4) return '';
+  var skip = { categoryHeader: 1, subhead: 1, subhead2: 1 };
+  var btns = Object.keys(gbTypes).filter(function (k) { return !skip[k]; }).map(function (k) {
+    var t = gbTypes[k];
+    return '<button type="button" class="gb-btn" style="font-size:11px;padding:4px 9px;" onclick="gbQuickAddDetail(\'' + k + '\')">+ ' + esc(t.labelKo) + '</button>';
+  }).join('');
+  return '<h4>+ 세부 내용 추가</h4>' +
+    '<div class="gb-node-info" style="margin-bottom:6px;">이 카드 아래에 헤드카피·개조식·표·시각화 등을 바로 추가합니다. 여러 번 눌러 여러 유형을 조합할 수 있어요 — "제목만" 두고 싶으면 그냥 두세요.</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + btns + '</div>';
+}
+function gbQuickAddDetail(exprType) {
+  if (!gbSelectedId) { alert('먼저 카드를 선택하세요.'); return; }
+  var node = gbNodes.find(function (n) { return n.id === gbSelectedId; });
+  if (!node) return;
+  var childLevel = Math.min(node.level + 1, 4);
+  var def = gbTypes[exprType];
+  gbAddNode(childLevel, node.id, exprType, def ? def.labelKo : '새 카드');
 }
 async function gbDuplicate(id) {
   gbPushUndoSnapshot();
@@ -13535,29 +13561,15 @@ app.get('/admin02', (c) => {
   <div class="tab-panel" id="tabGovSupport">
     <div class="admin-body">
       <div class="page-title">📋 지원사업 AI 초안 구조</div>
-      <div class="page-sub">사업별로 AI가 초안을 생성할 때 따라야 할 섹션·항목·표현방법을 직접 관리합니다. 섹션을 하나라도 등록하면 그 사업은 배포 없이 바로 AI 초안 생성이 가능해집니다(예비창업패키지는 등록 여부와 무관하게 기본 지원됩니다).</div>
+      <div class="page-sub">사업별로 AI가 초안을 생성할 때 따라야 할 대분류·중분류·소분류·소소분류 구조를 구조 빌더에서 관리합니다.</div>
 
       <div class="section-card">
         <h3>사업 선택</h3>
-        <select id="gsAdminProgramSelect" class="form-input" style="max-width:420px;" onchange="gsAdminLoadStructure()">
+        <select id="gsAdminProgramSelect" class="form-input" style="max-width:420px;">
           <option value="">불러오는 중...</option>
         </select>
-        <button type="button" class="btn-sm btn-primary-sm" style="margin-top:10px;" onclick="gsOpenNewBuilder()">🧩 새 구조 빌더로 편집 (베타)</button>
-        <div class="section-desc" style="margin-top:6px;">드래그로 카드를 조립하는 새 빌더입니다 — 아직 이 화면과는 별도 데이터(3단계 트리)를 씁니다. yebi는 이미 이관되어 있습니다.</div>
-      </div>
-
-      <div id="gsAdminSectionsWrap"></div>
-
-      <div class="section-card" id="gsAdminAddSectionCard" style="display:none;">
-        <h3>+ 섹션 추가</h3>
-        <div class="section-desc">섹션 키는 영문(예: problem)으로, AI 응답의 sectionId와 매칭됩니다. "summary"로 지으면 다른 섹션을 전부 작성한 뒤 그 내용을 요약하는 마지막 섹션으로 특별 취급됩니다.</div>
-        <div style="display:grid;grid-template-columns:1fr 2fr 90px 110px auto;gap:8px;align-items:center;">
-          <input id="gsNewSectionKey" class="form-input" placeholder="섹션 키 (예: problem)" />
-          <input id="gsNewSectionTitle" class="form-input" placeholder="제목 (예: 1. 문제 인식 (Problem))" />
-          <input id="gsNewSectionOrder" class="form-input" type="number" placeholder="순서" value="0" />
-          <input id="gsNewSectionChars" class="form-input" type="number" placeholder="목표 글자수" value="800" />
-          <button class="btn-sm btn-primary-sm" onclick="gsAdminAddSection()">섹션 추가</button>
-        </div>
+        <button type="button" class="btn-sm btn-primary-sm" style="margin-top:10px;" onclick="gsOpenBuilder()">🧩 구조 빌더 열기</button>
+        <div class="section-desc" style="margin-top:6px;">드래그로 카드를 조립하는 구조 빌더입니다(대분류/중분류/소분류/소소분류 4단계).</div>
       </div>
     </div>
   </div>
@@ -15594,13 +15606,11 @@ document.addEventListener('DOMContentLoaded', () => {
 })
 
 // ══════════════════════════════════════════════
-// 지원사업 AI 초안 구조 관리 — 섹션/항목을 어드민에서 직접 추가·삭제·보완
+// 지원사업 AI 초안 구조 관리 — 구조 빌더(노드 트리)로 통합. 섹션/항목(2단계) 편집
+// 화면은 더 이상 쓰지 않는다(yebi 포함 전부 노드 트리로 이관됨) — 백엔드 라우트/
+// 테이블(gov_support_sections/items)은 CLAUDE.md "6개월 병행" 방침대로 그대로
+// 남겨두되, 어드민 화면에서는 노출하지 않는다.
 // ══════════════════════════════════════════════
-const GS_EXPRESSION_TYPES_CLIENT = ['headlineBox', 'subhead', 'subhead2', 'paragraph', 'bullets', 'table', 'visual', 'iconStats']
-const GS_EXPR_LABELS = {
-  headlineBox: '박스형 헤드카피', subhead: '중제목(가/나/다)', subhead2: '소제목(1/2/3)',
-  paragraph: '서술형 문단', bullets: '개조식(불릿)', table: '표', visual: '시각화(이미지)', iconStats: '아이콘 도식화',
-}
 let gsAdminProgramsLoaded = false
 
 async function gsAdminApi(path, opts) {
@@ -15621,137 +15631,10 @@ async function gsAdminInit() {
   }).join('')
 }
 
-function gsOpenNewBuilder() {
+function gsOpenBuilder() {
   const programId = document.getElementById('gsAdminProgramSelect').value
   if (!programId) { alert('먼저 사업을 선택하세요.'); return }
   window.open('/admin02/gov/' + programId + '/builder', '_blank')
-}
-
-function gsAdminLoadStructure() {
-  const programId = document.getElementById('gsAdminProgramSelect').value
-  const addCard = document.getElementById('gsAdminAddSectionCard')
-  if (!programId) {
-    document.getElementById('gsAdminSectionsWrap').innerHTML = ''
-    addCard.style.display = 'none'
-    return
-  }
-  addCard.style.display = 'block'
-  gsAdminFetchAndRender(programId)
-}
-
-async function gsAdminFetchAndRender(programId) {
-  const wrap = document.getElementById('gsAdminSectionsWrap')
-  wrap.innerHTML = '<div class="section-card">불러오는 중...</div>'
-  const data = await gsAdminApi('/structure/' + programId)
-  if (!data.success) { wrap.innerHTML = '<div class="section-card">불러오기 실패: ' + (data.message || '') + '</div>'; return }
-  if (!data.sections.length) {
-    wrap.innerHTML = '<div class="section-card">아직 등록된 섹션이 없습니다. 아래에서 첫 섹션을 추가해주세요.</div>'
-    return
-  }
-  wrap.innerHTML = data.sections.map(gsAdminRenderSection).join('')
-}
-
-function gsAdminExprOptions(selected) {
-  return GS_EXPRESSION_TYPES_CLIENT.map(function (t) {
-    return '<option value="' + t + '"' + (t === selected ? ' selected' : '') + '>' + (GS_EXPR_LABELS[t] || t) + '</option>'
-  }).join('')
-}
-
-function gsAdminRenderSection(s) {
-  const itemsHtml = (s.items || []).map(function (it) {
-    return '<div style="display:grid;grid-template-columns:60px 160px 1.3fr 1.3fr auto auto;gap:6px;align-items:start;margin-bottom:6px;">' +
-      '<input class="form-input" type="number" value="' + it.item_order + '" onchange="gsAdminItemField(\\'' + it.id + '\\',\\'itemOrder\\',this.value)" />' +
-      '<select class="form-input" onchange="gsAdminItemField(\\'' + it.id + '\\',\\'expressionType\\',this.value)">' + gsAdminExprOptions(it.expression_type) + '</select>' +
-      '<input class="form-input" value="' + rsAdminEsc(it.label) + '" onchange="gsAdminItemField(\\'' + it.id + '\\',\\'label\\',this.value)" />' +
-      '<input class="form-input" value="' + rsAdminEsc(it.notes || '') + '" placeholder="추가 지시(선택)" onchange="gsAdminItemField(\\'' + it.id + '\\',\\'notes\\',this.value)" />' +
-      '<span style="font-size:11px;color:#8b8ba0;align-self:center;">자동저장</span>' +
-      '<button class="btn-sm btn-danger-sm" onclick="gsAdminDeleteItem(\\'' + it.id + '\\',\\'' + s.id + '\\')">삭제</button>' +
-      '</div>'
-  }).join('')
-  return '<div class="section-card" data-section-id="' + s.id + '">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
-    '<h3 style="margin:0;">' + rsAdminEsc(s.title) + ' <span style="color:#8b8ba0;font-weight:400;font-size:12px;">(' + rsAdminEsc(s.section_key) + ')</span></h3>' +
-    '<button class="btn-sm btn-danger-sm" onclick="gsAdminDeleteSection(\\'' + s.id + '\\')">섹션 삭제</button>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px;">' +
-    '<input class="form-input" value="' + rsAdminEsc(s.title) + '" onchange="gsAdminSectionField(\\'' + s.id + '\\',\\'title\\',this.value)" placeholder="제목" />' +
-    '<input class="form-input" value="' + rsAdminEsc(s.section_key) + '" onchange="gsAdminSectionField(\\'' + s.id + '\\',\\'sectionKey\\',this.value)" placeholder="섹션 키" />' +
-    '<input class="form-input" type="number" value="' + s.display_order + '" onchange="gsAdminSectionField(\\'' + s.id + '\\',\\'displayOrder\\',this.value)" placeholder="순서" />' +
-    '<input class="form-input" type="number" value="' + s.target_chars + '" onchange="gsAdminSectionField(\\'' + s.id + '\\',\\'targetChars\\',this.value)" placeholder="목표 글자수" />' +
-    '</div>' +
-    '<div class="section-desc">항목(순서/표현방법/제목/추가 지시) — 값을 바꾸면 자동 저장됩니다.</div>' +
-    itemsHtml +
-    '<div style="display:grid;grid-template-columns:60px 160px 1.3fr 1.3fr auto auto;gap:6px;margin-top:8px;">' +
-    '<input class="form-input" type="number" id="gsNewItemOrder_' + s.id + '" value="' + (s.items ? s.items.length : 0) + '" />' +
-    '<select class="form-input" id="gsNewItemType_' + s.id + '">' + gsAdminExprOptions('subhead') + '</select>' +
-    '<input class="form-input" id="gsNewItemLabel_' + s.id + '" placeholder="예: 가. 창업아이템 배경" />' +
-    '<input class="form-input" id="gsNewItemNotes_' + s.id + '" placeholder="추가 지시(선택)" />' +
-    '<span></span>' +
-    '<button class="btn-sm btn-primary-sm" onclick="gsAdminAddItem(\\'' + s.id + '\\')">+ 항목 추가</button>' +
-    '</div>' +
-    '</div>'
-}
-
-function rsAdminEsc(s) {
-  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-async function gsAdminAddSection() {
-  const programId = document.getElementById('gsAdminProgramSelect').value
-  const sectionKey = document.getElementById('gsNewSectionKey').value.trim()
-  const title = document.getElementById('gsNewSectionTitle').value.trim()
-  const displayOrder = document.getElementById('gsNewSectionOrder').value
-  const targetChars = document.getElementById('gsNewSectionChars').value
-  if (!sectionKey || !title) { alert('섹션 키와 제목을 입력해주세요.'); return }
-  const data = await gsAdminApi('/structure/' + programId + '/sections', { method: 'POST', body: JSON.stringify({ sectionKey, title, displayOrder, targetChars }) })
-  if (!data.success) { alert(data.message || '추가 실패'); return }
-  document.getElementById('gsNewSectionKey').value = ''
-  document.getElementById('gsNewSectionTitle').value = ''
-  gsAdminFetchAndRender(programId)
-  gsAdminProgramsLoaded = false
-  gsAdminInit()
-}
-
-async function gsAdminSectionField(id, field, value) {
-  const body = {}; body[field] = value
-  const data = await gsAdminApi('/sections/' + id, { method: 'PATCH', body: JSON.stringify(body) })
-  if (!data.success) alert(data.message || '저장 실패')
-}
-
-async function gsAdminDeleteSection(id) {
-  if (!confirm('이 섹션과 그 안의 모든 항목을 삭제할까요?')) return
-  const programId = document.getElementById('gsAdminProgramSelect').value
-  const data = await gsAdminApi('/sections/' + id, { method: 'DELETE' })
-  if (!data.success) { alert(data.message || '삭제 실패'); return }
-  gsAdminFetchAndRender(programId)
-  gsAdminProgramsLoaded = false
-  gsAdminInit()
-}
-
-async function gsAdminAddItem(sectionId) {
-  const itemOrder = document.getElementById('gsNewItemOrder_' + sectionId).value
-  const expressionType = document.getElementById('gsNewItemType_' + sectionId).value
-  const label = document.getElementById('gsNewItemLabel_' + sectionId).value.trim()
-  const notes = document.getElementById('gsNewItemNotes_' + sectionId).value.trim()
-  if (!label) { alert('항목 제목(label)을 입력해주세요.'); return }
-  const data = await gsAdminApi('/sections/' + sectionId + '/items', { method: 'POST', body: JSON.stringify({ itemOrder, expressionType, label, notes }) })
-  if (!data.success) { alert(data.message || '추가 실패'); return }
-  const programId = document.getElementById('gsAdminProgramSelect').value
-  gsAdminFetchAndRender(programId)
-}
-
-async function gsAdminItemField(id, field, value) {
-  const body = {}; body[field] = value
-  const data = await gsAdminApi('/items/' + id, { method: 'PATCH', body: JSON.stringify(body) })
-  if (!data.success) alert(data.message || '저장 실패')
-}
-
-async function gsAdminDeleteItem(id, sectionId) {
-  if (!confirm('이 항목을 삭제할까요?')) return
-  const data = await gsAdminApi('/items/' + id, { method: 'DELETE' })
-  if (!data.success) { alert(data.message || '삭제 실패'); return }
-  const programId = document.getElementById('gsAdminProgramSelect').value
-  gsAdminFetchAndRender(programId)
 }
 </script>
 </body>
