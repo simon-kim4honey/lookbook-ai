@@ -166,3 +166,22 @@ test('구조 무결성 — L1의 자식이 L2가 아니면(레벨 규칙 위반)
   const issues = validateProgram([l1, wrong])
   assert.ok(issues.some((i) => i.code === 'STRUCT_LEVEL'))
 })
+
+test('구조 무결성 — 4단계(대분류/중분류/소분류/소소분류)까지는 레벨 오류 없이 통과한다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: 'L1', payload: {}, binding: 'static' })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', title: 'L2', payload: { text: 'L2' }, binding: 'static' })
+  const l3 = node({ id: 'l3', level: 3, parentId: 'l2', expressionType: 'subhead2', title: 'L3', payload: { text: 'L3' }, binding: 'static' })
+  const l4 = node({ id: 'l4', level: 4, parentId: 'l3', expressionType: 'paragraph', title: 'L4', payload: { text: 'L4' }, binding: 'static' })
+  const issues = validateProgram([l1, l2, l3, l4])
+  assert.ok(!issues.some((i) => i.code === 'STRUCT_LEVEL'))
+})
+
+test('구조 무결성 — level이 4를 초과하면 오류', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader' })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', payload: { text: 'x' } })
+  const l3 = node({ id: 'l3', level: 3, parentId: 'l2', expressionType: 'subhead2', payload: { text: 'x' } })
+  const l4 = node({ id: 'l4', level: 4, parentId: 'l3', expressionType: 'paragraph', payload: { text: 'x' } })
+  const l5 = node({ id: 'l5', level: 5 as any, parentId: 'l4', expressionType: 'bullets', payload: {} })
+  const issues = validateProgram([l1, l2, l3, l4, l5])
+  assert.ok(issues.some((i) => i.code === 'STRUCT_LEVEL' && i.nodeId === 'l5'))
+})
