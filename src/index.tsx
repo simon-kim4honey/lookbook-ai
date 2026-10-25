@@ -298,6 +298,8 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:
 </head>
 <body>
 
+<div id="gbDebugBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#334155;color:#fff;font-size:12px;line-height:1.5;padding:8px 12px;word-break:break-all;"></div>
+
 <div id="gbLoginOverlay">
   <div class="gb-login-card">
     <div style="font-size:26px;margin-bottom:8px;">🧩</div>
@@ -367,6 +369,35 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:
 </div>
 
 <script>
+// ── 화면 진단 배너 — 이 페이지 로딩/로그인 중 어떤 JS 오류든 화면에 직접 보여준다.
+// 모바일 등 콘솔을 볼 수 없는 환경에서 "왜 안 되는지 모르겠다"는 상황을 막기 위함.
+var gbDebugHasError = false;
+function gbShowDebug(msg, isError) {
+  try {
+    var el = document.getElementById('gbDebugBanner');
+    if (!el) return;
+    if (isError) { gbDebugHasError = true; el.style.background = '#7f1d1d'; }
+    el.style.display = 'block';
+    el.textContent += (el.textContent ? ' | ' : '진단: ') + msg;
+  } catch (e) {}
+}
+function gbAutoHideDebugIfOk() {
+  setTimeout(function () {
+    if (!gbDebugHasError) {
+      var el = document.getElementById('gbDebugBanner');
+      if (el) el.style.display = 'none';
+    }
+  }, 4000);
+}
+window.addEventListener('error', function (ev) {
+  var loc = ev && ev.filename ? (' (' + String(ev.filename).split('/').pop() + ':' + ev.lineno + ')') : '';
+  gbShowDebug('스크립트 오류 — ' + (ev && ev.message ? ev.message : String(ev)) + loc, true);
+});
+window.addEventListener('unhandledrejection', function (ev) {
+  var reason = ev && ev.reason;
+  gbShowDebug('처리되지 않은 오류 — ' + (reason && reason.message ? reason.message : String(reason)), true);
+});
+
 var GB_PROGRAM_ID = __GB_PROGRAM_ID_JSON__;
 var adminPassword = '';
 var gbNodes = [];
@@ -398,11 +429,13 @@ function authHeaders(json) {
 // 새 탭이면 sessionStorage도 물려받지만 브라우저마다 신뢰성이 달라 보조 수단으로만
 // 쓴다). 틀렸거나 둘 다 없으면 평소대로 로그인 화면을 보여준다.
 async function gbDoLogin(pwOverride) {
+  gbShowDebug('gbDoLogin 호출됨 (' + (pwOverride != null ? '자동' : '수동') + ')');
   var pw = pwOverride != null ? pwOverride : document.getElementById('gbPwInput').value;
   var err = document.getElementById('gbLoginErr');
   err.textContent = '';
   try {
     var res = await fetch('/api/admin/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+    gbShowDebug('/api/admin/auth 응답 ' + res.status);
     var data = await res.json();
     if (data.success) {
       adminPassword = pw;
@@ -410,6 +443,7 @@ async function gbDoLogin(pwOverride) {
       document.getElementById('gbLoginOverlay').style.display = 'none';
       document.getElementById('gbMain').style.display = 'flex';
       gbInit();
+      gbAutoHideDebugIfOk();
       return true;
     } else {
       err.textContent = pwOverride ? '자동 로그인 실패 — 비밀번호를 다시 입력해주세요.' : '비밀번호가 올바르지 않습니다.';
@@ -421,11 +455,13 @@ async function gbDoLogin(pwOverride) {
   }
 }
 function gbTryAutoLogin() {
+  gbShowDebug('gbTryAutoLogin 실행, hash=' + JSON.stringify(location.hash));
   var saved = null;
   var m = /(?:^|[#&])pw=([^&]*)/.exec(location.hash);
   if (m) { saved = decodeURIComponent(m[1]); history.replaceState(null, '', location.pathname + location.search); }
   if (!saved) { try { saved = sessionStorage.getItem('gsAdminPw'); } catch (e) { saved = null; } }
   if (saved) gbDoLogin(saved);
+  else gbShowDebug('저장된 비밀번호 없음 — 자동 로그인 생략');
 }
 
 async function gbInit() {
@@ -1057,6 +1093,7 @@ document.getElementById('gbCards').addEventListener('drop', function (ev) {
 app.get('/admin02/gov/:programId/builder', (c) => {
   const raw = c.req.param('programId')
   if (!/^[a-zA-Z0-9_-]+$/.test(raw)) return c.text('잘못된 programId', 400)
+  c.header('Cache-Control', 'no-store')
   return c.html(GOV_BUILDER_PAGE_HTML.replace('__GB_PROGRAM_ID_JSON__', JSON.stringify(raw)))
 })
 
