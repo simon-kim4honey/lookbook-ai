@@ -644,9 +644,17 @@ async function gbRenderInspector() {
     return;
   }
 
+  // subhead/subhead2/diagram/timeline/chart는 표현방법 자체의 페이로드에 이미
+  // "제목" 필드(payload.text 또는 payload.title)가 있어서 — 그게 실제로 화면에
+  // 렌더되는 제목이다. 그런 타입엔 여기서 또 제목란을 보여주면 "제목"이 두 번
+  // 나와서 헷갈린다. 페이로드에 제목 개념이 아예 없는 타입(헤드카피·개조식·표 등)
+  // 에서만 관리자용 라벨로 보여준다.
+  var GB_TYPES_WITH_OWN_TITLE = { subhead: 1, subhead2: 1, diagram: 1, timeline: 1, chart: 1 };
+  var titleFieldHtml = GB_TYPES_WITH_OWN_TITLE[node.expressionType] ? '' :
+    '<h4>제목</h4><div class="sf-field"><input class="sf-input" id="gbTitleInput" value="' + esc(node.title || '') + '" /></div>';
+
   body.innerHTML =
-    '<h4>제목</h4>' +
-    '<div class="sf-field"><input class="sf-input" id="gbTitleInput" value="' + esc(node.title || '') + '" /></div>' +
+    titleFieldHtml +
     '<h4>표현방법</h4>' +
     '<select class="sf-select" id="gbInspectorTypeSelect">' + gbTypeOptionsHtml(node.expressionType) + '</select>' +
     '<h4>페이로드</h4><div id="gbPayloadForm">불러오는 중…</div>' +
@@ -657,7 +665,8 @@ async function gbRenderInspector() {
     '<h4>관리자 메모</h4><textarea class="sf-textarea" id="gbNoteInput">' + esc(node.note || '') + '</textarea>' +
     '<h4>이 노드 정보</h4>' + gbNodeInfoHtml(node);
 
-  document.getElementById('gbTitleInput').addEventListener('change', function () { gbPatchNode(node.id, { title: this.value }); gbRenderTree(); gbRenderCanvas(); });
+  var titleInput = document.getElementById('gbTitleInput');
+  if (titleInput) titleInput.addEventListener('change', function () { gbPatchNode(node.id, { title: this.value }); gbRenderTree(); gbRenderCanvas(); });
   document.getElementById('gbInspectorTypeSelect').addEventListener('change', function () { gbSwitchType(node.id, this.value); });
   document.getElementById('gbNoteInput').addEventListener('change', function () { gbPatchNode(node.id, { note: this.value }); });
   gbWireBindingSection(node);
