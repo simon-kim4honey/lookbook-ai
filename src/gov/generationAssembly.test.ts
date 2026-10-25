@@ -110,6 +110,15 @@ test('buildCategoryStructureText는 moduleId와 바인딩 지시문을 포함한
   assert.match(text, /생성 금지/) // answer 지시
 })
 
+test('buildCategoryStructureText — payload.text가 없고 caption만 있는 노드(아이콘형 시각화 등)도 힌트로 포함된다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '1. 문제 인식', payload: {}, binding: 'static', targetChars: 1000 })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', title: '가. 배경', payload: { text: '가. 배경' }, binding: 'static' })
+  const l3icon = node({ id: 'l3icon', level: 3, parentId: 'l2', expressionType: 'iconStats', title: '아이콘 도식화', payload: { caption: '창업아이템 배경 핵심 수치' }, binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, l3icon])[0]
+  const text = buildCategoryStructureText(cat, {})
+  assert.match(text, /참고\(관리자가 적어둔 힌트\/제목\/캡션\): 창업아이템 배경 핵심 수치/)
+})
+
 test('mergeCategoryBlocks — computed 모듈은 AI 응답과 무관하게 서버 계산값으로 강제된다', () => {
   const cat = sampleTree()
   const aiBlocks = new Map<string, any>([
