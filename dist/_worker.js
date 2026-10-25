@@ -212,7 +212,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${qn}" font-size="128" font-weight="800" fill="${Gn(e.statColor||`#ffffff`)}">${Gn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${qn}" font-size="64" font-weight="800" fill="#ffffff">${Gn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${qn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Gn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Yn=`mvnre04x`;function Xn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Zn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${qn}" font-size="128" font-weight="800" fill="${Gn(e.statColor||`#ffffff`)}">${Gn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${qn}" font-size="64" font-weight="800" fill="#ffffff">${Gn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${qn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Gn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Yn=`mvnre5gd`;function Xn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Zn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -309,6 +309,10 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:
 .gb-radio-row{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:#c0c0d0;margin-bottom:8px;}
 .gb-radio-row label{display:flex;align-items:center;gap:4px;cursor:pointer;}
 .gb-node-info{font-size:11px;color:#6b6b88;line-height:1.8;word-break:break-all;}
+.gb-accordion{margin-bottom:10px;border:1px solid #2e2e50;border-radius:8px;padding:0 10px;}
+.gb-accordion summary{padding:9px 0;font-size:12.5px;font-weight:700;color:#a0a0c0;cursor:pointer;user-select:none;}
+.gb-accordion[open] summary{color:#e0e0f0;border-bottom:1px solid #2e2e5055;margin-bottom:8px;}
+.gb-accordion > *:not(summary){margin-bottom:8px;}
 .gb-toast-wrap{position:fixed;bottom:20px;right:20px;z-index:150;display:flex;flex-direction:column;gap:8px;}
 .gb-toast{background:#1a1a2e;border:1px solid #3a3a60;border-radius:10px;padding:12px 16px;font-size:13px;color:#e0e0f0;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,.4);}
 .gb-toast button{background:#3182F6;border:none;color:#fff;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;}
@@ -627,8 +631,8 @@ async function gbRenderInspector() {
     '<select class="sf-select" id="gbInspectorTypeSelect">' + gbTypeOptionsHtml(node.expressionType) + '</select>' +
     '<h4>페이로드</h4><div id="gbPayloadForm">불러오는 중…</div>' +
     '<h4>바인딩</h4>' + gbBindingSectionHtml(node) +
-    '<h4>반복</h4>' + gbRepeatSectionHtml(node) +
-    '<h4>조건</h4>' + gbConditionSectionHtml(node) +
+    '<details class="gb-accordion"' + (node.repeatConfig && node.repeatConfig.enabled ? ' open' : '') + '><summary>반복' + (node.repeatConfig && node.repeatConfig.enabled ? ' · 사용 중' : ' (거의 안 씀)') + '</summary>' + gbRepeatSectionHtml(node) + '</details>' +
+    '<details class="gb-accordion"' + (node.conditionConfig && node.conditionConfig.enabled ? ' open' : '') + '><summary>조건' + (node.conditionConfig && node.conditionConfig.enabled ? ' · 사용 중' : ' (거의 안 씀)') + '</summary>' + gbConditionSectionHtml(node) + '</details>' +
     gbQuickAddDetailHtml(node) +
     '<h4>관리자 메모</h4><textarea class="sf-textarea" id="gbNoteInput">' + esc(node.note || '') + '</textarea>' +
     '<h4>이 노드 정보</h4>' + gbNodeInfoHtml(node);
@@ -844,15 +848,28 @@ function gbAddNodeUnderSelected(level) {
 // 한 번의 클릭으로 바로 덧붙인다(기존 "+소소분류"는 매번 레벨을 고르고 표현방법을
 // 다시 드롭다운에서 바꿔야 했다). 같은 카드에 여러 유형을 연속으로 눌러 "헤드카피
 // + 표 + 시각화"처럼 여러 세부 내용을 조합할 수 있다.
+// 자주 쓰는 조합(실제 yebi 구조에서 반복된 패턴)은 템플릿 버튼 하나로 한 번에 넣는다.
+var GB_TEMPLATES = [
+  { label: '헤드카피+개조식+아이콘통계', types: ['headlineBox', 'bullets', 'iconStats'] },
+  { label: '헤드카피+개조식', types: ['headlineBox', 'bullets'] },
+  { label: '헤드카피+표', types: ['headlineBox', 'table'] },
+  { label: '개조식+표', types: ['bullets', 'table'] },
+];
 function gbQuickAddDetailHtml(node) {
   if (node.level >= 4) return '';
+  var tplBtns = GB_TEMPLATES.map(function (tpl, i) {
+    return '<button type="button" class="gb-btn" style="font-size:11px;padding:4px 9px;" onclick="gbQuickAddTemplate(' + i + ')">📦 ' + esc(tpl.label) + '</button>';
+  }).join('');
   var skip = { categoryHeader: 1, subhead: 1, subhead2: 1 };
   var btns = Object.keys(gbTypes).filter(function (k) { return !skip[k]; }).map(function (k) {
     var t = gbTypes[k];
     return '<button type="button" class="gb-btn" style="font-size:11px;padding:4px 9px;" onclick="gbQuickAddDetail('' + k + '')">+ ' + esc(t.labelKo) + '</button>';
   }).join('');
   return '<h4>+ 세부 내용 추가</h4>' +
-    '<div class="gb-node-info" style="margin-bottom:6px;">이 카드 아래에 헤드카피·개조식·표·시각화 등을 바로 추가합니다. 여러 번 눌러 여러 유형을 조합할 수 있어요 — "제목만" 두고 싶으면 그냥 두세요.</div>' +
+    '<div class="gb-node-info" style="margin-bottom:6px;">이 카드 아래에 헤드카피·개조식·표·시각화 등을 바로 추가합니다. "제목만" 두고 싶으면 아무것도 누르지 마세요.</div>' +
+    '<div class="gb-node-info" style="margin-bottom:4px;">자주 쓰는 조합 — 한 번에 여러 개 추가</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + tplBtns + '</div>' +
+    '<div class="gb-node-info" style="margin-bottom:4px;">하나씩 추가</div>' +
     '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + btns + '</div>';
 }
 function gbQuickAddDetail(exprType) {
@@ -861,7 +878,20 @@ function gbQuickAddDetail(exprType) {
   if (!node) return;
   var childLevel = Math.min(node.level + 1, 4);
   var def = gbTypes[exprType];
-  gbAddNode(childLevel, node.id, exprType, def ? def.labelKo : '새 카드');
+  return gbAddNode(childLevel, node.id, exprType, def ? def.labelKo : '새 카드');
+}
+async function gbQuickAddTemplate(tplIdx) {
+  if (!gbSelectedId) { alert('먼저 카드를 선택하세요.'); return; }
+  var parentId = gbSelectedId;
+  var tpl = GB_TEMPLATES[tplIdx];
+  if (!tpl) return;
+  for (var i = 0; i < tpl.types.length; i++) {
+    var node = gbNodes.find(function (n) { return n.id === parentId; });
+    if (!node) break;
+    var childLevel = Math.min(node.level + 1, 4);
+    var def = gbTypes[tpl.types[i]];
+    await gbAddNode(childLevel, parentId, tpl.types[i], def ? def.labelKo : '새 카드');
+  }
 }
 async function gbDuplicate(id) {
   gbPushUndoSnapshot();
