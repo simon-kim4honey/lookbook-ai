@@ -389,8 +389,11 @@ function authHeaders(json) {
 }
 
 // ── 로그인 (admin02와 동일한 /api/admin/auth 재사용) ──
-async function gbDoLogin() {
-  var pw = document.getElementById('gbPwInput').value;
+// admin02에서 이미 로그인한 상태로 "구조 빌더 열기"를 누르면(window.open은 같은
+// 출처 탭 사이에 sessionStorage를 그대로 물려받는다) 비밀번호를 또 묻지 않고
+// 자동으로 들어간다 — 틀렸거나 없으면 평소대로 로그인 화면을 보여준다.
+async function gbDoLogin(pwOverride) {
+  var pw = pwOverride != null ? pwOverride : document.getElementById('gbPwInput').value;
   var err = document.getElementById('gbLoginErr');
   err.textContent = '';
   try {
@@ -398,15 +401,24 @@ async function gbDoLogin() {
     var data = await res.json();
     if (data.success) {
       adminPassword = pw;
+      try { sessionStorage.setItem('gsAdminPw', pw); } catch (e) {}
       document.getElementById('gbLoginOverlay').style.display = 'none';
       document.getElementById('gbMain').style.display = 'flex';
       gbInit();
+      return true;
     } else {
-      err.textContent = '비밀번호가 올바르지 않습니다.';
+      if (!pwOverride) err.textContent = '비밀번호가 올바르지 않습니다.';
+      return false;
     }
   } catch (e) {
-    err.textContent = '서버 오류가 발생했습니다.';
+    if (!pwOverride) err.textContent = '서버 오류가 발생했습니다.';
+    return false;
   }
+}
+function gbTryAutoLogin() {
+  var saved;
+  try { saved = sessionStorage.getItem('gsAdminPw'); } catch (e) { saved = null; }
+  if (saved) gbDoLogin(saved);
 }
 
 async function gbInit() {
@@ -942,7 +954,8 @@ function gbKeyHandler(ev) {
 
 // ── 이벤트 위임 바인딩 (한 번만 등록) ──
 document.getElementById('gbPwInput').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') gbDoLogin(); });
-document.getElementById('gbLoginBtn').addEventListener('click', gbDoLogin);
+document.getElementById('gbLoginBtn').addEventListener('click', function () { gbDoLogin(); });
+gbTryAutoLogin();
 document.getElementById('gbUndoBtn').addEventListener('click', gbUndo);
 document.getElementById('gbRedoBtn').addEventListener('click', gbRedo);
 document.getElementById('gbPublishBtn').addEventListener('click', gbPublish);
@@ -14681,6 +14694,7 @@ async function doLogin() {
     const data = await res.json()
     if (data.success) {
       adminPassword = pw
+      try { sessionStorage.setItem('gsAdminPw', pw) } catch(e) {}
       document.getElementById('loginOverlay').style.display = 'none'
       document.getElementById('adminMain').style.display = 'block'
       loadConfig()
@@ -14690,6 +14704,7 @@ async function doLogin() {
 }
 function doLogout() {
   adminPassword = ''
+  try { sessionStorage.removeItem('gsAdminPw') } catch(e) {}
   document.getElementById('loginOverlay').style.display = 'flex'
   document.getElementById('adminMain').style.display = 'none'
   document.getElementById('pwInput').value = ''
