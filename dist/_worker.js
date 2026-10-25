@@ -212,7 +212,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${qn}" font-size="128" font-weight="800" fill="${Gn(e.statColor||`#ffffff`)}">${Gn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${qn}" font-size="64" font-weight="800" fill="#ffffff">${Gn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${qn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Gn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Yn=`mvnn89je`;function Xn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Zn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${qn}" font-size="128" font-weight="800" fill="${Gn(e.statColor||`#ffffff`)}">${Gn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${qn}" font-size="64" font-weight="800" fill="#ffffff">${Gn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${qn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Gn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Yn=`mvnre04x`;function Xn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Zn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -416,8 +416,11 @@ function authHeaders(json) {
 }
 
 // ── 로그인 (admin02와 동일한 /api/admin/auth 재사용) ──
-async function gbDoLogin() {
-  var pw = document.getElementById('gbPwInput').value;
+// admin02에서 이미 로그인한 상태로 "구조 빌더 열기"를 누르면(window.open은 같은
+// 출처 탭 사이에 sessionStorage를 그대로 물려받는다) 비밀번호를 또 묻지 않고
+// 자동으로 들어간다 — 틀렸거나 없으면 평소대로 로그인 화면을 보여준다.
+async function gbDoLogin(pwOverride) {
+  var pw = pwOverride != null ? pwOverride : document.getElementById('gbPwInput').value;
   var err = document.getElementById('gbLoginErr');
   err.textContent = '';
   try {
@@ -425,15 +428,24 @@ async function gbDoLogin() {
     var data = await res.json();
     if (data.success) {
       adminPassword = pw;
+      try { sessionStorage.setItem('gsAdminPw', pw); } catch (e) {}
       document.getElementById('gbLoginOverlay').style.display = 'none';
       document.getElementById('gbMain').style.display = 'flex';
       gbInit();
+      return true;
     } else {
-      err.textContent = '비밀번호가 올바르지 않습니다.';
+      if (!pwOverride) err.textContent = '비밀번호가 올바르지 않습니다.';
+      return false;
     }
   } catch (e) {
-    err.textContent = '서버 오류가 발생했습니다.';
+    if (!pwOverride) err.textContent = '서버 오류가 발생했습니다.';
+    return false;
   }
+}
+function gbTryAutoLogin() {
+  var saved;
+  try { saved = sessionStorage.getItem('gsAdminPw'); } catch (e) { saved = null; }
+  if (saved) gbDoLogin(saved);
 }
 
 async function gbInit() {
@@ -969,7 +981,8 @@ function gbKeyHandler(ev) {
 
 // ── 이벤트 위임 바인딩 (한 번만 등록) ──
 document.getElementById('gbPwInput').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') gbDoLogin(); });
-document.getElementById('gbLoginBtn').addEventListener('click', gbDoLogin);
+document.getElementById('gbLoginBtn').addEventListener('click', function () { gbDoLogin(); });
+gbTryAutoLogin();
 document.getElementById('gbUndoBtn').addEventListener('click', gbUndo);
 document.getElementById('gbRedoBtn').addEventListener('click', gbRedo);
 document.getElementById('gbPublishBtn').addEventListener('click', gbPublish);
@@ -7334,6 +7347,7 @@ async function doLogin() {
     const data = await res.json()
     if (data.success) {
       adminPassword = pw
+      try { sessionStorage.setItem('gsAdminPw', pw) } catch(e) {}
       document.getElementById('loginOverlay').style.display = 'none'
       document.getElementById('adminMain').style.display = 'block'
       loadConfig()
@@ -7343,6 +7357,7 @@ async function doLogin() {
 }
 function doLogout() {
   adminPassword = ''
+  try { sessionStorage.removeItem('gsAdminPw') } catch(e) {}
   document.getElementById('loginOverlay').style.display = 'flex'
   document.getElementById('adminMain').style.display = 'none'
   document.getElementById('pwInput').value = ''
