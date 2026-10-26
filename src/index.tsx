@@ -5018,6 +5018,10 @@ app.get('/gov-support/wizard/:id', async (c) => {
             </div>
             <div class="wz-field-hint">공방은 소규모 수작업, 자체 공장은 직접 소유한 생산 설비를 뜻해요. 스마트팩토리는 자동화·IoT 설비를 갖춘 공장이에요.</div>
           </div>
+          <div class="wz-field" id="f_productionDetailField" style="display:none;">
+            <div class="wz-field-label" id="f_productionDetailLabel">세부 내용 (선택)</div>
+            <input type="text" class="wz-input" id="f_productionDetail" maxlength="150" />
+          </div>
         </div>
 
         <div class="wz-step" data-step="6">
@@ -5044,7 +5048,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
               <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
               <div class="wz-highlight-desc">"차별점이 뭔가요?"라고 물으면 막막할 수 있어요. 대신 아래 3가지 질문에 답해보세요 — 답하다 보면 본인도 몰랐던 차별점이 드러나는 경우가 많아요.</div>
             </div>
-            <div class="wz-field-label">경쟁사와 똑같이 만든다면, 고객이 굳이 당신 브랜드를 선택할 이유가 있을까요? <span class="wz-required">*</span></div>
+            <div class="wz-field-label">경쟁사와 똑같이 만든다면, 고객이 굳이 당신 브랜드를 선택할 이유는 무엇인가요? <span class="wz-required">*</span></div>
             <textarea class="wz-textarea" id="f_diffReason" placeholder="예: 가격은 비슷해도 소재와 마감을 보면 티가 난다고 생각해요" maxlength="200" data-required="1"></textarea>
           </div>
           <div class="wz-field">
@@ -5234,7 +5238,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
     }
 
     function wzFillFormFromAnswers() {
-      var simpleFields = ['brandName','product1','product2','product3','concept','ipStatus','validationEfforts','target','problemStatement','processNote','diffReason','diffStubborn','diffFeedback','experienceDetail','externalBackground','motivation','expectedImpact','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl','productOutput'];
+      var simpleFields = ['brandName','product1','product2','product3','concept','ipStatus','validationEfforts','target','problemStatement','productionDetail','processNote','diffReason','diffStubborn','diffFeedback','experienceDetail','externalBackground','motivation','expectedImpact','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl','productOutput'];
       simpleFields.forEach(function (k) {
         var el = document.getElementById('f_' + k);
         if (el && wzAnswers[k] !== undefined) el.value = wzAnswers[k];
@@ -5260,6 +5264,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
       wzApplyCompetitorUnknownUI();
       wzUpdateExperienceDetailVisibility();
       wzUpdateStageWarning();
+      wzUpdateProductionDetailVisibility();
     }
 
     // 예비창업패키지는 사업자등록 전인 사람만 지원 가능 — 위저드는 9개 사업
@@ -5293,7 +5298,35 @@ app.get('/gov-support/wizard/:id', async (c) => {
       if (row.getAttribute('data-field') === 'channels') wzUpdateSelfMallUrlVisibility();
       if (row.getAttribute('data-field') === 'experience') wzUpdateExperienceDetailVisibility();
       if (row.getAttribute('data-field') === 'stage') wzUpdateStageWarning();
+      if (row.getAttribute('data-field') === 'productionMethod') wzUpdateProductionDetailVisibility();
     });
+
+    // 생산 방식 버튼마다 실제로 궁금한 게 달라서(공방이면 작업 공간, 위탁이면
+    // 협력 생산처 등) 선택한 값에 맞춰 라벨·placeholder가 바뀌는 추가 질문
+    // 하나를 보여준다. "미정(추천 원함)"은 물어볼 게 없어 숨긴다.
+    var WZ_PRODUCTION_DETAIL_META = {
+      '자체 제작(공방)': { label: '작업 공간 규모·보유 설비 (선택)', placeholder: '예: 서울 성수동 15평 작업실, 재봉틀 4대 보유' },
+      '자체 공장(일반)': { label: '공장 규모·보유 설비·인력 (선택)', placeholder: '예: 경기 안산 50평 공장, 재단기 2대·오버록 5대, 생산인력 4명' },
+      '자체 공장(스마트팩토리)': { label: '도입한 자동화 설비·시스템 (선택)', placeholder: '예: CAD 자동 재단 시스템, IoT 생산관리 솔루션, 스마트공장 확인서 보유' },
+      '국내 OEM·CMT 위탁': { label: '협력(예정) 생산처 (선택)', placeholder: '예: 동대문 OEM 업체와 샘플 제작 협의 중, 최소발주수량 50장' },
+      '소량생산 전문업체': { label: '협력 업체·생산 조건 (선택)', placeholder: '예: 소량생산 전문 OO업체, 최소수량 10장부터 가능' },
+      '해외 생산': { label: '생산국·선택 이유 (선택)', placeholder: '예: 중국 광저우, 원가 절감 및 다품종 소량생산 용이' },
+    };
+    function wzUpdateProductionDetailVisibility() {
+      var row = document.querySelector('.wz-chip-row[data-field="productionMethod"]');
+      var field = document.getElementById('f_productionDetailField');
+      if (!row || !field) return;
+      var selected = row.querySelector('.wz-chip.on');
+      var value = selected ? selected.getAttribute('data-value') : '';
+      var meta = WZ_PRODUCTION_DETAIL_META[value];
+      if (meta) {
+        document.getElementById('f_productionDetailLabel').textContent = meta.label;
+        document.getElementById('f_productionDetail').placeholder = meta.placeholder;
+        field.style.display = 'block';
+      } else {
+        field.style.display = 'none';
+      }
+    }
 
     function wzUpdateSelfMallUrlVisibility() {
       var row = document.querySelector('.wz-chip-row[data-field="channels"]');
@@ -5437,6 +5470,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
         patch.competitor1_name = val('f_competitor1_name'); patch.competitor1_feature = val('f_competitor1_feature');
         patch.competitor2_name = val('f_competitor2_name'); patch.competitor2_feature = val('f_competitor2_feature');
         patch.competitorsUnknown = !!wzAnswers.competitorsUnknown;
+      } else if (stepNum === 5) {
+        patch.productionDetail = val('f_productionDetail');
       } else if (stepNum === 6) {
         patch.processNote = val('f_processNote');
       } else if (stepNum === 7) {
@@ -5940,7 +5975,8 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 14. externalBackground(시장·트렌드 변화)·motivation(창업 동기)이 있으면 "가.창업아이템 배경"의 외부적 배경/내부적 배경/필요성에 각각 자연스럽게 반영한다 — externalBackground가 비어있으면 motivation과 업종 특성을 참고해 합리적인 시장 배경을 직접 제시하되 원칙 3에 따라 "(임의 작성)"을 덧붙인다.
 15. experienceDetail(관련 경력 설명)이 있으면 "가.대표자 보유역량"에서 그 내용을 구체적으로 반영한다. experienceDetail이 비어있고 experience(관련 경력 선택)만 있다면 선택된 항목을 바탕으로 서술한다.
 16. expectedImpact(기대효과)가 있으면 "라.기대효과" 섹션에서 그 내용을 구체적인 수치와 함께 반영한다.
-17. ipStatus(지식재산권 보유·출원 현황)·validationEfforts(시장 검증 활동)가 있으면 "2-1 창업아이템 현황(준비정도)"에서 "현재 준비 상태"를 보여주는 구체적 근거로 반영한다. 둘 다 비어있으면 지어내지 말고(지식재산권·시장검증 실적은 사실 왜곡 위험이 큰 항목이다) 해당 내용 없이 다른 준비 현황(공정·생산방식 등)만으로 섹션을 구성한다.`
+17. ipStatus(지식재산권 보유·출원 현황)·validationEfforts(시장 검증 활동)가 있으면 "2-1 창업아이템 현황(준비정도)"에서 "현재 준비 상태"를 보여주는 구체적 근거로 반영한다. 둘 다 비어있으면 지어내지 말고(지식재산권·시장검증 실적은 사실 왜곡 위험이 큰 항목이다) 해당 내용 없이 다른 준비 현황(공정·생산방식 등)만으로 섹션을 구성한다.
+18. productionDetail(생산 방식 세부 내용 — productionMethod에서 고른 값에 따라 작업 공간/설비, 협력 생산처, 생산국 등 다른 걸 물어본 답변이다)이 있으면 "2-1 창업아이템 현황(준비정도)"와 "다.해결방안"에서 생산 준비 상태의 구체적 근거로 반영한다. 비어있으면 productionMethod(선택한 생산 방식)만으로 일반적인 수준에서 서술한다.`
 
 function gsBlockVariant(type: string, props: Record<string, any>, required: string[]) {
   return {
