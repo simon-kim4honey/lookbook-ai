@@ -6260,6 +6260,9 @@ async function gsCallGroupWithRetry(
   const first = await gsCallClaudeWithSchema(apiKey, prompt, schema, expectCount, maxTokens, timeoutMs, env, label)
   if (first) return first
   console.error(`gov-support(nodes) ${label} 1차 실패 — 재시도`)
+  // 1차 실패 직후 지연 없이 바로 재시도하면 순간 버스트 패턴이 그대로 반복될 뿐이다(2026-10-26
+  // 실사용자 리포트: 1차·재시도 둘 다 같은 1초 안에 403으로 거부됨) — 2초 쉬었다가 재시도한다.
+  await new Promise((r) => setTimeout(r, 2000))
   return gsCallClaudeWithSchema(apiKey, prompt, schema, expectCount, maxTokens, timeoutMs, env, `${label}(재시도)`)
 }
 
@@ -6326,11 +6329,20 @@ async function generateGovSupportSectionsFromNodes(
   const groups = gsChunk(mainCats, 2)
   const l1IndexById = new Map(mainCats.map((c, i) => [c.node.id, i + 1]))
 
-  const groupResults = await Promise.all(groups.map(async (group) => {
+  // 2026-10-26: 사용자 리포트로 그룹 전체(1·2번, 3·4번)가 같은 1초 안에 전부 403
+  // "forbidden"(Anthropic 표준 에러 타입이 아님 — invalid_request_error/rate_limit_error
+  // 등과 다름)으로 거부된 사례를 확인. 콘솔에서 결제/크레딧/속도 제한을 직접 확인했는데
+  // 전부 1% 미만 사용으로 정상이었다 — 공개된 24시간 사용량 한도가 원인은 아니라는 뜻.
+  // 가장 설명이 되는 가설은 Promise.all로 여러 그룹을 동시에 쏘고, 실패하면 지연 없이
+  // 즉시 재시도하는 지금 패턴이 순간적인 버스트 요청으로 보여 어뷰징 방지 로직을 건드렸을
+  // 가능성이다. 그룹별로 약간씩(인덱스 * 400ms) 시차를 둬 동시 발사를 완화한다.
+  const groupResults = await Promise.all(groups.map(async (group, i) => {
     const ids = group.map((c) => c.node.id)
     const label = group.map((c) => c.node.title).join('·')
     const hasAiNode = group.some((c) => flattenCategory(c, answers).some((e) => isAiGeneratedNode(e.node)))
     if (!hasAiNode) return group.map((c) => ({ categoryId: c.node.id, blocks: [] })) // AI 모듈이 없으면 호출 자체 생략
+
+    if (i > 0) await new Promise((r) => setTimeout(r, i * 400))
 
     const structureBlock = group.map((c) => buildCategoryStructureText(c, answers)).join('\n\n')
     const prompt = `${intro}
