@@ -6395,7 +6395,19 @@ ${GS_NODES_JSON_FORMAT}
       const { blocks, warnings } = mergeCategoryBlocks(c, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), l1Index)
       if (warnings.length) {
         console.error(`gov-support(nodes) "${c.node.title}" 병합 경고:`, JSON.stringify(warnings).slice(0, 500))
-        mergeWarningsByCategory.push({ category: c.node.title, warnings })
+        // 2026-10-26: 403도 아니고 JSON 파싱 실패도 아닌데 moduleId가 통째로 비는 사례가
+        // 실사용자 리포트로 확인됨 — AI 응답 자체는 유효한 JSON이었다는 뜻이라, 이 categoryId에
+        // 대응하는 섹션을 AI가 실제로 뭘 돌려줬는지(아예 없었는지, blocks가 비어있었는지,
+        // 다른 categoryId로 잘못 붙였는지) 다음에는 바로 알 수 있게 같이 남긴다.
+        // logError의 extra는 2000자에서 잘린다 — 핵심 진단값(아래 3개)이 먼저 잘려나가지
+        //않도록 장황한 moduleId 목록 대신 개수만 남기고 앞쪽에 배치한다.
+        mergeWarningsByCategory.push({
+          category: c.node.title,
+          aiResultFound: !!aiResult,
+          aiResultBlockCount: aiResult?.blocks?.length ?? 0,
+          allReturnedCategoryIds: result.map((r: any) => r.categoryId),
+          missingModuleIdCount: warnings.length,
+        })
       }
       return { sectionId: c.node.id, headline: c.node.title, lead: '', blocks }
     })
