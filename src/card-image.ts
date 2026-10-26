@@ -72,6 +72,7 @@ ${input.statText ? `[수치] ${input.statText}` : ''}
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        'User-Agent': 'EZlook-card-image/1.0 (+https://aifashion.co.kr)',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
