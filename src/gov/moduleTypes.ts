@@ -46,6 +46,7 @@ export const CHART_COMPUTED_SOURCES = ['costBreakdown', 'channelMargin', 'revenu
 // V005(검증)에서 이 목록 밖의 bindingKey를 오류로 처리한다.
 export const COMPUTED_KEY_WHITELIST = [
   'costBreakdown', 'channelMargin', 'revenueScenario', 'fundUse.stage1', 'fundUse.stage2',
+  'competitorTable',
 ] as const
 
 // binding='answer' 및 repeat.source / condition.when이 허용하는 위저드 답변 키 —
