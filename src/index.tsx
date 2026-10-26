@@ -6111,7 +6111,12 @@ async function gsCallClaudeWithSchema(
       // Console Playground(cURL 내보내기로 실제 anthropic-version: 2026-10-21 확인)와 동일하게
       // 맞추니 더 이상 재현되지 않았다. 구버전 헤더가 claude-sonnet-5 같은 신규 모델에서 레거시
       // 경로로 라우팅되며 생긴 문제로 추정.
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21' },
+      // 2026-10-26: User-Agent를 아예 안 보내고 있었다 — Cloudflare Workers의 fetch()는
+      // 브라우저와 달리 기본 User-Agent를 붙이지 않는다. 완전히 무관한 다른 기능
+      // (content-digest.ts)의 독립적인 api.anthropic.com 호출도 같은 403
+      // "forbidden"(Anthropic 표준 에러 타입이 아님)을 똑같이 겪었는데, 그쪽도 User-Agent가
+      // 없었다는 공통점이 있어 가장 유력한 원인으로 보고 명시적으로 추가한다.
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21', 'User-Agent': 'EZlook-gov-support/1.0 (+https://aifashion.co.kr)' },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
         thinking: { type: 'disabled' },
