@@ -51,15 +51,26 @@ export const COMPUTED_KEY_WHITELIST = [
 // binding='answer' 및 repeat.source / condition.when이 허용하는 위저드 답변 키 —
 // 부록 C. 배열 답변은 '[]' 표기를 떼고 키 이름만 남긴다(repeat.source가 참조하는 건
 // 배열 키 자체이므로). V011/V012(검증)에서 이 목록 밖의 키를 경고로 처리한다.
+//
+// 2026-10-26: 위저드(wzCollectStep, src/index.tsx)가 실제로 저장하는 키 이름과
+// 이 목록이 달랐다(예: 'targetCustomer'가 아니라 'target', 'deliverables'가 아니라
+// 'productOutput') — 지금은 yebi가 binding='answer'를 전혀 쓰지 않고 answers 전체를
+// 통째로 AI 프롬프트에 넘기는 방식이라 실제 생성엔 영향이 없었지만, 관리자가 구조
+// 빌더에서 특정 칸에 답변을 직접 바인딩하려 하면 혼란스럽거나 조용히 빈 값이 나올
+// 수 있어 위저드가 실제로 쓰는 키 이름으로 전부 맞췄다.
 export const ANSWER_KEYS = [
-  'brandName', 'founderAgeBand', 'startupStage',
-  'category', 'products', 'brandConcept', 'priceBand',
-  'targetCustomer', 'purchaseReasons', 'competitors', 'competitorUnknown',
-  'productionMethod', 'processSteps', 'processNote',
-  'differentiationTypes', 'differentiationNote',
-  'productCost', 'productPrice', 'channels', 'ownMallUrl', 'preparedCapital', 'fundUse',
-  'experiences', 'motivation', 'goal3y',
-  'deliverables', 'founderJob', 'teamMembers', 'partners',
+  'brandName', 'founderAge', 'stage',
+  'product1', 'product2', 'product3', 'concept', 'category', 'priceRange', 'ipStatus', 'validationEfforts',
+  'target', 'problemStatement',
+  'competitor1_name', 'competitor1_feature', 'competitor2_name', 'competitor2_feature', 'competitorsUnknown', 'buyReason',
+  'productionMethod',
+  'processSteps', 'processNote',
+  'diffReason', 'diffStubborn', 'diffFeedback', 'differentiationTypes',
+  'preSale', 'cost_product1', 'cost_product2', 'cost_product3', 'price_product1', 'price_product2', 'price_product3',
+  'selfMallUrl', 'channels',
+  'capital', 'fundUse',
+  'experience', 'experienceDetail', 'externalBackground', 'motivation', 'expectedImpact',
+  'productOutput', 'founderJob', 'teamMembers', 'partners', 'threeYearGoal',
 ] as const
 
 const toneOptions = [

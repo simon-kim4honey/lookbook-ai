@@ -4961,6 +4961,16 @@ app.get('/gov-support/wizard/:id', async (c) => {
               ${['2~5만', '5~10만', '10~20만', '20만+'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
+          <div class="wz-field">
+            <div class="wz-field-label">지식재산권 보유·출원 현황 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">상표·디자인권·특허 등 출원했거나 보유한 게 있다면 적어주세요. 없으면 비워두셔도 됩니다.</div>
+            <input type="text" class="wz-input" id="f_ipStatus" placeholder="예: 브랜드명 상표 출원 완료, 패턴 디자인권 출원 준비 중" maxlength="150" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">지금까지 진행한 시장 검증 활동 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">팝업스토어, 사전 주문, SNS 반응 테스트 등 아이템을 검증해본 활동이 있다면 적어주세요.</div>
+            <textarea class="wz-textarea" id="f_validationEfforts" placeholder="예: 인스타그램에 시제품 사진을 올려 사전 주문 32건 접수, 성수동 팝업스토어 3일 운영" maxlength="200"></textarea>
+          </div>
         </div>
 
         <div class="wz-step" data-step="3">
@@ -5397,6 +5407,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
       } else if (stepNum === 2) {
         patch.product1 = val('f_product1'); patch.product2 = val('f_product2'); patch.product3 = val('f_product3');
         patch.concept = val('f_concept');
+        patch.ipStatus = val('f_ipStatus');
+        patch.validationEfforts = val('f_validationEfforts');
       } else if (stepNum === 3) {
         patch.target = val('f_target');
         patch.problemStatement = val('f_problemStatement');
@@ -5471,7 +5483,10 @@ app.get('/gov-support/wizard/:id', async (c) => {
 
     function wzRenderEligibility() {
       var list = document.getElementById('wzEligibilityList');
-      list.innerHTML = wzEligibility.map(function (text, i) {
+      var stageNote = wzAnswers.stage
+        ? '<div class="wz-field-hint" style="margin-bottom:12px;">1단계에서 선택하신 창업 단계: <strong>' + wzAnswers.stage + '</strong> — 아래 자격 요건과 맞는지 다시 한번 확인해주세요.</div>'
+        : '';
+      list.innerHTML = stageNote + wzEligibility.map(function (text, i) {
         var checked = wzAnswers.eligibilityChecks && wzAnswers.eligibilityChecks[i] ? 'checked' : '';
         return '<label class="wz-elig-item"><input type="checkbox" data-elig-idx="' + i + '" ' + checked + '/><span>' + text + '</span></label>';
       }).join('');
@@ -5902,7 +5917,8 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 13. problemStatement(해결하려는 문제)가 있으면 "나.문제점" 섹션에서 그 내용을 구체적인 수치·상황과 함께 풀어 쓴다.
 14. externalBackground(시장·트렌드 변화)·motivation(창업 동기)이 있으면 "가.창업아이템 배경"의 외부적 배경/내부적 배경/필요성에 각각 자연스럽게 반영한다 — externalBackground가 비어있으면 motivation과 업종 특성을 참고해 합리적인 시장 배경을 직접 제시하되 원칙 3에 따라 "(임의 작성)"을 덧붙인다.
 15. experienceDetail(관련 경력 설명)이 있으면 "가.대표자 보유역량"에서 그 내용을 구체적으로 반영한다. experienceDetail이 비어있고 experience(관련 경력 선택)만 있다면 선택된 항목을 바탕으로 서술한다.
-16. expectedImpact(기대효과)가 있으면 "라.기대효과" 섹션에서 그 내용을 구체적인 수치와 함께 반영한다.`
+16. expectedImpact(기대효과)가 있으면 "라.기대효과" 섹션에서 그 내용을 구체적인 수치와 함께 반영한다.
+17. ipStatus(지식재산권 보유·출원 현황)·validationEfforts(시장 검증 활동)가 있으면 "2-1 창업아이템 현황(준비정도)"에서 "현재 준비 상태"를 보여주는 구체적 근거로 반영한다. 둘 다 비어있으면 지어내지 말고(지식재산권·시장검증 실적은 사실 왜곡 위험이 큰 항목이다) 해당 내용 없이 다른 준비 현황(공정·생산방식 등)만으로 섹션을 구성한다.`
 
 function gsBlockVariant(type: string, props: Record<string, any>, required: string[]) {
   return {
