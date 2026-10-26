@@ -4699,7 +4699,7 @@ app.post('/api/gov-support/custom-request', async (c) => {
 // ────────────────────────────────────────────────────
 // 지원사업 도우미 — 위저드(입력 수집) API + 화면
 // 9개 사업 중 "사업계획서형" 6종(예비/초기/희망리턴/청년사관학교/로컬크리에이터/혁신소상공인)은
-// 공통 8단계 위저드를 공유한다(수집해야 하는 사업 정보 자체는 비슷하고, 사업별로 갈리는
+// 공통 13단계 위저드를 공유한다(수집해야 하는 사업 정보 자체는 비슷하고, 사업별로 갈리는
 // 부분은 다음 단계인 "AI 섹션 생성"에서 각 프로그램의 sections 구조를 따라간다).
 // 스마트상점·온라인판로·혁신바우처(경량 신청서형 3종)는 별도 3단계 위저드가 필요해 아직
 // 미구현 — /gov-support에서 "준비 중" 안내만 하고 이 위저드로 들어오지 않는다.
@@ -4882,6 +4882,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
     .wz-highlight-box { background: #FFF8E1; border: 1.5px solid #F5C842; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
     .wz-highlight-box .wz-highlight-title { font-size: 13px; font-weight: 800; color: #8A6D1D; margin-bottom: 4px; }
     .wz-highlight-box .wz-highlight-desc { font-size: 12.5px; color: #8A6D1D; line-height: 1.5; }
+    .wz-elig-warning { background: #FDEDEE; border: 1.5px solid #F04452; border-radius: 12px; padding: 13px 15px; margin-top: 10px; font-size: 13px; color: #C81E2C; line-height: 1.5; font-weight: 600; }
     .wz-chip-sm { padding: 8px 13px; border: 1px solid #E5E8EB; border-radius: 999px; background: #FFFFFF; font-size: 12.5px; color: #4E5968; cursor: pointer; }
     .wz-chip-sm.on { background: #191F28; border-color: #191F28; color: #fff; font-weight: 700; }
     .wz-product-cost-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; align-items: center; margin-bottom: 8px; }
@@ -4914,7 +4915,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
       <form id="wzForm" style="display:none;">
 
         <div class="wz-step active" data-step="1">
-          <div class="wz-step-label">1 / 12 · 기본 정보</div>
+          <div class="wz-step-label">1 / 13 · 기본 정보</div>
           <h2>브랜드를 소개해주세요</h2>
           <div class="wz-field">
             <div class="wz-field-label">브랜드명 (가칭 가능) <span class="wz-required">*</span></div>
@@ -4931,11 +4932,12 @@ app.get('/gov-support/wizard/:id', async (c) => {
             <div class="wz-chip-row" data-field="stage" data-required="1">
               ${['사업자등록 전', '사업자등록 후 3년 이내', '사업자등록 후 3년 이상'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
+            <div class="wz-elig-warning" id="wzStageWarning" style="display:none;">예비창업패키지 지원사업은 본인 명의의 사업자등록(개인/법인)이 없어야 신청할 수 있습니다</div>
           </div>
         </div>
 
         <div class="wz-step" data-step="2">
-          <div class="wz-step-label">2 / 12 · 아이템</div>
+          <div class="wz-step-label">2 / 13 · 아이템</div>
           <h2>어떤 제품을 만드시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">주력 카테고리 <span class="wz-required">*</span></div>
@@ -4961,6 +4963,11 @@ app.get('/gov-support/wizard/:id', async (c) => {
               ${['2~5만', '5~10만', '10~20만', '20만+'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
+        </div>
+
+        <div class="wz-step" data-step="3">
+          <div class="wz-step-label">3 / 13 · 준비 현황</div>
+          <h2>지금까지 준비한 게 있나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">지식재산권 보유·출원 현황 (선택)</div>
             <div class="wz-field-hint" style="margin:0 0 8px;">상표·디자인권·특허 등 출원했거나 보유한 게 있다면 적어주세요. 없으면 비워두셔도 됩니다.</div>
@@ -4973,8 +4980,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="3">
-          <div class="wz-step-label">3 / 12 · 고객과 경쟁</div>
+        <div class="wz-step" data-step="4">
+          <div class="wz-step-label">4 / 13 · 고객과 경쟁</div>
           <h2>누가, 왜 사나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">타겟 고객 <span class="wz-required">*</span></div>
@@ -5001,8 +5008,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="4">
-          <div class="wz-step-label">4 / 12 · 생산 방식</div>
+        <div class="wz-step" data-step="5">
+          <div class="wz-step-label">5 / 13 · 생산 방식</div>
           <h2>어떻게 만드시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">생산 방식 <span class="wz-required">*</span></div>
@@ -5013,8 +5020,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="5">
-          <div class="wz-step-label">5 / 12 · 제작 공정</div>
+        <div class="wz-step" data-step="6">
+          <div class="wz-step-label">6 / 13 · 제작 공정</div>
           <h2>어떤 과정을 거쳐 만드나요?</h2>
           <div class="wz-field">
             <div class="wz-highlight-box">
@@ -5029,8 +5036,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="6">
-          <div class="wz-step-label">6 / 12 · 차별성</div>
+        <div class="wz-step" data-step="7">
+          <div class="wz-step-label">7 / 13 · 차별성</div>
           <h2>남들과 다르게 만드나요?</h2>
           <div class="wz-field">
             <div class="wz-highlight-box">
@@ -5056,8 +5063,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="7">
-          <div class="wz-step-label">7 / 12 · 상품별 원가</div>
+        <div class="wz-step" data-step="8">
+          <div class="wz-step-label">8 / 13 · 상품별 원가</div>
           <h2>원가와 판매가는요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">상품별 원가 / 판매가 (선택)</div>
@@ -5067,8 +5074,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="8">
-          <div class="wz-step-label">8 / 12 · 판매 채널</div>
+        <div class="wz-step" data-step="9">
+          <div class="wz-step-label">9 / 13 · 판매 채널</div>
           <h2>어디서 파시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">판매 채널 (복수 선택) <span class="wz-required">*</span></div>
@@ -5080,8 +5087,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="9">
-          <div class="wz-step-label">9 / 12 · 자금 계획</div>
+        <div class="wz-step" data-step="10">
+          <div class="wz-step-label">10 / 13 · 자금 계획</div>
           <h2>지원금을 어디에 쓰실 건가요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">보유 준비자본 <span class="wz-required">*</span></div>
@@ -5097,8 +5104,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="10">
-          <div class="wz-step-label">10 / 12 · 역량과 비전</div>
+        <div class="wz-step" data-step="11">
+          <div class="wz-step-label">11 / 13 · 역량과 비전</div>
           <h2>왜 대표님이어야 하나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">관련 경력 (복수 선택) <span class="wz-required">*</span></div>
@@ -5126,8 +5133,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="11">
-          <div class="wz-step-label">11 / 12 · 팀 구성</div>
+        <div class="wz-step" data-step="12">
+          <div class="wz-step-label">12 / 13 · 팀 구성</div>
           <h2>함께하는 팀이 있나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">협약기간 내 목표 산출물 <span class="wz-required">*</span></div>
@@ -5157,8 +5164,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="12">
-          <div class="wz-step-label">12 / 12 · 자격 확인</div>
+        <div class="wz-step" data-step="13">
+          <div class="wz-step-label">13 / 13 · 자격 확인</div>
           <h2>자격 요건을 확인해주세요</h2>
           <div id="wzEligibilityList"></div>
         </div>
@@ -5189,7 +5196,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
   <script>
     var WZ_PROJECT_ID = ${JSON.stringify(projectId)};
     var WZ_GENERATION_READY = ${JSON.stringify(wzGenerationReady)};
-    var WZ_TOTAL_STEPS = 12;
+    var WZ_TOTAL_STEPS = 13;
     var wzCurrentStep = 1;
     var wzAnswers = {};
     var wzEligibility = [];
@@ -5227,7 +5234,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
     }
 
     function wzFillFormFromAnswers() {
-      var simpleFields = ['brandName','product1','product2','product3','concept','target','problemStatement','processNote','diffReason','diffStubborn','diffFeedback','experienceDetail','externalBackground','motivation','expectedImpact','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl','productOutput'];
+      var simpleFields = ['brandName','product1','product2','product3','concept','ipStatus','validationEfforts','target','problemStatement','processNote','diffReason','diffStubborn','diffFeedback','experienceDetail','externalBackground','motivation','expectedImpact','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl','productOutput'];
       simpleFields.forEach(function (k) {
         var el = document.getElementById('f_' + k);
         if (el && wzAnswers[k] !== undefined) el.value = wzAnswers[k];
@@ -5252,6 +5259,19 @@ app.get('/gov-support/wizard/:id', async (c) => {
       wzUpdateSelfMallUrlVisibility();
       wzApplyCompetitorUnknownUI();
       wzUpdateExperienceDetailVisibility();
+      wzUpdateStageWarning();
+    }
+
+    // 예비창업패키지는 사업자등록 전인 사람만 지원 가능 — 위저드는 9개 사업
+    // 공통이라 "창업 단계"에서 다른 값을 고를 수 있는 건 막지 않되(다른 사업은
+    // 기창업자도 대상이라서), 예비창업패키지를 작성 중일 때만 바로 경고한다.
+    function wzUpdateStageWarning() {
+      var warn = document.getElementById('wzStageWarning');
+      if (!warn) return;
+      var row = document.querySelector('.wz-chip-row[data-field="stage"]');
+      var selected = row ? row.querySelector('.wz-chip.on') : null;
+      var value = selected ? selected.getAttribute('data-value') : '';
+      warn.style.display = (wzProgramId === 'yebi' && value && value !== '사업자등록 전') ? 'block' : 'none';
     }
 
     document.addEventListener('click', function (e) {
@@ -5272,6 +5292,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
       }
       if (row.getAttribute('data-field') === 'channels') wzUpdateSelfMallUrlVisibility();
       if (row.getAttribute('data-field') === 'experience') wzUpdateExperienceDetailVisibility();
+      if (row.getAttribute('data-field') === 'stage') wzUpdateStageWarning();
     });
 
     function wzUpdateSelfMallUrlVisibility() {
@@ -5407,34 +5428,35 @@ app.get('/gov-support/wizard/:id', async (c) => {
       } else if (stepNum === 2) {
         patch.product1 = val('f_product1'); patch.product2 = val('f_product2'); patch.product3 = val('f_product3');
         patch.concept = val('f_concept');
+      } else if (stepNum === 3) {
         patch.ipStatus = val('f_ipStatus');
         patch.validationEfforts = val('f_validationEfforts');
-      } else if (stepNum === 3) {
+      } else if (stepNum === 4) {
         patch.target = val('f_target');
         patch.problemStatement = val('f_problemStatement');
         patch.competitor1_name = val('f_competitor1_name'); patch.competitor1_feature = val('f_competitor1_feature');
         patch.competitor2_name = val('f_competitor2_name'); patch.competitor2_feature = val('f_competitor2_feature');
         patch.competitorsUnknown = !!wzAnswers.competitorsUnknown;
-      } else if (stepNum === 5) {
-        patch.processNote = val('f_processNote');
       } else if (stepNum === 6) {
+        patch.processNote = val('f_processNote');
+      } else if (stepNum === 7) {
         patch.diffReason = val('f_diffReason');
         patch.diffStubborn = val('f_diffStubborn');
         patch.diffFeedback = val('f_diffFeedback');
-      } else if (stepNum === 7) {
+      } else if (stepNum === 8) {
         patch.preSale = !!wzAnswers.preSale;
         GS_PRODUCT_FIELDS.slice(0, wzVisibleProductCostCount).forEach(function (key) {
           patch['cost_' + key] = val('f_cost_' + key);
           patch['price_' + key] = val('f_price_' + key);
         });
-      } else if (stepNum === 8) {
+      } else if (stepNum === 9) {
         patch.selfMallUrl = val('f_selfMallUrl');
-      } else if (stepNum === 10) {
+      } else if (stepNum === 11) {
         patch.experienceDetail = val('f_experienceDetail');
         patch.externalBackground = val('f_externalBackground');
         patch.motivation = val('f_motivation');
         patch.expectedImpact = val('f_expectedImpact');
-      } else if (stepNum === 11) {
+      } else if (stepNum === 12) {
         patch.productOutput = val('f_productOutput');
         wzSyncTeamRowsFromDom(); wzSyncPartnerRowsFromDom();
         patch.teamMembers = wzTeamRows.filter(function (r) { return r.position || r.task || r.capability; });
@@ -5477,7 +5499,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
       document.getElementById('wzProgressBar').style.width = (n / WZ_TOTAL_STEPS * 100) + '%';
       document.getElementById('wzPrevBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
       document.getElementById('wzNextBtn').textContent = n === WZ_TOTAL_STEPS ? '완료' : '다음';
-      if (n === 7) wzRenderProductCostRows();
+      if (n === 8) wzRenderProductCostRows();
       window.scrollTo(0, 0);
     }
 
