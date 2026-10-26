@@ -241,8 +241,14 @@ export function buildCategoryStructureText(cat: CategoryTree, answers: Record<st
           if (hint) lines.push(`${indent}  참고(관리자가 적어둔 힌트/제목/캡션): ${hint}`)
         })
       } else {
-        lines.push(`${indent}- "${n.title || ''}" [${def?.labelKo || n.expressionType}] — ${bindingInstruction(n)}`)
-        if (isAiGeneratedNode(n) && def?.promptFragment) lines.push(`${indent}  지시: ${def.promptFragment}`)
+        // 자식을 가진 "그룹" 노드는 moduleId가 없어 AI가 새로 생성한 제목을 돌려받을
+        // 방법이 없다(leaf만 moduleId를 받는다). 그런데도 과거엔 binding='ai'인 그룹
+        // 노드에 leaf와 똑같이 "지시: 제목만 생성..."을 내려보냈더니, 모델이 "그럼
+        // 어떻게든 돌려줘야겠다"며 그룹 제목 문자열 자체를 가짜 moduleId로 쓴 블록을
+        // 지어내 응답에 끼워 넣는 경우가 실제로 있었다(스테이징/운영 둘 다 JSON 파싱
+        // 실패로 이어짐 — 운영 2026-10-26 생성 실패 재현). 그룹 제목은 항상 고정값으로
+        // 취급해 이 지시 자체를 내려보내지 않는다.
+        lines.push(`${indent}- "${n.title || ''}" [${def?.labelKo || n.expressionType}] — 고정 제목(구조 안내용 — 생성·수정 대상 아님).`)
       }
       walk(t.children, indent + '  ')
     })
