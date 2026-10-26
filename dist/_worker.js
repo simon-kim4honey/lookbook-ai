@@ -204,7 +204,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvoxlrvh`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvoxwg47`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2078,6 +2078,8 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .wz-field-label { font-size: 13.5px; font-weight: 700; color: #333D4B; margin-bottom: 8px; }
     .wz-field-hint { font-size: 12px; color: #8B95A1; margin-top: 6px; line-height: 1.5; }
     .wz-required { color: #F04452; font-weight: 800; }
+    .wz-char-counter { text-align: right; font-size: 11px; color: #B0B8C1; margin-top: 4px; }
+    .wz-char-counter.wz-char-counter-near { color: #F04452; font-weight: 600; }
     .wz-input.wz-invalid, .wz-chip-row.wz-invalid { border-color: #F04452 !important; box-shadow: 0 0 0 2px rgba(240,68,82,0.15); border-radius: 12px; }
     .wz-input, .wz-textarea, .wz-select { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 1px solid #E5E8EB; border-radius: 12px; font-size: 15px; color: #191F28; background: #FFFFFF; font-family: inherit; }
     .wz-textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
@@ -2448,6 +2450,36 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       }
     }
 
+    // maxlength가 걸린 input/textarea 전부에 "n / max" 글자수 표시를 붙인다. 정적
+    // 필드는 wzFillFormFromAnswers() 끝에서 한 번에, 팀원/협력기관처럼 동적으로
+    // innerHTML이 다시 그려지는 영역은 그 렌더 함수 끝에서 각자 다시 붙인다.
+    function wzEnsureCharCounter(el) {
+      var max = parseInt(el.getAttribute('maxlength') || '', 10);
+      if (!max) return;
+      var next = el.nextElementSibling;
+      var counter = (next && next.classList && next.classList.contains('wz-char-counter')) ? next : null;
+      if (!counter) {
+        counter = document.createElement('div');
+        counter.className = 'wz-char-counter';
+        el.insertAdjacentElement('afterend', counter);
+      }
+      function update() {
+        var len = el.value.length;
+        counter.textContent = len + ' / ' + max;
+        counter.classList.toggle('wz-char-counter-near', len >= max * 0.9);
+      }
+      if (!el.dataset.wzCounterBound) {
+        el.addEventListener('input', update);
+        el.dataset.wzCounterBound = '1';
+      }
+      update();
+    }
+    function wzAttachCharCounters(root) {
+      var scope = root || document.getElementById('wzForm');
+      if (!scope) return;
+      scope.querySelectorAll('input[maxlength], textarea[maxlength]').forEach(wzEnsureCharCounter);
+    }
+
     function wzFillFormFromAnswers() {
       var simpleFields = ['brandName','product1','product2','product3','concept','ipStatus','validationEfforts','target','problemStatement','productionDetail','processNote','diffReason','diffStubborn','diffFeedback','experienceDetail','externalBackground','motivation','expectedImpact','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl','productOutput'];
       simpleFields.forEach(function (k) {
@@ -2476,6 +2508,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       wzUpdateExperienceDetailVisibility();
       wzUpdateStageWarning();
       wzUpdateProductionDetailVisibility();
+      wzAttachCharCounters();
     }
 
     // 예비창업패키지는 사업자등록 전인 사람만 지원 가능 — 위저드는 9개 사업
@@ -2583,6 +2616,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           '</select></div>' +
           '</div></div>';
       }).join('');
+      wzAttachCharCounters(container);
     }
     function wzSyncTeamRowsFromDom() {
       wzTeamRows = wzTeamRows.map(function (_, i) {
@@ -2606,6 +2640,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           '<div class="wz-dynrow-cell"><label>협력시기</label><input type="text" class="wz-input" id="f_partner_timing_' + i + '" placeholder="예: 협약기간 내" maxlength="30" value="' + (row.timing || '') + '" /></div>' +
           '</div></div>';
       }).join('');
+      wzAttachCharCounters(container);
     }
     function wzSyncPartnerRowsFromDom() {
       wzPartnerRows = wzPartnerRows.map(function (_, i) {
