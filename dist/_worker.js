@@ -212,7 +212,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Kn}" font-size="128" font-weight="800" fill="${Wn(e.statColor||`#ffffff`)}">${Wn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Kn}" font-size="64" font-weight="800" fill="#ffffff">${Wn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Kn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Wn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Jn=`mvox0gbp`;function Yn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Xn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Kn}" font-size="128" font-weight="800" fill="${Wn(e.statColor||`#ffffff`)}">${Wn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Kn}" font-size="64" font-weight="800" fill="#ffffff">${Wn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Kn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Wn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Jn=`mvox3p8n`;function Yn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Xn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2075,7 +2075,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .wz-wrap { min-height: 100vh; padding: 0 0 100px; background: #F2F4F6; }
     .wz-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
     .wz-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 14px 16px; display: flex; align-items: center; gap: 10px; max-width: 480px; margin: 0 auto; }
-    .wz-back { width: 36px; height: 36px; border: none; background: #FFFFFF; border-radius: 50%; color: #333D4B; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(15,23,42,0.06); }
     .wz-progress { flex: 1; height: 6px; background: #E5E8EB; border-radius: 999px; overflow: hidden; }
     .wz-progress-bar { height: 100%; background: #3182F6; border-radius: 999px; transition: width .2s; width: 12.5%; }
     .wz-save-btn { font-size: 12.5px; font-weight: 700; color: #3182F6; background: #EAF2FF; border: none; border-radius: 999px; padding: 7px 12px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
@@ -2126,7 +2125,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
   <div class="wz-wrap">
     ${xi(e,480)}
     <div class="wz-header">
-      <a href="/gov-support" class="wz-back">‹</a>
       <div class="wz-progress"><div class="wz-progress-bar" id="wzProgressBar"></div></div>
       <button type="button" class="wz-save-btn" onclick="wzManualSave()">임시 저장</button>
     </div>
