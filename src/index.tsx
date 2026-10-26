@@ -5899,13 +5899,26 @@ async function generateGovSupportProcessImage(
       ? ` IMPORTANT: This brand's key competitive differentiator is in the area of "${diffTypesText}"${diffText ? ` — specifically: "${diffText}"` : ''}. Visually emphasize the one or two process steps most related to this differentiator (e.g. a highlighted/accent-colored box, a small star or badge icon, or a short callout label) so a reader immediately sees WHERE in the process this company does things differently from competitors — do not just draw a generic uniform flowchart.`
       : ''
     const prompt = `Create a clean, professional infographic flowchart (process diagram) for a Korean government startup grant business plan document, in a minimalist corporate style with a white background, consistent icon style, and connecting arrows. Draw the following fashion ${category || 'product'} production process as a left-to-right or top-to-bottom flow with clearly labeled steps, each with a short Korean label and a simple icon: ${stepsText}.${noteText}${diffInstruction} No photorealistic people or products — use simple flat-design icons and boxes only. No watermarks, no extra text besides the step labels.`
-    return await atlasGenerateAndWaitDetailed({
+    const result = await atlasGenerateAndWaitDetailed({
       images: [`data:image/png;base64,${GS_BLANK_CANVAS_PNG_B64}`],
       prompt,
-      aspect_ratio: '16:9',
+      aspect_ratio: '21:9',
       resolution: '1K',
       apiKey,
     })
+    if (!result.url) return result
+    // 2026-10-26: Atlas가 돌려주는 결과 URL을 그대로 저장해 결과 페이지에서 바로
+    // <img src="(외부 URL)">로 링크했더니, 사용자 확인 결과 Atlas 콘솔에서는 생성이
+    // 정상 완료("완료됨")된 게 확인되는데도 사용자 페이지에서는 깨진 이미지로만 뜨는
+    // 사례가 보고됨 — 서명 URL 만료/핫링크 제한 등 외부 호스팅 URL을 나중에 직접
+    // 불러오는 데 따른 문제로 추정된다. 생성 직후(URL이 가장 신선할 때) 서버가 직접
+    // 한 번 내려받아 base64 data URI로 변환해 저장하면, 이후 몇 번을 다시 열어봐도
+    // 외부 URL 상태와 무관하게 항상 뜬다(모델컷 등 다른 기능의 kv base64 저장 패턴과
+    // 동일한 방향).
+    const dataUri = await urlToBase64(result.url)
+    if (dataUri) return { url: dataUri, error: null }
+    console.error('generateGovSupportProcessImage: base64 변환 실패, 원본 URL로 폴백:', result.url)
+    return result
   } catch (e) {
     console.error('generateGovSupportProcessImage 실패:', e)
     return { url: null, error: 'AI 이미지 생성 중 오류: ' + (e instanceof Error ? e.message : String(e)).slice(0, 150) }
@@ -6334,6 +6347,12 @@ ${GS_NODES_JSON_FORMAT}
     return gsCallGroupWithRetry(apiKey, prompt, null, group.length, 16000, 100000, env, label)
   }))
 
+  // 2026-10-26: moduleId 누락 경고는 지금까지 console.error로만 남아 error_logs/자동
+  // GitHub 이슈 생성 경로를 안 탔다 — 공정 이미지 실패와 같은 사각지대였다(실사용자
+  // 리포트: 헤드카피/개조식에 관리자 힌트 문구가 그대로 노출됨, 원인이 바로 이 누락).
+  // AI가 통째로 실패(JSON 파싱 실패)하는 경우는 이미 로깅되지만, "파싱은 됐는데 일부
+  // moduleId만 빠짐" 같은 부분 실패는 이번에 처음 추적 대상에 포함한다.
+  const mergeWarningsByCategory: { category: string; warnings: any[] }[] = []
   const mainSections = groups.flatMap((group, i) => {
     const result = groupResults[i]
     if (!result) {
@@ -6345,10 +6364,22 @@ ${GS_NODES_JSON_FORMAT}
       const aiBlocksByModuleId = buildAiBlocksByModuleId(c, answers, aiResult?.blocks || [])
       const l1Index = l1IndexById.get(c.node.id) || 1
       const { blocks, warnings } = mergeCategoryBlocks(c, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), l1Index)
-      if (warnings.length) console.error(`gov-support(nodes) "${c.node.title}" 병합 경고:`, JSON.stringify(warnings).slice(0, 500))
+      if (warnings.length) {
+        console.error(`gov-support(nodes) "${c.node.title}" 병합 경고:`, JSON.stringify(warnings).slice(0, 500))
+        mergeWarningsByCategory.push({ category: c.node.title, warnings })
+      }
       return { sectionId: c.node.id, headline: c.node.title, lead: '', blocks }
     })
   })
+
+  if (mergeWarningsByCategory.length && env) {
+    await logError(env, {
+      source: 'server',
+      message: `gov-support AI 응답에 일부 moduleId 누락 — ${mergeWarningsByCategory.length}개 대분류(${mergeWarningsByCategory.map((w) => w.category).join('·')})`,
+      route: '/api/gov-support/projects/:id/generate (mergeCategoryBlocks)',
+      extra: { programName, warningsByCategory: mergeWarningsByCategory.slice(0, 10) },
+    })
+  }
 
   if (!summaryCat) return mainSections
 
@@ -6649,11 +6680,14 @@ app.get('/gov-support/result/:id', (c) => {
     }
 
     function rsRenderBlock(b) {
-      if (b.type === 'headlineBox') return '<div class="rs-headline-box">' + rsEsc(b.text) + '</div>';
+      // 2026-10-26: AI 응답에 해당 moduleId가 없을 때 서버가 text를 비워 보낸다(관리자
+      // 힌트 문구가 그대로 노출되던 버그 수정) — 빈 헤드카피/제목까지 빈 박스·빈 줄로
+      // 보여주면 되레 더 어색해서, 콘텐츠가 없으면 블록 자체를 생략한다.
+      if (b.type === 'headlineBox') return b.text ? '<div class="rs-headline-box">' + rsEsc(b.text) + '</div>' : '';
       // b.number는 AI가 아니라 서버가 트리 형제 순서로 계산해 붙인다(§11-6) — 있으면
       // 앞에 붙이고, 없으면(구버전 생성 결과 등) 번호 없이 그대로 렌더한다.
-      if (b.type === 'subhead') return '<div class="rs-subhead">' + (b.number ? rsEsc(b.number) + ' ' : '') + rsEsc(b.text) + '</div>';
-      if (b.type === 'subhead2') return '<div class="rs-subhead2">' + (b.number ? rsEsc(b.number) + ' ' : '') + rsEsc(b.text) + '</div>';
+      if (b.type === 'subhead') return (b.number || b.text) ? '<div class="rs-subhead">' + (b.number ? rsEsc(b.number) + ' ' : '') + rsEsc(b.text) + '</div>' : '';
+      if (b.type === 'subhead2') return (b.number || b.text) ? '<div class="rs-subhead2">' + (b.number ? rsEsc(b.number) + ' ' : '') + rsEsc(b.text) + '</div>' : '';
       if (b.type === 'bulletsSummary') {
         return (b.label ? '<div class="rs-subhead2">' + rsEsc(b.label) + '</div>' : '') +
           '<ul class="rs-bullets">' + (b.items||[]).map(function(i){ return '<li>' + rsEsc(i) + '</li>'; }).join('') + '</ul>';

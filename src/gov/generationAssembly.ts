@@ -380,8 +380,16 @@ function buildOneBlock(
   const ai = aiBlocksByModuleId.get(moduleId)
   if (!ai) {
     warnings.push({ moduleId, reason: 'AI 응답에 해당 moduleId가 없음' })
-    // §11-5 item6 상당 — payload에 이미 있는 관리자 힌트(text/items)는 위에서 깔렸으니
-    // 그대로 유지되고, 별도로 더 채울 건 없다.
+    // 2026-10-26: 예전엔 §11-5 item6에 따라 payload에 이미 깔린 관리자 힌트(text/items)를
+    // 그대로 유지했는데, 실제로는 "나. 문제점 전체를 관통하는 헤드카피 한 줄"처럼 AI에게
+    // "이런 걸 써라"고 알려주는 지시문이지 실제 완성 문구가 아닌 경우가 대부분이었다 —
+    // AI 응답이 통째로 빠지면 이 지시문이 최종 생성물에 사용자 눈에 보이는 문장으로
+    // 그대로 노출되는 사고로 이어짐(실사용자 리포트로 확인). AI_FIELD_SCHEMA에 정의된,
+    // AI가 책임지는 필드(text/items/rows 등)만 지워 콘텐츠를 비우고, tone/align/visualId
+    // 같은 표현 설정(위에서 이미 깔아둔 payload 중 AI_FIELD_SCHEMA 밖의 필드)은 그대로
+    // 남긴다 — 렌더러가 빈 text/items/rows를 빈 블록으로 안전하게 처리한다.
+    const aiOwnedKeys = AI_FIELD_SCHEMA[node.expressionType]?.properties
+    if (aiOwnedKeys) for (const key of Object.keys(aiOwnedKeys)) delete base[key]
     return base
   }
   const spec = AI_FIELD_SCHEMA[node.expressionType]
