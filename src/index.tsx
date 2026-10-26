@@ -6470,6 +6470,18 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
       processImageError: processImageResult.error,
     }
 
+    // 2026-10-26: 공정 순서도 생성 실패가 사용자 리포트로만 발견됨 — generateGovSupportProcessImage()가
+    // 실패를 자기 안에서 {url:null, error}로 삼켜서 error_logs/자동 GitHub 이슈 생성 경로를 전혀
+    // 안 탔다(사용자 답변이 비어있는 통상적인 경우는 제외하고 실제 API/생성 실패만 기록).
+    if (processImageResult.error && answers.processSteps?.length) {
+      await logError(c.env, {
+        source: 'server',
+        message: `공정 순서도 이미지 생성 실패: ${processImageResult.error}`,
+        route: '/api/gov-support/projects/:id/generate (processImage)',
+        extra: { programId: project.program_id, projectId: project.id },
+      })
+    }
+
     await db.prepare(
       `UPDATE gov_support_projects SET finance = ?, generated_content = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
     ).bind(JSON.stringify(finance), JSON.stringify(generatedContent), project.id).run()
