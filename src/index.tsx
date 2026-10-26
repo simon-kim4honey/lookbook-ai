@@ -1125,6 +1125,10 @@ const AIFASHION_BASE = 'https://www.aifashion.co.kr'
 // lookbook-ai와는 기술 스택이 완전히 달라(Next.js/NestJS/Postgres) 별도 배포 대상이며,
 // /techpack은 PC 화면에서 이 URL로 리다이렉트만 한다.
 const TECHPACK_APP_URL = 'https://ezlook-techpack-web.onrender.com'
+// 앱인토스(Apps in Toss) 로그인 API — TossPayments(c.env.TOSS_API_BASE, 별개 서비스)와 이름이
+// 겹치지 않도록 APPS_IN_TOSS_* 접두사 사용. 전 구간 mTLS 클라이언트 인증서 필수
+// (c.env.APPS_IN_TOSS_MTLS — wrangler.jsonc의 mtls_certificates 바인딩).
+const APPS_IN_TOSS_AUTH_BASE = 'https://apps-in-toss-api.toss.im/api-partner/v1/apps-in-toss/user/oauth2'
 // 어드민 인증 미들웨어 (상단 선언 필수 — 스토어/라우트보다 먼저 참조됨)
 const adminAuth = async (c: any, next: any) => {
   const authHeader = c.req.header('X-Admin-Password')
@@ -6100,38 +6104,50 @@ async function gsCallClaudeWithSchema(
   env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string, temperature?: number
 ): Promise<any[] | null> {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      // 2026-10-24: anthropic-version을 2023-06-01(3년 전)로 고정해뒀던 게 진짜 원인이었다 —
-      // 스키마를 완전히 제거해도 재현되던 400 "compiled grammar is too large"가, Anthropic
-      // Console Playground(cURL 내보내기로 실제 anthropic-version: 2026-10-21 확인)와 동일하게
-      // 맞추니 더 이상 재현되지 않았다. 구버전 헤더가 claude-sonnet-5 같은 신규 모델에서 레거시
-      // 경로로 라우팅되며 생긴 문제로 추정.
-      // 2026-10-26: User-Agent를 아예 안 보내고 있었다 — Cloudflare Workers의 fetch()는
-      // 브라우저와 달리 기본 User-Agent를 붙이지 않는다. 완전히 무관한 다른 기능
-      // (content-digest.ts)의 독립적인 api.anthropic.com 호출도 같은 403
-      // "forbidden"(Anthropic 표준 에러 타입이 아님)을 똑같이 겪었는데, 그쪽도 User-Agent가
-      // 없었다는 공통점이 있어 가장 유력한 원인으로 보고 명시적으로 추가한다.
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21', 'User-Agent': 'EZlook-gov-support/1.0 (+https://aifashion.co.kr)' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        thinking: { type: 'disabled' },
-        ...(temperature !== undefined ? { temperature } : {}),
-        max_tokens: maxTokens,
-        messages: [{ role: 'user', content: prompt }],
-        ...(schema ? { output_config: { format: { type: 'json_schema', schema } } } : {}),
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    })
-    if (!res.ok) {
-      const bodyText = await res.text().catch(() => '')
-      console.error(`gov-support 섹션 생성(${label}) HTTP 실패:`, res.status, bodyText.slice(0, 500))
+    // 2026-10-24: anthropic-version을 2023-06-01(3년 전)로 고정해뒀던 게 진짜 원인이었다 —
+    // 스키마를 완전히 제거해도 재현되던 400 "compiled grammar is too large"가, Anthropic
+    // Console Playground(cURL 내보내기로 실제 anthropic-version: 2026-10-21 확인)와 동일하게
+    // 맞추니 더 이상 재현되지 않았다. 구버전 헤더가 claude-sonnet-5 같은 신규 모델에서 레거시
+    // 경로로 라우팅되며 생긴 문제로 추정.
+    // 2026-10-26: 이것과 별개로 간헐적인 403 "forbidden"(Anthropic 표준 에러 타입이 아님)이
+    // 발생한다. content-digest.ts가 2026-09-22에 이미 같은 증상을 더 깊이 조사해뒀다 —
+    // /debug-classify로 응답 헤더를 직접 확인한 결과 x-request-id/anthropic-ratelimit-*가
+    // 전부 없고 응답이 15ms 만에 돌아와, Anthropic 애플리케이션 계층까지 가지도 못하고
+    // Cloudflare 엣지에서 막히는 것으로 확인됨("Orange-to-Orange" 트래픽 — Workers가 마찬가지로
+    // Cloudflare 뒤에 있는 api.anthropic.com을 호출). User-Agent를 명시해도 이 차단은
+    // 재현됨(원인 아닌 것으로 이미 확인됐지만 무해해 유지), max_tokens 크기도 원인이 아니었다.
+    // 근본 해결은 보류하고 content-digest.ts와 동일하게 재시도로 완화한다.
+    let res: Response | null = null
+    let bodyText = ''
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21', 'User-Agent': 'EZlook-gov-support/1.0 (+https://aifashion.co.kr)' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          thinking: { type: 'disabled' },
+          ...(temperature !== undefined ? { temperature } : {}),
+          max_tokens: maxTokens,
+          messages: [{ role: 'user', content: prompt }],
+          ...(schema ? { output_config: { format: { type: 'json_schema', schema } } } : {}),
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      if (res.ok) break
+      bodyText = await res.text().catch(() => '')
+      const retryable = res.status === 403 || res.status === 429 || res.status >= 500
+      if (!retryable || attempt === 3) break
+      console.error(`gov-support 섹션 생성(${label}) HTTP 실패(${attempt}차):`, res.status, bodyText.slice(0, 500))
+      await new Promise((r) => setTimeout(r, attempt * 800))
+    }
+    if (!res || !res.ok) {
+      console.error(`gov-support 섹션 생성(${label}) HTTP 실패:`, res?.status, bodyText.slice(0, 500))
       if (env) {
         await logError(env, {
           source: 'server',
-          message: `gov-support 섹션 생성(${label}) HTTP 실패: ${res.status}`,
+          message: `gov-support 섹션 생성(${label}) HTTP 실패: ${res?.status}`,
           route: '/api/gov-support/projects/:id/generate',
-          extra: { status: res.status, bodyHead: bodyText.slice(0, 800) },
+          extra: { status: res?.status, bodyHead: bodyText.slice(0, 800) },
         })
       }
       return null
@@ -7045,10 +7061,20 @@ app.get('/api/auth/kakao/callback', async (c) => {
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
         isNewUser = true
       }
-    } else if (kakaoPhone && user.phone_number !== kakaoPhone) {
-      // 기존 카카오 사용자가 이후 시점에 전화번호 동의항목을 승인한 경우, 재로그인 시 반영
-      await db.prepare(`UPDATE users SET phone_number = ? WHERE id = ?`).bind(kakaoPhone, user.id).run()
-      user.phone_number = kakaoPhone
+    } else {
+      // 기존 카카오 사용자가 이후 시점에 새 동의항목을 승인했거나(전화번호), 위 scope 회귀
+      // 버그로 "카카오 사용자" 플레이스홀더 이름/빈 프로필사진으로 저장됐던 경우 재로그인
+      // 시점에 최신 정보로 채워 넣는다. name은 이미 실제 닉네임으로 바뀐 사용자를 실수로
+      // 덮어쓰지 않도록 플레이스홀더인 경우에만 갱신한다.
+      const patchCols: string[] = []
+      const patchVals: any[] = []
+      if (kakaoPhone && user.phone_number !== kakaoPhone) { patchCols.push('phone_number = ?'); patchVals.push(kakaoPhone); user.phone_number = kakaoPhone }
+      if (user.name === '카카오 사용자' && kakaoName !== '카카오 사용자') { patchCols.push('name = ?'); patchVals.push(kakaoName); user.name = kakaoName }
+      if (!user.avatar_url && kakaoAvatar) { patchCols.push('avatar_url = ?'); patchVals.push(kakaoAvatar); user.avatar_url = kakaoAvatar }
+      if (patchCols.length) {
+        patchVals.push(user.id)
+        await db.prepare(`UPDATE users SET ${patchCols.join(', ')} WHERE id = ?`).bind(...patchVals).run()
+      }
     }
     if (!user || user.status !== 'active') throw new Error('계정이 정지 상태입니다.')
 
@@ -7263,6 +7289,128 @@ app.get('/api/auth/google/callback', async (c) => {
   } catch (err: any) {
     console.error('google callback error:', err)
     return errorResponse(err.message || '로그인 오류')
+  }
+})
+
+// ────────────────────────────────────────────────────
+// 토스 로그인 (Apps in Toss) — 클라이언트가 appLogin()으로 받은 authorizationCode를
+// AccessToken으로 교환하고, 사용자 정보를 조회해 기존 회원 시스템에 연결한다.
+// 참고: github.com/toss/apps-in-toss-examples의 toss-login/server 예제 코드 기준으로 구현.
+// ────────────────────────────────────────────────────
+
+// AES-256-GCM 복호화 — 토스 사용자 정보의 name/phone/email 등 개인정보 필드는
+// base64(IV(12B) + 암호문 + 태그(16B)) 형태로 암호화되어 내려온다.
+function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(b64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+async function decryptTossField(
+  encryptedBase64: string | null | undefined,
+  keyBase64: string,
+  aad: string,
+): Promise<string | null> {
+  if (!encryptedBase64) return null
+  try {
+    const decoded = base64ToBytes(encryptedBase64)
+    const iv = decoded.slice(0, 12)
+    const ciphertextWithTag = decoded.slice(12)
+    const key = await crypto.subtle.importKey('raw', base64ToBytes(keyBase64), 'AES-GCM', false, ['decrypt'])
+    const plainBuf = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(aad), tagLength: 128 },
+      key,
+      ciphertextWithTag,
+    )
+    return new TextDecoder().decode(plainBuf)
+  } catch (err) {
+    console.error('토스 사용자 정보 복호화 실패:', err)
+    return null
+  }
+}
+
+// POST /api/auth/toss — 인가 코드 → AccessToken 교환 → 사용자 정보 조회 → 세션 발급
+app.post('/api/auth/toss', async (c) => {
+  const mtls: any = (c.env as any)?.APPS_IN_TOSS_MTLS
+  if (!mtls) {
+    return c.json({ success: false, message: '토스 로그인이 아직 설정되지 않았습니다. (mTLS 인증서 바인딩 필요)' }, 503)
+  }
+  try {
+    const db = c.env.LOOKBOOK_DB
+    const body: any = await c.req.json()
+    const { authorizationCode, referrer } = body
+    if (!authorizationCode) return c.json({ success: false, message: 'authorizationCode가 필요합니다.' }, 400)
+
+    // 1) 인가 코드 → AccessToken 교환 (mTLS 필수)
+    const tokenRes = await mtls.fetch(`${APPS_IN_TOSS_AUTH_BASE}/generate-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ authorizationCode, referrer: referrer || 'DEFAULT' }),
+    })
+    const tokenJson: any = await tokenRes.json().catch(() => null)
+    const accessToken = tokenJson?.success?.accessToken
+    if (!accessToken) {
+      console.error('토스 토큰 발급 실패:', tokenJson)
+      return c.json({ success: false, message: '토스 로그인 토큰 발급에 실패했습니다.' }, 502)
+    }
+
+    // 2) 사용자 정보 조회
+    const userRes = await mtls.fetch(`${APPS_IN_TOSS_AUTH_BASE}/login-me`, {
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    })
+    const userJson: any = await userRes.json().catch(() => null)
+    const rawUser = userJson?.success
+    if (!rawUser?.userKey) {
+      console.error('토스 사용자 정보 조회 실패:', userJson)
+      return c.json({ success: false, message: '토스 사용자 정보 조회에 실패했습니다.' }, 502)
+    }
+
+    // 3) 개인정보 필드 복호화 — AAD_STRING/DECRYPTION_KEY_BASE64가 아직 설정 안 됐으면
+    //    이름/이메일 없이(placeholder) 로그인만 우선 되게 한다.
+    const decryptKey = (c.env as any).APPS_IN_TOSS_DECRYPTION_KEY_BASE64
+    const aad = (c.env as any).APPS_IN_TOSS_AAD_STRING
+    let name: string | null = null
+    let email: string | null = null
+    let phone: string | null = null
+    if (decryptKey && aad) {
+      ;[name, email, phone] = await Promise.all([
+        decryptTossField(rawUser.name, decryptKey, aad),
+        decryptTossField(rawUser.email, decryptKey, aad),
+        decryptTossField(rawUser.phone, decryptKey, aad),
+      ])
+    }
+
+    const providerId = String(rawUser.userKey)
+    const tossEmail = email || `toss_${providerId}@toss.local`
+    const tossName = name || '토스 사용자'
+
+    // 4) 기존 users 테이블에 upsert (카카오/구글 로그인과 동일 패턴)
+    let user: any = await db.prepare(`SELECT * FROM users WHERE provider = 'toss' AND provider_id = ?`).bind(providerId).first()
+    if (!user) {
+      user = await db.prepare(`SELECT * FROM users WHERE email = ?`).bind(tossEmail).first()
+      if (user) {
+        await db.prepare(`UPDATE users SET provider_id = ?, phone_number = COALESCE(?, phone_number) WHERE id = ?`).bind(providerId, phone, user.id).run()
+      } else {
+        const id = genUserId()
+        await db.prepare(
+          `INSERT INTO users (id, email, name, provider, provider_id, phone_number, status, credits, role)
+           VALUES (?, ?, ?, 'toss', ?, ?, 'active', 200, 'user')`
+        ).bind(id, tossEmail, tossName, providerId, phone).run()
+        await db.prepare(
+          `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
+           VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`
+        ).bind(id, `signup_${id}`).run()
+        user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
+      }
+    }
+    if (user.status !== 'active') return c.json({ success: false, message: '정지된 계정입니다.' }, 403)
+
+    const token = await createSession(db, user.id)
+    return c.json({ success: true, user: publicUser(user), token })
+  } catch (err: any) {
+    console.error('토스 로그인 오류:', err)
+    return c.json({ success: false, message: '서버 오류가 발생했습니다.' }, 500)
   }
 })
 
@@ -12884,7 +13032,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         </div>
         <div class="gslide-nav" id="step4Nav">
           <div class="result-nav-grid">
-            <button class="result-nav-btn primary" id="downloadActionBtn" onclick="downloadWithCreditCheck(0)">
+            <button class="result-nav-btn primary" onclick="downloadWithCreditCheck(0)">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운</span>
               <span class="rnb-sub" id="downloadActionSub"><s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90</span>
@@ -13083,6 +13231,10 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
 app.get('/', (c) => generatorPageHandler(c, 'model'))
 app.get('/generator', (c) => c.redirect('/', 301))
 app.get('/ghostcut', (c) => generatorPageHandler(c, 'ghostcut'))
+// 토스 인앱(toss-app) 클라이언트가 이 페이지 HTML을 크로스오리진으로 fetch해서 그대로
+// 이식(transplant)하는 용도 — /api/* 아래 두어 기존 cors() 미들웨어를 그대로 탄다.
+// generatorPageHandler 자체는 손대지 않고 재사용만 하므로 기존 화면/생성 로직에 영향 없음.
+app.get('/api/toss/generator-html', (c) => generatorPageHandler(c, 'model'))
 
 // ────────────────────────────────────────────────────
 // 도식화 만들기 (AI Technical Flat Sketch) — PC 전용
@@ -13771,9 +13923,20 @@ app.get('/admin02', (c) => {
         </div>
       </div>
 
+      <div class="leads-card">
+        <div class="leads-hint" style="margin-bottom:8px;">이번 달 네이버 API 사용량</div>
+        <div id="digestUsage" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
+      </div>
+
       <div class="leads-row" style="align-items:flex-start;">
         <div class="leads-card" style="flex:1;min-width:260px;max-width:320px;">
           <h3>다이제스트 목록</h3>
+          <div class="leads-row" style="gap:4px;margin-bottom:8px;flex-wrap:wrap;">
+            <button class="leads-btn secondary small" onclick="digestFilterList('')" id="digestFilterAll">전체</button>
+            <button class="leads-btn secondary small" onclick="digestFilterList('news')" id="digestFilterNews">기사</button>
+            <button class="leads-btn secondary small" onclick="digestFilterList('search_trend')" id="digestFilterSearchTrend">검색트렌드</button>
+            <button class="leads-btn secondary small" onclick="digestFilterList('shopping_insight')" id="digestFilterShoppingInsight">쇼핑인사이트</button>
+          </div>
           <div id="digestList" style="max-height:520px;overflow-y:auto;"></div>
         </div>
 
@@ -15025,25 +15188,66 @@ async function digestApi(path, opts) {
   }
 }
 
+let digestListFilter = ''
+
 async function digestInit() {
   await digestLoadList()
+  await digestLoadUsage()
+}
+
+async function digestLoadUsage() {
+  const data = await digestApi('/usage')
+  const box = document.getElementById('digestUsage')
+  if (!data.success) { box.innerHTML = ''; return }
+  const label = { news: '뉴스 검색', search_trend: '검색어트렌드', shopping_insight: '쇼핑인사이트' }
+  box.innerHTML = data.usage.map((u) => {
+    const color = u.pct >= 80 ? '#ff6b6b' : (u.pct >= 50 ? '#ffb703' : '#6c47ff')
+    return (
+      '<div style="min-width:160px;">' +
+        '<div class="leads-hint" style="margin-bottom:2px;">' + label[u.apiType] + ' — ' + u.count.toLocaleString() + ' / ' + u.limit.toLocaleString() + ' (' + u.pct + '%)</div>' +
+        '<div style="background:#252540;border-radius:4px;height:6px;overflow:hidden;">' +
+          '<div style="background:' + color + ';width:' + Math.min(100, u.pct) + '%;height:100%;"></div>' +
+        '</div>' +
+      '</div>'
+    )
+  }).join('')
+}
+
+function digestFilterList(type) {
+  digestListFilter = type
+  const ids = { '': 'digestFilterAll', news: 'digestFilterNews', search_trend: 'digestFilterSearchTrend', shopping_insight: 'digestFilterShoppingInsight' }
+  Object.values(ids).forEach((id) => { document.getElementById(id).style.borderColor = ''; document.getElementById(id).style.color = '' })
+  document.getElementById(ids[type]).style.borderColor = '#6c47ff'
+  document.getElementById(ids[type]).style.color = '#fff'
+  digestLoadList()
 }
 
 async function digestLoadList() {
-  const data = await digestApi('/list')
+  const data = await digestApi('/list' + (digestListFilter ? '?type=' + digestListFilter : ''))
   const list = document.getElementById('digestList')
   if (!data.success || !data.digests.length) {
-    list.innerHTML = '<div class="leads-hint">아직 생성된 다이제스트가 없습니다. "지금 생성"을 눌러보세요.</div>'
+    list.innerHTML = '<div class="leads-hint">' + (digestListFilter ? '이 종류로 생성된 다이제스트가 없습니다.' : '아직 생성된 다이제스트가 없습니다. "지금 생성"을 눌러보세요.') + '</div>'
     return
   }
   const statusLabel = { draft: '초안', reviewed: '검토완료', sent: '발행완료' }
   const typeLabel = { news: '📰 기사', search_trend: '🔎 검색어트렌드', shopping_insight: '🛍️ 쇼핑인사이트' }
   list.innerHTML = data.digests.map((d) => (
-    '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;' + (d.id === digestCurrentId ? 'border-color:#6c47ff' : '') + '" onclick="digestSelect(' + d.id + ')">' +
-      '<div style="font-weight:600;color:#e0e0f0;font-size:13px;">' + (typeLabel[d.type] || '📰 기사') + ' · ' + d.period + '</div>' +
+    '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;position:relative;' + (d.id === digestCurrentId ? 'border-color:#6c47ff' : '') + '" onclick="digestSelect(' + d.id + ')">' +
+      '<button class="leads-btn secondary small" style="position:absolute;top:8px;right:8px;padding:2px 8px;" onclick="event.stopPropagation();digestDelete(' + d.id + ')">삭제</button>' +
+      '<div style="font-weight:600;color:#e0e0f0;font-size:13px;padding-right:40px;">' + (typeLabel[d.type] || '📰 기사') + ' · ' + d.period + '</div>' +
       '<div class="leads-hint">' + statusLabel[d.status] + (d.type === 'news' || !d.type ? ' · 기사 ' + d.article_count + '건' : ' · 항목 ' + d.article_count + '개') + '</div>' +
     '</div>'
   )).join('')
+}
+
+async function digestDelete(id) {
+  if (!confirm('이 다이제스트를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return
+  await digestApi('/' + id, { method: 'DELETE' })
+  if (digestCurrentId === id) {
+    digestCurrentId = null
+    document.getElementById('digestDetailCard').innerHTML = '<div class="leads-hint">왼쪽 목록에서 다이제스트를 선택하세요.</div>'
+  }
+  await digestLoadList()
 }
 
 const digestGenBtnIds = { news: 'digestGenBtnNews', search_trend: 'digestGenBtnSearchTrend', shopping_insight: 'digestGenBtnShoppingInsight' }
