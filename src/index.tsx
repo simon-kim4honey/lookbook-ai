@@ -5725,7 +5725,8 @@ solution: `"2. 실현 가능성 (Solution)" — 다음 순서를 그대로 따�
   - headlineBox: 2-2 헤드카피 한 줄
   - 중분류 2~3개를 subhead2로 나누고 각각 bullets 상세 서술 + table(표: 서비스 설명/핵심 기능/차별화 등)
   - processSteps(제작 공정)가 있으면 visual(visualId="process-flow") 블록을 이 안에 포함
-  - subhead "사업추진일정(협약기간 내)" + table(표: 구분/추진 내용/추진 기간/세부 내용)
+  - subhead "사업추진일정(협약기간 내)" + table(표: 구분/추진 내용/추진 기간/세부 내용 — 행 3~4개,
+    processSteps·productOutput·productionDetail 등 사용자 답변에 맞는 실제 추진 단계로 구체적으로 작성)
   - subhead "1단계 정부지원사업비 집행 계획(2000만원 기준)" + table(표: 비목/산출근거/정부지원사업비(원)).
     행은 [재무 계산 결과].budgetStages.stage1Split의 각 항목(item/amount)을 그대로 쓰고, 금액
     (정부지원사업비 열)은 amount 숫자를 원 단위로 그대로 적되 재계산하지 않는다. 산출근거(가운데
@@ -6212,7 +6213,11 @@ async function gsCallGroupWithRetry(
 
 // 서버 계산값(finance)을 binding=computed 모듈이 인용할 수 있게 bindingKey→값으로 변환한다.
 // 부록 B 화이트리스트와 1:1 대응 — 이 목록 밖의 키는 validateNode()의 V005에서 이미 걸러진다.
-function gsResolveComputedValue(bindingKey: string | null | undefined, finance: any): any {
+// competitorTable은 finance 기반이 아니라 buildGsCompetitorTable(answers)로 이미 결정론적으로
+// 만들어둔 표를 그대로 꽂아준다 — AI가 브랜드명을 지어내는 걸 막기 위해(§8) 처음부터
+// "참고자료"로만 쓰던 걸, 경쟁사 분석표를 실제 블록으로도 보여달라는 요청에 맞춰 computed
+// 모듈로도 노출한다.
+function gsResolveComputedValue(bindingKey: string | null | undefined, finance: any, competitorTable?: any): any {
   if (!bindingKey) return null
   switch (bindingKey) {
     case 'fundUse.stage1':
@@ -6225,6 +6230,8 @@ function gsResolveComputedValue(bindingKey: string | null | undefined, finance: 
       return { channelMargins: finance?.channelMargins }
     case 'revenueScenario':
       return finance?.scenario
+    case 'competitorTable':
+      return competitorTable ? { rows: competitorTable.rows } : null
     default:
       return null
   }
@@ -6298,7 +6305,7 @@ ${GS_NODES_JSON_FORMAT}
       const aiResult: any = aiByCategoryId.get(c.node.id)
       const aiBlocksByModuleId = buildAiBlocksByModuleId(c, answers, aiResult?.blocks || [])
       const l1Index = l1IndexById.get(c.node.id) || 1
-      const { blocks, warnings } = mergeCategoryBlocks(c, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance), l1Index)
+      const { blocks, warnings } = mergeCategoryBlocks(c, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), l1Index)
       if (warnings.length) console.error(`gov-support(nodes) "${c.node.title}" 병합 경고:`, JSON.stringify(warnings).slice(0, 500))
       return { sectionId: c.node.id, headline: c.node.title, lead: '', blocks }
     })
@@ -6310,7 +6317,7 @@ ${GS_NODES_JSON_FORMAT}
   if (groupResults.every((r) => r !== null)) {
     const summaryHasAi = flattenCategory(summaryCat, answers).some((e) => isAiGeneratedNode(e.node))
     if (!summaryHasAi) {
-      const { blocks } = mergeCategoryBlocks(summaryCat, new Map(), answers, (key) => gsResolveComputedValue(key, finance), 0)
+      const { blocks } = mergeCategoryBlocks(summaryCat, new Map(), answers, (key) => gsResolveComputedValue(key, finance, competitorTable), 0)
       summarySection = { sectionId: summaryCat.node.id, headline: summaryCat.node.title, lead: '', blocks }
     } else {
       const structureBlock = buildCategoryStructureText(summaryCat, answers)
@@ -6332,7 +6339,7 @@ ${GS_NODES_JSON_FORMAT}`
       } else {
         const aiResult: any = result[0]
         const aiBlocksByModuleId = buildAiBlocksByModuleId(summaryCat, answers, aiResult?.blocks || [])
-        const { blocks } = mergeCategoryBlocks(summaryCat, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance), 0)
+        const { blocks } = mergeCategoryBlocks(summaryCat, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), 0)
         summarySection = { sectionId: summaryCat.node.id, headline: summaryCat.node.title, lead: '', blocks }
       }
     }
