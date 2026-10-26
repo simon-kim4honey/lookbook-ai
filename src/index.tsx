@@ -6104,33 +6104,50 @@ async function gsCallClaudeWithSchema(
   env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string, temperature?: number
 ): Promise<any[] | null> {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      // 2026-10-24: anthropic-version을 2023-06-01(3년 전)로 고정해뒀던 게 진짜 원인이었다 —
-      // 스키마를 완전히 제거해도 재현되던 400 "compiled grammar is too large"가, Anthropic
-      // Console Playground(cURL 내보내기로 실제 anthropic-version: 2026-10-21 확인)와 동일하게
-      // 맞추니 더 이상 재현되지 않았다. 구버전 헤더가 claude-sonnet-5 같은 신규 모델에서 레거시
-      // 경로로 라우팅되며 생긴 문제로 추정.
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        thinking: { type: 'disabled' },
-        ...(temperature !== undefined ? { temperature } : {}),
-        max_tokens: maxTokens,
-        messages: [{ role: 'user', content: prompt }],
-        ...(schema ? { output_config: { format: { type: 'json_schema', schema } } } : {}),
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    })
-    if (!res.ok) {
-      const bodyText = await res.text().catch(() => '')
-      console.error(`gov-support 섹션 생성(${label}) HTTP 실패:`, res.status, bodyText.slice(0, 500))
+    // 2026-10-24: anthropic-version을 2023-06-01(3년 전)로 고정해뒀던 게 진짜 원인이었다 —
+    // 스키마를 완전히 제거해도 재현되던 400 "compiled grammar is too large"가, Anthropic
+    // Console Playground(cURL 내보내기로 실제 anthropic-version: 2026-10-21 확인)와 동일하게
+    // 맞추니 더 이상 재현되지 않았다. 구버전 헤더가 claude-sonnet-5 같은 신규 모델에서 레거시
+    // 경로로 라우팅되며 생긴 문제로 추정.
+    // 2026-10-26: 이것과 별개로 간헐적인 403 "forbidden"(Anthropic 표준 에러 타입이 아님)이
+    // 발생한다. content-digest.ts가 2026-09-22에 이미 같은 증상을 더 깊이 조사해뒀다 —
+    // /debug-classify로 응답 헤더를 직접 확인한 결과 x-request-id/anthropic-ratelimit-*가
+    // 전부 없고 응답이 15ms 만에 돌아와, Anthropic 애플리케이션 계층까지 가지도 못하고
+    // Cloudflare 엣지에서 막히는 것으로 확인됨("Orange-to-Orange" 트래픽 — Workers가 마찬가지로
+    // Cloudflare 뒤에 있는 api.anthropic.com을 호출). User-Agent를 명시해도 이 차단은
+    // 재현됨(원인 아닌 것으로 이미 확인됐지만 무해해 유지), max_tokens 크기도 원인이 아니었다.
+    // 근본 해결은 보류하고 content-digest.ts와 동일하게 재시도로 완화한다.
+    let res: Response | null = null
+    let bodyText = ''
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21', 'User-Agent': 'EZlook-gov-support/1.0 (+https://aifashion.co.kr)' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          thinking: { type: 'disabled' },
+          ...(temperature !== undefined ? { temperature } : {}),
+          max_tokens: maxTokens,
+          messages: [{ role: 'user', content: prompt }],
+          ...(schema ? { output_config: { format: { type: 'json_schema', schema } } } : {}),
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      if (res.ok) break
+      bodyText = await res.text().catch(() => '')
+      const retryable = res.status === 403 || res.status === 429 || res.status >= 500
+      if (!retryable || attempt === 3) break
+      console.error(`gov-support 섹션 생성(${label}) HTTP 실패(${attempt}차):`, res.status, bodyText.slice(0, 500))
+      await new Promise((r) => setTimeout(r, attempt * 800))
+    }
+    if (!res || !res.ok) {
+      console.error(`gov-support 섹션 생성(${label}) HTTP 실패:`, res?.status, bodyText.slice(0, 500))
       if (env) {
         await logError(env, {
           source: 'server',
-          message: `gov-support 섹션 생성(${label}) HTTP 실패: ${res.status}`,
+          message: `gov-support 섹션 생성(${label}) HTTP 실패: ${res?.status}`,
           route: '/api/gov-support/projects/:id/generate',
-          extra: { status: res.status, bodyHead: bodyText.slice(0, 800) },
+          extra: { status: res?.status, bodyHead: bodyText.slice(0, 800) },
         })
       }
       return null

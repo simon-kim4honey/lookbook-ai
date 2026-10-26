@@ -349,23 +349,35 @@ Brand name: ${name}
 Category: ${category || 'unknown'}
 Country: ${country}`
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': env.ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-      'User-Agent': 'EZlook-ContentDigest/1.0 (+https://www.aifashion.co.kr)',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-5',
-      // Sonnet 5는 명시하지 않으면 기본으로 적응형 사고가 켜진 채 실행되어 토큰을 잡아먹는다
-      thinking: { type: 'disabled' },
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  })
-  if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status}`)
+  // content-digest.ts에서 먼저 확인된 간헐적 403 "forbidden"(Cloudflare "Orange-to-Orange"
+  // 엣지 차단 추정 — 자세한 내용은 content-digest.ts의 2026-09-22 주석 참고)과 같은 패턴을
+  // 막기 위해 동일한 재시도 방식을 적용한다.
+  let res: Response | null = null
+  let lastErrorText = ''
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': env.ANTHROPIC_API_KEY!,
+        'anthropic-version': '2023-06-01',
+        'User-Agent': 'EZlook-leads/1.0 (+https://aifashion.co.kr)',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        // Sonnet 5는 명시하지 않으면 기본으로 적응형 사고가 켜진 채 실행되어 토큰을 잡아먹는다
+        thinking: { type: 'disabled' },
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    })
+    if (res.ok) break
+    lastErrorText = (await res.text()).slice(0, 300)
+    const retryable = res.status === 403 || res.status === 429 || res.status >= 500
+    if (!retryable || attempt === 3) break
+    await new Promise((r) => setTimeout(r, attempt * 800))
+  }
+  if (!res || !res.ok) throw new Error(`Claude API 오류: HTTP ${res?.status} — ${lastErrorText}`)
   const data = await res.json<any>()
   // content[0]이 항상 텍스트라고 가정하면 안 됨 — 최신 모델은 앞에 thinking 블록을 먼저 넣는다
   const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
@@ -477,12 +489,21 @@ function templateDraft(lang: 'ko' | 'en' | 'ja', brandName: string, styleTags: s
 async function claudeDraft(env: LeadBindings, lang: 'ko' | 'en' | 'ja', brandName: string, category: string | null, styleTags: string[], targetCustomer: string) {
   const langName = lang === 'ko' ? 'Korean' : lang === 'ja' ? 'Japanese' : 'English'
   const prompt = `Write a short, professional B2B cold-outreach email (under 150 words) in ${langName} from an AI fashion lookbook generation SaaS to a fashion brand called "${brandName}" (category: ${category || 'unknown'}, style: ${styleTags.join(', ') || 'unknown'}, target customer: ${targetCustomer || 'unknown'}). Tone: friendly, non-spammy, no exaggerated claims, easy opt-out line included. Return ONLY strict JSON: {"subject": string, "body": string}`
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'User-Agent': 'EZlook-ContentDigest/1.0 (+https://www.aifashion.co.kr)' },
-    body: JSON.stringify({ model: 'claude-sonnet-5', thinking: { type: 'disabled' }, max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
-  })
-  if (!res.ok) throw new Error(`Claude API 오류: HTTP ${res.status}`)
+  let res: Response | null = null
+  let lastErrorText = ''
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'User-Agent': 'EZlook-leads/1.0 (+https://aifashion.co.kr)' },
+      body: JSON.stringify({ model: 'claude-sonnet-5', thinking: { type: 'disabled' }, max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }),
+    })
+    if (res.ok) break
+    lastErrorText = (await res.text()).slice(0, 300)
+    const retryable = res.status === 403 || res.status === 429 || res.status >= 500
+    if (!retryable || attempt === 3) break
+    await new Promise((r) => setTimeout(r, attempt * 800))
+  }
+  if (!res || !res.ok) throw new Error(`Claude API 오류: HTTP ${res?.status} — ${lastErrorText}`)
   const data = await res.json<any>()
   // content[0]이 항상 텍스트라고 가정하면 안 됨 — 최신 모델은 앞에 thinking 블록을 먼저 넣는다
   const textBlock = (data?.content || []).find((b: any) => b.type === 'text')
