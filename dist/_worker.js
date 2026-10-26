@@ -212,7 +212,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Kn}" font-size="128" font-weight="800" fill="${Wn(e.statColor||`#ffffff`)}">${Wn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Kn}" font-size="64" font-weight="800" fill="#ffffff">${Wn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Kn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Wn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Jn=`mvows5mz`;function Yn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Xn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Kn}" font-size="128" font-weight="800" fill="${Wn(e.statColor||`#ffffff`)}">${Wn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Kn}" font-size="64" font-weight="800" fill="#ffffff">${Wn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Kn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Wn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Jn=`mvowvx07`;function Yn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Xn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2610,9 +2610,9 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         return '<div class="wz-dynrow">' +
           '<div class="wz-dynrow-head"><span>협력기관 ' + (i + 1) + '</span>' + removeBtn + '</div>' +
           '<div class="wz-dynrow-grid">' +
-          '<div class="wz-dynrow-cell"><label>파트너명</label><input type="text" class="wz-input" id="f_partner_name_' + i + '" placeholder="예: OO전자" maxlength="30" value="' + (row.name || '') + '" /></div>' +
-          '<div class="wz-dynrow-cell"><label>보유역량</label><input type="text" class="wz-input" id="f_partner_capability_' + i + '" placeholder="예: 시제품 테스트 장비" maxlength="40" value="' + (row.capability || '') + '" /></div>' +
-          '<div class="wz-dynrow-cell"><label>협업방안</label><input type="text" class="wz-input" id="f_partner_plan_' + i + '" placeholder="예: 장비 지원" maxlength="40" value="' + (row.plan || '') + '" /></div>' +
+          '<div class="wz-dynrow-cell"><label>파트너명</label><input type="text" class="wz-input" id="f_partner_name_' + i + '" placeholder="예: OO봉제공장 / OO홍보대행사" maxlength="30" value="' + (row.name || '') + '" /></div>' +
+          '<div class="wz-dynrow-cell"><label>보유역량</label><input type="text" class="wz-input" id="f_partner_capability_' + i + '" placeholder="예: 의류 샘플 제작 설비 / SNS 마케팅 채널 운영" maxlength="40" value="' + (row.capability || '') + '" /></div>' +
+          '<div class="wz-dynrow-cell"><label>협업방안</label><input type="text" class="wz-input" id="f_partner_plan_' + i + '" placeholder="예: 샘플 제작 위탁 / 콘텐츠 제작·광고 집행" maxlength="40" value="' + (row.plan || '') + '" /></div>' +
           '<div class="wz-dynrow-cell"><label>협력시기</label><input type="text" class="wz-input" id="f_partner_timing_' + i + '" placeholder="예: 협약기간 내" maxlength="30" value="' + (row.timing || '') + '" /></div>' +
           '</div></div>';
       }).join('');
