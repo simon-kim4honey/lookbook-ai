@@ -4854,7 +4854,6 @@ app.get('/gov-support/wizard/:id', async (c) => {
     .wz-wrap { min-height: 100vh; padding: 0 0 100px; background: #F2F4F6; }
     .wz-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
     .wz-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 14px 16px; display: flex; align-items: center; gap: 10px; max-width: 480px; margin: 0 auto; }
-    .wz-back { width: 36px; height: 36px; border: none; background: #FFFFFF; border-radius: 50%; color: #333D4B; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(15,23,42,0.06); }
     .wz-progress { flex: 1; height: 6px; background: #E5E8EB; border-radius: 999px; overflow: hidden; }
     .wz-progress-bar { height: 100%; background: #3182F6; border-radius: 999px; transition: width .2s; width: 12.5%; }
     .wz-save-btn { font-size: 12.5px; font-weight: 700; color: #3182F6; background: #EAF2FF; border: none; border-radius: 999px; padding: 7px 12px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
@@ -4905,7 +4904,6 @@ app.get('/gov-support/wizard/:id', async (c) => {
   <div class="wz-wrap">
     ${govSupportTopNav(c, 480)}
     <div class="wz-header">
-      <a href="/gov-support" class="wz-back">‹</a>
       <div class="wz-progress"><div class="wz-progress-bar" id="wzProgressBar"></div></div>
       <button type="button" class="wz-save-btn" onclick="wzManualSave()">임시 저장</button>
     </div>
