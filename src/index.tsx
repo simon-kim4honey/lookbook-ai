@@ -67,6 +67,12 @@ type Bindings = {
   OPENAI_API_KEY: string
   // 브랜드 리드 분석/초안 생성 고도화(선택) — 미설정 시 휴리스틱/템플릿으로 자동 폴백
   ANTHROPIC_API_KEY?: string
+  // 2026-10-26: 이 Worker(Cloudflare)가 마찬가지로 Cloudflare 뒤에 있는 api.anthropic.com을
+  // 직접 호출하면 "Orange-to-Orange" 트래픽으로 간헐적 403에 걸린다(relay/README.md 참고) —
+  // 비-Cloudflare(Render) 중계 서버를 거치도록 전환. 둘 다 미설정이면(스테이징 Preview에
+  // 아직 수동 등록 전 등) gsCallClaudeWithSchema가 api.anthropic.com 직접 호출로 폴백한다.
+  ANTHROPIC_RELAY_URL?: string
+  ANTHROPIC_RELAY_SECRET?: string
   // GA4 측정 ID (예: G-XXXXXXXXXX) — 미설정 시 GA 스니펫 자체를 삽입하지 않음
   GA4_MEASUREMENT_ID?: string
   // ezlook-techpack(별도 서비스) 로그인 연동용 핸드오프 토큰 서명 키
@@ -6101,7 +6107,7 @@ function gsSectionsSchema(sectionIds: string[]) {
 // 모듈을 정확히 지칭하도록 보장하는 게 더 안전하다.
 async function gsCallClaudeWithSchema(
   apiKey: string, prompt: string, schema: any | null, expectCount: number, maxTokens: number, timeoutMs: number,
-  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string, temperature?: number
+  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string; ANTHROPIC_RELAY_URL?: string; ANTHROPIC_RELAY_SECRET?: string } | undefined, label: string, temperature?: number
 ): Promise<any[] | null> {
   try {
     // 2026-10-24: anthropic-version을 2023-06-01(3년 전)로 고정해뒀던 게 진짜 원인이었다 —
@@ -6116,13 +6122,21 @@ async function gsCallClaudeWithSchema(
     // Cloudflare 엣지에서 막히는 것으로 확인됨("Orange-to-Orange" 트래픽 — Workers가 마찬가지로
     // Cloudflare 뒤에 있는 api.anthropic.com을 호출). User-Agent를 명시해도 이 차단은
     // 재현됨(원인 아닌 것으로 이미 확인됐지만 무해해 유지), max_tokens 크기도 원인이 아니었다.
-    // 근본 해결은 보류하고 content-digest.ts와 동일하게 재시도로 완화한다.
+    // 재시도만으로는 막히는 구간을 못 벗어나는 사례가 실사용자 리포트로 재현됨 — 근본적으로
+    // "둘 다 Cloudflare 뒤"라는 패턴 자체를 없애기 위해 비-Cloudflare(Render) 중계 서버
+    // (relay/README.md)를 거치도록 전환했다. ANTHROPIC_RELAY_URL/SECRET이 아직 설정되지 않은
+    // 환경(예: 스테이징 Preview에 수동 등록 전)에서는 기존처럼 api.anthropic.com을 직접
+    // 호출하는 걸로 안전하게 폴백한다. 재시도 로직은 중계 서버 자체의 일시적 문제(예: 무료
+    // 플랜 콜드 스타트)에 대비해 그대로 유지한다.
+    const useRelay = !!(env?.ANTHROPIC_RELAY_URL && env?.ANTHROPIC_RELAY_SECRET)
+    const targetUrl = useRelay ? env!.ANTHROPIC_RELAY_URL! : 'https://api.anthropic.com/v1/messages'
+    const extraHeaders = useRelay ? { 'X-Relay-Secret': env!.ANTHROPIC_RELAY_SECRET! } : {}
     let res: Response | null = null
     let bodyText = ''
     for (let attempt = 1; attempt <= 3; attempt++) {
-      res = await fetch('https://api.anthropic.com/v1/messages', {
+      res = await fetch(targetUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21', 'User-Agent': 'EZlook-gov-support/1.0 (+https://aifashion.co.kr)' },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21', 'User-Agent': 'EZlook-gov-support/1.0 (+https://aifashion.co.kr)', ...extraHeaders },
         body: JSON.stringify({
           model: 'claude-sonnet-5',
           thinking: { type: 'disabled' },
@@ -6218,7 +6232,7 @@ async function gsCallClaudeWithSchema(
 
 async function gsCallClaudeSections(
   apiKey: string, prompt: string, sectionIds: string[], maxTokens: number, timeoutMs: number,
-  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string
+  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string; ANTHROPIC_RELAY_URL?: string; ANTHROPIC_RELAY_SECRET?: string } | undefined, label: string
 ): Promise<any[] | null> {
   return gsCallClaudeWithSchema(apiKey, prompt, gsSectionsSchema(sectionIds), sectionIds.length, maxTokens, timeoutMs, env, label)
 }
@@ -6272,7 +6286,7 @@ function gsBuildEmptyCategorySection(cat: CategoryTree, how: string) {
 // 인자를 아예 넘기지 않는 동일 설정 재시도로 되돌린다.
 async function gsCallGroupWithRetry(
   apiKey: string, prompt: string, schema: any, expectCount: number, maxTokens: number, timeoutMs: number,
-  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string
+  env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string; ANTHROPIC_RELAY_URL?: string; ANTHROPIC_RELAY_SECRET?: string } | undefined, label: string
 ): Promise<any[] | null> {
   const first = await gsCallClaudeWithSchema(apiKey, prompt, schema, expectCount, maxTokens, timeoutMs, env, label)
   if (first) return first
@@ -6333,7 +6347,7 @@ blocks의 각 원소는 moduleId와 함께, 그 모듈의 표현방법(타입)�
 // 생성으로 검증 전이니 스테이징에서 다시 확인 필요.
 async function generateGovSupportSectionsFromNodes(
   apiKey: string, programName: string, categories: CategoryTree[], answers: any, finance: any,
-  competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string }
+  competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string; ANTHROPIC_RELAY_URL?: string; ANTHROPIC_RELAY_SECRET?: string }
 ): Promise<any[]> {
   const sharedContext = gsBuildSharedContext(answers, finance, competitorTable, selfMallExcerpt)
   const intro = `당신은 한국 정부지원사업(${programName}) 심사 경험이 10년 이상인 패션 제조 전문 컨설턴트다. 실제로 선정된 사업계획서를 여러 건 써온 사람처럼, 자연스럽고 전문적인 문장으로 아래 소상공인의 답변을 바탕으로 공식 사업계획서 양식의 섹션을 작성한다.`
@@ -6463,7 +6477,7 @@ ${GS_NODES_JSON_FORMAT}`
 
 async function generateGovSupportSections(
   apiKey: string | undefined, programId: string, programName: string, answers: any, finance: any,
-  competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string }
+  competitorTable: any, selfMallExcerpt: string | null, env?: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string; ANTHROPIC_RELAY_URL?: string; ANTHROPIC_RELAY_SECRET?: string }
 ): Promise<any[]> {
   // 2026-10-23(P4, 모듈 빌더 생성 파이프라인 전환): 새 3단계 노드 트리(gov_support_nodes,
   // P0~P3)가 게시+검증통과 상태면 최우선으로 그걸 쓴다. 안 되면(미게시/오류/노드없음)
