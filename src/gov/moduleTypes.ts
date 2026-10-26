@@ -135,9 +135,13 @@ export const EXPRESSION_TYPES: ExpressionTypeDef[] = [
       },
       { key: 'maxItems', labelKo: '최대 항목 수', type: 'number' },
       { key: 'hintToAI', labelKo: 'AI 추가 지시(선택)', type: 'text' },
+      {
+        key: 'showLabel', labelKo: '카드 제목을 본문에 소제목으로 표시', type: 'toggle',
+        helpText: '"1) 외부적 배경 및 동기"처럼 카드 제목 자체가 실제 소소분류 항목명일 때만 켠다. "OOO 개조식 설명"처럼 관리자가 편의상 붙인 이름이면 꺼둔다(기본값) — 켜면 생성물에 그대로 노출된다.',
+      },
     ],
     promptFragment: '• 불릿 3~5개. 각 항목 40자 이내. 수치 또는 고유명사 1개 이상 포함.',
-    defaultPayload: { items: [], marker: 'dot', maxItems: 6, hintToAI: '' },
+    defaultPayload: { items: [], marker: 'dot', maxItems: 6, hintToAI: '', showLabel: false },
   },
   {
     key: 'bulletsSummary', labelKo: '개조식 요약 설명', icon: '≡', levelAllow: [2, 3, 4],
