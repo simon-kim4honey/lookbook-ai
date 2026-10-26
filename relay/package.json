@@ -1,0 +1,12 @@
+{
+  "name": "ezlook-anthropic-relay",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal non-Cloudflare relay for Anthropic API calls. Exists because Cloudflare Workers calling api.anthropic.com (also Cloudflare-fronted) intermittently gets blocked at the Cloudflare edge (\"Orange-to-Orange\" traffic) with HTTP 403 \"forbidden\"/\"Request not allowed\" before the request ever reaches Anthropic. Hosting this relay off Cloudflare (Render) breaks that pattern.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
