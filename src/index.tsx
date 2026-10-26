@@ -6104,38 +6104,50 @@ async function gsCallClaudeWithSchema(
   env: { LOOKBOOK_DB: D1Database; GITHUB_TOKEN?: string } | undefined, label: string, temperature?: number
 ): Promise<any[] | null> {
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      // 2026-10-24: anthropic-version을 2023-06-01(3년 전)로 고정해뒀던 게 진짜 원인이었다 —
-      // 스키마를 완전히 제거해도 재현되던 400 "compiled grammar is too large"가, Anthropic
-      // Console Playground(cURL 내보내기로 실제 anthropic-version: 2026-10-21 확인)와 동일하게
-      // 맞추니 더 이상 재현되지 않았다. 구버전 헤더가 claude-sonnet-5 같은 신규 모델에서 레거시
-      // 경로로 라우팅되며 생긴 문제로 추정.
-      // 2026-10-26: User-Agent를 아예 안 보내고 있었다 — Cloudflare Workers의 fetch()는
-      // 브라우저와 달리 기본 User-Agent를 붙이지 않는다. 완전히 무관한 다른 기능
-      // (content-digest.ts)의 독립적인 api.anthropic.com 호출도 같은 403
-      // "forbidden"(Anthropic 표준 에러 타입이 아님)을 똑같이 겪었는데, 그쪽도 User-Agent가
-      // 없었다는 공통점이 있어 가장 유력한 원인으로 보고 명시적으로 추가한다.
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21', 'User-Agent': 'EZlook-gov-support/1.0 (+https://aifashion.co.kr)' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        thinking: { type: 'disabled' },
-        ...(temperature !== undefined ? { temperature } : {}),
-        max_tokens: maxTokens,
-        messages: [{ role: 'user', content: prompt }],
-        ...(schema ? { output_config: { format: { type: 'json_schema', schema } } } : {}),
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    })
-    if (!res.ok) {
-      const bodyText = await res.text().catch(() => '')
-      console.error(`gov-support 섹션 생성(${label}) HTTP 실패:`, res.status, bodyText.slice(0, 500))
+    // 2026-10-24: anthropic-version을 2023-06-01(3년 전)로 고정해뒀던 게 진짜 원인이었다 —
+    // 스키마를 완전히 제거해도 재현되던 400 "compiled grammar is too large"가, Anthropic
+    // Console Playground(cURL 내보내기로 실제 anthropic-version: 2026-10-21 확인)와 동일하게
+    // 맞추니 더 이상 재현되지 않았다. 구버전 헤더가 claude-sonnet-5 같은 신규 모델에서 레거시
+    // 경로로 라우팅되며 생긴 문제로 추정.
+    // 2026-10-26: 이것과 별개로 간헐적인 403 "forbidden"(Anthropic 표준 에러 타입이 아님)이
+    // 발생한다. content-digest.ts가 2026-09-22에 이미 같은 증상을 더 깊이 조사해뒀다 —
+    // /debug-classify로 응답 헤더를 직접 확인한 결과 x-request-id/anthropic-ratelimit-*가
+    // 전부 없고 응답이 15ms 만에 돌아와, Anthropic 애플리케이션 계층까지 가지도 못하고
+    // Cloudflare 엣지에서 막히는 것으로 확인됨("Orange-to-Orange" 트래픽 — Workers가 마찬가지로
+    // Cloudflare 뒤에 있는 api.anthropic.com을 호출). User-Agent를 명시해도 이 차단은
+    // 재현됨(원인 아닌 것으로 이미 확인됐지만 무해해 유지), max_tokens 크기도 원인이 아니었다.
+    // 근본 해결은 보류하고 content-digest.ts와 동일하게 재시도로 완화한다.
+    let res: Response | null = null
+    let bodyText = ''
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2026-10-21', 'User-Agent': 'EZlook-gov-support/1.0 (+https://aifashion.co.kr)' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-5',
+          thinking: { type: 'disabled' },
+          ...(temperature !== undefined ? { temperature } : {}),
+          max_tokens: maxTokens,
+          messages: [{ role: 'user', content: prompt }],
+          ...(schema ? { output_config: { format: { type: 'json_schema', schema } } } : {}),
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      if (res.ok) break
+      bodyText = await res.text().catch(() => '')
+      const retryable = res.status === 403 || res.status === 429 || res.status >= 500
+      if (!retryable || attempt === 3) break
+      console.error(`gov-support 섹션 생성(${label}) HTTP 실패(${attempt}차):`, res.status, bodyText.slice(0, 500))
+      await new Promise((r) => setTimeout(r, attempt * 800))
+    }
+    if (!res || !res.ok) {
+      console.error(`gov-support 섹션 생성(${label}) HTTP 실패:`, res?.status, bodyText.slice(0, 500))
       if (env) {
         await logError(env, {
           source: 'server',
-          message: `gov-support 섹션 생성(${label}) HTTP 실패: ${res.status}`,
+          message: `gov-support 섹션 생성(${label}) HTTP 실패: ${res?.status}`,
           route: '/api/gov-support/projects/:id/generate',
-          extra: { status: res.status, bodyHead: bodyText.slice(0, 800) },
+          extra: { status: res?.status, bodyHead: bodyText.slice(0, 800) },
         })
       }
       return null
@@ -13020,7 +13032,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
         </div>
         <div class="gslide-nav" id="step4Nav">
           <div class="result-nav-grid">
-            <button class="result-nav-btn primary" id="downloadActionBtn" onclick="downloadWithCreditCheck(0)">
+            <button class="result-nav-btn primary" onclick="downloadWithCreditCheck(0)">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운</span>
               <span class="rnb-sub" id="downloadActionSub"><s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90</span>
@@ -13911,9 +13923,20 @@ app.get('/admin02', (c) => {
         </div>
       </div>
 
+      <div class="leads-card">
+        <div class="leads-hint" style="margin-bottom:8px;">이번 달 네이버 API 사용량</div>
+        <div id="digestUsage" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
+      </div>
+
       <div class="leads-row" style="align-items:flex-start;">
         <div class="leads-card" style="flex:1;min-width:260px;max-width:320px;">
           <h3>다이제스트 목록</h3>
+          <div class="leads-row" style="gap:4px;margin-bottom:8px;flex-wrap:wrap;">
+            <button class="leads-btn secondary small" onclick="digestFilterList('')" id="digestFilterAll">전체</button>
+            <button class="leads-btn secondary small" onclick="digestFilterList('news')" id="digestFilterNews">기사</button>
+            <button class="leads-btn secondary small" onclick="digestFilterList('search_trend')" id="digestFilterSearchTrend">검색트렌드</button>
+            <button class="leads-btn secondary small" onclick="digestFilterList('shopping_insight')" id="digestFilterShoppingInsight">쇼핑인사이트</button>
+          </div>
           <div id="digestList" style="max-height:520px;overflow-y:auto;"></div>
         </div>
 
@@ -15165,25 +15188,66 @@ async function digestApi(path, opts) {
   }
 }
 
+let digestListFilter = ''
+
 async function digestInit() {
   await digestLoadList()
+  await digestLoadUsage()
+}
+
+async function digestLoadUsage() {
+  const data = await digestApi('/usage')
+  const box = document.getElementById('digestUsage')
+  if (!data.success) { box.innerHTML = ''; return }
+  const label = { news: '뉴스 검색', search_trend: '검색어트렌드', shopping_insight: '쇼핑인사이트' }
+  box.innerHTML = data.usage.map((u) => {
+    const color = u.pct >= 80 ? '#ff6b6b' : (u.pct >= 50 ? '#ffb703' : '#6c47ff')
+    return (
+      '<div style="min-width:160px;">' +
+        '<div class="leads-hint" style="margin-bottom:2px;">' + label[u.apiType] + ' — ' + u.count.toLocaleString() + ' / ' + u.limit.toLocaleString() + ' (' + u.pct + '%)</div>' +
+        '<div style="background:#252540;border-radius:4px;height:6px;overflow:hidden;">' +
+          '<div style="background:' + color + ';width:' + Math.min(100, u.pct) + '%;height:100%;"></div>' +
+        '</div>' +
+      '</div>'
+    )
+  }).join('')
+}
+
+function digestFilterList(type) {
+  digestListFilter = type
+  const ids = { '': 'digestFilterAll', news: 'digestFilterNews', search_trend: 'digestFilterSearchTrend', shopping_insight: 'digestFilterShoppingInsight' }
+  Object.values(ids).forEach((id) => { document.getElementById(id).style.borderColor = ''; document.getElementById(id).style.color = '' })
+  document.getElementById(ids[type]).style.borderColor = '#6c47ff'
+  document.getElementById(ids[type]).style.color = '#fff'
+  digestLoadList()
 }
 
 async function digestLoadList() {
-  const data = await digestApi('/list')
+  const data = await digestApi('/list' + (digestListFilter ? '?type=' + digestListFilter : ''))
   const list = document.getElementById('digestList')
   if (!data.success || !data.digests.length) {
-    list.innerHTML = '<div class="leads-hint">아직 생성된 다이제스트가 없습니다. "지금 생성"을 눌러보세요.</div>'
+    list.innerHTML = '<div class="leads-hint">' + (digestListFilter ? '이 종류로 생성된 다이제스트가 없습니다.' : '아직 생성된 다이제스트가 없습니다. "지금 생성"을 눌러보세요.') + '</div>'
     return
   }
   const statusLabel = { draft: '초안', reviewed: '검토완료', sent: '발행완료' }
   const typeLabel = { news: '📰 기사', search_trend: '🔎 검색어트렌드', shopping_insight: '🛍️ 쇼핑인사이트' }
   list.innerHTML = data.digests.map((d) => (
-    '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;' + (d.id === digestCurrentId ? 'border-color:#6c47ff' : '') + '" onclick="digestSelect(' + d.id + ')">' +
-      '<div style="font-weight:600;color:#e0e0f0;font-size:13px;">' + (typeLabel[d.type] || '📰 기사') + ' · ' + d.period + '</div>' +
+    '<div class="leads-card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer;position:relative;' + (d.id === digestCurrentId ? 'border-color:#6c47ff' : '') + '" onclick="digestSelect(' + d.id + ')">' +
+      '<button class="leads-btn secondary small" style="position:absolute;top:8px;right:8px;padding:2px 8px;" onclick="event.stopPropagation();digestDelete(' + d.id + ')">삭제</button>' +
+      '<div style="font-weight:600;color:#e0e0f0;font-size:13px;padding-right:40px;">' + (typeLabel[d.type] || '📰 기사') + ' · ' + d.period + '</div>' +
       '<div class="leads-hint">' + statusLabel[d.status] + (d.type === 'news' || !d.type ? ' · 기사 ' + d.article_count + '건' : ' · 항목 ' + d.article_count + '개') + '</div>' +
     '</div>'
   )).join('')
+}
+
+async function digestDelete(id) {
+  if (!confirm('이 다이제스트를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return
+  await digestApi('/' + id, { method: 'DELETE' })
+  if (digestCurrentId === id) {
+    digestCurrentId = null
+    document.getElementById('digestDetailCard').innerHTML = '<div class="leads-hint">왼쪽 목록에서 다이제스트를 선택하세요.</div>'
+  }
+  await digestLoadList()
 }
 
 const digestGenBtnIds = { news: 'digestGenBtnNews', search_trend: 'digestGenBtnSearchTrend', shopping_insight: 'digestGenBtnShoppingInsight' }
