@@ -6639,12 +6639,13 @@ app.get('/gov-support/result/:id', (c) => {
         return '<div style="background:' + toneBg + ';border-radius:10px;padding:12px 14px;font-size:12.5px;color:' + toneColor + ';line-height:1.6;margin:0 0 14px;">' + rsEsc(b.text) + '</div>';
       }
       if (b.type === 'iconStats') {
-        return '<div class="rs-icon-stats">' + (b.items||[]).slice(0,4).map(function(it){
+        return (b.caption ? '<div class="rs-subhead2">' + rsEsc(b.caption) + '</div>' : '') +
+          '<div class="rs-icon-stats">' + (b.tiles||[]).slice(0,4).map(function(it){
           return '<div class="rs-icon-stat"><div class="rs-icon-stat-icon">' + rsEsc(it.icon||'📌') + '</div><div class="rs-icon-stat-value">' + rsEsc(it.value) + '</div><div class="rs-icon-stat-label">' + rsEsc(it.label) + '</div></div>';
         }).join('') + '</div>';
       }
       if (b.type === 'paragraph') return '<p class="rs-paragraph">' + rsEsc(b.text) + '</p>';
-      if (b.type === 'bullets') return '<ul class="rs-bullets">' + (b.items||[]).map(function(i){ return '<li>' + rsEsc(i) + '</li>'; }).join('') + '</ul>';
+      if (b.type === 'bullets') return (b.label ? '<div class="rs-subhead2">' + rsEsc(b.label) + '</div>' : '') + '<ul class="rs-bullets">' + (b.items||[]).map(function(i){ return '<li>' + rsEsc(i) + '</li>'; }).join('') + '</ul>';
       if (b.type === 'table') {
         var head = '<tr>' + (b.headers||[]).map(function(h){ return '<th>' + rsEsc(h) + '</th>'; }).join('') + '</tr>';
         var rows = (b.rows||[]).map(function(r){ return '<tr>' + r.map(function(cell){ return '<td>' + rsEsc(cell) + '</td>'; }).join('') + '</tr>'; }).join('');

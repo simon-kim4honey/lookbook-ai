@@ -329,6 +329,23 @@ function buildOneBlock(
   const def = getExpressionType(node.expressionType)
   const base: MergedBlock = { type: node.expressionType }
 
+  // bullets는 payloadSchema에 제목 필드가 없어(items만 있음) 렌더될 때 아무 라벨도
+  // 안 보인다. 소소분류(L4)에 "1) 외부적 배경 및 동기"처럼 제목이 꼭 필요한 리프를
+  // bullets로 둬야 하는 경우(그 아래로 더 못 내려가는 4단계 한계) 관리자가 지어둔
+  // node.title을 라벨로 그대로 보여준다 — 렌더러(rsRenderBlock)가 label이 있으면
+  // timeline/table처럼 소제목 스타일로 먼저 보여주고 그 아래 불릿을 보여준다.
+  if (node.expressionType === 'bullets' && node.title) {
+    base.label = node.title
+  }
+
+  // table은 AI가 rows만 채우고 헤더(컬럼명)는 관리자가 payload.columns로 미리
+  // 정해둔다(§5 — "컬럼 추가·삭제·순서변경 절대 금지"). 그런데 렌더러는 b.headers를
+  // 읽는데 이걸 payload.columns(label)에서 뽑아 넣는 코드가 어디에도 없었다 —
+  // static/computed/ai 바인딩 전부 헤더 없는 표로만 렌더되고 있었다(전사적 버그).
+  if (node.expressionType === 'table' && Array.isArray(node.payload?.columns)) {
+    base.headers = node.payload.columns.map((c: any) => c?.label || c?.key || '')
+  }
+
   // subhead/subhead2 자동 번호 — payload에 남겨둔 텍스트 뒤에 붙이지 않고, 번호를
   // 별도 필드로 둬서 렌더러가 조합한다(§11-6).
   if ((node.expressionType === 'subhead' || node.expressionType === 'subhead2') && node.payload?.autoNumber) {

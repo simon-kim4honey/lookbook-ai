@@ -133,6 +133,38 @@ test('buildCategoryStructureText — binding=ai인 그룹(자식 있는) 노드�
   assert.doesNotMatch(text, /moduleId="l2g"/)
 })
 
+test('mergeCategoryBlocks — bullets는 payloadSchema에 제목 필드가 없어, node.title을 label로 실어 보낸다', () => {
+  // 2026-10-26: "1) 외부적 배경 및 동기"처럼 소소분류(L4) 자체가 bullets 리프인
+  // 경우(4단계 한계로 더 못 내려감) node.title이 블록에 전혀 실리지 않아 화면에
+  // 제목이 통째로 안 보였다 — label 필드로 실어 렌더러가 보여줄 수 있게 한다.
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '1. 문제 인식', payload: {}, binding: 'static', targetChars: 1000 })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', title: '가. 배경', payload: { text: '가. 배경' }, binding: 'static' })
+  const l3bullets = node({ id: 'l3b', level: 3, parentId: 'l2', expressionType: 'bullets', title: '1) 외부적 배경 및 동기', payload: { items: [] }, binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, l3bullets])[0]
+  const { blocks } = mergeCategoryBlocks(cat, new Map([['l3b', { moduleId: 'l3b', items: ['국내 시장 규모 1조원'] }]]), {}, () => null, 1)
+  const bulletsBlock = blocks.find((b) => b.type === 'bullets')!
+  assert.equal(bulletsBlock.label, '1) 외부적 배경 및 동기')
+  assert.deepEqual(bulletsBlock.items, ['국내 시장 규모 1조원'])
+})
+
+test('mergeCategoryBlocks — table은 payload.columns에서 헤더를 뽑아 base.headers로 싣는다(바인딩 종류 무관)', () => {
+  // 2026-10-26: 렌더러(rsRenderBlock)가 b.headers를 읽는데, 이걸 payload.columns
+  // (label)에서 채워 넣는 코드가 어디에도 없어 모든 table이 헤더 없이 렌더되고
+  // 있었다 — static/computed/ai 바인딩 전부 해당(전사적 버그).
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '1. 문제 인식', payload: {}, binding: 'static', targetChars: 1000 })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', title: '2-4', payload: { text: '2-4' }, binding: 'static' })
+  const l3table = node({
+    id: 'l3t', level: 3, parentId: 'l2', expressionType: 'table', title: '1단계 집행계획 표',
+    payload: { columns: [{ key: 'item', label: '비목' }, { key: 'amount', label: '금액' }] },
+    binding: 'computed', bindingKey: 'fundUse.stage1',
+  })
+  const cat = buildCategoryTrees([l1, l2, l3table])[0]
+  const { blocks } = mergeCategoryBlocks(cat, new Map(), {}, (key) => (key === 'fundUse.stage1' ? { rows: [['샘플·가봉', '20000000']] } : null), 1)
+  const tableBlock = blocks.find((b) => b.type === 'table')!
+  assert.deepEqual(tableBlock.headers, ['비목', '금액'])
+  assert.deepEqual(tableBlock.rows, [['샘플·가봉', '20000000']])
+})
+
 test('mergeCategoryBlocks — computed 모듈은 AI 응답과 무관하게 서버 계산값으로 강제된다', () => {
   const cat = sampleTree()
   const aiBlocks = new Map<string, any>([
