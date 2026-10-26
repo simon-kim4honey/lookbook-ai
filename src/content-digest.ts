@@ -278,6 +278,7 @@ ${list}
       'Content-Type': 'application/json',
       'x-api-key': env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
+      'User-Agent': 'EZlook-content-digest/1.0 (+https://aifashion.co.kr)',
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
@@ -474,6 +475,7 @@ ${list}
         'Content-Type': 'application/json',
         'x-api-key': c.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
+        'User-Agent': 'EZlook-content-digest/1.0 (+https://aifashion.co.kr)',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-5',
