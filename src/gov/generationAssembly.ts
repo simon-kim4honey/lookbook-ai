@@ -334,7 +334,11 @@ function buildOneBlock(
   // bullets로 둬야 하는 경우(그 아래로 더 못 내려가는 4단계 한계) 관리자가 지어둔
   // node.title을 라벨로 그대로 보여준다 — 렌더러(rsRenderBlock)가 label이 있으면
   // timeline/table처럼 소제목 스타일로 먼저 보여주고 그 아래 불릿을 보여준다.
-  if (node.expressionType === 'bullets' && node.title) {
+  // 2026-10-26: node.title이 있으면 무조건 보여줬더니, "OOO 개조식 설명"·"OOO
+  // 중분류별 서술"처럼 관리자가 편의상 붙인 내부 이름까지 전부 생성물에 그대로
+  // 노출됐다 — payload.showLabel로 관리자가 명시적으로 켠 경우에만 보여주도록
+  // 좁힌다(기본값 false).
+  if (node.expressionType === 'bullets' && node.title && node.payload?.showLabel) {
     base.label = node.title
   }
 

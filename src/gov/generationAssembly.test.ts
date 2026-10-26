@@ -133,18 +133,24 @@ test('buildCategoryStructureText — binding=ai인 그룹(자식 있는) 노드�
   assert.doesNotMatch(text, /moduleId="l2g"/)
 })
 
-test('mergeCategoryBlocks — bullets는 payloadSchema에 제목 필드가 없어, node.title을 label로 실어 보낸다', () => {
+test('mergeCategoryBlocks — bullets는 payload.showLabel이 켜져 있을 때만 node.title을 label로 실어 보낸다', () => {
   // 2026-10-26: "1) 외부적 배경 및 동기"처럼 소소분류(L4) 자체가 bullets 리프인
   // 경우(4단계 한계로 더 못 내려감) node.title이 블록에 전혀 실리지 않아 화면에
   // 제목이 통째로 안 보였다 — label 필드로 실어 렌더러가 보여줄 수 있게 한다.
+  // 단, node.title이 있다고 무조건 보여주면 "OOO 개조식 설명"처럼 관리자가
+  // 편의상 붙인 내부 이름까지 노출되므로 showLabel로 명시한 경우만 보여준다.
   const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '1. 문제 인식', payload: {}, binding: 'static', targetChars: 1000 })
   const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', title: '가. 배경', payload: { text: '가. 배경' }, binding: 'static' })
-  const l3bullets = node({ id: 'l3b', level: 3, parentId: 'l2', expressionType: 'bullets', title: '1) 외부적 배경 및 동기', payload: { items: [] }, binding: 'ai' })
-  const cat = buildCategoryTrees([l1, l2, l3bullets])[0]
-  const { blocks } = mergeCategoryBlocks(cat, new Map([['l3b', { moduleId: 'l3b', items: ['국내 시장 규모 1조원'] }]]), {}, () => null, 1)
-  const bulletsBlock = blocks.find((b) => b.type === 'bullets')!
-  assert.equal(bulletsBlock.label, '1) 외부적 배경 및 동기')
-  assert.deepEqual(bulletsBlock.items, ['국내 시장 규모 1조원'])
+  const l3bullets = node({ id: 'l3b', level: 3, parentId: 'l2', expressionType: 'bullets', title: '1) 외부적 배경 및 동기', payload: { items: [], showLabel: true }, binding: 'ai' })
+  const l3noLabel = node({ id: 'l3n', level: 3, parentId: 'l2', expressionType: 'bullets', title: '가.배경 개조식 설명', payload: { items: [] }, binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, l3bullets, l3noLabel])[0]
+  const { blocks } = mergeCategoryBlocks(cat, new Map([
+    ['l3b', { moduleId: 'l3b', items: ['국내 시장 규모 1조원'] }],
+    ['l3n', { moduleId: 'l3n', items: ['편안함을 중시하는 소비 성향'] }],
+  ]), {}, () => null, 1)
+  const bulletsBlocks = blocks.filter((b) => b.type === 'bullets')
+  assert.equal(bulletsBlocks[0].label, '1) 외부적 배경 및 동기')
+  assert.equal(bulletsBlocks[1].label, undefined)
 })
 
 test('mergeCategoryBlocks — table은 payload.columns에서 헤더를 뽑아 base.headers로 싣는다(바인딩 종류 무관)', () => {
