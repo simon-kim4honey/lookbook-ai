@@ -63,7 +63,7 @@ export const ANSWER_KEYS = [
   'product1', 'product2', 'product3', 'concept', 'category', 'priceRange', 'ipStatus', 'validationEfforts',
   'target', 'problemStatement',
   'competitor1_name', 'competitor1_feature', 'competitor2_name', 'competitor2_feature', 'competitorsUnknown', 'buyReason',
-  'productionMethod',
+  'productionMethod', 'productionDetail',
   'processSteps', 'processNote',
   'diffReason', 'diffStubborn', 'diffFeedback', 'differentiationTypes',
   'preSale', 'cost_product1', 'cost_product2', 'cost_product3', 'price_product1', 'price_product2', 'price_product3',
