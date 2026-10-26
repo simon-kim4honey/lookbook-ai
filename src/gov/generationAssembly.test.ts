@@ -226,12 +226,31 @@ test('mergeCategoryBlocks — 번호 없는 형제(headlineBox/iconStats 등)가
   assert.deepEqual(numbered, ['1-1.', '1-2.', '1-3.']) // 1-1,1-3,1-5처럼 건너뛰지 않는다
 })
 
-test('mergeCategoryBlocks — AI 응답에 moduleId가 없으면 경고를 남기고 관리자 힌트로 대체한다', () => {
+test('mergeCategoryBlocks — AI 응답에 moduleId가 없으면 경고를 남기고 콘텐츠 필드는 비운다(관리자 힌트를 콘텐츠로 노출하지 않음)', () => {
   const cat = sampleTree()
   const { blocks, warnings } = mergeCategoryBlocks(cat, new Map(), {}, () => null, 1)
   const headlineBlock = blocks.find((b) => b.type === 'headlineBox')!
-  assert.equal(headlineBlock.text, '힌트 문장') // node.payload.text로 폴백
+  // node.payload.text("힌트 문장")는 AI를 위한 프롬프트 힌트일 뿐 완성 문구가 아니다 —
+  // AI 응답이 없으면 그대로 노출하지 않고 비운다(2026-10-26, 실사용자 리포트로 확인된
+  // "관리자 메모가 그대로 생성물에 노출" 버그 수정).
+  assert.equal(headlineBlock.text, undefined)
   assert.ok(warnings.some((w) => w.moduleId === 'l3h'))
+})
+
+test('mergeCategoryBlocks — AI 응답 누락 시 AI 소유 필드(items 등)만 지우고 표현 설정(tone 등)은 남긴다', () => {
+  const l1 = node({ id: 'g1', level: 1, parentId: null, expressionType: 'categoryHeader', payload: {}, binding: 'static' })
+  const l2 = node({ id: 'g2', level: 2, parentId: 'g1', expressionType: 'subhead', payload: { text: '가.', autoNumber: false }, binding: 'static' })
+  const headline = node({ id: 'g3', level: 3, parentId: 'g2', expressionType: 'headlineBox', payload: { text: '힌트 문장', tone: 'info', align: 'left' }, binding: 'ai' })
+  const bullets = node({ id: 'g4', level: 3, parentId: 'g2', expressionType: 'bullets', payload: { items: ['관리자 메모 힌트'], marker: 'dot' }, binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, headline, bullets])[0]
+  const { blocks } = mergeCategoryBlocks(cat, new Map(), {}, () => null, 1)
+  const headlineBlock = blocks.find((b) => b.type === 'headlineBox')!
+  const bulletsBlock = blocks.find((b) => b.type === 'bullets')!
+  assert.equal(headlineBlock.text, undefined)
+  assert.equal(headlineBlock.tone, 'info') // 표현 설정은 유지
+  assert.equal(headlineBlock.align, 'left')
+  assert.equal(bulletsBlock.items, undefined) // 관리자 메모가 콘텐츠로 남지 않는다
+  assert.equal(bulletsBlock.marker, 'dot') // 표현 설정은 유지
 })
 
 test('mergeCategoryBlocks — iconStats 타일은 4개로 절단된다', () => {
