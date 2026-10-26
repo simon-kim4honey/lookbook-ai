@@ -119,6 +119,20 @@ test('buildCategoryStructureText — payload.text가 없고 caption만 있는 �
   assert.match(text, /참고\(관리자가 적어둔 힌트\/제목\/캡션\): 창업아이템 배경 핵심 수치/)
 })
 
+test('buildCategoryStructureText — binding=ai인 그룹(자식 있는) 노드는 moduleId가 없어 "지시:"를 내려보내지 않는다', () => {
+  // 2026-10-26: 그룹 노드는 moduleId가 없어 AI가 생성한 제목을 돌려받을 방법이
+  // 없는데도 "지시: 제목만 생성..."을 내려보냈더니, 모델이 그룹 제목 문자열을
+  // 가짜 moduleId로 쓴 블록을 지어내 JSON 파싱이 깨지는 사례가 실제로 있었다.
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '1. 문제 인식', payload: {}, binding: 'static', targetChars: 1000 })
+  const l2group = node({ id: 'l2g', level: 2, parentId: 'l1', expressionType: 'subhead', title: '2-4. 1단계 정부지원사업비 집행 계획', payload: { text: '2-4. 1단계 정부지원사업비 집행 계획' }, binding: 'ai' })
+  const l3leaf = node({ id: 'l3t', level: 3, parentId: 'l2g', expressionType: 'table', title: '집행계획 표', payload: { columns: [{ key: 'item', label: '비목' }] }, binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2group, l3leaf])[0]
+  const text = buildCategoryStructureText(cat, {})
+  assert.doesNotMatch(text, /지시: 제목만 생성/)
+  assert.match(text, /고정 제목\(구조 안내용 — 생성·수정 대상 아님\)/)
+  assert.doesNotMatch(text, /moduleId="l2g"/)
+})
+
 test('mergeCategoryBlocks — computed 모듈은 AI 응답과 무관하게 서버 계산값으로 강제된다', () => {
   const cat = sampleTree()
   const aiBlocks = new Map<string, any>([
