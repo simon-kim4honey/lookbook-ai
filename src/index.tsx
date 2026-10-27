@@ -2569,7 +2569,7 @@ async function atlasGenerateAndWaitDetailed(params: {
 
     if (terminalStatuses.has(status)) {
       console.error('atlasGenerateAndWait failed status:', status)
-      return { url: null, error: `실패 상태: ${status} — ${JSON.stringify(pollRes.data).slice(0, 200)}` }
+      return { url: null, error: `실패 상태: ${status} — ${JSON.stringify(pollRes.data).slice(0, 600)}` }
     }
   }
 
@@ -6970,7 +6970,7 @@ app.get('/gov-support/result/:id', (c) => {
       var token = localStorage.getItem('lookbook_token') || '';
       if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); location.href = '/'; return; }
       try {
-        var res = await fetch('/api/gov-support/projects/' + RS_PROJECT_ID + '/result', { headers: { 'X-Session-Token': token } });
+        var res = await fetch('/api/gov-support/projects/' + RS_PROJECT_ID + '/result', { headers: { 'X-Session-Token': token }, signal: AbortSignal.timeout(20000) });
         var data = await res.json();
         if (!data.success) { showToast(data.message || '불러오기에 실패했어요.', 'error'); location.href = '/gov-support/wizard/' + RS_PROJECT_ID; return; }
 
@@ -6995,7 +6995,17 @@ app.get('/gov-support/result/:id', (c) => {
         document.getElementById('rsLoading').style.display = 'none';
         document.getElementById('rsContent').style.display = 'block';
       } catch (e) {
-        showToast('네트워크 오류가 발생했어요.', 'error');
+        // 2026-10-27: 여기서 뭔가 던지면(네트워크 오류든 예상 못한 데이터 모양이든)
+        // catch가 토스트만 띄우고 끝나서, rsLoading이 'none'으로 안 바뀌어 "불러오는
+        // 중..."에 영원히 멈춘 것처럼 보이는 문제가 있었다(실사용자 리포트 — 토스트가
+        // 잠깐 떴다 사라지는 걸 못 보면 그냥 멈춘 화면만 남음). 무슨 에러든 로딩 화면
+        // 자체를 눈에 보이는 에러 상태로 바꿔서, 최소한 "새로고침해보라"는 걸 알 수 있게 한다.
+        console.error('rsLoad error:', e);
+        var loadingEl = document.getElementById('rsLoading');
+        if (loadingEl) {
+          loadingEl.innerHTML = '불러오는 중 오류가 발생했어요.<br/><button type="button" class="rs-print-btn" style="margin-top:10px;" onclick="location.reload()">새로고침</button>';
+        }
+        showToast('불러오기 중 오류가 발생했어요.', 'error');
       }
     }
 
