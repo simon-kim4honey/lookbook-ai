@@ -5001,8 +5001,9 @@ app.get('/gov-support/wizard/:id', async (c) => {
           <div class="wz-field">
             <div class="wz-field-label">고객이 사는 이유 (최대 2개) <span class="wz-required">*</span></div>
             <div class="wz-chip-row" data-field="buyReason" data-multi="1" data-max="2" data-required="1">
-              ${['핏/사이즈', '가성비', '스토리·취향', '지속가능성', '기능성'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+              ${['핏/사이즈', '가성비', '스토리·취향', '지속가능성', '기능성', '디자인'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
+            <div id="wzBuyReasonDetails"></div>
           </div>
           <div class="wz-field">
             <div class="wz-field-label">경쟁사·유사 브랜드 (선택, 비교표에 쓰여요)</div>
@@ -5301,6 +5302,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
       wzUpdateExperienceDetailVisibility();
       wzUpdateStageWarning();
       wzUpdateProductionDetailVisibility();
+      wzRenderBuyReasonDetails();
       wzAttachCharCounters();
     }
 
@@ -5336,6 +5338,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
       if (row.getAttribute('data-field') === 'experience') wzUpdateExperienceDetailVisibility();
       if (row.getAttribute('data-field') === 'stage') wzUpdateStageWarning();
       if (row.getAttribute('data-field') === 'productionMethod') wzUpdateProductionDetailVisibility();
+      if (row.getAttribute('data-field') === 'buyReason') wzRenderBuyReasonDetails();
     });
 
     // 생산 방식 버튼마다 실제로 궁금한 게 달라서(공방이면 작업 공간, 위탁이면
@@ -5363,6 +5366,40 @@ app.get('/gov-support/wizard/:id', async (c) => {
       } else {
         field.style.display = 'none';
       }
+    }
+
+    // 고객이 사는 이유(최대 2개 선택) — 선택한 이유마다 "왜 그렇게 생각하는지"를
+    // 짧게 적을 수 있는 입력란을 동적으로 보여준다(선택할 때마다 다시 그림).
+    // 이미 입력해둔 값은 선택이 바뀌어도 보존했다가, 같은 이유를 다시 선택하면 복원한다.
+    var wzBuyReasonDraft = {};
+    function wzEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function wzRenderBuyReasonDetails() {
+      var row = document.querySelector('.wz-chip-row[data-field="buyReason"]');
+      var container = document.getElementById('wzBuyReasonDetails');
+      if (!row || !container) return;
+      container.querySelectorAll('textarea[data-reason]').forEach(function (el) {
+        wzBuyReasonDraft[el.getAttribute('data-reason')] = el.value;
+      });
+      var selected = Array.prototype.slice.call(row.querySelectorAll('.wz-chip.on')).map(function (c) { return c.getAttribute('data-value'); });
+      container.innerHTML = selected.map(function (reason) {
+        var saved = (wzAnswers.buyReasonDetails && wzAnswers.buyReasonDetails[reason]) || '';
+        var val = wzBuyReasonDraft[reason] !== undefined ? wzBuyReasonDraft[reason] : saved;
+        return '<div class="wz-field" style="margin-top:10px;">' +
+          '<div class="wz-field-label" style="font-size:12.5px;color:#4E5968;">' + wzEsc(reason) + ' — 그렇게 생각하시는 이유 (선택)</div>' +
+          '<textarea class="wz-textarea" data-reason="' + wzEsc(reason) + '" maxlength="150" placeholder="예: 구체적인 이유를 자유롭게 적어주세요" style="min-height:56px;">' + wzEsc(val) + '</textarea>' +
+          '</div>';
+      }).join('');
+      wzAttachCharCounters(container);
+    }
+    function wzCollectBuyReasonDetails() {
+      var container = document.getElementById('wzBuyReasonDetails');
+      var result = {};
+      if (!container) return result;
+      container.querySelectorAll('textarea[data-reason]').forEach(function (el) {
+        var v = el.value.trim();
+        if (v) result[el.getAttribute('data-reason')] = v;
+      });
+      return result;
     }
 
     function wzUpdateSelfMallUrlVisibility() {
@@ -5506,6 +5543,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
       } else if (stepNum === 4) {
         patch.target = val('f_target');
         patch.problemStatement = val('f_problemStatement');
+        patch.buyReasonDetails = wzCollectBuyReasonDetails();
         patch.competitor1_name = val('f_competitor1_name'); patch.competitor1_feature = val('f_competitor1_feature');
         patch.competitor2_name = val('f_competitor2_name'); patch.competitor2_feature = val('f_competitor2_feature');
         patch.competitorsUnknown = !!wzAnswers.competitorsUnknown;
@@ -6031,7 +6069,8 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 15. experienceDetail(관련 경력 설명)이 있으면 "가.대표자 보유역량"에서 그 내용을 구체적으로 반영한다. experienceDetail이 비어있고 experience(관련 경력 선택)만 있다면 선택된 항목을 바탕으로 서술한다.
 16. "라.기대효과"는 "나.문제점"을 "다.해결방안"으로 해결했을 때 사업이 얻는 효과(매출 성장·고객 확보·시장 변화·사회적 가치 등)를 쓰는 섹션이다 — 본 지원사업을 통해 받는 지원금·시제품·산출물 등 "지원사업에서 받는 것" 자체를 기대효과로 적지 말 것(흔히 발생하는 오류). expectedImpact(기대효과) 답변이 있으면 그 내용을 구체적인 수치와 함께 반영하고, 비어있으면 problemStatement(해결하려는 문제)·해결방안 내용을 바탕으로 합리적인 효과를 직접 제시하되 원칙 3에 따라 "(임의 작성)"을 덧붙인다.
 17. ipStatus(지식재산권 보유·출원 현황)·validationEfforts(시장 검증 활동)가 있으면 "2-1 창업아이템 현황(준비정도)"에서 "현재 준비 상태"를 보여주는 구체적 근거로 반영한다. 둘 다 비어있으면 지어내지 말고(지식재산권·시장검증 실적은 사실 왜곡 위험이 큰 항목이다) 해당 내용 없이 다른 준비 현황(공정·생산방식 등)만으로 섹션을 구성한다.
-18. productionDetail(생산 방식 세부 내용 — productionMethod에서 고른 값에 따라 작업 공간/설비, 협력 생산처, 생산국 등 다른 걸 물어본 답변이다)이 있으면 "2-1 창업아이템 현황(준비정도)"와 "다.해결방안"에서 생산 준비 상태의 구체적 근거로 반영한다. 비어있으면 productionMethod(선택한 생산 방식)만으로 일반적인 수준에서 서술한다.`
+18. productionDetail(생산 방식 세부 내용 — productionMethod에서 고른 값에 따라 작업 공간/설비, 협력 생산처, 생산국 등 다른 걸 물어본 답변이다)이 있으면 "2-1 창업아이템 현황(준비정도)"와 "다.해결방안"에서 생산 준비 상태의 구체적 근거로 반영한다. 비어있으면 productionMethod(선택한 생산 방식)만으로 일반적인 수준에서 서술한다.
+19. buyReasonDetails({선택한 구매 이유: 그렇게 생각하는 근거} 객체, buyReason에서 고른 이유마다 사용자가 직접 적은 설명)가 있으면 "가.목표시장(고객)"·"나.제공할 혜택(가치)"에서 "고객이 왜 사는가"를 뒷받침하는 구체적 근거로 반영한다(예: 추상적으로 "핏이 좋아서"라고만 쓰지 말고, 사용자가 적은 근거를 살려 구체적으로 풀어 쓴다). 특정 이유에 설명이 없으면 그 이유는 buyReason 값 자체만으로 일반적인 수준에서 서술한다.`
 
 function gsBlockVariant(type: string, props: Record<string, any>, required: string[]) {
   return {
