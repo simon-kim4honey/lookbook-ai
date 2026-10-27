@@ -5072,6 +5072,13 @@ app.get('/gov-support/wizard/:id', async (c) => {
             <div class="wz-field-label" id="f_productionDetailLabel">세부 내용 (선택)</div>
             <input type="text" class="wz-input" id="f_productionDetail" maxlength="150" />
           </div>
+          <div class="wz-field">
+            <div class="wz-field-label">초기 생산 규모 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="productionScale" data-required="1">
+              ${['샘플만', '10~30장', '50~100장', '100장+', '프리오더'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <div class="wz-field-hint">매출 시나리오·초기 생산 수량 계산에 쓰여요.</div>
+          </div>
         </div>
 
         <div class="wz-step" data-step="6">
@@ -6126,7 +6133,10 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 16. "라.기대효과"는 "나.문제점"을 "다.해결방안"으로 해결했을 때 사업이 얻는 효과(매출 성장·고객 확보·시장 변화·사회적 가치 등)를 쓰는 섹션이다 — 본 지원사업을 통해 받는 지원금·시제품·산출물 등 "지원사업에서 받는 것" 자체를 기대효과로 적지 말 것(흔히 발생하는 오류). expectedImpact(기대효과) 답변이 있으면 그 내용을 구체적인 수치와 함께 반영하고, 비어있으면 problemStatement(해결하려는 문제)·해결방안 내용을 바탕으로 합리적인 효과를 직접 제시하되 원칙 3에 따라 "[[AI]]"를 덧붙인다.
 17. ipStatus(지식재산권 보유·출원 현황)·validationEfforts(시장 검증 활동)가 있으면 "2-1 창업아이템 현황(준비정도)"에서 "현재 준비 상태"를 보여주는 구체적 근거로 반영한다. 둘 다 비어있으면 지어내지 말고(지식재산권·시장검증 실적은 사실 왜곡 위험이 큰 항목이다) 해당 내용 없이 다른 준비 현황(공정·생산방식 등)만으로 섹션을 구성한다.
 18. productionDetail(생산 방식 세부 내용 — productionMethod에서 고른 값에 따라 작업 공간/설비, 협력 생산처, 생산국 등 다른 걸 물어본 답변이다)이 있으면 "2-1 창업아이템 현황(준비정도)"와 "다.해결방안"에서 생산 준비 상태의 구체적 근거로 반영한다. 비어있으면 productionMethod(선택한 생산 방식)만으로 일반적인 수준에서 서술한다.
-19. buyReasonDetails({선택한 구매 이유: 그렇게 생각하는 근거} 객체, buyReason에서 고른 이유마다 사용자가 직접 적은 설명)가 있으면 "가.목표시장(고객)"·"나.제공할 혜택(가치)"에서 "고객이 왜 사는가"를 뒷받침하는 구체적 근거로 반영한다(예: 추상적으로 "핏이 좋아서"라고만 쓰지 말고, 사용자가 적은 근거를 살려 구체적으로 풀어 쓴다). 특정 이유에 설명이 없으면 그 이유는 buyReason 값 자체만으로 일반적인 수준에서 서술한다.`
+19. buyReasonDetails({선택한 구매 이유: 그렇게 생각하는 근거} 객체, buyReason에서 고른 이유마다 사용자가 직접 적은 설명)가 있으면 "가.목표시장(고객)"·"나.제공할 혜택(가치)"에서 "고객이 왜 사는가"를 뒷받침하는 구체적 근거로 반영한다(예: 추상적으로 "핏이 좋아서"라고만 쓰지 말고, 사용자가 적은 근거를 살려 구체적으로 풀어 쓴다). 특정 이유에 설명이 없으면 그 이유는 buyReason 값 자체만으로 일반적인 수준에서 서술한다.
+20. founderAge(대표자 연령대)가 있으면 "가.대표자 보유역량"에서 자연스럽게 언급한다 — 나이 자체를 강조하기보다 그 연령대에 맞는 경력·소비자 공감대·네트워크 같은 맥락으로 녹여 쓴다.
+21. priceRange(목표 가격대)가 있으면 상품의 가격 책정 근거(원가 대비 판매가 적정성, 목표 고객의 구매력과의 정합성)를 다룰 때 반영한다 — 사용자가 price_product1 등으로 실제 가격을 입력했다면 그 값을 우선하고, priceRange는 보조 맥락으로만 쓴다.
+22. capital(보유 준비자본)이 있으면 "2-1 창업아이템 현황(준비정도)"에서 사업 수행을 위한 자기 재정 준비 상태를 보여주는 근거로 자연스럽게 언급한다 — 구체적인 금액을 지어내지 말고 선택한 구간 그대로 쓰고, 정부지원사업비와는 별개의 자기자본(매칭 투자)이라는 맥락으로 서술한다.`
 
 function gsBlockVariant(type: string, props: Record<string, any>, required: string[]) {
   return {
