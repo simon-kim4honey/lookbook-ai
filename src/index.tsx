@@ -4446,6 +4446,11 @@ app.get('/gov-support/my', (c) => {
     .gsm-badge-draft { background: #FFF3DB; color: #B8860B; }
     .gsm-badge-generated { background: #EAF2FF; color: #3182F6; }
     .gsm-card-date { font-size: 12px; color: #8B95A1; }
+    .gsm-pagination { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 18px; flex-wrap: wrap; }
+    .gsm-page-btn { min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid #E5E8EB; background: #FFFFFF; border-radius: 10px; color: #4E5968; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .gsm-page-btn.active { background: #3182F6; border-color: #3182F6; color: #fff; }
+    .gsm-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .gsm-page-ellipsis { color: #8B95A1; font-size: 13px; padding: 0 2px; }
   </style>
   <div class="gsm-wrap">
     ${govSupportTopNav(c, 480)}
@@ -4456,6 +4461,7 @@ app.get('/gov-support/my', (c) => {
     </div>
     <div class="gsm-inner">
       <div id="gsmList"></div>
+      <div id="gsmPagination" class="gsm-pagination"></div>
     </div>
   </div>
   <script>
@@ -4464,6 +4470,49 @@ app.get('/gov-support/my', (c) => {
       return { 'X-Session-Token': token };
     }
     var GSM_STATUS_LABEL = { draft: '작성중', generated: '생성완료' };
+    // 카드가 많아지면 한 페이지에 다 늘어놓는 대신 하단에 페이지 번호를 둬서 끊어 보여준다
+    // (사용자 리포트: "스크롤 너무 길다") — 목록 자체는 이미 한 번에 전부 받아오므로
+    // 서버 변경 없이 화면에서만 나눠서 그린다.
+    var GSM_PAGE_SIZE = 8;
+    var gsmAllProjects = [];
+    var gsmCurrentPage = 1;
+    function gsmRenderCard(p) {
+      var href = p.status === 'generated' ? ('/gov-support/result/' + p.id) : ('/gov-support/wizard/' + p.id);
+      var badgeClass = p.status === 'generated' ? 'gsm-badge-generated' : 'gsm-badge-draft';
+      var badgeLabel = GSM_STATUS_LABEL[p.status] || p.status;
+      var dateStr = (p.updated_at || p.created_at || '').slice(0, 16).replace('T', ' ');
+      return '<a class="gsm-card" href="' + href + '">' +
+        '<div class="gsm-card-top"><span class="gsm-card-name">' + p.program_name + '</span>' +
+        '<span class="gsm-badge ' + badgeClass + '">' + badgeLabel + '</span></div>' +
+        '<div class="gsm-card-date">마지막 수정 ' + dateStr + '</div></a>';
+    }
+    function gsmGoToPage(n) {
+      var totalPages = Math.max(1, Math.ceil(gsmAllProjects.length / GSM_PAGE_SIZE));
+      gsmCurrentPage = Math.min(Math.max(1, n), totalPages);
+      var start = (gsmCurrentPage - 1) * GSM_PAGE_SIZE;
+      document.getElementById('gsmList').innerHTML = gsmAllProjects.slice(start, start + GSM_PAGE_SIZE).map(gsmRenderCard).join('');
+      gsmRenderPagination(totalPages);
+      window.scrollTo(0, 0);
+    }
+    function gsmRenderPagination(totalPages) {
+      var el = document.getElementById('gsmPagination');
+      if (totalPages <= 1) { el.innerHTML = ''; return; }
+      var parts = [];
+      parts.push('<button type="button" class="gsm-page-btn" ' + (gsmCurrentPage === 1 ? 'disabled' : '') + ' onclick="gsmGoToPage(' + (gsmCurrentPage - 1) + ')">‹</button>');
+      // 페이지가 많아지면(8개 초과) 현재 페이지 주변 + 처음/끝만 보여주고 나머지는 "…"로 줄인다.
+      var pagesToShow = [];
+      for (var i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || Math.abs(i - gsmCurrentPage) <= 2) pagesToShow.push(i);
+      }
+      var last = 0;
+      pagesToShow.forEach(function (p) {
+        if (last && p - last > 1) parts.push('<span class="gsm-page-ellipsis">…</span>');
+        parts.push('<button type="button" class="gsm-page-btn ' + (p === gsmCurrentPage ? 'active' : '') + '" onclick="gsmGoToPage(' + p + ')">' + p + '</button>');
+        last = p;
+      });
+      parts.push('<button type="button" class="gsm-page-btn" ' + (gsmCurrentPage === totalPages ? 'disabled' : '') + ' onclick="gsmGoToPage(' + (gsmCurrentPage + 1) + ')">›</button>');
+      el.innerHTML = parts.join('');
+    }
     async function gsmLoad() {
       var token = localStorage.getItem('lookbook_token') || '';
       if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); location.href = '/'; return; }
@@ -4477,16 +4526,8 @@ app.get('/gov-support/my', (c) => {
           list.innerHTML = '<div class="gsm-empty">아직 작성 중인 사업계획서가 없어요.<br/>"+ 새로 시작"을 눌러 시작해보세요.</div>';
           return;
         }
-        list.innerHTML = data.projects.map(function (p) {
-          var href = p.status === 'generated' ? ('/gov-support/result/' + p.id) : ('/gov-support/wizard/' + p.id);
-          var badgeClass = p.status === 'generated' ? 'gsm-badge-generated' : 'gsm-badge-draft';
-          var badgeLabel = GSM_STATUS_LABEL[p.status] || p.status;
-          var dateStr = (p.updated_at || p.created_at || '').slice(0, 16).replace('T', ' ');
-          return '<a class="gsm-card" href="' + href + '">' +
-            '<div class="gsm-card-top"><span class="gsm-card-name">' + p.program_name + '</span>' +
-            '<span class="gsm-badge ' + badgeClass + '">' + badgeLabel + '</span></div>' +
-            '<div class="gsm-card-date">마지막 수정 ' + dateStr + '</div></a>';
-        }).join('');
+        gsmAllProjects = data.projects;
+        gsmGoToPage(1);
       } catch (e) {
         showToast('네트워크 오류가 발생했어요.', 'error');
       }
@@ -4705,7 +4746,7 @@ app.post('/api/gov-support/custom-request', async (c) => {
 // ────────────────────────────────────────────────────
 // 지원사업 도우미 — 위저드(입력 수집) API + 화면
 // 9개 사업 중 "사업계획서형" 6종(예비/초기/희망리턴/청년사관학교/로컬크리에이터/혁신소상공인)은
-// 공통 13단계 위저드를 공유한다(수집해야 하는 사업 정보 자체는 비슷하고, 사업별로 갈리는
+// 공통 12단계 위저드를 공유한다(수집해야 하는 사업 정보 자체는 비슷하고, 사업별로 갈리는
 // 부분은 다음 단계인 "AI 섹션 생성"에서 각 프로그램의 sections 구조를 따라간다).
 // 스마트상점·온라인판로·혁신바우처(경량 신청서형 3종)는 별도 3단계 위저드가 필요해 아직
 // 미구현 — /gov-support에서 "준비 중" 안내만 하고 이 위저드로 들어오지 않는다.
@@ -4777,11 +4818,9 @@ app.get('/api/gov-support/projects/:id', async (c) => {
     ).bind(c.req.param('id'), sess.user_id).first() as any
     if (!project) return c.json({ success: false, message: '프로젝트를 찾을 수 없습니다.' }, 404)
 
-    const program = GOV_SUPPORT_PROGRAMS.find((p) => p.id === project.program_id)
     return c.json({
       success: true,
       project: { ...project, answers: JSON.parse(project.answers || '{}') },
-      eligibility: program?.eligibility || [],
     })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
@@ -4882,8 +4921,6 @@ app.get('/gov-support/wizard/:id', async (c) => {
     .wz-sub3 { display: grid; grid-template-columns: 1fr; gap: 8px; }
     .wz-info-box { background: #EAF2FF; border-radius: 10px; padding: 12px 14px; font-size: 12.5px; color: #3182F6; line-height: 1.6; margin-top: 10px; }
     .wz-competitor-row { display: flex; gap: 8px; margin-bottom: 8px; }
-    .wz-elig-item { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; border-bottom: 1px solid #E5E8EB; font-size: 15.5px; color: #333D4B; line-height: 1.5; }
-    .wz-elig-item input { margin-top: 2px; flex-shrink: 0; width: 20px; height: 20px; }
     .wz-unknown-btn { width: 100%; padding: 12px; border: 1px dashed #B0B8C1; border-radius: 12px; background: #FAFBFC; color: #4E5968; font-size: 13.5px; font-weight: 600; cursor: pointer; margin-top: 4px; }
     .wz-unknown-btn.on { background: #EAF2FF; border: 1px solid #3182F6; border-style: solid; color: #3182F6; }
     .wz-highlight-box { background: #FFF8E1; border: 1.5px solid #F5C842; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
@@ -4921,7 +4958,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
       <form id="wzForm" style="display:none;">
 
         <div class="wz-step active" data-step="1">
-          <div class="wz-step-label">1 / 13 · 기본 정보</div>
+          <div class="wz-step-label">1 / 12 · 기본 정보</div>
           <h2>브랜드를 소개해주세요</h2>
           <div class="wz-field">
             <div class="wz-field-label">브랜드명 (가칭 가능) <span class="wz-required">*</span></div>
@@ -4943,7 +4980,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="2">
-          <div class="wz-step-label">2 / 13 · 아이템</div>
+          <div class="wz-step-label">2 / 12 · 아이템</div>
           <h2>어떤 제품을 만드시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">주력 카테고리 <span class="wz-required">*</span></div>
@@ -4972,7 +5009,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="3">
-          <div class="wz-step-label">3 / 13 · 준비 현황</div>
+          <div class="wz-step-label">3 / 12 · 준비 현황</div>
           <h2>지금까지 준비한 게 있나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">지식재산권 보유·출원 현황 (선택)</div>
@@ -4987,7 +5024,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="4">
-          <div class="wz-step-label">4 / 13 · 고객과 경쟁</div>
+          <div class="wz-step-label">4 / 12 · 고객과 경쟁</div>
           <h2>누가, 왜 사나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">타겟 고객 <span class="wz-required">*</span></div>
@@ -5016,7 +5053,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="5">
-          <div class="wz-step-label">5 / 13 · 생산 방식</div>
+          <div class="wz-step-label">5 / 12 · 생산 방식</div>
           <h2>어떻게 만드시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">생산 방식 <span class="wz-required">*</span></div>
@@ -5032,7 +5069,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="6">
-          <div class="wz-step-label">6 / 13 · 제작 공정</div>
+          <div class="wz-step-label">6 / 12 · 제작 공정</div>
           <h2>어떤 과정을 거쳐 만드나요?</h2>
           <div class="wz-field">
             <div class="wz-highlight-box">
@@ -5048,7 +5085,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="7">
-          <div class="wz-step-label">7 / 13 · 차별성</div>
+          <div class="wz-step-label">7 / 12 · 차별성</div>
           <h2>남들과 다르게 만드나요?</h2>
           <div class="wz-field">
             <div class="wz-highlight-box">
@@ -5075,7 +5112,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="8">
-          <div class="wz-step-label">8 / 13 · 상품별 원가</div>
+          <div class="wz-step-label">8 / 12 · 상품별 원가</div>
           <h2>원가와 판매가는요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">상품별 원가 / 판매가 (선택)</div>
@@ -5086,7 +5123,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="9">
-          <div class="wz-step-label">9 / 13 · 판매 채널</div>
+          <div class="wz-step-label">9 / 12 · 판매 채널</div>
           <h2>어디서 파시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">판매 채널 (복수 선택) <span class="wz-required">*</span></div>
@@ -5099,7 +5136,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="10">
-          <div class="wz-step-label">10 / 13 · 자금 계획</div>
+          <div class="wz-step-label">10 / 12 · 자금 계획</div>
           <h2>지원금을 어디에 쓰실 건가요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">보유 준비자본 <span class="wz-required">*</span></div>
@@ -5116,7 +5153,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="11">
-          <div class="wz-step-label">11 / 13 · 역량과 비전</div>
+          <div class="wz-step-label">11 / 12 · 역량과 비전</div>
           <h2>왜 대표님이어야 하나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">관련 경력 (복수 선택) <span class="wz-required">*</span></div>
@@ -5145,7 +5182,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         </div>
 
         <div class="wz-step" data-step="12">
-          <div class="wz-step-label">12 / 13 · 팀 구성</div>
+          <div class="wz-step-label">12 / 12 · 팀 구성</div>
           <h2>함께하는 팀이 있나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">협약기간 내 목표 산출물 <span class="wz-required">*</span></div>
@@ -5175,12 +5212,6 @@ app.get('/gov-support/wizard/:id', async (c) => {
           </div>
         </div>
 
-        <div class="wz-step" data-step="13">
-          <div class="wz-step-label">13 / 13 · 자격 확인</div>
-          <h2>자격 요건을 확인해주세요</h2>
-          <div id="wzEligibilityList"></div>
-        </div>
-
       </form>
 
       <div class="wz-step" id="wzDoneStep" style="display:none;">
@@ -5207,10 +5238,9 @@ app.get('/gov-support/wizard/:id', async (c) => {
   <script>
     var WZ_PROJECT_ID = ${JSON.stringify(projectId)};
     var WZ_GENERATION_READY = ${JSON.stringify(wzGenerationReady)};
-    var WZ_TOTAL_STEPS = 13;
+    var WZ_TOTAL_STEPS = 12;
     var wzCurrentStep = 1;
     var wzAnswers = {};
-    var wzEligibility = [];
     var wzProgramId = null;
     var wzTeamRows = [{}];
     var wzPartnerRows = [{}];
@@ -5230,10 +5260,8 @@ app.get('/gov-support/wizard/:id', async (c) => {
         if (!data.success) { showToast(data.message || '불러오기에 실패했어요.', 'error'); location.href = '/gov-support'; return; }
 
         wzAnswers = data.project.answers || {};
-        wzEligibility = data.eligibility || [];
         wzProgramId = data.project.program_id;
         wzFillFormFromAnswers();
-        wzRenderEligibility();
 
         document.getElementById('wzLoading').style.display = 'none';
         document.getElementById('wzForm').style.display = 'block';
@@ -5615,17 +5643,6 @@ app.get('/gov-support/wizard/:id', async (c) => {
       window.scrollTo(0, 0);
     }
 
-    function wzRenderEligibility() {
-      var list = document.getElementById('wzEligibilityList');
-      var stageNote = wzAnswers.stage
-        ? '<div class="wz-field-hint" style="margin-bottom:12px;">1단계에서 선택하신 창업 단계: <strong>' + wzAnswers.stage + '</strong> — 아래 자격 요건과 맞는지 다시 한번 확인해주세요.</div>'
-        : '';
-      list.innerHTML = stageNote + wzEligibility.map(function (text, i) {
-        var checked = wzAnswers.eligibilityChecks && wzAnswers.eligibilityChecks[i] ? 'checked' : '';
-        return '<label class="wz-elig-item"><input type="checkbox" data-elig-idx="' + i + '" ' + checked + '/><span>' + text + '</span></label>';
-      }).join('');
-    }
-
     // 필수 항목(data-required="1") 검증 — 입력칸은 값 공란 여부, 칩 묶음은 선택된(.on) 칩 존재 여부로 판단.
     // 문항의 70% 이상을 필수로 지정해 공란이 많을 때 AI가 JSON 대신 대화형 응답을 쓰며 생성이
     // 깨지던 문제(답변이 거의 비어있을 때 재현됨)를 입력 단계에서부터 줄인다.
@@ -5656,9 +5673,6 @@ app.get('/gov-support/wizard/:id', async (c) => {
       if (!wzValidateStep(wzCurrentStep)) return;
       wzAutoSave();
       if (wzCurrentStep === WZ_TOTAL_STEPS) {
-        var checks = Array.prototype.slice.call(document.querySelectorAll('[data-elig-idx]')).map(function (el) { return el.checked; });
-        wzAnswers.eligibilityChecks = checks;
-        wzAutoSave();
         document.getElementById('wzForm').style.display = 'none';
         document.getElementById('wzNavBar').style.display = 'none';
         document.getElementById('wzDoneStep').style.display = 'block';
