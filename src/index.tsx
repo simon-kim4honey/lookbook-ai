@@ -6454,7 +6454,19 @@ ${GS_NODES_JSON_FORMAT}
     if (!result) {
       return group.map((c) => gsBuildEmptyCategorySection(c, `AI 초안 생성 실패(${group.map((x) => x.node.title).join('·')}) — 관리자에게 문의해주세요.`))
     }
-    const aiByCategoryId = new Map(result.map((r: any) => [r.categoryId, r]))
+    // 2026-10-27: new Map(result.map(r => [r.categoryId, r]))는 같은 categoryId를 쓰는
+    // section 객체가 여러 개 오면 "마지막 것만" 남기고 앞의 것들을 통째로 버렸다 — 실사용자
+    // 리포트로 확인(진단 로그: 한 그룹 응답에 같은 categoryId를 쓰는 section이 5개까지
+    // 중복으로 왔는데, 그중 4개분의 blocks가 통째로 사라짐). 모델이 응답을 하나의
+    // section으로 모으지 않고 여러 section으로 쪼개 보내는 경우가 있는 것으로 보여,
+    // 같은 categoryId의 section이 여러 개면 blocks를 전부 이어붙인다(먼저 온 순서대로).
+    const aiByCategoryId = new Map<string, any>()
+    for (const r of (result as any[])) {
+      if (!r || !r.categoryId) continue
+      const existing = aiByCategoryId.get(r.categoryId)
+      if (existing) existing.blocks = [...(existing.blocks || []), ...(r.blocks || [])]
+      else aiByCategoryId.set(r.categoryId, { ...r, blocks: [...(r.blocks || [])] })
+    }
     return group.map((c) => {
       const aiResult: any = aiByCategoryId.get(c.node.id)
       const aiBlocksByModuleId = buildAiBlocksByModuleId(c, answers, aiResult?.blocks || [])
