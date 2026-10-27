@@ -204,7 +204,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvpy5kig`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvpyacu9`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -1848,6 +1848,11 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .gsm-badge-draft { background: #FFF3DB; color: #B8860B; }
     .gsm-badge-generated { background: #EAF2FF; color: #3182F6; }
     .gsm-card-date { font-size: 12px; color: #8B95A1; }
+    .gsm-pagination { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 18px; flex-wrap: wrap; }
+    .gsm-page-btn { min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid #E5E8EB; background: #FFFFFF; border-radius: 10px; color: #4E5968; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .gsm-page-btn.active { background: #3182F6; border-color: #3182F6; color: #fff; }
+    .gsm-page-btn:disabled { opacity: .4; cursor: not-allowed; }
+    .gsm-page-ellipsis { color: #8B95A1; font-size: 13px; padding: 0 2px; }
   </style>
   <div class="gsm-wrap">
     ${hi(e,480)}
@@ -1858,6 +1863,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     </div>
     <div class="gsm-inner">
       <div id="gsmList"></div>
+      <div id="gsmPagination" class="gsm-pagination"></div>
     </div>
   </div>
   <script>
@@ -1866,6 +1872,49 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       return { 'X-Session-Token': token };
     }
     var GSM_STATUS_LABEL = { draft: '작성중', generated: '생성완료' };
+    // 카드가 많아지면 한 페이지에 다 늘어놓는 대신 하단에 페이지 번호를 둬서 끊어 보여준다
+    // (사용자 리포트: "스크롤 너무 길다") — 목록 자체는 이미 한 번에 전부 받아오므로
+    // 서버 변경 없이 화면에서만 나눠서 그린다.
+    var GSM_PAGE_SIZE = 8;
+    var gsmAllProjects = [];
+    var gsmCurrentPage = 1;
+    function gsmRenderCard(p) {
+      var href = p.status === 'generated' ? ('/gov-support/result/' + p.id) : ('/gov-support/wizard/' + p.id);
+      var badgeClass = p.status === 'generated' ? 'gsm-badge-generated' : 'gsm-badge-draft';
+      var badgeLabel = GSM_STATUS_LABEL[p.status] || p.status;
+      var dateStr = (p.updated_at || p.created_at || '').slice(0, 16).replace('T', ' ');
+      return '<a class="gsm-card" href="' + href + '">' +
+        '<div class="gsm-card-top"><span class="gsm-card-name">' + p.program_name + '</span>' +
+        '<span class="gsm-badge ' + badgeClass + '">' + badgeLabel + '</span></div>' +
+        '<div class="gsm-card-date">마지막 수정 ' + dateStr + '</div></a>';
+    }
+    function gsmGoToPage(n) {
+      var totalPages = Math.max(1, Math.ceil(gsmAllProjects.length / GSM_PAGE_SIZE));
+      gsmCurrentPage = Math.min(Math.max(1, n), totalPages);
+      var start = (gsmCurrentPage - 1) * GSM_PAGE_SIZE;
+      document.getElementById('gsmList').innerHTML = gsmAllProjects.slice(start, start + GSM_PAGE_SIZE).map(gsmRenderCard).join('');
+      gsmRenderPagination(totalPages);
+      window.scrollTo(0, 0);
+    }
+    function gsmRenderPagination(totalPages) {
+      var el = document.getElementById('gsmPagination');
+      if (totalPages <= 1) { el.innerHTML = ''; return; }
+      var parts = [];
+      parts.push('<button type="button" class="gsm-page-btn" ' + (gsmCurrentPage === 1 ? 'disabled' : '') + ' onclick="gsmGoToPage(' + (gsmCurrentPage - 1) + ')">‹</button>');
+      // 페이지가 많아지면(8개 초과) 현재 페이지 주변 + 처음/끝만 보여주고 나머지는 "…"로 줄인다.
+      var pagesToShow = [];
+      for (var i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || Math.abs(i - gsmCurrentPage) <= 2) pagesToShow.push(i);
+      }
+      var last = 0;
+      pagesToShow.forEach(function (p) {
+        if (last && p - last > 1) parts.push('<span class="gsm-page-ellipsis">…</span>');
+        parts.push('<button type="button" class="gsm-page-btn ' + (p === gsmCurrentPage ? 'active' : '') + '" onclick="gsmGoToPage(' + p + ')">' + p + '</button>');
+        last = p;
+      });
+      parts.push('<button type="button" class="gsm-page-btn" ' + (gsmCurrentPage === totalPages ? 'disabled' : '') + ' onclick="gsmGoToPage(' + (gsmCurrentPage + 1) + ')">›</button>');
+      el.innerHTML = parts.join('');
+    }
     async function gsmLoad() {
       var token = localStorage.getItem('lookbook_token') || '';
       if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); location.href = '/'; return; }
@@ -1879,16 +1928,8 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           list.innerHTML = '<div class="gsm-empty">아직 작성 중인 사업계획서가 없어요.<br/>"+ 새로 시작"을 눌러 시작해보세요.</div>';
           return;
         }
-        list.innerHTML = data.projects.map(function (p) {
-          var href = p.status === 'generated' ? ('/gov-support/result/' + p.id) : ('/gov-support/wizard/' + p.id);
-          var badgeClass = p.status === 'generated' ? 'gsm-badge-generated' : 'gsm-badge-draft';
-          var badgeLabel = GSM_STATUS_LABEL[p.status] || p.status;
-          var dateStr = (p.updated_at || p.created_at || '').slice(0, 16).replace('T', ' ');
-          return '<a class="gsm-card" href="' + href + '">' +
-            '<div class="gsm-card-top"><span class="gsm-card-name">' + p.program_name + '</span>' +
-            '<span class="gsm-badge ' + badgeClass + '">' + badgeLabel + '</span></div>' +
-            '<div class="gsm-card-date">마지막 수정 ' + dateStr + '</div></a>';
-        }).join('');
+        gsmAllProjects = data.projects;
+        gsmGoToPage(1);
       } catch (e) {
         showToast('네트워크 오류가 발생했어요.', 'error');
       }
@@ -2059,7 +2100,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       }
     }
   <\/script>
-  `,``,`패션 제조 브랜드를 위한 정부지원사업 사업계획서 작성 도우미 — 예비창업패키지·초기창업패키지 등 9개 사업`,e.env.GA4_MEASUREMENT_ID))}),B.post(`/api/gov-support/custom-request`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.env.LOOKBOOK_KV;try{let r=e.req.header(`X-Session-Token`)||``,i=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(r).first();if(!i)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let a=await e.req.json(),o=String(a.programName||``).trim().slice(0,200),s=String(a.fileName||``).slice(0,200),l=String(a.contentType||``).slice(0,100),u=String(a.fileBase64||``);if(!o)return e.json({success:!1,message:`지원사업명을 입력해주세요.`},400);if(!u)return e.json({success:!1,message:`파일을 첨부해주세요.`},400);if(u.length>15*1024*1024)return e.json({success:!1,message:`파일 용량이 너무 큽니다 (최대 약 10MB).`},400);let d=`gov_support_custom:${crypto.randomUUID()}`;return await n.put(d,u,{metadata:{contentType:l,fileName:s}}),await t.prepare(`INSERT INTO gov_support_custom_requests (user_id, program_name, file_name, kv_key, content_type) VALUES (?,?,?,?,?)`).bind(i.user_id,o,s,d,l).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}});var _i=[`yebi`,`choi`,`hope-return`,`youth-academy`,`local-creator`,`innov-sop`];B.post(`/api/gov-support/projects`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await e.req.json(),a=String(i.programId||``),o=gi.find(e=>e.id===a);if(!o||!_i.includes(a))return e.json({success:!1,message:`아직 지원하지 않는 사업입니다.`},400);let s=crypto.randomUUID();return await t.prepare(`INSERT INTO gov_support_projects (id, user_id, program_id, program_name, answers) VALUES (?,?,?,?,'{}')`).bind(s,r.user_id,a,o.name).run(),e.json({success:!0,projectId:s})}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/api/gov-support/projects`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let{results:i}=await t.prepare(`SELECT id, program_id, program_name, status, created_at, updated_at, generated_at FROM gov_support_projects WHERE user_id = ? ORDER BY updated_at DESC`).bind(r.user_id).all();return e.json({success:!0,projects:i||[]})}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/api/gov-support/projects/:id`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT id, program_id, program_name, answers, status, updated_at FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();if(!i)return e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404);let a=gi.find(e=>e.id===i.program_id);return e.json({success:!0,project:{...i,answers:JSON.parse(i.answers||`{}`)},eligibility:a?.eligibility||[]})}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/api/gov-support/projects/:id/result`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT id, program_id, program_name, status, generated_content, generated_at FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();return i?i.status!==`generated`||!i.generated_content?e.json({success:!1,message:`아직 생성된 초안이 없습니다.`},400):e.json({success:!0,programName:i.program_name,generatedAt:i.generated_at,content:JSON.parse(i.generated_content)}):e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404)}catch(t){return e.json({success:!1,message:t.message},500)}}),B.patch(`/api/gov-support/projects/:id/answers`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT answers FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();if(!i)return e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404);let a=(await e.req.json()).answers||{},o={...JSON.parse(i.answers||`{}`),...a},s=JSON.stringify(o);return s.length>2e5?e.json({success:!1,message:`입력 내용이 너무 많습니다.`},400):(await t.prepare(`UPDATE gov_support_projects SET answers = ?, updated_at = datetime('now') WHERE id = ?`).bind(s,e.req.param(`id`)).run(),e.json({success:!0}))}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/gov-support/wizard/:id`,async e=>{let t=e.req.param(`id`),n=(await e.env.LOOKBOOK_DB.prepare(`SELECT DISTINCT program_id FROM gov_support_sections`).all()).results,r=Array.from(new Set([...vi,...(n||[]).map(e=>e.program_id)]));return e.html($(`지원사업 작성`,`
+  `,``,`패션 제조 브랜드를 위한 정부지원사업 사업계획서 작성 도우미 — 예비창업패키지·초기창업패키지 등 9개 사업`,e.env.GA4_MEASUREMENT_ID))}),B.post(`/api/gov-support/custom-request`,async e=>{let t=e.env.LOOKBOOK_DB,n=e.env.LOOKBOOK_KV;try{let r=e.req.header(`X-Session-Token`)||``,i=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(r).first();if(!i)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let a=await e.req.json(),o=String(a.programName||``).trim().slice(0,200),s=String(a.fileName||``).slice(0,200),l=String(a.contentType||``).slice(0,100),u=String(a.fileBase64||``);if(!o)return e.json({success:!1,message:`지원사업명을 입력해주세요.`},400);if(!u)return e.json({success:!1,message:`파일을 첨부해주세요.`},400);if(u.length>15*1024*1024)return e.json({success:!1,message:`파일 용량이 너무 큽니다 (최대 약 10MB).`},400);let d=`gov_support_custom:${crypto.randomUUID()}`;return await n.put(d,u,{metadata:{contentType:l,fileName:s}}),await t.prepare(`INSERT INTO gov_support_custom_requests (user_id, program_name, file_name, kv_key, content_type) VALUES (?,?,?,?,?)`).bind(i.user_id,o,s,d,l).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}});var _i=[`yebi`,`choi`,`hope-return`,`youth-academy`,`local-creator`,`innov-sop`];B.post(`/api/gov-support/projects`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await e.req.json(),a=String(i.programId||``),o=gi.find(e=>e.id===a);if(!o||!_i.includes(a))return e.json({success:!1,message:`아직 지원하지 않는 사업입니다.`},400);let s=crypto.randomUUID();return await t.prepare(`INSERT INTO gov_support_projects (id, user_id, program_id, program_name, answers) VALUES (?,?,?,?,'{}')`).bind(s,r.user_id,a,o.name).run(),e.json({success:!0,projectId:s})}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/api/gov-support/projects`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let{results:i}=await t.prepare(`SELECT id, program_id, program_name, status, created_at, updated_at, generated_at FROM gov_support_projects WHERE user_id = ? ORDER BY updated_at DESC`).bind(r.user_id).all();return e.json({success:!0,projects:i||[]})}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/api/gov-support/projects/:id`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT id, program_id, program_name, answers, status, updated_at FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();return i?e.json({success:!0,project:{...i,answers:JSON.parse(i.answers||`{}`)}}):e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404)}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/api/gov-support/projects/:id/result`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT id, program_id, program_name, status, generated_content, generated_at FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();return i?i.status!==`generated`||!i.generated_content?e.json({success:!1,message:`아직 생성된 초안이 없습니다.`},400):e.json({success:!0,programName:i.program_name,generatedAt:i.generated_at,content:JSON.parse(i.generated_content)}):e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404)}catch(t){return e.json({success:!1,message:t.message},500)}}),B.patch(`/api/gov-support/projects/:id/answers`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT answers FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();if(!i)return e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404);let a=(await e.req.json()).answers||{},o={...JSON.parse(i.answers||`{}`),...a},s=JSON.stringify(o);return s.length>2e5?e.json({success:!1,message:`입력 내용이 너무 많습니다.`},400):(await t.prepare(`UPDATE gov_support_projects SET answers = ?, updated_at = datetime('now') WHERE id = ?`).bind(s,e.req.param(`id`)).run(),e.json({success:!0}))}catch(t){return e.json({success:!1,message:t.message},500)}}),B.get(`/gov-support/wizard/:id`,async e=>{let t=e.req.param(`id`),n=(await e.env.LOOKBOOK_DB.prepare(`SELECT DISTINCT program_id FROM gov_support_sections`).all()).results,r=Array.from(new Set([...vi,...(n||[]).map(e=>e.program_id)]));return e.html($(`지원사업 작성`,`
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
@@ -2089,8 +2130,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .wz-sub3 { display: grid; grid-template-columns: 1fr; gap: 8px; }
     .wz-info-box { background: #EAF2FF; border-radius: 10px; padding: 12px 14px; font-size: 12.5px; color: #3182F6; line-height: 1.6; margin-top: 10px; }
     .wz-competitor-row { display: flex; gap: 8px; margin-bottom: 8px; }
-    .wz-elig-item { display: flex; align-items: flex-start; gap: 12px; padding: 16px 0; border-bottom: 1px solid #E5E8EB; font-size: 15.5px; color: #333D4B; line-height: 1.5; }
-    .wz-elig-item input { margin-top: 2px; flex-shrink: 0; width: 20px; height: 20px; }
     .wz-unknown-btn { width: 100%; padding: 12px; border: 1px dashed #B0B8C1; border-radius: 12px; background: #FAFBFC; color: #4E5968; font-size: 13.5px; font-weight: 600; cursor: pointer; margin-top: 4px; }
     .wz-unknown-btn.on { background: #EAF2FF; border: 1px solid #3182F6; border-style: solid; color: #3182F6; }
     .wz-highlight-box { background: #FFF8E1; border: 1.5px solid #F5C842; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
@@ -2128,7 +2167,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       <form id="wzForm" style="display:none;">
 
         <div class="wz-step active" data-step="1">
-          <div class="wz-step-label">1 / 13 · 기본 정보</div>
+          <div class="wz-step-label">1 / 12 · 기본 정보</div>
           <h2>브랜드를 소개해주세요</h2>
           <div class="wz-field">
             <div class="wz-field-label">브랜드명 (가칭 가능) <span class="wz-required">*</span></div>
@@ -2150,7 +2189,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="2">
-          <div class="wz-step-label">2 / 13 · 아이템</div>
+          <div class="wz-step-label">2 / 12 · 아이템</div>
           <h2>어떤 제품을 만드시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">주력 카테고리 <span class="wz-required">*</span></div>
@@ -2179,7 +2218,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="3">
-          <div class="wz-step-label">3 / 13 · 준비 현황</div>
+          <div class="wz-step-label">3 / 12 · 준비 현황</div>
           <h2>지금까지 준비한 게 있나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">지식재산권 보유·출원 현황 (선택)</div>
@@ -2194,7 +2233,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="4">
-          <div class="wz-step-label">4 / 13 · 고객과 경쟁</div>
+          <div class="wz-step-label">4 / 12 · 고객과 경쟁</div>
           <h2>누가, 왜 사나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">타겟 고객 <span class="wz-required">*</span></div>
@@ -2223,7 +2262,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="5">
-          <div class="wz-step-label">5 / 13 · 생산 방식</div>
+          <div class="wz-step-label">5 / 12 · 생산 방식</div>
           <h2>어떻게 만드시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">생산 방식 <span class="wz-required">*</span></div>
@@ -2239,7 +2278,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="6">
-          <div class="wz-step-label">6 / 13 · 제작 공정</div>
+          <div class="wz-step-label">6 / 12 · 제작 공정</div>
           <h2>어떤 과정을 거쳐 만드나요?</h2>
           <div class="wz-field">
             <div class="wz-highlight-box">
@@ -2255,7 +2294,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="7">
-          <div class="wz-step-label">7 / 13 · 차별성</div>
+          <div class="wz-step-label">7 / 12 · 차별성</div>
           <h2>남들과 다르게 만드나요?</h2>
           <div class="wz-field">
             <div class="wz-highlight-box">
@@ -2282,7 +2321,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="8">
-          <div class="wz-step-label">8 / 13 · 상품별 원가</div>
+          <div class="wz-step-label">8 / 12 · 상품별 원가</div>
           <h2>원가와 판매가는요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">상품별 원가 / 판매가 (선택)</div>
@@ -2293,7 +2332,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="9">
-          <div class="wz-step-label">9 / 13 · 판매 채널</div>
+          <div class="wz-step-label">9 / 12 · 판매 채널</div>
           <h2>어디서 파시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">판매 채널 (복수 선택) <span class="wz-required">*</span></div>
@@ -2306,7 +2345,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="10">
-          <div class="wz-step-label">10 / 13 · 자금 계획</div>
+          <div class="wz-step-label">10 / 12 · 자금 계획</div>
           <h2>지원금을 어디에 쓰실 건가요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">보유 준비자본 <span class="wz-required">*</span></div>
@@ -2323,7 +2362,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="11">
-          <div class="wz-step-label">11 / 13 · 역량과 비전</div>
+          <div class="wz-step-label">11 / 12 · 역량과 비전</div>
           <h2>왜 대표님이어야 하나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">관련 경력 (복수 선택) <span class="wz-required">*</span></div>
@@ -2352,7 +2391,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
 
         <div class="wz-step" data-step="12">
-          <div class="wz-step-label">12 / 13 · 팀 구성</div>
+          <div class="wz-step-label">12 / 12 · 팀 구성</div>
           <h2>함께하는 팀이 있나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">협약기간 내 목표 산출물 <span class="wz-required">*</span></div>
@@ -2382,12 +2421,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           </div>
         </div>
 
-        <div class="wz-step" data-step="13">
-          <div class="wz-step-label">13 / 13 · 자격 확인</div>
-          <h2>자격 요건을 확인해주세요</h2>
-          <div id="wzEligibilityList"></div>
-        </div>
-
       </form>
 
       <div class="wz-step" id="wzDoneStep" style="display:none;">
@@ -2414,10 +2447,9 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
   <script>
     var WZ_PROJECT_ID = ${JSON.stringify(t)};
     var WZ_GENERATION_READY = ${JSON.stringify(r)};
-    var WZ_TOTAL_STEPS = 13;
+    var WZ_TOTAL_STEPS = 12;
     var wzCurrentStep = 1;
     var wzAnswers = {};
-    var wzEligibility = [];
     var wzProgramId = null;
     var wzTeamRows = [{}];
     var wzPartnerRows = [{}];
@@ -2437,10 +2469,8 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         if (!data.success) { showToast(data.message || '불러오기에 실패했어요.', 'error'); location.href = '/gov-support'; return; }
 
         wzAnswers = data.project.answers || {};
-        wzEligibility = data.eligibility || [];
         wzProgramId = data.project.program_id;
         wzFillFormFromAnswers();
-        wzRenderEligibility();
 
         document.getElementById('wzLoading').style.display = 'none';
         document.getElementById('wzForm').style.display = 'block';
@@ -2822,17 +2852,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       window.scrollTo(0, 0);
     }
 
-    function wzRenderEligibility() {
-      var list = document.getElementById('wzEligibilityList');
-      var stageNote = wzAnswers.stage
-        ? '<div class="wz-field-hint" style="margin-bottom:12px;">1단계에서 선택하신 창업 단계: <strong>' + wzAnswers.stage + '</strong> — 아래 자격 요건과 맞는지 다시 한번 확인해주세요.</div>'
-        : '';
-      list.innerHTML = stageNote + wzEligibility.map(function (text, i) {
-        var checked = wzAnswers.eligibilityChecks && wzAnswers.eligibilityChecks[i] ? 'checked' : '';
-        return '<label class="wz-elig-item"><input type="checkbox" data-elig-idx="' + i + '" ' + checked + '/><span>' + text + '</span></label>';
-      }).join('');
-    }
-
     // 필수 항목(data-required="1") 검증 — 입력칸은 값 공란 여부, 칩 묶음은 선택된(.on) 칩 존재 여부로 판단.
     // 문항의 70% 이상을 필수로 지정해 공란이 많을 때 AI가 JSON 대신 대화형 응답을 쓰며 생성이
     // 깨지던 문제(답변이 거의 비어있을 때 재현됨)를 입력 단계에서부터 줄인다.
@@ -2863,9 +2882,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       if (!wzValidateStep(wzCurrentStep)) return;
       wzAutoSave();
       if (wzCurrentStep === WZ_TOTAL_STEPS) {
-        var checks = Array.prototype.slice.call(document.querySelectorAll('[data-elig-idx]')).map(function (el) { return el.checked; });
-        wzAnswers.eligibilityChecks = checks;
-        wzAutoSave();
         document.getElementById('wzForm').style.display = 'none';
         document.getElementById('wzNavBar').style.display = 'none';
         document.getElementById('wzDoneStep').style.display = 'block';
