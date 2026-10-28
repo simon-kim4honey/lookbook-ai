@@ -204,7 +204,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Rn}" font-size="128" font-weight="800" fill="${In(e.statColor||`#ffffff`)}">${In(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Rn}" font-size="64" font-weight="800" fill="#ffffff">${In(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Rn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${In(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Bn=`mvrhbtz4`;function Vn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Hn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Rn}" font-size="128" font-weight="800" fill="${In(e.statColor||`#ffffff`)}">${In(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Rn}" font-size="64" font-weight="800" fill="#ffffff">${In(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Rn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${In(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Bn=`mvrmmkab`;function Vn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Hn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3190,7 +3190,16 @@ ${JSON.stringify(_)}
     function rsMarkArb(s) {
       if (s == null) return '';
       var str = String(s);
-      var re = /\[\[AI(?::([^\]]*))?\]\]/g;
+      // 2026-10-28: 이 script 전체가 index.tsx 바깥쪽 템플릿 리터럴 문자열 안에
+      // 있어서, 정규식 안에 백슬래시를 하나만 쓰면(대괄호 escape) 바깥쪽 템플릿
+      // 리터럴이 인식 못하는 escape로 보고 그 백슬래시를 조용히 삼켜버린다(CLAUDE.md가
+      // 경고하는 홑따옴표 escape 소실과 같은 패턴) — 그 결과 브라우저가 받는 실제
+      // 정규식에는 대괄호가 escape 안 된 채로 남아 그 자리에서 SyntaxError가 나고,
+      // 이 script 블록 전체(rsLoad 포함)가 파싱 단계에서부터 실행되지 않는다 —
+      // 실사용자 리포트("불러오는 중" 영원히 멈춤)로 발견, 브라우저 콘솔에서 직접
+      // SyntaxError 확인. 백슬래시를 2개 겹쳐 써야 바깥쪽 템플릿 리터럴을 통과한 뒤
+      // 브라우저에 1개로 정확히 도달한다.
+      var re = /\\[\\[AI(?::([^\\]]*))?\\]\\]/g;
       var out = '';
       var segStart = 0;
       var m;
