@@ -4902,6 +4902,45 @@ app.get('/api/gov-support/projects/:id/process-image', async (c) => {
   }
 })
 
+// 2026-10-28: 1-1/나.문제점/다.해결방안/3-2 요약 인포그래픽 — process-image와 같은
+// 이유(JSON 응답 비대화 방지)로 별도 컬럼+전용 엔드포인트로 분리하되, 슬롯이 4개라
+// 컬럼을 늘리는 대신 {visualId: dataUri} JSON 맵 하나(visual_images_b64)에 담고
+// :key로 구분해 꺼낸다.
+app.get('/api/gov-support/projects/:id/visual-image/:key', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || c.req.query('token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const project = await db.prepare(
+      `SELECT visual_images_b64 FROM gov_support_projects WHERE id = ? AND user_id = ?`
+    ).bind(c.req.param('id'), sess.user_id).first() as any
+    if (!project || !project.visual_images_b64) return c.json({ success: false, message: '이미지를 찾을 수 없습니다.' }, 404)
+
+    let images: Record<string, string> = {}
+    try { images = JSON.parse(project.visual_images_b64) } catch { /* 무시 — 아래서 404 처리 */ }
+    const dataUri = images[c.req.param('key')]
+    if (!dataUri) return c.json({ success: false, message: '이미지를 찾을 수 없습니다.' }, 404)
+
+    const match = dataUri.match(/^data:([^;]+);base64,([\s\S]*)$/)
+    if (!match) return c.json({ success: false, message: '잘못된 이미지 형식입니다.' }, 500)
+    const contentType = match[1]
+    const binary = atob(match[2])
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+
+    return new Response(bytes, {
+      status: 200,
+      headers: { 'Content-Type': contentType, 'Cache-Control': 'private, max-age=31536000, immutable' },
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 app.patch('/api/gov-support/projects/:id/answers', async (c) => {
   const db: D1Database = c.env.LOOKBOOK_DB
   try {
@@ -6006,11 +6045,59 @@ function calcGovSupportFinance(answers: any) {
   return { products, cost, price, margin: primary.price > 0 ? primary.margin : null, marginRate: primary.price > 0 ? primary.marginRate : null, channelMargins, baseQty, scenario, budgetSplit, budgetStages }
 }
 
+// 2026-10-28: competitorsUnknown이 true면(경쟁사를 실제로 모르는 흔한 경우) 예전엔
+// 경쟁사 행을 아예 안 넣어서, 표에 "본 브랜드" 한 줄만 남아 비교할 대상이 없는
+// "경쟁사 분석 내용이 없다"는 실사용자 리포트로 이어짐. 이 표는 computed
+// 바인딩이라 AI가 대신 채울 수 없으므로(재무 숫자처럼 재계산 금지 원칙과 같은
+// 이유로 AI 환각을 막기 위해 computed로 전환했었음), 실존 브랜드명을 지어내지
+// 않고 카테고리에 맞는 일반적인 "경쟁 유형" 2개를 서버가 결정론적으로 채운다.
+const GS_GENERIC_COMPETITOR_TYPES: Record<string, Array<{ name: string; feature: string }>> = {
+  '의류(여성)': [
+    { name: '대형 SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
+    { name: '온라인 전문 브랜드(플랫폼 입점)', feature: '트렌드 반영 속도 빠름, SNS·인플루언서 마케팅 중심' },
+  ],
+  '의류(남성)': [
+    { name: '대형 SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
+    { name: '온라인 전문 브랜드(플랫폼 입점)', feature: '트렌드 반영 속도 빠름, SNS·인플루언서 마케팅 중심' },
+  ],
+  '의류(유니섹스)': [
+    { name: '대형 SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
+    { name: '온라인 전문 브랜드(플랫폼 입점)', feature: '트렌드 반영 속도 빠름, SNS·인플루언서 마케팅 중심' },
+  ],
+  '가방': [
+    { name: '대형 SPA·잡화 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
+    { name: '온라인 편집숍 브랜드', feature: '소량 다품종, 디자인 차별화 중심' },
+  ],
+  '잡화': [
+    { name: '대형 SPA·잡화 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
+    { name: '온라인 편집숍 브랜드', feature: '소량 다품종, 디자인 차별화 중심' },
+  ],
+  '신발': [
+    { name: '대형 스포츠·SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
+    { name: '온라인 편집숍 브랜드', feature: '소량 다품종, 디자인 차별화 중심' },
+  ],
+  '주얼리': [
+    { name: '로드샵·백화점 주얼리 브랜드', feature: '오프라인 신뢰도, 상대적으로 높은 가격대' },
+    { name: '온라인 액세서리 셀러', feature: '빠른 트렌드 반영, SNS 중심 저가 판매' },
+  ],
+  '키즈': [
+    { name: '대형 유아동 전문 브랜드', feature: '안전·품질 인증 기반 신뢰도, 전국 매장 운영' },
+    { name: '온라인 키즈 편집숍', feature: '소량 다품종, 가성비·디자인 중심' },
+  ],
+}
+const GS_GENERIC_COMPETITOR_DEFAULT: Array<{ name: string; feature: string }> = [
+  { name: '대형 SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
+  { name: '온라인 전문 브랜드(플랫폼 입점)', feature: '트렌드 반영 속도 빠름, SNS 마케팅 중심' },
+]
+
 function buildGsCompetitorTable(answers: any) {
   const rows: string[][] = []
   if (!answers.competitorsUnknown) {
     if (answers.competitor1_name) rows.push([answers.competitor1_name, answers.competitor1_feature || '-'])
     if (answers.competitor2_name) rows.push([answers.competitor2_name, answers.competitor2_feature || '-'])
+  } else {
+    const generic = GS_GENERIC_COMPETITOR_TYPES[answers.category] || GS_GENERIC_COMPETITOR_DEFAULT
+    generic.forEach((g) => rows.push([g.name, g.feature]))
   }
   const selfFeature = (answers.differentiation || answers.concept || '').toString().slice(0, 60) || '-'
   rows.push([(answers.brandName || '본 브랜드') + ' (본 브랜드)', selfFeature])
@@ -6070,6 +6157,60 @@ async function generateGovSupportProcessImage(
     return result
   } catch (e) {
     console.error('generateGovSupportProcessImage 실패:', e)
+    return { url: null, error: 'AI 이미지 생성 중 오류: ' + (e instanceof Error ? e.message : String(e)).slice(0, 150) }
+  }
+}
+
+// 2026-10-28: iconStats로만 보여주던 4개 요약 슬롯(1-1 필요성/나.문제점/다.해결방안/
+// 3-2 사업화 전략)을, AI가 이미 생성한 tiles(icon/value/label 4개)를 바탕으로
+// AtlasCloud 인포그래픽 이미지로 만든다. 공정 흐름도(generateGovSupportProcessImage)와
+// 동일한 원칙: images를 비워 순수 텍스트→이미지 모드로 호출해야 요청한 가로 비율이
+// 실제로 지켜진다(2026-10-27에 확인된 edit 모드의 비율 무시 문제).
+//
+// aspect_ratio 주의: 처음 "20:9"/"22:9"로 호출했다가 실사용자 테스트에서
+// "upstream status 400 ... aspect_ratio must be one of '1:1','1:4','1:8','2:3',
+// '3:2','3:4','4:1','4:3','4:5','5:4','8:1','9:16','16:9','21:9'"로 실패 확인
+// — 이 목록 밖의 값은 즉시 거부된다(400이라 atlasGenerateAndWaitDetailed의
+// 403/429/5xx 재시도 대상도 아님). 반드시 이 목록 안의 값만 쓸 것 — 가장 넓은
+// 가로형은 '21:9'.
+async function generateGovSupportVisualInfographic(
+  apiKey: string | undefined,
+  tiles: Array<{ icon?: string; value?: string; label?: string }>,
+  themeHint: string,
+  style: 'icon' | 'photo',
+  layout: 'grid' | 'row',
+  aspectRatio: string
+): Promise<{ url: string | null; error: string | null }> {
+  if (!apiKey) return { url: null, error: 'ATLAS_API_KEY 미설정' }
+  const items = (Array.isArray(tiles) ? tiles : []).slice(0, 4).filter((t) => t && (t.value || t.label))
+  if (items.length === 0) return { url: null, error: '시각화 데이터 없음' }
+  try {
+    // [[AI]] 류 임의작성 토큰은 이미지 프롬프트에 그대로 들어가면 안 되므로 걷어낸다.
+    const stripToken = (s: string) => String(s || '').split('[[AI')[0].trim()
+    const panelsText = items
+      .map((t, i) => `Panel ${i + 1}: large bold stat "${stripToken(t.value || '')}" with short Korean caption "${stripToken(t.label || '')}" below it.`)
+      .join(' ')
+    const layoutText = layout === 'row'
+      ? `${items.length} panels arranged horizontally in a single row, evenly spaced`
+      : `${items.length} panels arranged in a 2x2 grid (or ${items.length} evenly spaced boxes if fewer than 4)`
+    const styleText = style === 'photo'
+      ? 'Each panel includes a small, tasteful, photorealistic lifestyle/editorial photo relevant to the panel’s topic as a background or side accent (soft overlay so the text stays readable) — not cartoonish, not flat icons.'
+      : 'Each panel includes one simple flat-design icon (no photorealistic imagery) above or beside the stat.'
+    const prompt = `Create a clean, professional infographic for a Korean government startup grant business plan document, minimalist corporate style, white or very light background, consistent visual style across panels, no watermarks, no extra decorative text beyond what is specified. Context: ${themeHint}. Layout: ${layoutText}. ${styleText} ${panelsText} All numbers and Korean captions must be rendered exactly as given, clearly legible.`
+    const result = await atlasGenerateAndWaitDetailed({
+      images: [],
+      prompt,
+      aspect_ratio: aspectRatio,
+      resolution: '1K',
+      apiKey,
+    })
+    if (!result.url) return result
+    const dataUri = await urlToBase64(result.url)
+    if (dataUri) return { url: dataUri, error: null }
+    console.error('generateGovSupportVisualInfographic: base64 변환 실패, 원본 URL로 폴백:', result.url)
+    return result
+  } catch (e) {
+    console.error('generateGovSupportVisualInfographic 실패:', e)
     return { url: null, error: 'AI 이미지 생성 중 오류: ' + (e instanceof Error ? e.message : String(e)).slice(0, 150) }
   }
 }
@@ -6178,7 +6319,8 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 19. buyReasonDetails({선택한 구매 이유: 그렇게 생각하는 근거} 객체, buyReason에서 고른 이유마다 사용자가 직접 적은 설명)가 있으면 "가.목표시장(고객)"·"나.제공할 혜택(가치)"에서 "고객이 왜 사는가"를 뒷받침하는 구체적 근거로 반영한다(예: 추상적으로 "핏이 좋아서"라고만 쓰지 말고, 사용자가 적은 근거를 살려 구체적으로 풀어 쓴다). 특정 이유에 설명이 없으면 그 이유는 buyReason 값 자체만으로 일반적인 수준에서 서술한다.
 20. founderAge(대표자 연령대)가 있으면 "가.대표자 보유역량"에서 자연스럽게 언급한다 — 나이 자체를 강조하기보다 그 연령대에 맞는 경력·소비자 공감대·네트워크 같은 맥락으로 녹여 쓴다.
 21. priceRange(목표 가격대)가 있으면 상품의 가격 책정 근거(원가 대비 판매가 적정성, 목표 고객의 구매력과의 정합성)를 다룰 때 반영한다 — 사용자가 price_product1 등으로 실제 가격을 입력했다면 그 값을 우선하고, priceRange는 보조 맥락으로만 쓴다.
-22. capital(보유 준비자본)이 있으면 "2-1 창업아이템 현황(준비정도)"에서 사업 수행을 위한 자기 재정 준비 상태를 보여주는 근거로 자연스럽게 언급한다 — 구체적인 금액을 지어내지 말고 선택한 구간 그대로 쓰고, 정부지원사업비와는 별개의 자기자본(매칭 투자)이라는 맥락으로 서술한다.`
+22. capital(보유 준비자본)이 있으면 "2-1 창업아이템 현황(준비정도)"에서 사업 수행을 위한 자기 재정 준비 상태를 보여주는 근거로 자연스럽게 언급한다 — 구체적인 금액을 지어내지 말고 선택한 구간 그대로 쓰고, 정부지원사업비와는 별개의 자기자본(매칭 투자)이라는 맥락으로 서술한다.
+23. "나.문제점"→"다.해결방안"→"2-1/2-2 실현 가능성"은 하나의 인과 사슬이다 — 뭉뚱그린 업계 통용 문구를 쓰지 말 것. 문제점은 "직장인 체형 고려 부족", "품질 편차 심각", "유사 상품 다수로 차별화 어려움"처럼 업종 전체에 두루 해당하는 일반론이 아니라, problemStatement·diffReason·diffStubborn·diffFeedback 등 사용자 답변에서 드러난 이 브랜드만의 구체적 상황(예: 정확히 어떤 체형·어떤 부위가 안 맞는지, 어떤 공정의 어느 단계에서 왜 품질이 흔들리는지, 경쟁 상품과 정확히 무엇이 같아서 구분이 안 되는지)까지 파고든다. 해결방안도 "특허로 해결한다", "품질 기준을 직접 관리한다"처럼 그 자체로는 구체적 수단이 되지 못하는 선언형 문장을 쓰지 말 것 — 방금 그 깊이 있는 문제점 하나하나를 정확히 겨냥해 "무엇을(구체적 방법·공정·기준·설계)" "어떻게" 바꾸는지까지 쓴다(예: "디자인 특허 보유"라는 사실만 적지 말고, 그 특허가 구체적으로 어떤 체형 문제를 어떤 설계로 해결하는지까지). 이렇게 구체화된 해결방안은 "2-1/2-2 창업아이템 현황·실현 및 구체화 방안"에서 그 방안을 실제로 어떻게 수행할지(공정 순서·설비·검수 기준·일정 등)를 상세히 풀어내는 토대가 되어야 한다 — 앞에서 뭉뚱그리면 뒤에서도 구체화할 근거가 없다. 다른 모든 섹션도 동일: 추상적 선언 대신 숫자·공정·기준·대상을 못박아 쓴다.`
 
 function gsBlockVariant(type: string, props: Record<string, any>, required: string[]) {
   return {
@@ -6744,6 +6886,60 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
       generateGovSupportProcessImage(c.env.ATLAS_API_KEY, answers.processSteps, answers.processNote, answers.category, answers.differentiationTypes, [answers.diffReason, answers.diffStubborn].filter(Boolean).join(' / ')),
     ])
 
+    // 2026-10-28: 1-1 필요성/나.문제점/다.해결방안/3-2 사업화 전략 — iconStats로만
+    // 보여주던 4개 요약 슬롯을 AI가 채운 tiles(icon/value/label)를 재료 삼아
+    // AtlasCloud 인포그래픽 이미지로 바꾼다("시각화가 다 동일해서 단조롭다"는
+    // 리포트의 연장 — 아이콘 카드 대신 실제 이미지로). sections가 나와야 tiles
+    // 데이터가 있으므로 processImage와 달리 동시에 시작할 수 없다. 생성 실패 시
+    // 원래 iconStats 블록을 그대로 둔다(콘텐츠 유실 없이 우아하게 폴백).
+    const VISUAL_THEME_HINTS: Record<string, string> = {
+      'vis-1-1-necessity': '창업 아이템의 배경과 필요성(왜 이 사업이 필요한가)을 요약하는 패널',
+      'vis-problem': '고객이 겪고 있는 문제점을 요약하는 패널',
+      'vis-solution': '그 문제에 대한 해결방안을 요약하는 패널',
+      'vis-scaleup': '창업 아이템의 사업화 추진 전략과 목표시장을 요약하는 패널',
+    }
+    const visualTargets: Array<{ sIdx: number; bIdx: number; block: any }> = []
+    ;(sections as any[]).forEach((s: any, sIdx: number) => {
+      (s.blocks || []).forEach((b: any, bIdx: number) => {
+        if (b?.type === 'iconStats' && b.visualId && VISUAL_THEME_HINTS[b.visualId]) {
+          visualTargets.push({ sIdx, bIdx, block: b })
+        }
+      })
+    })
+    const visualResults = await Promise.all(visualTargets.map((t) =>
+      generateGovSupportVisualInfographic(
+        c.env.ATLAS_API_KEY,
+        t.block.tiles,
+        VISUAL_THEME_HINTS[t.block.visualId],
+        t.block.visualStyle === 'photo' ? 'photo' : 'icon',
+        t.block.visualLayout === 'row' ? 'row' : 'grid',
+        t.block.visualAspect || '21:9'
+      )
+    ))
+    const visualImagesMap: Record<string, string> = {}
+    for (let vi = 0; vi < visualTargets.length; vi++) {
+      const t = visualTargets[vi]
+      const r = visualResults[vi]
+      const isVisData = typeof r.url === 'string' && r.url.startsWith('data:')
+      if (isVisData) {
+        visualImagesMap[t.block.visualId] = r.url as string
+        ;(sections as any[])[t.sIdx].blocks[t.bIdx] = {
+          type: 'visual',
+          visualId: t.block.visualId,
+          visualUrl: `/api/gov-support/projects/${project.id}/visual-image/${t.block.visualId}`,
+          caption: VISUAL_THEME_HINTS[t.block.visualId],
+          alt: VISUAL_THEME_HINTS[t.block.visualId],
+        }
+      } else if (r.error) {
+        await logError(c.env, {
+          source: 'server',
+          message: `시각화 인포그래픽 생성 실패(${t.block.visualId}): ${r.error}`,
+          route: '/api/gov-support/projects/:id/generate (visualImage)',
+          extra: { programId: project.program_id, projectId: project.id, visualId: t.block.visualId },
+        })
+      }
+    }
+
     // 2026-10-28: 공정 흐름도 이미지를 base64 data URI로 변환해 generatedContent
     // JSON 안에 그대로 박아넣었더니(2026-10-26 핫링크 깨짐 수정), 이미지 하나가
     // 600~700KB대라 결과 페이지가 그 JSON 전체를 한 번에 fetch+parse하면서 "불러오는
@@ -6773,9 +6969,11 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
       })
     }
 
+    const visualImagesB64 = Object.keys(visualImagesMap).length > 0 ? JSON.stringify(visualImagesMap) : null
+
     await db.prepare(
-      `UPDATE gov_support_projects SET finance = ?, generated_content = ?, process_image_b64 = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
-    ).bind(JSON.stringify(finance), JSON.stringify(generatedContent), processImageB64, project.id).run()
+      `UPDATE gov_support_projects SET finance = ?, generated_content = ?, process_image_b64 = ?, visual_images_b64 = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+    ).bind(JSON.stringify(finance), JSON.stringify(generatedContent), processImageB64, visualImagesB64, project.id).run()
 
     return c.json({ success: true })
   } catch (err: any) {
@@ -7052,6 +7250,16 @@ app.get('/gov-support/result/:id', (c) => {
         }
         if (b.visualId === 'process-flow') {
           return '<div class="rs-evidence-gap"><b>📊 공정 순서도 이미지를 만들지 못했어요</b>' + rsEsc(window.RS_PROCESS_IMAGE_ERROR || '다음에 다시 시도해주세요.') + '</div>';
+        }
+        // 2026-10-28: 1-1 필요성/나.문제점/다.해결방안/3-2 사업화 전략 — 각 블록이
+        // 자기 이미지 경로(b.visualUrl)를 직접 들고 있다(process-flow처럼 전역
+        // window.RS_* 변수를 거치지 않음, 슬롯이 여러 개라 블록별로 바로 쓰는 게
+        // 더 단순함). <img src>가 커스텀 헤더를 못 보내므로 세션 토큰을
+        // 쿼리스트링으로 붙인다.
+        if (b.visualUrl) {
+          var vToken = localStorage.getItem('lookbook_token') || '';
+          var vSrc = b.visualUrl + (b.visualUrl.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(vToken);
+          return '<img class="rs-visual-img" src="' + rsEsc(vSrc) + '" alt="' + rsEsc(b.alt||b.caption||'') + '"/>' + (b.caption ? '<div class="rs-visual-caption">' + rsEsc(b.caption) + '</div>' : '');
         }
         return '<div class="rs-evidence-gap"><b>📊 시각화: ' + rsEsc(b.caption || b.visualId || '') + '</b>다음 업데이트에서 자동으로 그려드릴게요. 지금은 직접 표/그래프로 채워주세요.</div>';
       }
