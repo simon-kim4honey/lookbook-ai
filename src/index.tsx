@@ -4861,6 +4861,41 @@ app.get('/api/gov-support/projects/:id/result', async (c) => {
   }
 })
 
+// 2026-10-28: 공정 흐름도 이미지를 /result의 generated_content JSON에 base64로 박아
+// 넣었더니 응답이 700KB까지 부풀어 "불러오는 중" 멈춤으로 이어졌다(위 UPDATE 쪽 주석
+// 참고) — 이미지를 별도 컬럼(process_image_b64)에서 꺼내 전용 엔드포인트로 서빙한다.
+// <img src>는 커스텀 헤더를 못 보내므로, 세션 토큰은 쿼리스트링(?token=)으로도 받는다.
+app.get('/api/gov-support/projects/:id/process-image', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || c.req.query('token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const project = await db.prepare(
+      `SELECT process_image_b64 FROM gov_support_projects WHERE id = ? AND user_id = ?`
+    ).bind(c.req.param('id'), sess.user_id).first() as any
+    if (!project || !project.process_image_b64) return c.json({ success: false, message: '이미지를 찾을 수 없습니다.' }, 404)
+
+    const dataUri: string = project.process_image_b64
+    const match = dataUri.match(/^data:([^;]+);base64,([\s\S]*)$/)
+    if (!match) return c.json({ success: false, message: '잘못된 이미지 형식입니다.' }, 500)
+    const contentType = match[1]
+    const binary = atob(match[2])
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+
+    return new Response(bytes, {
+      status: 200,
+      headers: { 'Content-Type': contentType, 'Cache-Control': 'private, max-age=31536000, immutable' },
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 app.patch('/api/gov-support/projects/:id/answers', async (c) => {
   const db: D1Database = c.env.LOOKBOOK_DB
   try {
@@ -6702,9 +6737,20 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
       generateGovSupportProcessImage(c.env.ATLAS_API_KEY, answers.processSteps, answers.processNote, answers.category, answers.differentiationTypes, [answers.diffReason, answers.diffStubborn].filter(Boolean).join(' / ')),
     ])
 
+    // 2026-10-28: 공정 흐름도 이미지를 base64 data URI로 변환해 generatedContent
+    // JSON 안에 그대로 박아넣었더니(2026-10-26 핫링크 깨짐 수정), 이미지 하나가
+    // 600~700KB대라 결과 페이지가 그 JSON 전체를 한 번에 fetch+parse하면서 "불러오는
+    // 중"에서 멈추는 사례가 실사용자 리포트로 확인됨(여러 프로젝트에서 재현). 이미지는
+    // 별도 컬럼(process_image_b64)에 저장하고, generatedContent.processImageUrl에는
+    // 전용 엔드포인트 경로만 남겨 본문 JSON을 가볍게 유지한다 — <img>가 그 경로를 따로
+    // 요청해서 받아오므로 브라우저가 알아서 병렬로 처리한다.
+    const isDataUri = typeof processImageResult.url === 'string' && processImageResult.url.startsWith('data:')
+    const processImageB64 = isDataUri ? processImageResult.url : null
+    const processImageUrlForContent = isDataUri ? `/api/gov-support/projects/${project.id}/process-image` : processImageResult.url
+
     const generatedContent = {
       sections, finance, competitorTable,
-      processImageUrl: processImageResult.url,
+      processImageUrl: processImageUrlForContent,
       processImageError: processImageResult.error,
     }
 
@@ -6721,8 +6767,8 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
     }
 
     await db.prepare(
-      `UPDATE gov_support_projects SET finance = ?, generated_content = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
-    ).bind(JSON.stringify(finance), JSON.stringify(generatedContent), project.id).run()
+      `UPDATE gov_support_projects SET finance = ?, generated_content = ?, process_image_b64 = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+    ).bind(JSON.stringify(finance), JSON.stringify(generatedContent), processImageB64, project.id).run()
 
     return c.json({ success: true })
   } catch (err: any) {
@@ -6974,7 +7020,13 @@ app.get('/gov-support/result/:id', (c) => {
         var data = await res.json();
         if (!data.success) { showToast(data.message || '불러오기에 실패했어요.', 'error'); location.href = '/gov-support/wizard/' + RS_PROJECT_ID; return; }
 
-        window.RS_PROCESS_IMAGE_URL = data.content.processImageUrl || null;
+        // process-image 전용 엔드포인트는 <img src>가 커스텀 헤더를 못 보내므로
+        // 세션 토큰을 쿼리스트링으로 붙인다(과거 base64 URL이 저장된 구버전 프로젝트는
+        // data: URI 그대로라 손댈 게 없다).
+        var rawImgUrl = data.content.processImageUrl || null;
+        window.RS_PROCESS_IMAGE_URL = (rawImgUrl && rawImgUrl.indexOf('/api/gov-support/projects/') === 0)
+          ? rawImgUrl + (rawImgUrl.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(token)
+          : rawImgUrl;
         window.RS_PROCESS_IMAGE_ERROR = data.content.processImageError || null;
         window.RS_FINANCE = data.content.finance || null;
         // summary(개요 요약)는 problem/solution/scaleup/team을 전부 참고해 가장 마지막에
