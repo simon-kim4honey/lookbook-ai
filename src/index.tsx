@@ -4435,6 +4435,10 @@ const GOV_SUPPORT_PROGRAMS = [
 
 // 2026-10-24: 임시저장/생성완료된 사업계획서로 돌아갈 길이 없던 것을 메우는 목록 페이지.
 app.get('/gov-support/my', (c) => {
+  // 2026-10-28: 아래 /gov-support/result/:id와 동일한 이유로 no-store — 사용자별
+  // 동적 페이지가 Cloudflare 엣지/브라우저에 캐시되면 다른 사용자나 과거 상태가
+  // 보일 수 있다.
+  c.header('Cache-Control', 'no-store')
   return c.html(htmlShell('내 사업계획서', `
   <div class="toast-container" id="toastContainer"></div>
   <style>
@@ -4793,6 +4797,7 @@ app.post('/api/gov-support/projects', async (c) => {
 // 전혀 없어서(전부 정확한 project id 단건 조회뿐) 사용자가 URL을 북마크해두지 않으면
 // 작성 중이던 사업계획서로 돌아갈 길이 없었다. 사용자별 전체 프로젝트 목록을 추가한다.
 app.get('/api/gov-support/projects', async (c) => {
+  c.header('Cache-Control', 'no-store')
   const db: D1Database = c.env.LOOKBOOK_DB
   try {
     const sessionToken = c.req.header('X-Session-Token') || ''
@@ -4834,6 +4839,7 @@ app.get('/api/gov-support/projects/:id', async (c) => {
 })
 
 app.get('/api/gov-support/projects/:id/result', async (c) => {
+  c.header('Cache-Control', 'no-store')
   const db: D1Database = c.env.LOOKBOOK_DB
   try {
     const sessionToken = c.req.header('X-Session-Token') || ''
@@ -4928,6 +4934,7 @@ app.patch('/api/gov-support/projects/:id/answers', async (c) => {
 
 app.get('/gov-support/wizard/:id', async (c) => {
   const projectId = c.req.param('id')
+  c.header('Cache-Control', 'no-store')
   // 어드민이 gov_support_sections에 구조를 등록한 프로그램은 코드 배포 없이 바로 생성 가능
   // 목록에 포함되도록 DB에서 동적으로 조회(GS_GENERATION_READY_IDS 하드코딩과 합집합).
   const dbReadyRows = (await c.env.LOOKBOOK_DB.prepare(`SELECT DISTINCT program_id FROM gov_support_sections`).all()).results as any[]
@@ -6778,6 +6785,12 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
 
 app.get('/gov-support/result/:id', (c) => {
   const projectId = c.req.param('id')
+  // 2026-10-28: 이 페이지에 명시적 Cache-Control이 없어서(이 레포 대부분의 동적
+  // 페이지가 그렇듯) Cloudflare 캐시 레벨이 "aggressive"로 설정된 이 zone에서
+  // 과거 버전 HTML이 브라우저/엣지에 캐시되어 남아있을 수 있다 — "불러오는 중"
+  // 멈춤을 코드로 고쳤는데도 사용자가 여전히 구버전 페이지를 보고 있던 것으로
+  // 추정되는 사례가 있었다. 사용자별 동적 페이지라 캐시되면 안 된다.
+  c.header('Cache-Control', 'no-store')
   return c.html(htmlShell('지원사업 초안', `
   <div class="toast-container" id="toastContainer"></div>
 
