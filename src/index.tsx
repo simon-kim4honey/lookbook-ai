@@ -4902,6 +4902,45 @@ app.get('/api/gov-support/projects/:id/process-image', async (c) => {
   }
 })
 
+// 2026-10-28: 1-1/나.문제점/다.해결방안/3-2 요약 인포그래픽 — process-image와 같은
+// 이유(JSON 응답 비대화 방지)로 별도 컬럼+전용 엔드포인트로 분리하되, 슬롯이 4개라
+// 컬럼을 늘리는 대신 {visualId: dataUri} JSON 맵 하나(visual_images_b64)에 담고
+// :key로 구분해 꺼낸다.
+app.get('/api/gov-support/projects/:id/visual-image/:key', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || c.req.query('token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const project = await db.prepare(
+      `SELECT visual_images_b64 FROM gov_support_projects WHERE id = ? AND user_id = ?`
+    ).bind(c.req.param('id'), sess.user_id).first() as any
+    if (!project || !project.visual_images_b64) return c.json({ success: false, message: '이미지를 찾을 수 없습니다.' }, 404)
+
+    let images: Record<string, string> = {}
+    try { images = JSON.parse(project.visual_images_b64) } catch { /* 무시 — 아래서 404 처리 */ }
+    const dataUri = images[c.req.param('key')]
+    if (!dataUri) return c.json({ success: false, message: '이미지를 찾을 수 없습니다.' }, 404)
+
+    const match = dataUri.match(/^data:([^;]+);base64,([\s\S]*)$/)
+    if (!match) return c.json({ success: false, message: '잘못된 이미지 형식입니다.' }, 500)
+    const contentType = match[1]
+    const binary = atob(match[2])
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+
+    return new Response(bytes, {
+      status: 200,
+      headers: { 'Content-Type': contentType, 'Cache-Control': 'private, max-age=31536000, immutable' },
+    })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 app.patch('/api/gov-support/projects/:id/answers', async (c) => {
   const db: D1Database = c.env.LOOKBOOK_DB
   try {
@@ -6074,6 +6113,53 @@ async function generateGovSupportProcessImage(
   }
 }
 
+// 2026-10-28: iconStats로만 보여주던 4개 요약 슬롯(1-1 필요성/나.문제점/다.해결방안/
+// 3-2 사업화 전략)을, AI가 이미 생성한 tiles(icon/value/label 4개)를 바탕으로
+// AtlasCloud 인포그래픽 이미지로 만든다. 공정 흐름도(generateGovSupportProcessImage)와
+// 동일한 원칙: images를 비워 순수 텍스트→이미지 모드로 호출해야 요청한 가로 비율이
+// 실제로 지켜진다(2026-10-27에 확인된 edit 모드의 비율 무시 문제).
+async function generateGovSupportVisualInfographic(
+  apiKey: string | undefined,
+  tiles: Array<{ icon?: string; value?: string; label?: string }>,
+  themeHint: string,
+  style: 'icon' | 'photo',
+  layout: 'grid' | 'row',
+  aspectRatio: string
+): Promise<{ url: string | null; error: string | null }> {
+  if (!apiKey) return { url: null, error: 'ATLAS_API_KEY 미설정' }
+  const items = (Array.isArray(tiles) ? tiles : []).slice(0, 4).filter((t) => t && (t.value || t.label))
+  if (items.length === 0) return { url: null, error: '시각화 데이터 없음' }
+  try {
+    // [[AI]] 류 임의작성 토큰은 이미지 프롬프트에 그대로 들어가면 안 되므로 걷어낸다.
+    const stripToken = (s: string) => String(s || '').split('[[AI')[0].trim()
+    const panelsText = items
+      .map((t, i) => `Panel ${i + 1}: large bold stat "${stripToken(t.value || '')}" with short Korean caption "${stripToken(t.label || '')}" below it.`)
+      .join(' ')
+    const layoutText = layout === 'row'
+      ? `${items.length} panels arranged horizontally in a single row, evenly spaced`
+      : `${items.length} panels arranged in a 2x2 grid (or ${items.length} evenly spaced boxes if fewer than 4)`
+    const styleText = style === 'photo'
+      ? 'Each panel includes a small, tasteful, photorealistic lifestyle/editorial photo relevant to the panel’s topic as a background or side accent (soft overlay so the text stays readable) — not cartoonish, not flat icons.'
+      : 'Each panel includes one simple flat-design icon (no photorealistic imagery) above or beside the stat.'
+    const prompt = `Create a clean, professional infographic for a Korean government startup grant business plan document, minimalist corporate style, white or very light background, consistent visual style across panels, no watermarks, no extra decorative text beyond what is specified. Context: ${themeHint}. Layout: ${layoutText}. ${styleText} ${panelsText} All numbers and Korean captions must be rendered exactly as given, clearly legible.`
+    const result = await atlasGenerateAndWaitDetailed({
+      images: [],
+      prompt,
+      aspect_ratio: aspectRatio,
+      resolution: '1K',
+      apiKey,
+    })
+    if (!result.url) return result
+    const dataUri = await urlToBase64(result.url)
+    if (dataUri) return { url: dataUri, error: null }
+    console.error('generateGovSupportVisualInfographic: base64 변환 실패, 원본 URL로 폴백:', result.url)
+    return result
+  } catch (e) {
+    console.error('generateGovSupportVisualInfographic 실패:', e)
+    return { url: null, error: 'AI 이미지 생성 중 오류: ' + (e instanceof Error ? e.message : String(e)).slice(0, 150) }
+  }
+}
+
 // 자사몰 URL이 있으면 실제 페이지 텍스트를 가져와 AI 프롬프트의 참고 자료로 넣는다
 // (브랜드 톤·실제 판매 중인 문구 등을 반영하기 위함) — 실패해도 생성 자체는 그대로
 // 진행되도록 모든 예외를 삼키고 null을 반환한다. 외부 사이트에서 가져온 텍스트는
@@ -6744,6 +6830,60 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
       generateGovSupportProcessImage(c.env.ATLAS_API_KEY, answers.processSteps, answers.processNote, answers.category, answers.differentiationTypes, [answers.diffReason, answers.diffStubborn].filter(Boolean).join(' / ')),
     ])
 
+    // 2026-10-28: 1-1 필요성/나.문제점/다.해결방안/3-2 사업화 전략 — iconStats로만
+    // 보여주던 4개 요약 슬롯을 AI가 채운 tiles(icon/value/label)를 재료 삼아
+    // AtlasCloud 인포그래픽 이미지로 바꾼다("시각화가 다 동일해서 단조롭다"는
+    // 리포트의 연장 — 아이콘 카드 대신 실제 이미지로). sections가 나와야 tiles
+    // 데이터가 있으므로 processImage와 달리 동시에 시작할 수 없다. 생성 실패 시
+    // 원래 iconStats 블록을 그대로 둔다(콘텐츠 유실 없이 우아하게 폴백).
+    const VISUAL_THEME_HINTS: Record<string, string> = {
+      'vis-1-1-necessity': '창업 아이템의 배경과 필요성(왜 이 사업이 필요한가)을 요약하는 패널',
+      'vis-problem': '고객이 겪고 있는 문제점을 요약하는 패널',
+      'vis-solution': '그 문제에 대한 해결방안을 요약하는 패널',
+      'vis-scaleup': '창업 아이템의 사업화 추진 전략과 목표시장을 요약하는 패널',
+    }
+    const visualTargets: Array<{ sIdx: number; bIdx: number; block: any }> = []
+    ;(sections as any[]).forEach((s: any, sIdx: number) => {
+      (s.blocks || []).forEach((b: any, bIdx: number) => {
+        if (b?.type === 'iconStats' && b.visualId && VISUAL_THEME_HINTS[b.visualId]) {
+          visualTargets.push({ sIdx, bIdx, block: b })
+        }
+      })
+    })
+    const visualResults = await Promise.all(visualTargets.map((t) =>
+      generateGovSupportVisualInfographic(
+        c.env.ATLAS_API_KEY,
+        t.block.tiles,
+        VISUAL_THEME_HINTS[t.block.visualId],
+        t.block.visualStyle === 'photo' ? 'photo' : 'icon',
+        t.block.visualLayout === 'row' ? 'row' : 'grid',
+        t.block.visualAspect || '20:9'
+      )
+    ))
+    const visualImagesMap: Record<string, string> = {}
+    for (let vi = 0; vi < visualTargets.length; vi++) {
+      const t = visualTargets[vi]
+      const r = visualResults[vi]
+      const isVisData = typeof r.url === 'string' && r.url.startsWith('data:')
+      if (isVisData) {
+        visualImagesMap[t.block.visualId] = r.url as string
+        ;(sections as any[])[t.sIdx].blocks[t.bIdx] = {
+          type: 'visual',
+          visualId: t.block.visualId,
+          visualUrl: `/api/gov-support/projects/${project.id}/visual-image/${t.block.visualId}`,
+          caption: VISUAL_THEME_HINTS[t.block.visualId],
+          alt: VISUAL_THEME_HINTS[t.block.visualId],
+        }
+      } else if (r.error) {
+        await logError(c.env, {
+          source: 'server',
+          message: `시각화 인포그래픽 생성 실패(${t.block.visualId}): ${r.error}`,
+          route: '/api/gov-support/projects/:id/generate (visualImage)',
+          extra: { programId: project.program_id, projectId: project.id, visualId: t.block.visualId },
+        })
+      }
+    }
+
     // 2026-10-28: 공정 흐름도 이미지를 base64 data URI로 변환해 generatedContent
     // JSON 안에 그대로 박아넣었더니(2026-10-26 핫링크 깨짐 수정), 이미지 하나가
     // 600~700KB대라 결과 페이지가 그 JSON 전체를 한 번에 fetch+parse하면서 "불러오는
@@ -6773,9 +6913,11 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
       })
     }
 
+    const visualImagesB64 = Object.keys(visualImagesMap).length > 0 ? JSON.stringify(visualImagesMap) : null
+
     await db.prepare(
-      `UPDATE gov_support_projects SET finance = ?, generated_content = ?, process_image_b64 = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
-    ).bind(JSON.stringify(finance), JSON.stringify(generatedContent), processImageB64, project.id).run()
+      `UPDATE gov_support_projects SET finance = ?, generated_content = ?, process_image_b64 = ?, visual_images_b64 = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`
+    ).bind(JSON.stringify(finance), JSON.stringify(generatedContent), processImageB64, visualImagesB64, project.id).run()
 
     return c.json({ success: true })
   } catch (err: any) {
@@ -7052,6 +7194,16 @@ app.get('/gov-support/result/:id', (c) => {
         }
         if (b.visualId === 'process-flow') {
           return '<div class="rs-evidence-gap"><b>📊 공정 순서도 이미지를 만들지 못했어요</b>' + rsEsc(window.RS_PROCESS_IMAGE_ERROR || '다음에 다시 시도해주세요.') + '</div>';
+        }
+        // 2026-10-28: 1-1 필요성/나.문제점/다.해결방안/3-2 사업화 전략 — 각 블록이
+        // 자기 이미지 경로(b.visualUrl)를 직접 들고 있다(process-flow처럼 전역
+        // window.RS_* 변수를 거치지 않음, 슬롯이 여러 개라 블록별로 바로 쓰는 게
+        // 더 단순함). <img src>가 커스텀 헤더를 못 보내므로 세션 토큰을
+        // 쿼리스트링으로 붙인다.
+        if (b.visualUrl) {
+          var vToken = localStorage.getItem('lookbook_token') || '';
+          var vSrc = b.visualUrl + (b.visualUrl.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(vToken);
+          return '<img class="rs-visual-img" src="' + rsEsc(vSrc) + '" alt="' + rsEsc(b.alt||b.caption||'') + '"/>' + (b.caption ? '<div class="rs-visual-caption">' + rsEsc(b.caption) + '</div>' : '');
         }
         return '<div class="rs-evidence-gap"><b>📊 시각화: ' + rsEsc(b.caption || b.visualId || '') + '</b>다음 업데이트에서 자동으로 그려드릴게요. 지금은 직접 표/그래프로 채워주세요.</div>';
       }
