@@ -6891,7 +6891,16 @@ app.get('/gov-support/result/:id', (c) => {
     function rsMarkArb(s) {
       if (s == null) return '';
       var str = String(s);
-      var re = /\[\[AI(?::([^\]]*))?\]\]/g;
+      // 2026-10-28: 이 script 전체가 index.tsx 바깥쪽 템플릿 리터럴 문자열 안에
+      // 있어서, 정규식 안에 백슬래시를 하나만 쓰면(대괄호 escape) 바깥쪽 템플릿
+      // 리터럴이 인식 못하는 escape로 보고 그 백슬래시를 조용히 삼켜버린다(CLAUDE.md가
+      // 경고하는 홑따옴표 escape 소실과 같은 패턴) — 그 결과 브라우저가 받는 실제
+      // 정규식에는 대괄호가 escape 안 된 채로 남아 그 자리에서 SyntaxError가 나고,
+      // 이 script 블록 전체(rsLoad 포함)가 파싱 단계에서부터 실행되지 않는다 —
+      // 실사용자 리포트("불러오는 중" 영원히 멈춤)로 발견, 브라우저 콘솔에서 직접
+      // SyntaxError 확인. 백슬래시를 2개 겹쳐 써야 바깥쪽 템플릿 리터럴을 통과한 뒤
+      // 브라우저에 1개로 정확히 도달한다.
+      var re = /\\[\\[AI(?::([^\\]]*))?\\]\\]/g;
       var out = '';
       var segStart = 0;
       var m;
