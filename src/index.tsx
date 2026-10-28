@@ -6190,9 +6190,19 @@ async function generateGovSupportVisualInfographic(
     const panelsText = items
       .map((t, i) => `Panel ${i + 1}: large bold stat "${stripToken(t.value || '')}" with short Korean caption "${stripToken(t.label || '')}" below it.`)
       .join(' ')
+    // 2026-10-28: "2x2 grid (or N evenly spaced boxes if fewer than 4)"처럼 빠져나갈
+    // 구멍을 열어뒀더니, tiles가 4개가 아니라 3개로 올 때마다 모델이 매번 그 구멍을
+    // 택해 가로 한 줄로 그려버렸다(2x2를 기대한 실사용자 리포트로 확인). 개수별로
+    // 명확한 그리드 모양을 못박아 "한 줄" 선택지를 아예 없앤다.
+    const GRID_LAYOUT_BY_COUNT: Record<number, string> = {
+      4: '4 panels arranged in a strict 2x2 grid — exactly 2 rows and 2 columns. Do NOT arrange them in a single row.',
+      3: '3 panels arranged in a 2-row grid: 2 panels on the top row, 1 panel centered on the bottom row. Do NOT arrange them in a single row.',
+      2: '2 panels arranged side by side in one row of 2 columns.',
+      1: '1 panel, full width.',
+    }
     const layoutText = layout === 'row'
       ? `${items.length} panels arranged horizontally in a single row, evenly spaced`
-      : `${items.length} panels arranged in a 2x2 grid (or ${items.length} evenly spaced boxes if fewer than 4)`
+      : (GRID_LAYOUT_BY_COUNT[items.length] || `${items.length} panels arranged in a balanced grid layout (not a single row).`)
     const styleText = style === 'photo'
       ? 'Each panel includes a small, tasteful, photorealistic lifestyle/editorial photo relevant to the panel’s topic as a background or side accent (soft overlay so the text stays readable) — not cartoonish, not flat icons.'
       : 'Each panel includes one simple flat-design icon (no photorealistic imagery) above or beside the stat.'
