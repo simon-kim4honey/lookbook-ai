@@ -204,7 +204,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Rn}" font-size="128" font-weight="800" fill="${In(e.statColor||`#ffffff`)}">${In(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Rn}" font-size="64" font-weight="800" fill="#ffffff">${In(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Rn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${In(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Bn=`mvrmpoqk`;function Vn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Hn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Rn}" font-size="128" font-weight="800" fill="${In(e.statColor||`#ffffff`)}">${In(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Rn}" font-size="64" font-weight="800" fill="#ffffff">${In(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Rn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${In(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Bn=`mvro82eu`;function Vn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Hn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3115,10 +3115,18 @@ ${JSON.stringify(_)}
     .rs-subhead2 { font-size: 13.5px; font-weight: 700; color: #4E5968; margin: 14px 0 6px 4px; padding-left: 8px; border-left: 2px solid #D1D6DB; }
     .rs-headline-box { background: #EAF2FF; border-radius: 10px; padding: 14px 16px; font-size: 14px; font-weight: 700; color: #1B64DA; text-align: center; line-height: 1.5; margin: 0 0 14px; }
     .rs-icon-stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
-    .rs-icon-stat { flex: 1 1 calc(50% - 10px); min-width: 120px; background: #F8F9FA; border-radius: 12px; padding: 14px 10px; text-align: center; }
-    .rs-icon-stat-icon { font-size: 20px; margin-bottom: 4px; }
-    .rs-icon-stat-value { font-size: 17px; font-weight: 800; color: #191F28; margin-bottom: 2px; }
+    .rs-icon-stat { flex: 1 1 calc(50% - 10px); min-width: 120px; background: #F8F9FA; border: 1px solid #EDEFF2; border-radius: 14px; padding: 16px 10px 14px; text-align: center; box-shadow: 0 1px 2px rgba(15,23,42,0.03); }
+    .rs-icon-stat-icon { width: 34px; height: 34px; margin: 0 auto 8px; border-radius: 50%; background: #EAF2FF; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .rs-icon-stat-value { font-size: 18px; font-weight: 800; color: #191F28; margin-bottom: 2px; }
     .rs-icon-stat-label { font-size: 11.5px; color: #8B95A1; line-height: 1.4; }
+    .rs-icon-stat-bar { height: 4px; border-radius: 2px; background: #E5E8EB; margin: 7px 2px 6px; overflow: hidden; }
+    .rs-icon-stat-bar-fill { height: 100%; border-radius: 2px; background: #3182F6; }
+    .rs-icon-stat.tone-negative .rs-icon-stat-icon { background: #FDEAEA; }
+    .rs-icon-stat.tone-negative .rs-icon-stat-value { color: #D93025; }
+    .rs-icon-stat.tone-negative .rs-icon-stat-bar-fill { background: #EF4444; }
+    .rs-icon-stat.tone-positive .rs-icon-stat-icon { background: #E6F7EE; }
+    .rs-icon-stat.tone-positive .rs-icon-stat-value { color: #0C8044; }
+    .rs-icon-stat.tone-positive .rs-icon-stat-bar-fill { background: #1DB955; }
     .rs-paragraph { font-size: 14px; color: #333D4B; line-height: 1.7; margin: 0 0 10px; }
     .rs-bullets { margin: 0 0 10px; padding-left: 18px; font-size: 14px; color: #333D4B; line-height: 1.8; }
     .rs-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 10px 0 14px; }
@@ -3301,9 +3309,27 @@ ${JSON.stringify(_)}
         return '<div style="background:' + toneBg + ';border-radius:10px;padding:12px 14px;font-size:12.5px;color:' + toneColor + ';line-height:1.6;margin:0 0 14px;">' + rsEsc(b.text) + '</div>';
       }
       if (b.type === 'iconStats') {
+        // 2026-10-28: 카드 4개가 전부 같은 회색 톤이라 "단조롭다"는 피드백 — 섹션
+        // 맥락(문제점=부정적, 해결방안/기대효과=긍정적)에 따라 관리자가 지정한
+        // b.tone으로 색을 구분하고, 값이 퍼센트(%)면 그 아래 작은 진행 막대를 추가해
+        // 수치 크기가 한눈에 비교되게 한다. 정규식은 안 쓴다 — 이 블록도 바깥쪽
+        // 템플릿 리터럴 안이라 정규식에 백슬래시를 쓰면 또 같은 종류의 버그가 재발할
+        // 위험이 있어(바로 위 rsMarkArb에서 실제로 터진 사고), 문자열 메서드만 쓴다.
+        var tone = (b.tone === 'negative' || b.tone === 'positive') ? b.tone : 'neutral';
         return (b.caption ? '<div class="rs-subhead2">' + rsEsc(b.caption) + '</div>' : '') +
           '<div class="rs-icon-stats">' + (b.tiles||[]).slice(0,4).map(function(it){
-          return '<div class="rs-icon-stat"><div class="rs-icon-stat-icon">' + rsEsc(it.icon||'📌') + '</div><div class="rs-icon-stat-value">' + rsMarkArb(it.value) + '</div><div class="rs-icon-stat-label">' + rsMarkArb(it.label) + '</div></div>';
+          var rawVal = String(it.value == null ? '' : it.value);
+          var tokenIdx = rawVal.indexOf('[[AI');
+          if (tokenIdx !== -1) rawVal = rawVal.slice(0, tokenIdx);
+          rawVal = rawVal.trim();
+          var pctNum = null;
+          if (rawVal.length > 1 && rawVal.charAt(rawVal.length - 1) === '%') {
+            var numPart = rawVal.slice(0, -1).trim();
+            var n = Number(numPart);
+            if (numPart !== '' && isFinite(n)) pctNum = Math.max(0, Math.min(100, n));
+          }
+          var barHtml = pctNum == null ? '' : '<div class="rs-icon-stat-bar"><div class="rs-icon-stat-bar-fill" style="width:' + pctNum + '%"></div></div>';
+          return '<div class="rs-icon-stat tone-' + tone + '"><div class="rs-icon-stat-icon">' + rsEsc(it.icon||'📌') + '</div><div class="rs-icon-stat-value">' + rsMarkArb(it.value) + '</div>' + barHtml + '<div class="rs-icon-stat-label">' + rsMarkArb(it.label) + '</div></div>';
         }).join('') + '</div>';
       }
       if (b.type === 'paragraph') return '<p class="rs-paragraph">' + rsMarkArb(b.text) + '</p>';
