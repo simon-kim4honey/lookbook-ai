@@ -3673,6 +3673,14 @@ async function startGeneration() {
       label:    ci.label || '',
     }));
 
+    // 신발/가방 참고 이미지(선택) — 의류와 별개로 전달. 의류가 없으면 서버가
+    // 이 분류 결과(클래식/캐주얼)를 참고해 어울리는 의상을 자동 생성한다.
+    const accessoryImage = AppState.accessoryItem ? {
+      dataUrl:     AppState.accessoryItem.dataUrl,
+      type:        AppState.accessoryItem.type || 'UNKNOWN',
+      subCategory: AppState.accessoryItem.subCategory || null,
+    } : null;
+
     // 레거시 단일 필드 (서버에서도 하위 호환 처리)
     const clothingImageUrl = AppState.uploadedImageUrl;
 
@@ -3712,6 +3720,7 @@ async function startGeneration() {
       count,
       clothingImages,
       clothingImageUrl,
+      accessoryImage,
     };
     AppState.regenCount = 0;
 
