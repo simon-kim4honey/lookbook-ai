@@ -204,7 +204,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvu598b0`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${zn}" font-size="128" font-weight="800" fill="${Ln(e.statColor||`#ffffff`)}">${Ln(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${zn}" font-size="64" font-weight="800" fill="#ffffff">${Ln(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${zn}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Ln(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Vn=`mvu6h1mv`;function Hn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Un=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2308,7 +2308,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
               <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
               <div class="wz-highlight-desc">"차별점이 뭔가요?"라고 물으면 막막할 수 있어요. 대신 아래 3가지 질문에 답해보세요 — 답하다 보면 본인도 몰랐던 차별점이 드러나는 경우가 많아요.</div>
             </div>
-            <div class="wz-field-label">경쟁사와 똑같이 만든다면, 고객이 굳이 당신 브랜드를 선택할 이유는 무엇인가요? <span class="wz-required">*</span></div>
+            <div class="wz-field-label">고객이 경쟁사 제품이 아닌 굳이 당신 브랜드를 선택할 이유는 무엇인가요? <span class="wz-required">*</span></div>
             <textarea class="wz-textarea" id="f_diffReason" placeholder="예: 가격은 비슷해도 소재와 마감을 보면 티가 난다고 생각해요" maxlength="200" data-required="1"></textarea>
           </div>
           <div class="wz-field">
