@@ -10093,6 +10093,7 @@ app.post('/api/generation/start', async (c) => {
       count = 4,
       clothingImageUrl,          // 레거시 단일 파라미터 (하위 호환)
       clothingImages,            // 신규: [{ dataUrl, category, label }] 배열
+      accessoryImage,            // 신발/가방 참고 이미지(선택): { dataUrl, type, subCategory }
     } = body
 
     // ── 세션 인증 (로그인 체크만, 크레딧 차감 없음) ──
@@ -10225,6 +10226,16 @@ app.post('/api/generation/start', async (c) => {
     console.log('Clothing items:', clothingItems.map(ci => `[${ci.category}]`).join(', ') || 'none')
     console.log('Model ID:', modelId, '| BG ID:', bgId)
 
+    // ── 신발/가방 참고 이미지 정규화 ──
+    // 의류가 없어도 신발/가방만으로 생성을 진행할 수 있게 하는 입력. type/subCategory는
+    // 업로드 시 /api/validate/accessory가 분류한 값(SHOE/BAG/JEWELRY, CLASSIC/CASUAL)을
+    // 그대로 신뢰한다 — 여기서 재검증하지 않는다(실패해도 생성 자체를 막지 않기 위함).
+    const accessoryImageBase64: string | null =
+      (accessoryImage?.dataUrl && String(accessoryImage.dataUrl).startsWith('data:')) ? accessoryImage.dataUrl : null
+    const accessoryType: string = accessoryImage?.type || 'UNKNOWN'
+    const accessorySubCategory: string | null = accessoryImage?.subCategory || null
+    console.log('Accessory:', accessoryImageBase64 ? `${accessoryType}/${accessorySubCategory || '-'}` : 'none')
+
     // ── Nano Banana 2 Edit: images 배열 구성 ──
     // 순서: [의류1, 의류2?, 의류3?, 모델?, 배경?]
     // 프롬프트에서 각 이미지 번호(Image N)를 명시해 역할 구분
@@ -10238,8 +10249,14 @@ app.post('/api/generation/start', async (c) => {
     sortedClothing.forEach(ci => images.push(ci.dataUrl))
 
     const clothingCount = sortedClothing.length
-    const modelImgIdx  = clothingCount + 1  // Image N (1-based)
-    const bgImgIdx     = clothingCount + (modelImageBase64 ? 1 : 0) + 1
+    const hasAccessory = !!accessoryImageBase64
+
+    // 1.5) 신발/가방 참고 이미지 — 의류 다음, 모델/배경보다 먼저 삽입
+    const accessoryImgIdx = hasAccessory ? clothingCount + 1 : 0
+    if (hasAccessory) images.push(accessoryImageBase64!)
+
+    const modelImgIdx  = clothingCount + (hasAccessory ? 1 : 0) + 1  // Image N (1-based)
+    const bgImgIdx     = clothingCount + (hasAccessory ? 1 : 0) + (modelImageBase64 ? 1 : 0) + 1
 
     // 2) 모델 이미지
     if (modelImageBase64) images.push(modelImageBase64)
@@ -10247,20 +10264,40 @@ app.post('/api/generation/start', async (c) => {
     // 3) 배경 이미지
     if (bgImageBase64) images.push(bgImageBase64)
 
-    console.log(`images 배열: 의류${clothingCount}장 | 모델${modelImageBase64 ? 1 : 0}장 | 배경${bgImageBase64 ? 1 : 0}장 | 총${images.length}장`)
+    console.log(`images 배열: 의류${clothingCount}장 | 액세서리${hasAccessory ? 1 : 0}장 | 모델${modelImageBase64 ? 1 : 0}장 | 배경${bgImageBase64 ? 1 : 0}장 | 총${images.length}장`)
 
     // ── 프롬프트 구성 ──
     let prompt: string = ''
     const hasBg    = !!bgImageBase64
     const hasModel = !!modelImageBase64
     const hasClothing = clothingCount > 0
+    // 신발/가방만 올리고 의류가 없는 경우에도 기존 의류 분기(멀티 이미지 합성 경로)를 타게
+    // 하기 위한 게이트 — 아래 모든 분기 조건의 hasClothing을 대체한다. accessoryImage가
+    // 없으면 hasGarmentRef === hasClothing이라 기존 동작과 완전히 동일하다.
+    const hasGarmentRef = hasClothing || hasAccessory
     // 생성 수량 1장 고정
     const jobCount = 1
 
-    if (hasClothing && hasModel && hasBg) {
+    // 신발/가방 참고 이미지에 대한 공통 지시문 — 모든 분기에서 재사용.
+    // inventOutfit=true(의류가 전혀 없을 때)면 분류된 스타일(클래식/캐주얼)에 맞는
+    // 의상을 AI가 직접 구상하도록 추가 지시를 덧붙인다.
+    function buildAccessoryBlock(idx: number, type: string, subCategory: string | null, inventOutfit: boolean): string {
+      if (!idx) return ''
+      const typeLabel: Record<string, string> = { SHOE: 'shoes', BAG: 'a bag', JEWELRY: 'a jewelry piece', UNKNOWN: 'an accessory item' }
+      const preserve = `Image ${idx} = ACCESSORY REFERENCE (${typeLabel[type] || typeLabel.UNKNOWN}) — the model must wear/carry this EXACT item. Preserve its exact color, material, shape, hardware, and design details precisely; do not alter, restyle, or substitute it.`
+      if (!inventOutfit) return preserve
+      const styleGuides: Record<string, string> = {
+        CLASSIC: 'a polished, classic outfit that pairs naturally with this accessory — tailored silhouettes, a neutral or refined color palette, minimal clean lines (e.g. a blazer, tailored trousers or a midi skirt, a simple blouse or knit top).',
+        CASUAL: 'a relaxed, casual outfit that pairs naturally with this accessory — everyday streetwear-friendly pieces, comfortable fits, casual denim or knitwear, an approachable color palette.',
+      }
+      const styleText = styleGuides[subCategory || ''] || 'a stylish, well-coordinated outfit that naturally complements this accessory.'
+      return `${preserve} Since no clothing reference was provided, design and dress the model in ${styleText} The outfit must look cohesive and intentional with the accessory as the styling anchor.`
+    }
+
+    if (hasGarmentRef && hasModel && hasBg) {
       // ══════════════════════════════════════════════════════════
       // ── 풀 모드: 단일 단계 — 의상 교체 + 얼굴/신원 교체 동시 처리 ──
-      //   이미지 순서: [의류1, 의류2?, ..., 모델(신원), 배경(씬)]
+      //   이미지 순서: [의류1, 의류2?, ..., 신발/가방?, 모델(신원), 배경(씬)]
       //
       // ⚠️ 아래 prompt 문자열은 실제 생성 품질에 직접 영향을 준다.
       //   다른 로직을 정리하다가 실수로 문구를 바꾸지 말 것 — 빌드/화면은
@@ -10272,8 +10309,9 @@ app.post('/api/generation/start', async (c) => {
 
       console.log('[단일 단계] 의상+얼굴+신원 통합 합성 시작')
 
-      const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-      const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+      const clothingRoleDesc = hasClothing ? buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1) : ''
+      const clothingReplaceInstructions = hasClothing ? buildClothingReplaceInstructions(sortedClothing, 1) : ''
+      const accessoryBlock = buildAccessoryBlock(accessoryImgIdx, accessoryType, accessorySubCategory, !hasClothing)
 
       prompt = [
         `COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,
@@ -10281,8 +10319,9 @@ app.post('/api/generation/start', async (c) => {
         clothingRoleDesc,
         `Image ${bgImgIdx} = SCENE ANCHOR. This scene defines: background environment, scene lighting direction/color-temperature/intensity/saturation, color grade, and mood. LOCKED: background. The output background must come EXCLUSIVELY from Image ${bgImgIdx} — never from any clothing reference image's own background.`,
 
-        `CLOTHING REPLACEMENT:`,
+        hasClothing ? `CLOTHING REPLACEMENT:` : '',
         clothingReplaceInstructions,
+        accessoryBlock,
         `POSE: If Image ${bgImgIdx} already shows a person, that person's pose, stance, and body position are the PRIMARY pose reference — the output pose should naturally emerge from theirs, adjusting only as needed to fit the new clothing (do not rigidly lock every joint, but do not replace it with an unrelated generic pose either). Only if Image ${bgImgIdx} has no person to reference, fall back to a ${poseTypeText}, ${poseStyleText}. The pose must NEVER be copied from a clothing reference image, even if that image shows a person modeling the garment — clothing images are a garment/texture source only, not a pose reference.`,
 
         `IDENTITY (from Image ${modelImgIdx}) — READ THIS ONCE, IT IS THE ONLY IDENTITY RULE:`,
@@ -10308,43 +10347,49 @@ app.post('/api/generation/start', async (c) => {
         HARD_CONSTRAINTS,
       ].join(' ')
 
-    } else if (hasClothing && hasModel && !hasBg) {
+    } else if (hasGarmentRef && hasModel && !hasBg) {
       // ── 의류 + 모델, 배경 없음 ──
-      const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-      const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+      const clothingRoleDesc = hasClothing ? buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1) : ''
+      const clothingReplaceInstructions = hasClothing ? buildClothingReplaceInstructions(sortedClothing, 1) : ''
+      const accessoryBlock = buildAccessoryBlock(accessoryImgIdx, accessoryType, accessorySubCategory, !hasClothing)
       prompt = [
         `Create a hyper-realistic professional fashion lookbook photograph.`,
         clothingRoleDesc,
         `Image ${modelImgIdx} = MODEL IDENTITY — preserve this exact person's face, hair, skin tone, body proportions exactly.`,
         modelBodyTypeNote,
         clothingReplaceInstructions,
+        accessoryBlock,
         `Show a ${poseTypeText}, ${poseStyleText}.`,
         `Background: ${bgDesc} (${bgName}). Create a photorealistic environment. Integrate the model naturally with correct lighting and shadows.`,
         HARD_CONSTRAINTS,
       ].join(' ')
 
-    } else if (hasClothing && !hasModel && hasBg) {
+    } else if (hasGarmentRef && !hasModel && hasBg) {
       // ── 의류 + 배경, 모델 없음 ── CLOTHING SWAP (배경 속 원래 사람 유지)
-      const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-      const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+      const clothingRoleDesc = hasClothing ? buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1) : ''
+      const clothingReplaceInstructions = hasClothing ? buildClothingReplaceInstructions(sortedClothing, 1) : ''
+      const accessoryBlock = buildAccessoryBlock(accessoryImgIdx, accessoryType, accessorySubCategory, !hasClothing)
       prompt = [
         `You are doing a CLOTHING SWAP on a fashion background scene.`,
         clothingRoleDesc,
         `Image ${bgImgIdx} = SOURCE BACKGROUND SCENE containing a person. Keep the scene and person EXACTLY as-is — same face, same pose, same stance, same body position.`,
         clothingReplaceInstructions,
+        accessoryBlock,
         `FINAL RESULT: Same scene, same person, same pose — only the specified clothing items are replaced. Natural lighting, seamless integration.`,
         HARD_CONSTRAINTS,
       ].join(' ')
 
-    } else if (hasClothing && !hasModel && !hasBg) {
+    } else if (hasGarmentRef && !hasModel && !hasBg) {
       // ── 의류만 ── 텍스트 모델/배경 사용
-      const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-      const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+      const clothingRoleDesc = hasClothing ? buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1) : ''
+      const clothingReplaceInstructions = hasClothing ? buildClothingReplaceInstructions(sortedClothing, 1) : ''
+      const accessoryBlock = buildAccessoryBlock(accessoryImgIdx, accessoryType, accessorySubCategory, !hasClothing)
       prompt = [
         `Create a hyper-realistic professional fashion lookbook photograph.`,
         clothingRoleDesc,
         `Model: ${modelDesc}. Show in a ${poseTypeText}, ${poseStyleText}.`,
         clothingReplaceInstructions,
+        accessoryBlock,
         `Background: ${bgDesc} (${bgName}). Photorealistic environment with correct lighting and shadows.`,
         HARD_CONSTRAINTS,
       ].join(' ')
