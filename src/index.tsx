@@ -2709,7 +2709,9 @@ app.get('/api/presets/backgrounds', async (c) => {
   } else {
     customBgRaw = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt, isDefault: !!(b as any).isDefault }))
   }
-  const customBgList = customBgRaw.map(b => ({
+  // '가방배경' 카테고리는 일반 사용자 배경 선택 그리드에 노출하지 않는다 — 신발/가방 업로드
+  // 전용 자동 매칭(향후 단계)에서만 쓰일 특수 목적 배경이라 일반 브라우징 대상이 아니다.
+  const customBgList = customBgRaw.filter(b => b.category !== '가방배경').map(b => ({
     id: Number(b.id), name: b.name, category: b.category, mood: '-',
     bgDesc: b.bgDesc, unsplashId: null, isCustom: true, customId: b.id,
     isDefault: !!b.isDefault,
@@ -14155,6 +14157,33 @@ app.get('/admin02', (c) => {
       </div>
 
       <div id="customBgGrid"></div>
+
+      <!-- 가방 배경 — 커스텀 배경과 별도 섹션. 신발/가방만 업로드했을 때 자동 매칭용으로 쓰일
+           특수 목적 배경이라 일반 사용자 배경 선택 화면에는 노출되지 않는다(/api/presets/backgrounds
+           에서 필터링됨). 배경 사진 속에 이미 가방이 등장하고, 생성 시 그 가방을 사용자가
+           업로드한 가방으로 교체한다 — "생성용 이미지"는 그 교체 기준이 되는 마킹본. -->
+      <div class="upload-form" style="margin-top:40px;border-top:2px solid #eee;padding-top:28px;">
+        <h3><i class="fas fa-shopping-bag" style="color:#3182F6;"></i> 가방 배경 <span style="font-size:13px;font-weight:400;color:#888;">(신발/가방 전용 — 일반 배경 목록에는 안 보임)</span></h3>
+        <div class="page-sub" style="margin-bottom:14px;">가방이 이미 등장하는 배경 사진을 올리세요. 등록 후 각 카드에서 "생성용 이미지 등록"으로 가방 위치를 마킹한 버전을 추가로 올려주세요(얼굴 마킹 배경과 동일한 방식) — 생성 시 그 가방이 사용자가 업로드한 가방으로 교체됩니다.</div>
+
+        <div class="upload-zone multi-zone" id="bagBgUploadZone" onclick="document.getElementById('bagBgFileInput').click()">
+          <div class="icon"><i class="fas fa-images"></i></div>
+          <p>클릭하거나 이미지를 드래그하세요<br/><span>여러 파일 선택 가능</span> (JPG, PNG, WEBP)</p>
+        </div>
+        <input type="file" id="bagBgFileInput" accept="image/*" multiple style="display:none" onchange="onBagBgFilesSelect(event)"/>
+
+        <div id="bagBgStagingGrid" style="display:none;margin-top:16px;">
+          <div style="font-size:13px;font-weight:600;color:#444;margin-bottom:10px;">선택된 이미지 — 이름을 입력 후 등록하세요</div>
+          <div id="bagBgStagingItems" style="display:flex;flex-wrap:wrap;gap:14px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+            <button class="btn-save" onclick="uploadBagBgs()"><i class="fas fa-upload"></i> 전체 등록</button>
+            <button class="btn-cancel" onclick="clearBagBgStaging()"><i class="fas fa-times"></i> 초기화</button>
+            <span class="save-status" id="bagBgUploadStatus"></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="bagBgGrid"></div>
     </div>
   </div>
 
@@ -14570,7 +14599,7 @@ function switchTab(name) {
   document.getElementById('tabErrors').classList.toggle('active', name === 'errors')
   document.getElementById('tabGovSupport').classList.toggle('active', name === 'govsupport')
   if (name === 'models') loadCustomModels()
-  if (name === 'bgs')    loadCustomBgs()
+  if (name === 'bgs')    { loadCustomBgs(); loadBagBgs() }
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos(); loadGcLoadingImages() }
   if (name === 'users')  loadUsers()
   if (name === 'bizleads') bizInit()
@@ -16100,6 +16129,7 @@ async function deleteBg(id) {
   const data = await res.json()
   if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
   await loadCustomBgs()
+  await loadBagBgs()
 }
 async function toggleBgDefault(id) {
   const res = await fetch('/api/admin/backgrounds/' + id + '/default', {method:'PUT', headers:{'X-Admin-Password':adminPassword}})
@@ -16112,12 +16142,14 @@ async function loadCustomBgs() {
   try {
     const res = await fetch('/api/admin/backgrounds', {headers:{'X-Admin-Password':adminPassword}})
     const data = await res.json()
-    if (!data.backgrounds || data.backgrounds.length === 0) {
+    // '가방배경' 카테고리는 아래 별도 섹션(가방 배경 그리드)에서 보여주므로 여기선 제외
+    const bgs = (data.backgrounds || []).filter(b => b.category !== '가방배경')
+    if (!bgs.length) {
       grid.innerHTML = '<div class="empty-state"><div class="icon"><i class="fas fa-image"></i></div><p>등록된 커스텀 배경이 없습니다.</p></div>'
       return
     }
-    grid.innerHTML = '<div style="font-size:14px;font-weight:600;margin:20px 0 12px;">커스텀 배경 (' + data.backgrounds.length + '개)</div><div class="media-grid">' +
-      data.backgrounds.map(b =>
+    grid.innerHTML = '<div style="font-size:14px;font-weight:600;margin:20px 0 12px;">커스텀 배경 (' + bgs.length + '개)</div><div class="media-grid">' +
+      bgs.map(b =>
         '<div class="media-card bg-card-item">' +
         '<img src="/api/proxy/custom-bg/' + b.id + '" alt="' + b.name + '" loading="lazy"/>' +
         '<span class="custom-badge">커스텀</span>' +
@@ -16137,6 +16169,108 @@ async function loadCustomBgs() {
         '</div>'
       ).join('') + '</div>'
   } catch(e) { console.error('loadCustomBgs error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+// ── 가방 배경 — 위 커스텀 배경과 같은 /api/admin/backgrounds API를 쓰되 category를
+//    항상 '가방배경'으로 고정해서 올린다(개별 카테고리 선택 불필요). 삭제/생성용 이미지
+//    등록(pickBgGenImage/deleteBg)은 id 기반으로 이미 범용이라 그대로 재사용한다.
+let bagBgStagingList = []  // [{ file, base64, name }]
+
+async function onBagBgFilesSelect(e) {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  for (const file of files) {
+    const base64 = await readFileAsBase64(file)
+    bagBgStagingList.push({ file, base64, name: file.name.replace(/\.[^.]+$/, '') })
+  }
+  e.target.value = ''
+  renderBagBgStaging()
+}
+
+function renderBagBgStaging() {
+  const grid = document.getElementById('bagBgStagingGrid')
+  const container = document.getElementById('bagBgStagingItems')
+  if (!bagBgStagingList.length) { grid.style.display = 'none'; return }
+  grid.style.display = 'block'
+  document.getElementById('bagBgUploadZone').style.borderColor = '#3182F6'
+  container.innerHTML = bagBgStagingList.map((item, i) =>
+    '<div style="width:160px;flex-shrink:0;">' +
+    '<div style="position:relative;width:160px;height:120px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
+    '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
+    '<button onclick="removeBagBgStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:16.2px;line-height:22px;text-align:center;padding:0;">✕</button>' +
+    '</div>' +
+    '<input class="form-input" value="' + escHtml(item.name) + '" oninput="bagBgStagingList[' + i + '].name=this.value" placeholder="배경 이름" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:11px;padding:4px 7px;"/>' +
+    '</div>'
+  ).join('')
+}
+
+function removeBagBgStaging(idx) {
+  bagBgStagingList.splice(idx, 1)
+  renderBagBgStaging()
+}
+
+function clearBagBgStaging() {
+  bagBgStagingList = []
+  document.getElementById('bagBgUploadZone').style.borderColor = ''
+  document.getElementById('bagBgStagingGrid').style.display = 'none'
+  document.getElementById('bagBgUploadStatus').textContent = ''
+}
+
+async function uploadBagBgs() {
+  const status = document.getElementById('bagBgUploadStatus')
+  if (!bagBgStagingList.length) { status.textContent = '이미지를 선택하세요'; status.className = 'save-status err'; return }
+  const missing = bagBgStagingList.filter(i => !i.name.trim())
+  if (missing.length) { status.textContent = '이름이 비어있는 항목이 있습니다'; status.className = 'save-status err'; return }
+  status.textContent = '등록 중...'; status.className = 'save-status'
+  try {
+    const payload = bagBgStagingList.map(i => ({
+      name: i.name.trim(),
+      bgDesc: i.name.trim(),
+      category: '가방배경',
+      imageBase64: i.base64,
+    }))
+    const res = await fetch('/api/admin/backgrounds', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json()
+    if (data.success) {
+      status.textContent = data.count + '개 등록 완료!'; status.className = 'save-status ok'
+      clearBagBgStaging()
+      loadBagBgs()
+    } else { status.textContent = data.message || '등록 실패'; status.className = 'save-status err' }
+  } catch(e) { status.textContent = '오류: ' + e.message; status.className = 'save-status err' }
+}
+
+async function loadBagBgs() {
+  const grid = document.getElementById('bagBgGrid')
+  if (!grid) return
+  try {
+    const res = await fetch('/api/admin/backgrounds', {headers:{'X-Admin-Password':adminPassword}})
+    const data = await res.json()
+    const bgs = (data.backgrounds || []).filter(b => b.category === '가방배경')
+    if (!bgs.length) {
+      grid.innerHTML = '<div class="empty-state"><div class="icon"><i class="fas fa-shopping-bag"></i></div><p>등록된 가방 배경이 없습니다.</p></div>'
+      return
+    }
+    grid.innerHTML = '<div style="font-size:14px;font-weight:600;margin:20px 0 12px;">가방 배경 (' + bgs.length + '개)</div><div class="media-grid">' +
+      bgs.map(b =>
+        '<div class="media-card bg-card-item">' +
+        '<img src="/api/proxy/custom-bg/' + b.id + '" alt="' + b.name + '" loading="lazy"/>' +
+        '<span class="custom-badge">가방배경</span>' +
+        '<button class="del-btn" onclick="event.stopPropagation();deleteBg(' + "'" + b.id + "'" + ')"><i class="fas fa-times"></i></button>' +
+        '<div class="meta"><div class="name">' + b.name + '</div>' +
+        '<div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
+        (b.hasGenImage
+          ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#dcfce7;color:#15803d;font-weight:600;">생성용 이미지 등록됨</span>'
+          : '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fef3c7;color:#92400e;font-weight:600;">생성용 미등록 (원본 사용)</span>') +
+        '<button onclick="event.stopPropagation();pickBgGenImage(' + "'" + b.id + "'" + ')" style="font-size:13.5px;padding:2px 8px;border-radius:20px;border:1px solid #ccc;background:#fff;cursor:pointer;">' +
+        (b.hasGenImage ? '생성용 이미지 교체' : '생성용 이미지 등록') + '</button>' +
+        '</div></div>' +
+        '</div>'
+      ).join('') + '</div>'
+  } catch(e) { console.error('loadBagBgs error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
 }
 
 // ══════════════════════════════════════════════
@@ -16532,6 +16666,7 @@ async function onBgGenImageSelect(e) {
     const data = await res.json()
     if (!data.success) { alert('등록 실패: ' + (data.message || '알 수 없는 오류')); return }
     await loadCustomBgs()
+    await loadBagBgs()
   } catch(err) { alert('오류: ' + err.message) }
 }
 
@@ -16559,6 +16694,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pwInput').focus()
   setupDrop('modelUploadZone', onModelFilesSelect)
   setupDrop('bgUploadZone', onBgFilesSelect)
+  setupDrop('bagBgUploadZone', onBagBgFilesSelect)
 
   // 이벤트 위임: 유저 테이블 버튼 처리 (onclick 대신 data-action 사용)
   document.addEventListener('click', function(e) {
