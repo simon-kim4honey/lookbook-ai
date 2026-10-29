@@ -1856,13 +1856,28 @@ footer {
 /* 3칸 가로 그리드 */
 .clothing-slots {
   display: grid;
-  /* 왼쪽 열: 상의+하의 세로 스택 / 오른쪽 열: 전체(DRESS) 전체 높이 */
+  /* 왼쪽 열: 상의+하의 세로 스택 / 오른쪽 열: 전체(DRESS) 전체 높이 / 3번째 행: 신발·가방(전체 너비) */
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: 1fr 1fr 0.8fr;
   gap: 10px;
   width: 100%;
   flex: 1;
   min-height: 0;
+}
+
+/* 신발/가방 슬롯 뱃지 — 업로드 후 AI 분류 결과(예: "신발 · 캐주얼") 표시 */
+.cslot-accessory-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.72);
+  color: #fff;
+  white-space: nowrap;
 }
 
 /* 개별 슬롯 — label 태그로 변경되어 block/inline-block 명시 필요 */
