@@ -1962,6 +1962,54 @@ app.post('/api/validate/clothing', async (c) => {
   }
 })
 
+// POST /api/validate/accessory — 신발/가방 슬롯 업로드 이미지의 종류(신발/가방/주얼리) +
+// 신발·가방의 스타일(클래식/캐주얼) 자동 분류. 의류 검증(validate/clothing)과 같은 철학으로
+// fail-open — 분류 실패/키 미설정 시 업로드를 막지 않고 UNKNOWN으로 통과시킨다
+// (분류 결과는 아직 생성 프롬프트에 연결되지 않음 — 다음 단계에서 의상 자동생성에 사용 예정).
+const ACCESSORY_CLASSIFY_PROMPT = [
+  `You are a fashion accessory classifier for an AI photoshoot app.`,
+  `Look at the uploaded image. First decide: is this clearly a photo of a SINGLE shoe, bag, or jewelry item (worn, held, laid flat, or on a plain background)?`,
+  `If it is NOT a shoe/bag/jewelry item (e.g. a person's portrait, a garment/clothing item, an animal, food, scenery, or an unrelated object), respond with exactly: NOT_ACCESSORY`,
+  `If it IS one of these, respond with EXACTLY ONE of these codes (the single best match, nothing else):`,
+  `SHOE_CLASSIC (a dress shoe, heel, or formal shoe suited to a classic/polished outfit), SHOE_CASUAL (a sneaker or casual shoe suited to a relaxed/everyday outfit), BAG_CLASSIC (a structured, formal-leaning bag suited to a classic outfit), BAG_CASUAL (a relaxed everyday bag — tote, backpack, crossbody — suited to a casual outfit), JEWELRY (a ring, necklace, earrings, bracelet, watch, or other jewelry item)`,
+  `Respond with ONLY the code — no explanation, no punctuation, no extra words.`,
+].join('\n')
+
+const ACCESSORY_CLASSIFY_MAP: Record<string, { type: string; subCategory: string | null }> = {
+  SHOE_CLASSIC: { type: 'SHOE', subCategory: 'CLASSIC' },
+  SHOE_CASUAL: { type: 'SHOE', subCategory: 'CASUAL' },
+  BAG_CLASSIC: { type: 'BAG', subCategory: 'CLASSIC' },
+  BAG_CASUAL: { type: 'BAG', subCategory: 'CASUAL' },
+  JEWELRY: { type: 'JEWELRY', subCategory: null },
+}
+
+app.post('/api/validate/accessory', async (c) => {
+  try {
+    const body: any = await c.req.json()
+    const imageBase64: string = body?.imageBase64 || ''
+    if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
+
+    const openaiKey = (c.env as any)?.OPENAI_API_KEY || ''
+    if (!openaiKey) return c.json({ success: true, isAccessory: true, type: 'UNKNOWN', subCategory: null })
+
+    const content = await openaiChatVision(openaiKey, imageBase64, ACCESSORY_CLASSIFY_PROMPT)
+    if (content === null) return c.json({ success: true, isAccessory: true, type: 'UNKNOWN', subCategory: null })
+
+    const code = content.trim().toUpperCase().replace(/[^A-Z_]/g, '')
+    if (code === 'NOT_ACCESSORY') return c.json({ success: true, isAccessory: false })
+
+    const result = ACCESSORY_CLASSIFY_MAP[code]
+    if (!result) {
+      console.warn('validate/accessory: 알 수 없는 분류 응답:', content)
+      return c.json({ success: true, isAccessory: true, type: 'UNKNOWN', subCategory: null })
+    }
+    return c.json({ success: true, isAccessory: true, ...result })
+  } catch (e: any) {
+    console.error('validate/accessory error:', e)
+    return c.json({ success: true, isAccessory: true, type: 'UNKNOWN', subCategory: null })
+  }
+})
+
 // POST /api/ghostcut/classify — 누끼컷용 상품 이미지의 카테고리(6종) 자동 판별
 // validate/clothing과 달리 여기서는 판별이 실패하면 사용자에게 재시도를 요청해야 하므로 fail-open하지 않음
 const GHOSTCUT_CLASSIFY_PROMPT = (() => {
@@ -13318,6 +13366,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <input type="file" id="fileInput-TOP"    accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'TOP')" />
           <input type="file" id="fileInput-BOTTOM" accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'BOTTOM')" />
           <input type="file" id="fileInput-DRESS"  accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'DRESS')" />
+          <input type="file" id="fileInput-ACCESSORY" accept="image/*" style="display:none;" onchange="handleAccessoryFileSelect(event)" />
 
           <!-- 2열 슬롯 그리드: 왼쪽=상의(위)+하의(아래) / 오른쪽=전체(전체 높이) -->
           <div class="clothing-slots">
@@ -13374,6 +13423,24 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               </span>
               <button type="button" class="cslot-remove hidden" id="slot-remove-DRESS"
                 onclick="removeSlot(event,'DRESS')">✕</button>
+            </label>
+
+            <!-- 신발/가방 슬롯 (3행, 전체 너비) — 의류와 별개로 취급. AI가 신발/가방을 자동 분류한다 -->
+            <label class="cslot" id="slot-ACCESSORY" for="fileInput-ACCESSORY"
+              style="grid-column:1 / span 2; grid-row:3;"
+              ondragover="handleAccessoryDragOver(event)"
+              ondragleave="handleAccessoryDragLeave(event)"
+              ondrop="handleAccessoryDrop(event)"
+              onclick="return handleAccessoryLabelClick(event)">
+              <span class="cslot-label">신발/가방</span>
+              <span class="cslot-body" id="slot-body-ACCESSORY">
+                <span class="cslot-empty">
+                  <span class="cslot-plus">＋</span>
+                  <span class="cslot-hint">탭하여 사진 선택</span>
+                </span>
+              </span>
+              <button type="button" class="cslot-remove hidden" id="slot-remove-ACCESSORY"
+                onclick="removeAccessorySlot(event)">✕</button>
             </label>
 
           </div><!-- /.clothing-slots -->
