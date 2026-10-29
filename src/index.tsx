@@ -6004,39 +6004,27 @@ function calcGovSupportFinance(answers: any) {
   // 재무 숫자가 AI 환각으로 바뀌는 일이 없도록.
   const STAGE1_TOTAL = 20000000
   const STAGE2_TOTAL = 40000000
-  // 2026-10-27: 예전엔 fundUse(사용자가 고른 "지원금 사용 항목", 복수선택 1~7개)를
-  // 1:1로 비목(item)으로 써서, 사용자가 1개만 고르면 집행계획 표가 1행짜리로 나와
-  // "현실성이 떨어진다"는 실사용자 리포트가 있었다(정부지원사업 집행계획은 보통
-  // 여러 세부 비목으로 쪼갠다). fundUse로 사실 왜곡 없이(사용자가 고르지 않은
-  // 카테고리를 지어내지 않고) 더 현실적인 행 수를 만들기 위해, 각 fundUse 카테고리를
-  // 그 카테고리 "안"에서 통상적으로 나뉘는 세부 비목으로 한 단계 더 쪼갠다(예:
-  // "소재·부자재" → "원단비"+"부자재비"). 1단계(2000만원)는 3~4개, 2단계(4000만원)는
-  // 4~5개 행을 목표로 하되, 선택한 카테고리 수가 적어 그만큼도 못 채우면(예: "인건비"
-  // 1개만 선택) 있는 만큼만 쓴다 — 억지로 더 쪼개지 않는다.
-  const FUND_USE_SUBITEMS: Record<string, string[]> = {
-    '소재·부자재': ['원단비', '부자재비'],
-    '샘플·가봉': ['샘플 제작비', '가봉·수정비'],
-    '생산(봉제)비': ['외주가공비(봉제)', '품질검사비'],
-    '포장·라벨': ['포장재비', '라벨·택 제작비'],
-    '촬영·마케팅': ['제품 촬영비', '온라인 광고비'],
-    '인건비': ['인건비'],
-    '임대료·장비': ['임대료', '장비 구입·대여비'],
-  }
-  const buildStageItems = (targetMin: number, targetMax: number): string[] => {
-    const primary = fundUse.map((c) => (FUND_USE_SUBITEMS[c]?.[0]) || c)
-    if (primary.length >= targetMax) return primary.slice(0, targetMax)
-    const items = [...primary]
-    for (const c of fundUse) {
-      if (items.length >= targetMax) break
-      const second = FUND_USE_SUBITEMS[c]?.[1]
-      if (second) items.push(second)
-    }
-    return items.length ? items : primary
-  }
+  // 2026-10-28: 사용자 지정 — "1단계 비목 3가지, 2단계 비목 4가지로, 홈페이지고도화/
+  // 샘플제작/온라인홍보/박람회 참여/광고 콘텐츠 제작/인건비 중 필요한 항목 사용"으로
+  // 교체(이전엔 fundUse 카테고리를 한 단계 더 쪼개는 방식이었으나 이 고정 비목
+  // 목록으로 대체). fundUse(지원금 사용 항목) 답변과 겹치는 후보를 우선순위로 올려
+  // "필요한 항목"을 고르되, 전부 이 6개 목록 안에서만 고른다(지어내지 않음).
+  const GS_BUDGET_ITEM_CANDIDATES: Array<{ label: string; fundUseMatch: string[] }> = [
+    { label: '샘플 제작', fundUseMatch: ['샘플·가봉', '소재·부자재', '생산(봉제)비'] },
+    { label: '온라인 홍보', fundUseMatch: ['촬영·마케팅'] },
+    { label: '광고 콘텐츠 제작', fundUseMatch: ['촬영·마케팅'] },
+    { label: '인건비', fundUseMatch: ['인건비'] },
+    { label: '홈페이지 고도화', fundUseMatch: ['촬영·마케팅', '임대료·장비'] },
+    { label: '박람회 참여', fundUseMatch: ['촬영·마케팅', '포장·라벨'] },
+  ]
+  const gsBudgetItemsRanked = GS_BUDGET_ITEM_CANDIDATES
+    .map((c, i) => ({ label: c.label, order: i, score: c.fundUseMatch.some((m) => fundUse.includes(m)) ? 1 : 0 }))
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .map((c) => c.label)
+  const stage1Items = gsBudgetItemsRanked.slice(0, 3)
+  const stage2Items = gsBudgetItemsRanked.slice(0, 4)
   const splitStage = (total: number, items: string[]) =>
     items.map((item) => ({ item, amount: items.length ? Math.round(total / items.length) : 0 }))
-  const stage1Items = buildStageItems(3, 4)
-  const stage2Items = buildStageItems(4, 5)
   const budgetStages = {
     stage1Total: STAGE1_TOTAL, stage2Total: STAGE2_TOTAL,
     stage1Split: splitStage(STAGE1_TOTAL, stage1Items), stage2Split: splitStage(STAGE2_TOTAL, stage2Items),
