@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildCategoryTrees, expandRepeat, moduleIdFor, flattenCategory, formatAutoNumber,
-  buildGroupResponseSchema, buildCategoryStructureText, mergeCategoryBlocks, isAiGeneratedNode,
+  buildGroupResponseSchema, buildCategoryStructureText, buildMissingModuleStructureText, mergeCategoryBlocks, isAiGeneratedNode,
   decodeTableRows, buildAiBlocksByModuleId,
 } from './generationAssembly.ts'
 import type { GovNode } from './validate.ts'
@@ -117,6 +117,19 @@ test('buildCategoryStructureText — payload.text가 없고 caption만 있는 �
   const cat = buildCategoryTrees([l1, l2, l3icon])[0]
   const text = buildCategoryStructureText(cat, {})
   assert.match(text, /참고\(관리자가 적어둔 힌트\/제목\/캡션\): 창업아이템 배경 핵심 수치/)
+})
+
+test('buildMissingModuleStructureText — 지정한 moduleId만 나열하고 그 외 리프·그룹 노드는 제외한다', () => {
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '3. 성장전략', payload: {}, binding: 'static', targetChars: 1000 })
+  const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', title: '가. 고객 확보 방안', payload: {}, binding: 'static' })
+  const l3missing = node({ id: 'l3missing', level: 3, parentId: 'l2', expressionType: 'paragraph', title: '가.고객 확보 방안 서술', payload: { text: '힌트문구' }, binding: 'ai' })
+  const l3present = node({ id: 'l3present', level: 3, parentId: 'l2', expressionType: 'paragraph', title: '다른 항목', payload: {}, binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2, l3missing, l3present])[0]
+  const text = buildMissingModuleStructureText(cat, {}, new Set(['l3missing']))
+  assert.match(text, /moduleId="l3missing"/)
+  assert.doesNotMatch(text, /moduleId="l3present"/)
+  assert.doesNotMatch(text, /고정 제목/) // 그룹(subhead) 노드는 나열하지 않음
+  assert.match(text, /힌트문구/)
 })
 
 test('buildCategoryStructureText — binding=ai인 그룹(자식 있는) 노드는 moduleId가 없어 "지시:"를 내려보내지 않는다', () => {
