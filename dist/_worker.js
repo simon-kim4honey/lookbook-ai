@@ -212,7 +212,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Un}" font-size="128" font-weight="800" fill="${Vn(e.statColor||`#ffffff`)}">${Vn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Un}" font-size="64" font-weight="800" fill="#ffffff">${Vn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Un}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Vn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Gn=`mvu7woso`;function Kn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var qn=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${Un}" font-size="128" font-weight="800" fill="${Vn(e.statColor||`#ffffff`)}">${Vn(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${Un}" font-size="64" font-weight="800" fill="#ffffff">${Vn(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${Un}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${Vn(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var Gn=`mvu7wv38`;function Kn(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var qn=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];

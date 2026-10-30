@@ -1829,7 +1829,7 @@ footer {
   display: grid;
   /* 왼쪽 열: 상의+하의 세로 스택 / 오른쪽 열: 전체(DRESS) 전체 높이 / 3번째 행: 신발·가방(전체 너비) */
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr 0.8fr;
+  grid-template-rows: 1fr 1fr 0.56fr;
   gap: 10px;
   width: 100%;
   flex: 1;
