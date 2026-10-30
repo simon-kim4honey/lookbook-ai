@@ -257,6 +257,28 @@ export function buildCategoryStructureText(cat: CategoryTree, answers: Record<st
   return lines.join('\n')
 }
 
+// 2026-10-30: mergeCategoryBlocks가 "AI 응답에 해당 moduleId가 없음" 경고를 내도
+// 지금까지는 콘솔/error_logs에만 남기고 그 자리를 빈 블록으로 그냥 렌더링했다 —
+// 사용자 화면에는 제목만 있고 본문이 통째로 빈, 실패처럼 안 보이는 "완성된 빈
+// 섹션"이 나타난다(실사용자 리포트: "3-2. 창업아이템 사업화 추진 전략" 전체가
+// 빈 채로 나옴). 전체 그룹을 통째로 재시도하면 비용이 거의 두 배가 되므로,
+// 누락된 moduleId만 모아 훨씬 작은 후속 요청으로 다시 요청할 수 있게 구조
+// 텍스트를 좁혀 만든다 — buildCategoryStructureText와 같은 줄 형식을 쓰되
+// 그룹(자식 보유) 노드는 건너뛰고 지정된 moduleId의 리프만 나열한다.
+export function buildMissingModuleStructureText(cat: CategoryTree, answers: Record<string, any>, moduleIds: Set<string>): string {
+  const entries = flattenCategory(cat, answers).filter((e) => moduleIds.has(e.moduleId))
+  const lines: string[] = [`[${cat.node.title}] — 아래는 앞서 요청에서 누락된 항목이다. 전부(이 순서로) 빠짐없이 작성할 것.`]
+  for (const e of entries) {
+    const def = getExpressionType(e.node.expressionType)
+    const idSuffix = e.repeatIndex == null ? '' : ` (반복 ${e.repeatIndex + 1}번째)`
+    lines.push(`- (moduleId="${e.moduleId}") "${e.node.title || ''}"${idSuffix} [${def?.labelKo || e.node.expressionType}] — 생성 대상.`)
+    if (def?.promptFragment) lines.push(`  지시: ${def.promptFragment}`)
+    const hint = e.node.payload?.text || e.node.payload?.caption
+    if (hint) lines.push(`  참고(관리자가 적어둔 힌트/제목/캡션): ${hint}`)
+  }
+  return lines.join('\n')
+}
+
 // 2026-10-24: structured outputs(그룹 응답을 moduleId별 anyOf로 강제)를 걷어내고
 // 프롬프트 기반 JSON으로 되돌리면서, 모델이 UUID 형태인 moduleId 문자열을 응답에
 // 정확히 그대로 베껴 쓰지 못해(살짝 다르게 쓰거나 생략) blocks가 전부 "AI 응답에
