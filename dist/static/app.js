@@ -2491,7 +2491,12 @@ async function loadModelsFromAPI() {
 // ─────────────────────────────────────────────────────────
 async function loadBackgroundsFromAPI() {
   try {
-    const res = await fetch('/api/presets/backgrounds');
+    // 1단계에서 가방을 업로드했으면(신발/가방 슬롯, AI 분류 결과 BAG) 3단계 배경 그리드를
+    // "가방 배경" 전용 풀로만 필터링한다 — 가방 촬영과 무관한 일반 배경을 고르지 않도록.
+    const isBagUpload = AppState.accessoryItem && AppState.accessoryItem.type === 'BAG';
+    AppState.backgroundsFilterTag = isBagUpload ? 'bag' : 'all';
+    const bgUrl = isBagUpload ? '/api/presets/backgrounds?filter=bag' : '/api/presets/backgrounds';
+    const res = await fetch(bgUrl);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
 
@@ -2641,7 +2646,10 @@ function changeStep(newStep) {
 
   // Step 3: 배경 그리드
   if (newStep === 3) {
-    if (AppState.allBackgrounds.length > 0) {
+    // 가방 업로드 여부에 따라 필터(전체/가방 전용)가 달라지므로, 캐시된 목록이 현재
+    // 필요한 필터와 다르면(1단계를 다시 오가며 가방을 추가/제거한 경우 등) 재조회한다.
+    const desiredBgFilter = (AppState.accessoryItem && AppState.accessoryItem.type === 'BAG') ? 'bag' : 'all';
+    if (AppState.allBackgrounds.length > 0 && AppState.backgroundsFilterTag === desiredBgFilter) {
       showGrid('bgsLoading', 'bgSwipeWrap', () => renderBgGrid(AppState.allBackgrounds));
     } else {
       loadBackgroundsFromAPI();

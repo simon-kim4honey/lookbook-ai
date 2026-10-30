@@ -2757,9 +2757,12 @@ app.get('/api/presets/backgrounds', async (c) => {
   } else {
     customBgRaw = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt, isDefault: !!(b as any).isDefault }))
   }
-  // '가방배경' 카테고리는 일반 사용자 배경 선택 그리드에 노출하지 않는다 — 신발/가방 업로드
-  // 전용 자동 매칭(향후 단계)에서만 쓰일 특수 목적 배경이라 일반 브라우징 대상이 아니다.
-  const customBgList = customBgRaw.filter(b => b.category !== '가방배경').map(b => ({
+  // '가방배경' 카테고리는 평소엔 일반 사용자 배경 선택 그리드에 노출하지 않는다 — 신발/가방
+  // 업로드 전용 자동 매칭에서만 쓰일 특수 목적 배경이라 일반 브라우징 대상이 아니다.
+  // 단, ?filter=bag으로 요청하면 거꾸로 '가방배경' 카테고리만 반환한다 — 1단계에서 가방을
+  // 업로드했을 때 3단계 배경 선택 그리드를 가방 배경 풀로만 필터링하는 데 사용.
+  const bgFilter = c.req.query('filter') || ''
+  const customBgList = customBgRaw.filter(b => bgFilter === 'bag' ? b.category === '가방배경' : b.category !== '가방배경').map(b => ({
     id: Number(b.id), name: b.name, category: b.category, mood: '-',
     bgDesc: b.bgDesc, unsplashId: null, isCustom: true, customId: b.id,
     isDefault: !!b.isDefault,
