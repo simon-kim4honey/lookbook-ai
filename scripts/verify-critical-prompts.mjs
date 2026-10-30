@@ -117,6 +117,16 @@ const GUARDS = [
     must: 'Since no clothing reference was provided, design and dress the model in',
     why: '2026-10-29 추가(buildAccessoryBlock): 의류 없이 신발/가방만 업로드했을 때 AI가 빈 캔버스가 아니라 분류된 스타일(클래식/캐주얼)에 맞는 의상을 직접 구상하도록 지시하는 문구. 없으면 의류 없는 요청이 조용히 기본 텍스트 생성(hasGarmentRef 분기 밖)으로 새어나가거나, 액세서리와 어울리지 않는 의상이 나올 수 있다.',
   },
+  {
+    name: '누끼컷 신발/가방 — 몸에 걸치지 않는 단독 제품컷 지시',
+    must: 'the ${productLabel} must appear as a standalone clean product shot, not worn, not held, not placed on any body part.',
+    why: '2026-10-30 추가: 의류용 "고스트 마네킹"(투명 인체가 착용한 것처럼 렌더링) 프롬프트를 신발/가방에 그대로 쓰면 투명한 발/손이 들고 있는 것처럼 왜곡될 위험이 있어, 신발/가방 전용 분기(isProductCategory)를 별도로 만들며 추가한 문구. 사라지면 신발/가방이 다시 "투명 인체 착용" 방식으로 잘못 렌더링될 수 있다.',
+  },
+  {
+    name: '누끼컷 신발/가방 — 업로드 제품의 형태·재질 보존 지시',
+    must: "Image 1's ${productLabel} SHAPE and PROPORTIONS must be preserved EXACTLY",
+    why: '2026-10-30 추가: 신발/가방 전용 분기에서 샘플(Image 2)의 형태를 베끼지 않고 사용자가 업로드한 실제 제품(Image 1)의 모양을 그대로 유지하도록 강제하는 문구 — 의류 분기의 "LENGTH and SILHOUETTE must be preserved EXACTLY" 가드와 동일한 목적.',
+  },
 ]
 
 let failed = false
