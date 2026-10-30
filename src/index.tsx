@@ -9,7 +9,7 @@ import govNodesApp, { loadProgramNodes } from './gov/nodesApi.ts'
 import { validateProgram } from './gov/validate.ts'
 import {
   buildCategoryTrees, buildCategoryStructureText, mergeCategoryBlocks,
-  isAiGeneratedNode, flattenCategory, buildAiBlocksByModuleId, type CategoryTree,
+  isAiGeneratedNode, flattenCategory, buildAiBlocksByModuleId, buildMissingModuleStructureText, type CategoryTree,
 } from './gov/generationAssembly.ts'
 import { rewriteForCardNews, renderCardSvg } from './card-image'
 
@@ -6735,11 +6735,27 @@ ${GS_NODES_JSON_FORMAT}
   // 리포트: 헤드카피/개조식에 관리자 힌트 문구가 그대로 노출됨, 원인이 바로 이 누락).
   // AI가 통째로 실패(JSON 파싱 실패)하는 경우는 이미 로깅되지만, "파싱은 됐는데 일부
   // moduleId만 빠짐" 같은 부분 실패는 이번에 처음 추적 대상에 포함한다.
-  const mergeWarningsByCategory: { category: string; warnings: any[] }[] = []
-  const mainSections = groups.flatMap((group, i) => {
+  //
+  // 2026-10-30: 위 로깅은 "빠졌다는 사실"만 남기고 그 자리는 그냥 빈 블록으로
+  // 렌더링해서, 사용자 화면에는 제목만 있고 본문이 통째로 빈 "완성된 것처럼 보이는
+  // 빈 섹션"이 나타났다(실사용자 리포트: "3-2. 창업아이템 사업화 추진 전략"이 가~마
+  // 전부 빈 채로 나옴). 그룹 전체를 통째로 재시도하면 비용이 거의 두 배가 되므로,
+  // 1차 병합에서 "AI 응답에 해당 moduleId가 없음"(진짜 누락 — computed 값 누락이나
+  // 항목 수 부족 같은 다른 경고는 재시도로 못 고치므로 제외)으로만 걸린 moduleId만
+  // 모아 훨씬 작은 후속 요청으로 1회 재시도한 뒤 최종 병합한다.
+  const catBuilds: { cat: CategoryTree; aiBlocksByModuleId: Map<string, any>; l1Index: number; aiResult: any; groupResult: any[] | null }[] = []
+  // mainCats(원래 대분류 순서)를 그대로 보존해야 하므로, 그룹 전체 실패 섹션도 바로
+  // 배열에 넣지 않고 node.id로 찾을 수 있게 Map에 담아뒀다가 마지막에 mainCats 순서로
+  // 복원한다 — 그룹 단위(2개씩)로 나눠 병렬 호출하다 보니 그룹1이 실패하고 그룹2가
+  // 성공하는 식의 사례에서 섹션 순서가 뒤섞이면 안 된다.
+  const sectionByCatId = new Map<string, any>()
+  groups.forEach((group, i) => {
     const result = groupResults[i]
     if (!result) {
-      return group.map((c) => gsBuildEmptyCategorySection(c, `AI 초안 생성 실패(${group.map((x) => x.node.title).join('·')}) — 관리자에게 문의해주세요.`))
+      for (const c of group) {
+        sectionByCatId.set(c.node.id, gsBuildEmptyCategorySection(c, `AI 초안 생성 실패(${group.map((x) => x.node.title).join('·')}) — 관리자에게 문의해주세요.`))
+      }
+      return
     }
     // 2026-10-27: new Map(result.map(r => [r.categoryId, r]))는 같은 categoryId를 쓰는
     // section 객체가 여러 개 오면 "마지막 것만" 남기고 앞의 것들을 통째로 버렸다 — 실사용자
@@ -6754,35 +6770,77 @@ ${GS_NODES_JSON_FORMAT}
       if (existing) existing.blocks = [...(existing.blocks || []), ...(r.blocks || [])]
       else aiByCategoryId.set(r.categoryId, { ...r, blocks: [...(r.blocks || [])] })
     }
-    return group.map((c) => {
+    for (const c of group) {
       const aiResult: any = aiByCategoryId.get(c.node.id)
       const aiBlocksByModuleId = buildAiBlocksByModuleId(c, answers, aiResult?.blocks || [])
       const l1Index = l1IndexById.get(c.node.id) || 1
-      const { blocks, warnings } = mergeCategoryBlocks(c, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), l1Index)
-      if (warnings.length) {
-        console.error(`gov-support(nodes) "${c.node.title}" 병합 경고:`, JSON.stringify(warnings).slice(0, 500))
-        // 2026-10-26: 403도 아니고 JSON 파싱 실패도 아닌데 moduleId가 통째로 비는 사례가
-        // 실사용자 리포트로 확인됨 — AI 응답 자체는 유효한 JSON이었다는 뜻이라, 이 categoryId에
-        // 대응하는 섹션을 AI가 실제로 뭘 돌려줬는지(아예 없었는지, blocks가 비어있었는지,
-        // 다른 categoryId로 잘못 붙였는지) 다음에는 바로 알 수 있게 같이 남긴다.
-        // logError의 extra는 2000자에서 잘린다 — 핵심 진단값(아래 3개)이 먼저 잘려나가지
-        //않도록 장황한 moduleId 목록 대신 개수만 남기고 앞쪽에 배치한다.
-        mergeWarningsByCategory.push({
-          category: c.node.title,
-          aiResultFound: !!aiResult,
-          aiResultBlockCount: aiResult?.blocks?.length ?? 0,
-          allReturnedCategoryIds: result.map((r: any) => r.categoryId),
-          missingModuleIdCount: warnings.length,
-        })
-      }
-      return { sectionId: c.node.id, headline: c.node.title, lead: '', blocks }
-    })
+      catBuilds.push({ cat: c, aiBlocksByModuleId, l1Index, aiResult, groupResult: result })
+    }
   })
+
+  // 1차 병합 — 누락 moduleId를 찾기 위한 드라이런. 결과(blocks)는 재시도 후 버리고
+  // 최종 병합을 다시 한다(재시도로 aiBlocksByModuleId가 바뀌므로).
+  const retryTargets = catBuilds
+    .map((cb) => {
+      const { warnings } = mergeCategoryBlocks(cb.cat, cb.aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), cb.l1Index)
+      const missingIds = warnings.filter((w) => w.reason === 'AI 응답에 해당 moduleId가 없음').map((w) => w.moduleId)
+      return { cb, missingIds }
+    })
+    .filter((t) => t.missingIds.length > 0)
+
+  if (retryTargets.length) {
+    await Promise.all(retryTargets.map(async (t, idx) => {
+      if (idx > 0) await new Promise((r) => setTimeout(r, idx * 400))
+      const missingSet = new Set(t.missingIds)
+      const structureBlock = buildMissingModuleStructureText(t.cb.cat, answers, missingSet)
+      const prompt = `${intro}
+
+${GS_WRITING_PRINCIPLES}
+
+${sharedContext}
+[대분류 구조 — moduleId별로 지정된 표현방법·바인딩·지시를 그대로 따를 것]
+${structureBlock}
+
+${GS_NODES_JSON_FORMAT}
+
+입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "[[AI]]" 토큰과 함께 내용을 채워서라도 위에 나열된 moduleId 전부(이 순서로) 완전하게 작성한다.`
+      const maxTok = Math.min(16000, Math.max(2000, missingSet.size * 500))
+      const result = await gsCallClaudeWithSchema(apiKey, prompt, null, 1, maxTok, 60000, env, `${t.cb.cat.node.title}(누락분 재시도)`)
+      const retryBlocks = (result && (result as any[])[0]?.blocks) || []
+      for (const b of retryBlocks) {
+        if (b?.moduleId) t.cb.aiBlocksByModuleId.set(b.moduleId, b)
+      }
+    }))
+  }
+
+  // 최종 병합 — 재시도로도 못 채운 moduleId만 경고로 남긴다.
+  const mergeWarningsByCategory: { category: string; warnings: any[] }[] = []
+  for (const { cat: c, aiBlocksByModuleId, l1Index, aiResult, groupResult } of catBuilds) {
+    const { blocks, warnings } = mergeCategoryBlocks(c, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), l1Index)
+    if (warnings.length) {
+      console.error(`gov-support(nodes) "${c.node.title}" 병합 경고(재시도 후):`, JSON.stringify(warnings).slice(0, 500))
+      // 2026-10-26: 403도 아니고 JSON 파싱 실패도 아닌데 moduleId가 통째로 비는 사례가
+      // 실사용자 리포트로 확인됨 — AI 응답 자체는 유효한 JSON이었다는 뜻이라, 이 categoryId에
+      // 대응하는 섹션을 AI가 실제로 뭘 돌려줬는지(아예 없었는지, blocks가 비어있었는지,
+      // 다른 categoryId로 잘못 붙였는지) 다음에는 바로 알 수 있게 같이 남긴다.
+      // logError의 extra는 2000자에서 잘린다 — 핵심 진단값(아래 3개)이 먼저 잘려나가지
+      //않도록 장황한 moduleId 목록 대신 개수만 남기고 앞쪽에 배치한다.
+      mergeWarningsByCategory.push({
+        category: c.node.title,
+        aiResultFound: !!aiResult,
+        aiResultBlockCount: aiResult?.blocks?.length ?? 0,
+        allReturnedCategoryIds: (groupResult || []).map((r: any) => r.categoryId),
+        missingModuleIdCount: warnings.length,
+      })
+    }
+    sectionByCatId.set(c.node.id, { sectionId: c.node.id, headline: c.node.title, lead: '', blocks })
+  }
+  const mainSections = mainCats.map((c) => sectionByCatId.get(c.node.id))
 
   if (mergeWarningsByCategory.length && env) {
     await logError(env, {
       source: 'server',
-      message: `gov-support AI 응답에 일부 moduleId 누락 — ${mergeWarningsByCategory.length}개 대분류(${mergeWarningsByCategory.map((w) => w.category).join('·')})`,
+      message: `gov-support AI 응답에 일부 moduleId 누락(누락분 재시도 후에도) — ${mergeWarningsByCategory.length}개 대분류(${mergeWarningsByCategory.map((w) => w.category).join('·')})`,
       route: '/api/gov-support/projects/:id/generate (mergeCategoryBlocks)',
       extra: { programName, warningsByCategory: mergeWarningsByCategory.slice(0, 10) },
     })
