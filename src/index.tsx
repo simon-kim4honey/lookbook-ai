@@ -13926,13 +13926,6 @@ app.get('/admin02', (c) => {
     .tab-badge{display:inline-block;margin-left:6px;background:#ef4444;color:#fff;font-size:11px;font-weight:700;border-radius:10px;padding:1px 7px;vertical-align:2px;}
     .tab-panel{display:none;}
     .tab-panel.active{display:block;}
-    /* 배경 관리 내부 서브탭(커스텀 배경 / 가방 배경) — 페이지 레벨 .tab-bar와 구분되는 pill 스타일 */
-    .bg-subtab-bar{display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid #2e2e50;padding-bottom:16px;}
-    .bg-subtab-btn{padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #2e2e50;border-radius:999px;background:#1a1a2e;color:#8b8ba0;transition:all .15s;}
-    .bg-subtab-btn.active{color:#fff;background:#3182F6;border-color:#3182F6;}
-    .bg-subtab-btn:hover:not(.active){color:#e0e0f0;border-color:#444;}
-    .bg-subtab-panel{display:none;}
-    .bg-subtab-panel.active{display:block;}
     /* 바디 */
     .admin-body{max-width:960px;margin:0 auto;padding:28px 24px;}
     .page-title{font-size:20px;font-weight:700;margin-bottom:6px;}
@@ -14117,7 +14110,8 @@ app.get('/admin02', (c) => {
   <div class="tab-bar">
     <button class="tab-btn active" onclick="switchTab('prompt')"><i class="fas fa-magic"></i> 프롬프트</button>
     <button class="tab-btn" onclick="switchTab('models')"><i class="fas fa-user-circle"></i> 모델 관리</button>
-    <button class="tab-btn" onclick="switchTab('bgs')"><i class="fas fa-image"></i> 배경 관리</button>
+    <button class="tab-btn" onclick="switchTab('bgscustom')"><i class="fas fa-image"></i> 커스텀 배경</button>
+    <button class="tab-btn" onclick="switchTab('bgsbag')"><i class="fas fa-shopping-bag"></i> 가방 배경</button>
     <button class="tab-btn" onclick="switchTab('home')"><i class="fas fa-home"></i> 홈페이지 관리</button>
     <button class="tab-btn" onclick="switchTab('users')"><i class="fas fa-users"></i> 회원 관리</button>
     <button class="tab-btn" onclick="switchTab('bizleads')"><i class="fas fa-building"></i> 사업자 리드</button>
@@ -14237,82 +14231,79 @@ app.get('/admin02', (c) => {
   </div>
 
   <!-- ▼ 탭: 배경 관리 -->
-  <div class="tab-panel" id="tabBgs">
+  <div class="tab-panel" id="tabBgsCustom">
     <div class="admin-body">
-      <div class="page-title">🖼️ 배경 관리</div>
+      <div class="page-title">🖼️ 커스텀 배경</div>
       <div class="page-sub">업로드한 배경은 사용자 화면에서 기본 배경보다 먼저 표시됩니다.</div>
 
-      <div class="bg-subtab-bar">
-        <button class="bg-subtab-btn active" id="bgSubTabBtn-custom" onclick="switchBgSubTab('custom')"><i class="fas fa-image"></i> 커스텀 배경</button>
-        <button class="bg-subtab-btn" id="bgSubTabBtn-bag" onclick="switchBgSubTab('bag')"><i class="fas fa-shopping-bag"></i> 가방 배경</button>
-      </div>
+      <!-- 다중 업로드 폼 -->
+      <div class="upload-form">
+        <h3><i class="fas fa-plus-circle" style="color:#3182F6;"></i> 배경 추가 <span style="font-size:13px;font-weight:400;color:#888;">(여러 장 동시 업로드 가능)</span></h3>
 
-      <!-- 커스텀 배경 -->
-      <div class="bg-subtab-panel active" id="bgSubTabPanel-custom">
-        <!-- 다중 업로드 폼 -->
-        <div class="upload-form">
-          <h3><i class="fas fa-plus-circle" style="color:#3182F6;"></i> 배경 추가 <span style="font-size:13px;font-weight:400;color:#888;">(여러 장 동시 업로드 가능)</span></h3>
-
-          <!-- 기본 카테고리 (공통 적용) -->
-          <div class="form-row single" style="margin-bottom:10px;">
-            <div>
-              <label class="form-label">기본 카테고리 <span style="color:#888;font-weight:400;">(공통 적용, 개별 변경 가능)</span></label>
-              <input class="form-input" id="bgDefaultCategory" placeholder="예: 스튜디오, 야외, 럭셔리" style="max-width:320px;"/>
-            </div>
-          </div>
-
-          <!-- 드롭존 -->
-          <div class="upload-zone multi-zone" id="bgUploadZone" onclick="document.getElementById('bgFileInput').click()">
-            <div class="icon"><i class="fas fa-images"></i></div>
-            <p>클릭하거나 이미지를 드래그하세요<br/><span>여러 파일 선택 가능</span> (JPG, PNG, WEBP)</p>
-          </div>
-          <input type="file" id="bgFileInput" accept="image/*" multiple style="display:none" onchange="onBgFilesSelect(event)"/>
-
-          <!-- 선택된 파일 미리보기 그리드 -->
-          <div id="bgStagingGrid" style="display:none;margin-top:16px;">
-            <div style="font-size:13px;font-weight:600;color:#444;margin-bottom:10px;">
-              선택된 이미지 — 이름을 입력 후 등록하세요
-            </div>
-            <div id="bgStagingItems" style="display:flex;flex-wrap:wrap;gap:14px;"></div>
-            <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
-              <button class="btn-save" onclick="uploadBgs()"><i class="fas fa-upload"></i> 전체 등록</button>
-              <button class="btn-cancel" onclick="clearBgStaging()"><i class="fas fa-times"></i> 초기화</button>
-              <span class="save-status" id="bgUploadStatus"></span>
-            </div>
+        <!-- 기본 카테고리 (공통 적용) -->
+        <div class="form-row single" style="margin-bottom:10px;">
+          <div>
+            <label class="form-label">기본 카테고리 <span style="color:#888;font-weight:400;">(공통 적용, 개별 변경 가능)</span></label>
+            <input class="form-input" id="bgDefaultCategory" placeholder="예: 스튜디오, 야외, 럭셔리" style="max-width:320px;"/>
           </div>
         </div>
 
-        <div id="customBgGrid"></div>
-      </div>
+        <!-- 드롭존 -->
+        <div class="upload-zone multi-zone" id="bgUploadZone" onclick="document.getElementById('bgFileInput').click()">
+          <div class="icon"><i class="fas fa-images"></i></div>
+          <p>클릭하거나 이미지를 드래그하세요<br/><span>여러 파일 선택 가능</span> (JPG, PNG, WEBP)</p>
+        </div>
+        <input type="file" id="bgFileInput" accept="image/*" multiple style="display:none" onchange="onBgFilesSelect(event)"/>
 
-      <!-- 가방 배경 — 신발/가방만 업로드했을 때 자동 매칭용으로 쓰일 특수 목적 배경이라 일반
-           사용자 배경 선택 화면에는 노출되지 않는다(/api/presets/backgrounds에서 필터링됨).
-           배경 사진 속에 이미 가방이 등장하고, 생성 시 그 가방을 사용자가 업로드한 가방으로
-           교체한다 — "생성용 이미지"는 그 교체 기준이 되는 마킹본. -->
-      <div class="bg-subtab-panel" id="bgSubTabPanel-bag">
-        <div class="upload-form">
-          <h3><i class="fas fa-shopping-bag" style="color:#3182F6;"></i> 가방 배경 <span style="font-size:13px;font-weight:400;color:#888;">(신발/가방 전용 — 일반 배경 목록에는 안 보임)</span></h3>
-          <div class="page-sub" style="margin-bottom:14px;">가방이 이미 등장하는 배경 사진을 올리세요. 등록 후 각 카드에서 "생성용 이미지 등록"으로 가방 위치를 마킹한 버전을 추가로 올려주세요(얼굴 마킹 배경과 동일한 방식) — 생성 시 그 가방이 사용자가 업로드한 가방으로 교체됩니다.</div>
-
-          <div class="upload-zone multi-zone" id="bagBgUploadZone" onclick="document.getElementById('bagBgFileInput').click()">
-            <div class="icon"><i class="fas fa-images"></i></div>
-            <p>클릭하거나 이미지를 드래그하세요<br/><span>여러 파일 선택 가능</span> (JPG, PNG, WEBP)</p>
+        <!-- 선택된 파일 미리보기 그리드 -->
+        <div id="bgStagingGrid" style="display:none;margin-top:16px;">
+          <div style="font-size:13px;font-weight:600;color:#444;margin-bottom:10px;">
+            선택된 이미지 — 이름을 입력 후 등록하세요
           </div>
-          <input type="file" id="bagBgFileInput" accept="image/*" multiple style="display:none" onchange="onBagBgFilesSelect(event)"/>
-
-          <div id="bagBgStagingGrid" style="display:none;margin-top:16px;">
-            <div style="font-size:13px;font-weight:600;color:#444;margin-bottom:10px;">선택된 이미지 — 이름을 입력 후 등록하세요</div>
-            <div id="bagBgStagingItems" style="display:flex;flex-wrap:wrap;gap:14px;"></div>
-            <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
-              <button class="btn-save" onclick="uploadBagBgs()"><i class="fas fa-upload"></i> 전체 등록</button>
-              <button class="btn-cancel" onclick="clearBagBgStaging()"><i class="fas fa-times"></i> 초기화</button>
-              <span class="save-status" id="bagBgUploadStatus"></span>
-            </div>
+          <div id="bgStagingItems" style="display:flex;flex-wrap:wrap;gap:14px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+            <button class="btn-save" onclick="uploadBgs()"><i class="fas fa-upload"></i> 전체 등록</button>
+            <button class="btn-cancel" onclick="clearBgStaging()"><i class="fas fa-times"></i> 초기화</button>
+            <span class="save-status" id="bgUploadStatus"></span>
           </div>
         </div>
-
-        <div id="bagBgGrid"></div>
       </div>
+
+      <div id="customBgGrid"></div>
+    </div>
+  </div>
+
+  <!-- 가방 배경 — 신발/가방만 업로드했을 때 자동 매칭용으로 쓰일 특수 목적 배경이라 일반
+       사용자 배경 선택 화면에는 노출되지 않는다(/api/presets/backgrounds에서 필터링됨).
+       배경 사진 속에 이미 가방이 등장하고, 생성 시 그 가방을 사용자가 업로드한 가방으로
+       교체한다 — "생성용 이미지"는 그 교체 기준이 되는 마킹본. -->
+  <div class="tab-panel" id="tabBgsBag">
+    <div class="admin-body">
+      <div class="page-title">👜 가방 배경</div>
+      <div class="page-sub">신발/가방 전용 — 일반 사용자 배경 목록에는 노출되지 않습니다.</div>
+
+      <div class="upload-form">
+        <h3><i class="fas fa-shopping-bag" style="color:#3182F6;"></i> 가방 배경 추가 <span style="font-size:13px;font-weight:400;color:#888;">(여러 장 동시 업로드 가능)</span></h3>
+        <div class="page-sub" style="margin-bottom:14px;">가방이 이미 등장하는 배경 사진을 올리세요. 등록 후 각 카드에서 "생성용 이미지 등록"으로 가방 위치를 마킹한 버전을 추가로 올려주세요(얼굴 마킹 배경과 동일한 방식) — 생성 시 그 가방이 사용자가 업로드한 가방으로 교체됩니다.</div>
+
+        <div class="upload-zone multi-zone" id="bagBgUploadZone" onclick="document.getElementById('bagBgFileInput').click()">
+          <div class="icon"><i class="fas fa-images"></i></div>
+          <p>클릭하거나 이미지를 드래그하세요<br/><span>여러 파일 선택 가능</span> (JPG, PNG, WEBP)</p>
+        </div>
+        <input type="file" id="bagBgFileInput" accept="image/*" multiple style="display:none" onchange="onBagBgFilesSelect(event)"/>
+
+        <div id="bagBgStagingGrid" style="display:none;margin-top:16px;">
+          <div style="font-size:13px;font-weight:600;color:#444;margin-bottom:10px;">선택된 이미지 — 이름을 입력 후 등록하세요</div>
+          <div id="bagBgStagingItems" style="display:flex;flex-wrap:wrap;gap:14px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+            <button class="btn-save" onclick="uploadBagBgs()"><i class="fas fa-upload"></i> 전체 등록</button>
+            <button class="btn-cancel" onclick="clearBagBgStaging()"><i class="fas fa-times"></i> 초기화</button>
+            <span class="save-status" id="bagBgUploadStatus"></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="bagBgGrid"></div>
     </div>
   </div>
 
@@ -14714,12 +14705,13 @@ const PRESETS = {
 // ─── 탭 전환 ───
 function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['prompt','models','bgs','home','users','bizleads','ghostcut','contentdigest','errors','govsupport']
+    const names = ['prompt','models','bgscustom','bgsbag','home','users','bizleads','ghostcut','contentdigest','errors','govsupport']
     b.classList.toggle('active', names[i] === name)
   })
   document.getElementById('tabPrompt').classList.toggle('active', name === 'prompt')
   document.getElementById('tabModels').classList.toggle('active', name === 'models')
-  document.getElementById('tabBgs').classList.toggle('active', name === 'bgs')
+  document.getElementById('tabBgsCustom').classList.toggle('active', name === 'bgscustom')
+  document.getElementById('tabBgsBag').classList.toggle('active', name === 'bgsbag')
   document.getElementById('tabHome').classList.toggle('active', name === 'home')
   document.getElementById('tabUsers').classList.toggle('active', name === 'users')
   document.getElementById('tabBizLeads').classList.toggle('active', name === 'bizleads')
@@ -14728,7 +14720,8 @@ function switchTab(name) {
   document.getElementById('tabErrors').classList.toggle('active', name === 'errors')
   document.getElementById('tabGovSupport').classList.toggle('active', name === 'govsupport')
   if (name === 'models') loadCustomModels()
-  if (name === 'bgs')    { loadCustomBgs(); loadBagBgs() }
+  if (name === 'bgscustom') loadCustomBgs()
+  if (name === 'bgsbag') loadBagBgs()
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos(); loadGcLoadingImages() }
   if (name === 'users')  loadUsers()
   if (name === 'bizleads') bizInit()
@@ -14736,14 +14729,6 @@ function switchTab(name) {
   if (name === 'contentdigest') digestInit()
   if (name === 'errors') loadErrors()
   if (name === 'govsupport') gsAdminInit()
-}
-
-// ─── 배경 관리 내부 서브탭(커스텀 배경 / 가방 배경) 전환 ───
-function switchBgSubTab(name) {
-  document.getElementById('bgSubTabBtn-custom').classList.toggle('active', name === 'custom')
-  document.getElementById('bgSubTabBtn-bag').classList.toggle('active', name === 'bag')
-  document.getElementById('bgSubTabPanel-custom').classList.toggle('active', name === 'custom')
-  document.getElementById('bgSubTabPanel-bag').classList.toggle('active', name === 'bag')
 }
 
 // ══════════════════════════════════════════════
