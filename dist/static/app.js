@@ -2904,12 +2904,12 @@ function renderSlots() {
   });
 }
 
-// ── 다음 버튼: 슬롯 1개 이상 채워지면 활성화 ──
+// ── 다음 버튼: 슬롯 1개 이상(의류 또는 신발/가방) 채워지면 활성화 ──
 function updateNextBtn1() {
   const btn = document.getElementById('nextBtn1');
   if (!btn) return;
-  const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null);
-  const validating = SLOT_CATS.some(cat => slotValidating[cat]);
+  const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null) || accessoryData !== null;
+  const validating = SLOT_CATS.some(cat => slotValidating[cat]) || accessoryValidating;
   btn.disabled = !hasAny || validating;
 }
 
@@ -2918,7 +2918,137 @@ function resetUpload() {
   SLOT_CATS.forEach(cat => { slotData[cat] = null; });
   syncClothingItems();
   renderSlots();
+  accessoryData = null;
+  AppState.accessoryItem = null;
+  renderAccessorySlot();
   updateNextBtn1();
+}
+
+// ─────────────────────────────────────────────────────────
+// STEP 1 (계속): 신발/가방 슬롯 — 의류와 별개로 다룬다(AppState.clothingItems에
+// 섞지 않음). 업로드 시 AI가 신발/가방/주얼리 및 클래식/캐주얼 스타일을 분류해
+// AppState.accessoryItem에 저장한다 — 이 분류 결과는 다음 단계(의상 자동생성)에서
+// 사용될 예정이며, 아직 생성 요청 자체에는 반영되지 않는다.
+// ─────────────────────────────────────────────────────────
+
+const ACCESSORY_TYPE_LABEL = { SHOE: '신발', BAG: '가방', JEWELRY: '주얼리', UNKNOWN: '액세서리' };
+const ACCESSORY_SUBCAT_LABEL = { CLASSIC: '클래식', CASUAL: '캐주얼' };
+
+let accessoryData = null;       // { file, dataUrl, type, subCategory } | null
+let accessoryValidating = false;
+
+function handleAccessoryLabelClick(e) {
+  if (e.target.closest('.cslot-remove')) return false;
+  if (accessoryData || accessoryValidating) return false;
+  return true;
+}
+
+function handleAccessoryDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  if (accessoryData || accessoryValidating) return;
+  document.getElementById('slot-ACCESSORY')?.classList.add('drag-over');
+}
+function handleAccessoryDragLeave(e) {
+  const slot = document.getElementById('slot-ACCESSORY');
+  if (slot && !slot.contains(e.relatedTarget)) slot.classList.remove('drag-over');
+}
+function handleAccessoryDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.getElementById('slot-ACCESSORY')?.classList.remove('drag-over');
+  if (accessoryData || accessoryValidating) return;
+  const file = e.dataTransfer.files?.[0];
+  if (file) processAccessoryFile(file);
+}
+function handleAccessoryFileSelect(e) {
+  const file = e.target.files?.[0];
+  if (file) processAccessoryFile(file);
+  e.target.value = '';
+}
+
+function processAccessoryFile(file) {
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!validTypes.includes(file.type)) { showToast(t('uploadFormatErr'), 'error'); return; }
+  if (file.size > 10 * 1024 * 1024) { showToast(t('uploadSizeErr'), 'error'); return; }
+
+  const onReady = async (dataUrl) => {
+    accessoryValidating = true;
+    renderAccessorySlot();
+    updateNextBtn1();
+    let result = { isAccessory: true, type: 'UNKNOWN', subCategory: null };
+    try {
+      const vr = await fetch('/api/validate/accessory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: dataUrl }),
+      });
+      const vd = await vr.json();
+      if (vd) result = vd;
+    } catch (err) {
+      console.warn('신발/가방 분류 실패, 통과 처리:', err);
+    }
+    accessoryValidating = false;
+    if (result.isAccessory === false) {
+      showToast('신발, 가방, 또는 주얼리 사진을 올려주세요.', 'error');
+      renderAccessorySlot();
+      updateNextBtn1();
+      return;
+    }
+    accessoryData = { file, dataUrl, type: result.type || 'UNKNOWN', subCategory: result.subCategory || null };
+    AppState.accessoryItem = { file, dataUrl, type: accessoryData.type, subCategory: accessoryData.subCategory };
+    renderAccessorySlot();
+    updateNextBtn1();
+  };
+
+  _resizeImageFile(file, 1600, 0.85).then(onReady).catch((err) => {
+    console.warn('이미지 리사이즈 실패, 원본으로 대체:', err);
+    const reader = new FileReader();
+    reader.onload = (ev) => onReady(ev.target.result);
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeAccessorySlot(e) {
+  e.stopPropagation();
+  accessoryData = null;
+  AppState.accessoryItem = null;
+  renderAccessorySlot();
+  updateNextBtn1();
+}
+
+function renderAccessorySlot() {
+  const slot = document.getElementById('slot-ACCESSORY');
+  const body = document.getElementById('slot-body-ACCESSORY');
+  const removeBtn = document.getElementById('slot-remove-ACCESSORY');
+  if (!slot || !body) return;
+
+  if (accessoryValidating) {
+    slot.classList.remove('cslot--filled');
+    body.innerHTML = `
+      <span class="cslot-empty">
+        <span class="btn-spinner dark"></span>
+        <span class="cslot-hint">분석 중...</span>
+      </span>`;
+    if (removeBtn) removeBtn.classList.add('hidden');
+  } else if (accessoryData) {
+    slot.classList.add('cslot--filled');
+    const typeLabel = ACCESSORY_TYPE_LABEL[accessoryData.type] || '액세서리';
+    const subLabel = ACCESSORY_SUBCAT_LABEL[accessoryData.subCategory] || '';
+    const badgeText = subLabel ? `${typeLabel} · ${subLabel}` : typeLabel;
+    body.innerHTML = `
+      <img src="${accessoryData.dataUrl}" alt="신발/가방" class="cslot-img" />
+      <span class="cslot-accessory-badge">${badgeText}</span>`;
+    if (removeBtn) removeBtn.classList.remove('hidden');
+  } else {
+    slot.classList.remove('cslot--filled');
+    body.innerHTML = `
+      <span class="cslot-empty">
+        <span class="cslot-plus">＋</span>
+        <span class="cslot-hint">탭하여 사진 선택</span>
+      </span>`;
+    if (removeBtn) removeBtn.classList.add('hidden');
+  }
 }
 
 // ─────────────────────────────────────────────────────────
@@ -3545,6 +3675,14 @@ async function startGeneration() {
       label:    ci.label || '',
     }));
 
+    // 신발/가방 참고 이미지(선택) — 의류와 별개로 전달. 의류가 없으면 서버가
+    // 이 분류 결과(클래식/캐주얼)를 참고해 어울리는 의상을 자동 생성한다.
+    const accessoryImage = AppState.accessoryItem ? {
+      dataUrl:     AppState.accessoryItem.dataUrl,
+      type:        AppState.accessoryItem.type || 'UNKNOWN',
+      subCategory: AppState.accessoryItem.subCategory || null,
+    } : null;
+
     // 레거시 단일 필드 (서버에서도 하위 호환 처리)
     const clothingImageUrl = AppState.uploadedImageUrl;
 
@@ -3584,6 +3722,7 @@ async function startGeneration() {
       count,
       clothingImages,
       clothingImageUrl,
+      accessoryImage,
     };
     AppState.regenCount = 0;
 

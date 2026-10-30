@@ -107,6 +107,16 @@ const GUARDS = [
     must: 'ABSOLUTE PROHIBITION ON CREATIVE CHANGES: Do NOT add, remove, invent, embellish, restyle, or reinterpret ANYTHING.',
     why: '워싱/디스트레싱 외에도 질감·구김·비율·조명 등 다른 종류의 "응용"이 재발할 수 있으므로, 특정 케이스(워싱 등)에 한정하지 않고 모든 창작적 변경을 포괄적으로 금지하는 문구를 추가함. 특정 사례만 막으면 다른 형태의 변형이 계속 재발하는 패턴(2026-08-23 반복 확인)을 근본적으로 차단하기 위함.',
   },
+  {
+    name: '신발/가방 참고 이미지 — 업로드된 실제 아이템 보존 지시',
+    must: 'the model must wear/carry this EXACT item. Preserve its exact color, material, shape, hardware, and design details precisely',
+    why: '2026-10-29 추가(buildAccessoryBlock): 신발/가방 슬롯에 업로드한 실제 상품이 생성 결과에서 다른 디자인으로 바뀌지 않도록 보장하는 핵심 문구. 이 문구가 사라지면 AI가 업로드된 신발/가방을 무시하고 임의의 액세서리를 그려 넣을 수 있다.',
+  },
+  {
+    name: '신발/가방만 업로드(의류 없음) — 스타일에 맞는 의상 자동 구상 지시',
+    must: 'Since no clothing reference was provided, design and dress the model in',
+    why: '2026-10-29 추가(buildAccessoryBlock): 의류 없이 신발/가방만 업로드했을 때 AI가 빈 캔버스가 아니라 분류된 스타일(클래식/캐주얼)에 맞는 의상을 직접 구상하도록 지시하는 문구. 없으면 의류 없는 요청이 조용히 기본 텍스트 생성(hasGarmentRef 분기 밖)으로 새어나가거나, 액세서리와 어울리지 않는 의상이 나올 수 있다.',
+  },
 ]
 
 let failed = false

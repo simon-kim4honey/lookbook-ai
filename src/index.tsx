@@ -1962,6 +1962,54 @@ app.post('/api/validate/clothing', async (c) => {
   }
 })
 
+// POST /api/validate/accessory — 신발/가방 슬롯 업로드 이미지의 종류(신발/가방/주얼리) +
+// 신발·가방의 스타일(클래식/캐주얼) 자동 분류. 의류 검증(validate/clothing)과 같은 철학으로
+// fail-open — 분류 실패/키 미설정 시 업로드를 막지 않고 UNKNOWN으로 통과시킨다
+// (분류 결과는 아직 생성 프롬프트에 연결되지 않음 — 다음 단계에서 의상 자동생성에 사용 예정).
+const ACCESSORY_CLASSIFY_PROMPT = [
+  `You are a fashion accessory classifier for an AI photoshoot app.`,
+  `Look at the uploaded image. First decide: is this clearly a photo of a SINGLE shoe, bag, or jewelry item (worn, held, laid flat, or on a plain background)?`,
+  `If it is NOT a shoe/bag/jewelry item (e.g. a person's portrait, a garment/clothing item, an animal, food, scenery, or an unrelated object), respond with exactly: NOT_ACCESSORY`,
+  `If it IS one of these, respond with EXACTLY ONE of these codes (the single best match, nothing else):`,
+  `SHOE_CLASSIC (a dress shoe, heel, or formal shoe suited to a classic/polished outfit), SHOE_CASUAL (a sneaker or casual shoe suited to a relaxed/everyday outfit), BAG_CLASSIC (a structured, formal-leaning bag suited to a classic outfit), BAG_CASUAL (a relaxed everyday bag — tote, backpack, crossbody — suited to a casual outfit), JEWELRY (a ring, necklace, earrings, bracelet, watch, or other jewelry item)`,
+  `Respond with ONLY the code — no explanation, no punctuation, no extra words.`,
+].join('\n')
+
+const ACCESSORY_CLASSIFY_MAP: Record<string, { type: string; subCategory: string | null }> = {
+  SHOE_CLASSIC: { type: 'SHOE', subCategory: 'CLASSIC' },
+  SHOE_CASUAL: { type: 'SHOE', subCategory: 'CASUAL' },
+  BAG_CLASSIC: { type: 'BAG', subCategory: 'CLASSIC' },
+  BAG_CASUAL: { type: 'BAG', subCategory: 'CASUAL' },
+  JEWELRY: { type: 'JEWELRY', subCategory: null },
+}
+
+app.post('/api/validate/accessory', async (c) => {
+  try {
+    const body: any = await c.req.json()
+    const imageBase64: string = body?.imageBase64 || ''
+    if (!imageBase64) return c.json({ success: false, message: 'imageBase64 필수' }, 400)
+
+    const openaiKey = (c.env as any)?.OPENAI_API_KEY || ''
+    if (!openaiKey) return c.json({ success: true, isAccessory: true, type: 'UNKNOWN', subCategory: null })
+
+    const content = await openaiChatVision(openaiKey, imageBase64, ACCESSORY_CLASSIFY_PROMPT)
+    if (content === null) return c.json({ success: true, isAccessory: true, type: 'UNKNOWN', subCategory: null })
+
+    const code = content.trim().toUpperCase().replace(/[^A-Z_]/g, '')
+    if (code === 'NOT_ACCESSORY') return c.json({ success: true, isAccessory: false })
+
+    const result = ACCESSORY_CLASSIFY_MAP[code]
+    if (!result) {
+      console.warn('validate/accessory: 알 수 없는 분류 응답:', content)
+      return c.json({ success: true, isAccessory: true, type: 'UNKNOWN', subCategory: null })
+    }
+    return c.json({ success: true, isAccessory: true, ...result })
+  } catch (e: any) {
+    console.error('validate/accessory error:', e)
+    return c.json({ success: true, isAccessory: true, type: 'UNKNOWN', subCategory: null })
+  }
+})
+
 // POST /api/ghostcut/classify — 누끼컷용 상품 이미지의 카테고리(6종) 자동 판별
 // validate/clothing과 달리 여기서는 판별이 실패하면 사용자에게 재시도를 요청해야 하므로 fail-open하지 않음
 const GHOSTCUT_CLASSIFY_PROMPT = (() => {
@@ -2709,7 +2757,9 @@ app.get('/api/presets/backgrounds', async (c) => {
   } else {
     customBgRaw = _memBgs.map(b => ({ id: b.id, name: b.name, bgDesc: b.bgDesc, category: b.category, createdAt: b.createdAt, isDefault: !!(b as any).isDefault }))
   }
-  const customBgList = customBgRaw.map(b => ({
+  // '가방배경' 카테고리는 일반 사용자 배경 선택 그리드에 노출하지 않는다 — 신발/가방 업로드
+  // 전용 자동 매칭(향후 단계)에서만 쓰일 특수 목적 배경이라 일반 브라우징 대상이 아니다.
+  const customBgList = customBgRaw.filter(b => b.category !== '가방배경').map(b => ({
     id: Number(b.id), name: b.name, category: b.category, mood: '-',
     bgDesc: b.bgDesc, unsplashId: null, isCustom: true, customId: b.id,
     isDefault: !!b.isDefault,
@@ -10043,6 +10093,7 @@ app.post('/api/generation/start', async (c) => {
       count = 4,
       clothingImageUrl,          // 레거시 단일 파라미터 (하위 호환)
       clothingImages,            // 신규: [{ dataUrl, category, label }] 배열
+      accessoryImage,            // 신발/가방 참고 이미지(선택): { dataUrl, type, subCategory }
     } = body
 
     // ── 세션 인증 (로그인 체크만, 크레딧 차감 없음) ──
@@ -10175,6 +10226,16 @@ app.post('/api/generation/start', async (c) => {
     console.log('Clothing items:', clothingItems.map(ci => `[${ci.category}]`).join(', ') || 'none')
     console.log('Model ID:', modelId, '| BG ID:', bgId)
 
+    // ── 신발/가방 참고 이미지 정규화 ──
+    // 의류가 없어도 신발/가방만으로 생성을 진행할 수 있게 하는 입력. type/subCategory는
+    // 업로드 시 /api/validate/accessory가 분류한 값(SHOE/BAG/JEWELRY, CLASSIC/CASUAL)을
+    // 그대로 신뢰한다 — 여기서 재검증하지 않는다(실패해도 생성 자체를 막지 않기 위함).
+    const accessoryImageBase64: string | null =
+      (accessoryImage?.dataUrl && String(accessoryImage.dataUrl).startsWith('data:')) ? accessoryImage.dataUrl : null
+    const accessoryType: string = accessoryImage?.type || 'UNKNOWN'
+    const accessorySubCategory: string | null = accessoryImage?.subCategory || null
+    console.log('Accessory:', accessoryImageBase64 ? `${accessoryType}/${accessorySubCategory || '-'}` : 'none')
+
     // ── Nano Banana 2 Edit: images 배열 구성 ──
     // 순서: [의류1, 의류2?, 의류3?, 모델?, 배경?]
     // 프롬프트에서 각 이미지 번호(Image N)를 명시해 역할 구분
@@ -10188,8 +10249,14 @@ app.post('/api/generation/start', async (c) => {
     sortedClothing.forEach(ci => images.push(ci.dataUrl))
 
     const clothingCount = sortedClothing.length
-    const modelImgIdx  = clothingCount + 1  // Image N (1-based)
-    const bgImgIdx     = clothingCount + (modelImageBase64 ? 1 : 0) + 1
+    const hasAccessory = !!accessoryImageBase64
+
+    // 1.5) 신발/가방 참고 이미지 — 의류 다음, 모델/배경보다 먼저 삽입
+    const accessoryImgIdx = hasAccessory ? clothingCount + 1 : 0
+    if (hasAccessory) images.push(accessoryImageBase64!)
+
+    const modelImgIdx  = clothingCount + (hasAccessory ? 1 : 0) + 1  // Image N (1-based)
+    const bgImgIdx     = clothingCount + (hasAccessory ? 1 : 0) + (modelImageBase64 ? 1 : 0) + 1
 
     // 2) 모델 이미지
     if (modelImageBase64) images.push(modelImageBase64)
@@ -10197,20 +10264,40 @@ app.post('/api/generation/start', async (c) => {
     // 3) 배경 이미지
     if (bgImageBase64) images.push(bgImageBase64)
 
-    console.log(`images 배열: 의류${clothingCount}장 | 모델${modelImageBase64 ? 1 : 0}장 | 배경${bgImageBase64 ? 1 : 0}장 | 총${images.length}장`)
+    console.log(`images 배열: 의류${clothingCount}장 | 액세서리${hasAccessory ? 1 : 0}장 | 모델${modelImageBase64 ? 1 : 0}장 | 배경${bgImageBase64 ? 1 : 0}장 | 총${images.length}장`)
 
     // ── 프롬프트 구성 ──
     let prompt: string = ''
     const hasBg    = !!bgImageBase64
     const hasModel = !!modelImageBase64
     const hasClothing = clothingCount > 0
+    // 신발/가방만 올리고 의류가 없는 경우에도 기존 의류 분기(멀티 이미지 합성 경로)를 타게
+    // 하기 위한 게이트 — 아래 모든 분기 조건의 hasClothing을 대체한다. accessoryImage가
+    // 없으면 hasGarmentRef === hasClothing이라 기존 동작과 완전히 동일하다.
+    const hasGarmentRef = hasClothing || hasAccessory
     // 생성 수량 1장 고정
     const jobCount = 1
 
-    if (hasClothing && hasModel && hasBg) {
+    // 신발/가방 참고 이미지에 대한 공통 지시문 — 모든 분기에서 재사용.
+    // inventOutfit=true(의류가 전혀 없을 때)면 분류된 스타일(클래식/캐주얼)에 맞는
+    // 의상을 AI가 직접 구상하도록 추가 지시를 덧붙인다.
+    function buildAccessoryBlock(idx: number, type: string, subCategory: string | null, inventOutfit: boolean): string {
+      if (!idx) return ''
+      const typeLabel: Record<string, string> = { SHOE: 'shoes', BAG: 'a bag', JEWELRY: 'a jewelry piece', UNKNOWN: 'an accessory item' }
+      const preserve = `Image ${idx} = ACCESSORY REFERENCE (${typeLabel[type] || typeLabel.UNKNOWN}) — the model must wear/carry this EXACT item. Preserve its exact color, material, shape, hardware, and design details precisely; do not alter, restyle, or substitute it.`
+      if (!inventOutfit) return preserve
+      const styleGuides: Record<string, string> = {
+        CLASSIC: 'a polished, classic outfit that pairs naturally with this accessory — tailored silhouettes, a neutral or refined color palette, minimal clean lines (e.g. a blazer, tailored trousers or a midi skirt, a simple blouse or knit top).',
+        CASUAL: 'a relaxed, casual outfit that pairs naturally with this accessory — everyday streetwear-friendly pieces, comfortable fits, casual denim or knitwear, an approachable color palette.',
+      }
+      const styleText = styleGuides[subCategory || ''] || 'a stylish, well-coordinated outfit that naturally complements this accessory.'
+      return `${preserve} Since no clothing reference was provided, design and dress the model in ${styleText} The outfit must look cohesive and intentional with the accessory as the styling anchor.`
+    }
+
+    if (hasGarmentRef && hasModel && hasBg) {
       // ══════════════════════════════════════════════════════════
       // ── 풀 모드: 단일 단계 — 의상 교체 + 얼굴/신원 교체 동시 처리 ──
-      //   이미지 순서: [의류1, 의류2?, ..., 모델(신원), 배경(씬)]
+      //   이미지 순서: [의류1, 의류2?, ..., 신발/가방?, 모델(신원), 배경(씬)]
       //
       // ⚠️ 아래 prompt 문자열은 실제 생성 품질에 직접 영향을 준다.
       //   다른 로직을 정리하다가 실수로 문구를 바꾸지 말 것 — 빌드/화면은
@@ -10222,8 +10309,9 @@ app.post('/api/generation/start', async (c) => {
 
       console.log('[단일 단계] 의상+얼굴+신원 통합 합성 시작')
 
-      const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-      const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+      const clothingRoleDesc = hasClothing ? buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1) : ''
+      const clothingReplaceInstructions = hasClothing ? buildClothingReplaceInstructions(sortedClothing, 1) : ''
+      const accessoryBlock = buildAccessoryBlock(accessoryImgIdx, accessoryType, accessorySubCategory, !hasClothing)
 
       prompt = [
         `COMPLETE FASHION LOOKBOOK SYNTHESIS — clothing replacement + identity swap in a single pass.`,
@@ -10231,8 +10319,9 @@ app.post('/api/generation/start', async (c) => {
         clothingRoleDesc,
         `Image ${bgImgIdx} = SCENE ANCHOR. This scene defines: background environment, scene lighting direction/color-temperature/intensity/saturation, color grade, and mood. LOCKED: background. The output background must come EXCLUSIVELY from Image ${bgImgIdx} — never from any clothing reference image's own background.`,
 
-        `CLOTHING REPLACEMENT:`,
+        hasClothing ? `CLOTHING REPLACEMENT:` : '',
         clothingReplaceInstructions,
+        accessoryBlock,
         `POSE: If Image ${bgImgIdx} already shows a person, that person's pose, stance, and body position are the PRIMARY pose reference — the output pose should naturally emerge from theirs, adjusting only as needed to fit the new clothing (do not rigidly lock every joint, but do not replace it with an unrelated generic pose either). Only if Image ${bgImgIdx} has no person to reference, fall back to a ${poseTypeText}, ${poseStyleText}. The pose must NEVER be copied from a clothing reference image, even if that image shows a person modeling the garment — clothing images are a garment/texture source only, not a pose reference.`,
 
         `IDENTITY (from Image ${modelImgIdx}) — READ THIS ONCE, IT IS THE ONLY IDENTITY RULE:`,
@@ -10258,43 +10347,49 @@ app.post('/api/generation/start', async (c) => {
         HARD_CONSTRAINTS,
       ].join(' ')
 
-    } else if (hasClothing && hasModel && !hasBg) {
+    } else if (hasGarmentRef && hasModel && !hasBg) {
       // ── 의류 + 모델, 배경 없음 ──
-      const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-      const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+      const clothingRoleDesc = hasClothing ? buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1) : ''
+      const clothingReplaceInstructions = hasClothing ? buildClothingReplaceInstructions(sortedClothing, 1) : ''
+      const accessoryBlock = buildAccessoryBlock(accessoryImgIdx, accessoryType, accessorySubCategory, !hasClothing)
       prompt = [
         `Create a hyper-realistic professional fashion lookbook photograph.`,
         clothingRoleDesc,
         `Image ${modelImgIdx} = MODEL IDENTITY — preserve this exact person's face, hair, skin tone, body proportions exactly.`,
         modelBodyTypeNote,
         clothingReplaceInstructions,
+        accessoryBlock,
         `Show a ${poseTypeText}, ${poseStyleText}.`,
         `Background: ${bgDesc} (${bgName}). Create a photorealistic environment. Integrate the model naturally with correct lighting and shadows.`,
         HARD_CONSTRAINTS,
       ].join(' ')
 
-    } else if (hasClothing && !hasModel && hasBg) {
+    } else if (hasGarmentRef && !hasModel && hasBg) {
       // ── 의류 + 배경, 모델 없음 ── CLOTHING SWAP (배경 속 원래 사람 유지)
-      const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-      const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+      const clothingRoleDesc = hasClothing ? buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1) : ''
+      const clothingReplaceInstructions = hasClothing ? buildClothingReplaceInstructions(sortedClothing, 1) : ''
+      const accessoryBlock = buildAccessoryBlock(accessoryImgIdx, accessoryType, accessorySubCategory, !hasClothing)
       prompt = [
         `You are doing a CLOTHING SWAP on a fashion background scene.`,
         clothingRoleDesc,
         `Image ${bgImgIdx} = SOURCE BACKGROUND SCENE containing a person. Keep the scene and person EXACTLY as-is — same face, same pose, same stance, same body position.`,
         clothingReplaceInstructions,
+        accessoryBlock,
         `FINAL RESULT: Same scene, same person, same pose — only the specified clothing items are replaced. Natural lighting, seamless integration.`,
         HARD_CONSTRAINTS,
       ].join(' ')
 
-    } else if (hasClothing && !hasModel && !hasBg) {
+    } else if (hasGarmentRef && !hasModel && !hasBg) {
       // ── 의류만 ── 텍스트 모델/배경 사용
-      const clothingRoleDesc = buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1)
-      const clothingReplaceInstructions = buildClothingReplaceInstructions(sortedClothing, 1)
+      const clothingRoleDesc = hasClothing ? buildClothingRoleDesc(sortedClothing.map(ci => ({ ...ci })), 1) : ''
+      const clothingReplaceInstructions = hasClothing ? buildClothingReplaceInstructions(sortedClothing, 1) : ''
+      const accessoryBlock = buildAccessoryBlock(accessoryImgIdx, accessoryType, accessorySubCategory, !hasClothing)
       prompt = [
         `Create a hyper-realistic professional fashion lookbook photograph.`,
         clothingRoleDesc,
         `Model: ${modelDesc}. Show in a ${poseTypeText}, ${poseStyleText}.`,
         clothingReplaceInstructions,
+        accessoryBlock,
         `Background: ${bgDesc} (${bgName}). Photorealistic environment with correct lighting and shadows.`,
         HARD_CONSTRAINTS,
       ].join(' ')
@@ -13316,6 +13411,7 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
           <input type="file" id="fileInput-TOP"    accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'TOP')" />
           <input type="file" id="fileInput-BOTTOM" accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'BOTTOM')" />
           <input type="file" id="fileInput-DRESS"  accept="image/*" style="display:none;" onchange="handleSlotFileSelect(event,'DRESS')" />
+          <input type="file" id="fileInput-ACCESSORY" accept="image/*" style="display:none;" onchange="handleAccessoryFileSelect(event)" />
 
           <!-- 2열 슬롯 그리드: 왼쪽=상의(위)+하의(아래) / 오른쪽=전체(전체 높이) -->
           <div class="clothing-slots">
@@ -13372,6 +13468,24 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
               </span>
               <button type="button" class="cslot-remove hidden" id="slot-remove-DRESS"
                 onclick="removeSlot(event,'DRESS')">✕</button>
+            </label>
+
+            <!-- 신발/가방 슬롯 (3행, 전체 너비) — 의류와 별개로 취급. AI가 신발/가방을 자동 분류한다 -->
+            <label class="cslot" id="slot-ACCESSORY" for="fileInput-ACCESSORY"
+              style="grid-column:1 / span 2; grid-row:3;"
+              ondragover="handleAccessoryDragOver(event)"
+              ondragleave="handleAccessoryDragLeave(event)"
+              ondrop="handleAccessoryDrop(event)"
+              onclick="return handleAccessoryLabelClick(event)">
+              <span class="cslot-label">신발/가방</span>
+              <span class="cslot-body" id="slot-body-ACCESSORY">
+                <span class="cslot-empty">
+                  <span class="cslot-plus">＋</span>
+                  <span class="cslot-hint">탭하여 사진 선택</span>
+                </span>
+              </span>
+              <button type="button" class="cslot-remove hidden" id="slot-remove-ACCESSORY"
+                onclick="removeAccessorySlot(event)">✕</button>
             </label>
 
           </div><!-- /.clothing-slots -->
@@ -14155,6 +14269,33 @@ app.get('/admin02', (c) => {
       </div>
 
       <div id="customBgGrid"></div>
+
+      <!-- 가방 배경 — 커스텀 배경과 별도 섹션. 신발/가방만 업로드했을 때 자동 매칭용으로 쓰일
+           특수 목적 배경이라 일반 사용자 배경 선택 화면에는 노출되지 않는다(/api/presets/backgrounds
+           에서 필터링됨). 배경 사진 속에 이미 가방이 등장하고, 생성 시 그 가방을 사용자가
+           업로드한 가방으로 교체한다 — "생성용 이미지"는 그 교체 기준이 되는 마킹본. -->
+      <div class="upload-form" style="margin-top:40px;border-top:2px solid #eee;padding-top:28px;">
+        <h3><i class="fas fa-shopping-bag" style="color:#3182F6;"></i> 가방 배경 <span style="font-size:13px;font-weight:400;color:#888;">(신발/가방 전용 — 일반 배경 목록에는 안 보임)</span></h3>
+        <div class="page-sub" style="margin-bottom:14px;">가방이 이미 등장하는 배경 사진을 올리세요. 등록 후 각 카드에서 "생성용 이미지 등록"으로 가방 위치를 마킹한 버전을 추가로 올려주세요(얼굴 마킹 배경과 동일한 방식) — 생성 시 그 가방이 사용자가 업로드한 가방으로 교체됩니다.</div>
+
+        <div class="upload-zone multi-zone" id="bagBgUploadZone" onclick="document.getElementById('bagBgFileInput').click()">
+          <div class="icon"><i class="fas fa-images"></i></div>
+          <p>클릭하거나 이미지를 드래그하세요<br/><span>여러 파일 선택 가능</span> (JPG, PNG, WEBP)</p>
+        </div>
+        <input type="file" id="bagBgFileInput" accept="image/*" multiple style="display:none" onchange="onBagBgFilesSelect(event)"/>
+
+        <div id="bagBgStagingGrid" style="display:none;margin-top:16px;">
+          <div style="font-size:13px;font-weight:600;color:#444;margin-bottom:10px;">선택된 이미지 — 이름을 입력 후 등록하세요</div>
+          <div id="bagBgStagingItems" style="display:flex;flex-wrap:wrap;gap:14px;"></div>
+          <div style="display:flex;gap:10px;align-items:center;margin-top:16px;">
+            <button class="btn-save" onclick="uploadBagBgs()"><i class="fas fa-upload"></i> 전체 등록</button>
+            <button class="btn-cancel" onclick="clearBagBgStaging()"><i class="fas fa-times"></i> 초기화</button>
+            <span class="save-status" id="bagBgUploadStatus"></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="bagBgGrid"></div>
     </div>
   </div>
 
@@ -14570,7 +14711,7 @@ function switchTab(name) {
   document.getElementById('tabErrors').classList.toggle('active', name === 'errors')
   document.getElementById('tabGovSupport').classList.toggle('active', name === 'govsupport')
   if (name === 'models') loadCustomModels()
-  if (name === 'bgs')    loadCustomBgs()
+  if (name === 'bgs')    { loadCustomBgs(); loadBagBgs() }
   if (name === 'home')   { loadShowcaseImages(); loadFeatureBgs(); loadHowtoVideos(); loadGenLoadingVideos(); loadGcLoadingImages() }
   if (name === 'users')  loadUsers()
   if (name === 'bizleads') bizInit()
@@ -16100,6 +16241,7 @@ async function deleteBg(id) {
   const data = await res.json()
   if (!data.success) { alert('삭제 실패: ' + (data.message || '알 수 없는 오류')); return }
   await loadCustomBgs()
+  await loadBagBgs()
 }
 async function toggleBgDefault(id) {
   const res = await fetch('/api/admin/backgrounds/' + id + '/default', {method:'PUT', headers:{'X-Admin-Password':adminPassword}})
@@ -16112,12 +16254,14 @@ async function loadCustomBgs() {
   try {
     const res = await fetch('/api/admin/backgrounds', {headers:{'X-Admin-Password':adminPassword}})
     const data = await res.json()
-    if (!data.backgrounds || data.backgrounds.length === 0) {
+    // '가방배경' 카테고리는 아래 별도 섹션(가방 배경 그리드)에서 보여주므로 여기선 제외
+    const bgs = (data.backgrounds || []).filter(b => b.category !== '가방배경')
+    if (!bgs.length) {
       grid.innerHTML = '<div class="empty-state"><div class="icon"><i class="fas fa-image"></i></div><p>등록된 커스텀 배경이 없습니다.</p></div>'
       return
     }
-    grid.innerHTML = '<div style="font-size:14px;font-weight:600;margin:20px 0 12px;">커스텀 배경 (' + data.backgrounds.length + '개)</div><div class="media-grid">' +
-      data.backgrounds.map(b =>
+    grid.innerHTML = '<div style="font-size:14px;font-weight:600;margin:20px 0 12px;">커스텀 배경 (' + bgs.length + '개)</div><div class="media-grid">' +
+      bgs.map(b =>
         '<div class="media-card bg-card-item">' +
         '<img src="/api/proxy/custom-bg/' + b.id + '" alt="' + b.name + '" loading="lazy"/>' +
         '<span class="custom-badge">커스텀</span>' +
@@ -16137,6 +16281,108 @@ async function loadCustomBgs() {
         '</div>'
       ).join('') + '</div>'
   } catch(e) { console.error('loadCustomBgs error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
+}
+
+// ── 가방 배경 — 위 커스텀 배경과 같은 /api/admin/backgrounds API를 쓰되 category를
+//    항상 '가방배경'으로 고정해서 올린다(개별 카테고리 선택 불필요). 삭제/생성용 이미지
+//    등록(pickBgGenImage/deleteBg)은 id 기반으로 이미 범용이라 그대로 재사용한다.
+let bagBgStagingList = []  // [{ file, base64, name }]
+
+async function onBagBgFilesSelect(e) {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  for (const file of files) {
+    const base64 = await readFileAsBase64(file)
+    bagBgStagingList.push({ file, base64, name: file.name.replace(/\.[^.]+$/, '') })
+  }
+  e.target.value = ''
+  renderBagBgStaging()
+}
+
+function renderBagBgStaging() {
+  const grid = document.getElementById('bagBgStagingGrid')
+  const container = document.getElementById('bagBgStagingItems')
+  if (!bagBgStagingList.length) { grid.style.display = 'none'; return }
+  grid.style.display = 'block'
+  document.getElementById('bagBgUploadZone').style.borderColor = '#3182F6'
+  container.innerHTML = bagBgStagingList.map((item, i) =>
+    '<div style="width:160px;flex-shrink:0;">' +
+    '<div style="position:relative;width:160px;height:120px;border-radius:10px;overflow:hidden;border:1.5px solid #e0e0e0;">' +
+    '<img src="' + item.base64 + '" style="width:100%;height:100%;object-fit:cover;"/>' +
+    '<button onclick="removeBagBgStaging(' + i + ')" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:none;border-radius:50%;width:22px;height:22px;cursor:pointer;font-size:16.2px;line-height:22px;text-align:center;padding:0;">✕</button>' +
+    '</div>' +
+    '<input class="form-input" value="' + escHtml(item.name) + '" oninput="bagBgStagingList[' + i + '].name=this.value" placeholder="배경 이름" style="margin-top:6px;width:100%;box-sizing:border-box;font-size:11px;padding:4px 7px;"/>' +
+    '</div>'
+  ).join('')
+}
+
+function removeBagBgStaging(idx) {
+  bagBgStagingList.splice(idx, 1)
+  renderBagBgStaging()
+}
+
+function clearBagBgStaging() {
+  bagBgStagingList = []
+  document.getElementById('bagBgUploadZone').style.borderColor = ''
+  document.getElementById('bagBgStagingGrid').style.display = 'none'
+  document.getElementById('bagBgUploadStatus').textContent = ''
+}
+
+async function uploadBagBgs() {
+  const status = document.getElementById('bagBgUploadStatus')
+  if (!bagBgStagingList.length) { status.textContent = '이미지를 선택하세요'; status.className = 'save-status err'; return }
+  const missing = bagBgStagingList.filter(i => !i.name.trim())
+  if (missing.length) { status.textContent = '이름이 비어있는 항목이 있습니다'; status.className = 'save-status err'; return }
+  status.textContent = '등록 중...'; status.className = 'save-status'
+  try {
+    const payload = bagBgStagingList.map(i => ({
+      name: i.name.trim(),
+      bgDesc: i.name.trim(),
+      category: '가방배경',
+      imageBase64: i.base64,
+    }))
+    const res = await fetch('/api/admin/backgrounds', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-Admin-Password':adminPassword},
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json()
+    if (data.success) {
+      status.textContent = data.count + '개 등록 완료!'; status.className = 'save-status ok'
+      clearBagBgStaging()
+      loadBagBgs()
+    } else { status.textContent = data.message || '등록 실패'; status.className = 'save-status err' }
+  } catch(e) { status.textContent = '오류: ' + e.message; status.className = 'save-status err' }
+}
+
+async function loadBagBgs() {
+  const grid = document.getElementById('bagBgGrid')
+  if (!grid) return
+  try {
+    const res = await fetch('/api/admin/backgrounds', {headers:{'X-Admin-Password':adminPassword}})
+    const data = await res.json()
+    const bgs = (data.backgrounds || []).filter(b => b.category === '가방배경')
+    if (!bgs.length) {
+      grid.innerHTML = '<div class="empty-state"><div class="icon"><i class="fas fa-shopping-bag"></i></div><p>등록된 가방 배경이 없습니다.</p></div>'
+      return
+    }
+    grid.innerHTML = '<div style="font-size:14px;font-weight:600;margin:20px 0 12px;">가방 배경 (' + bgs.length + '개)</div><div class="media-grid">' +
+      bgs.map(b =>
+        '<div class="media-card bg-card-item">' +
+        '<img src="/api/proxy/custom-bg/' + b.id + '" alt="' + b.name + '" loading="lazy"/>' +
+        '<span class="custom-badge">가방배경</span>' +
+        '<button class="del-btn" onclick="event.stopPropagation();deleteBg(' + "'" + b.id + "'" + ')"><i class="fas fa-times"></i></button>' +
+        '<div class="meta"><div class="name">' + b.name + '</div>' +
+        '<div style="margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' +
+        (b.hasGenImage
+          ? '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#dcfce7;color:#15803d;font-weight:600;">생성용 이미지 등록됨</span>'
+          : '<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:#fef3c7;color:#92400e;font-weight:600;">생성용 미등록 (원본 사용)</span>') +
+        '<button onclick="event.stopPropagation();pickBgGenImage(' + "'" + b.id + "'" + ')" style="font-size:13.5px;padding:2px 8px;border-radius:20px;border:1px solid #ccc;background:#fff;cursor:pointer;">' +
+        (b.hasGenImage ? '생성용 이미지 교체' : '생성용 이미지 등록') + '</button>' +
+        '</div></div>' +
+        '</div>'
+      ).join('') + '</div>'
+  } catch(e) { console.error('loadBagBgs error:', e); grid.innerHTML = '<div class="empty-state"><p>불러오기 실패: ' + e.message + '</p></div>' }
 }
 
 // ══════════════════════════════════════════════
@@ -16532,6 +16778,7 @@ async function onBgGenImageSelect(e) {
     const data = await res.json()
     if (!data.success) { alert('등록 실패: ' + (data.message || '알 수 없는 오류')); return }
     await loadCustomBgs()
+    await loadBagBgs()
   } catch(err) { alert('오류: ' + err.message) }
 }
 
@@ -16559,6 +16806,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pwInput').focus()
   setupDrop('modelUploadZone', onModelFilesSelect)
   setupDrop('bgUploadZone', onBgFilesSelect)
+  setupDrop('bagBgUploadZone', onBagBgFilesSelect)
 
   // 이벤트 위임: 유저 테이블 버튼 처리 (onclick 대신 data-action 사용)
   document.addEventListener('click', function(e) {
