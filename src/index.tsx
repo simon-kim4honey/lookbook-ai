@@ -1840,6 +1840,11 @@ const GHOSTCUT_CATEGORIES: GhostCutCategory[] = [
   { code: 'DRESS',    group: '원피스', label: '원피스' },
   { code: 'JUMPSUIT', group: '점프수트', label: '점프수트' },
   { code: 'SET',      group: '세트',   label: '세트' },
+  // 2026-10-30: 신발/가방 추가 — 의류와 달리 "투명 마네킹이 입은 것처럼" 렌더링하는
+  // 고스트 마네킹 방식이 안 맞아서(신발/가방은 몸에 걸치는 게 아니라 놓이는 제품),
+  // 생성 프롬프트 쪽은 /api/ghostcut/generate에서 category별로 분기 처리한다.
+  { code: 'SHOE',     group: '신발',   label: '신발' },
+  { code: 'BAG',      group: '가방',   label: '가방' },
 ]
 const GHOSTCUT_CODE_SET = new Set(GHOSTCUT_CATEGORIES.map(g => g.code))
 
@@ -2015,10 +2020,10 @@ app.post('/api/validate/accessory', async (c) => {
 const GHOSTCUT_CLASSIFY_PROMPT = (() => {
   const lines = GHOSTCUT_CATEGORIES.map(g => `${g.code} (${g.group} - ${g.label})`)
   return [
-    `You are a clothing product classifier for a "ghost mannequin" e-commerce photography app.`,
-    `Look at the uploaded image. First decide: is this clearly a photo of a SINGLE clothing/fashion product (worn, laid flat, on a hanger, or on a mannequin)? It does not need to be a professional product shot.`,
-    `If it is NOT a clothing product at all (e.g. a person's portrait unrelated to showing a garment, an animal, food, scenery, a random object, or an image with no identifiable single garment), respond with exactly: NOT_CLOTHING`,
-    `If it IS a clothing product, respond with EXACTLY ONE of these category codes (the single best match, nothing else):`,
+    `You are a fashion product classifier for an e-commerce product photography app (clothing via "ghost mannequin" rendering, shoes/bags via clean product shots).`,
+    `Look at the uploaded image. First decide: is this clearly a photo of a SINGLE clothing, shoe, or bag product (worn, held, laid flat, on a hanger, or on a mannequin)? It does not need to be a professional product shot.`,
+    `If it is NOT a clothing/shoe/bag product at all (e.g. a person's portrait unrelated to showing the product, jewelry, an animal, food, scenery, a random object, or an image with no identifiable single product), respond with exactly: NOT_CLOTHING`,
+    `If it IS a clothing/shoe/bag product, respond with EXACTLY ONE of these category codes (the single best match, nothing else):`,
     lines.join(', '),
     `Respond with ONLY the code (e.g. "TOP") or "NOT_CLOTHING" — no explanation, no punctuation, no extra words.`,
   ].join('\n')
@@ -10723,29 +10728,65 @@ app.post('/api/ghostcut/generate', async (c) => {
     //   AI가 Image 1 의류의 길이/디자인 자체를 Image 2 샘플에 맞춰 바꿔버렸다(숏패딩→롱패딩
     //   사례). Image 2는 "고스트 마네킹 렌더링 기법·카메라 구도"만 참고하고, 의류의 길이/컷/
     //   실루엣/비율은 반드시 Image 1 그대로 유지해야 한다 — 이 구분을 절대 흐리지 말 것.
-    const GHOSTCUT_HARD_CONSTRAINTS = [
-      `ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,
-      `1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,
-      `2. DO NOT change, redesign, or substitute ANY detail of the garment from Image 1: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, stitching, OVERALL LENGTH, CUT, and SILHOUETTE must be reproduced EXACTLY as shown in Image 1.`,
-      `3. NO visible human body, face, hands, mannequin form, hanger, or flat-lay surface anywhere in the output — only the invisible-mannequin (ghost) effect.`,
-      `4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,
-      `5. Background MUST be pure solid white (#FFFFFF), completely flat and shadowless — NO drop shadow, NO contact shadow, NO reflection, NO gradient, NO vignette anywhere in the frame.`,
-      `6. The output garment's color, pattern, print, fabric, and overall design MUST come exclusively from Image 1. Image 1 and Image 2 show two different, unrelated products — if the output resembles Image 2's garment instead of Image 1's, this is a CRITICAL FAILURE.`,
-      `7. Image 1's garment LENGTH and SILHOUETTE (e.g., a cropped/short jacket must stay cropped/short, a long coat must stay long) must be preserved EXACTLY — do NOT lengthen, shorten, widen, or otherwise reshape it to match Image 2's proportions. Image 2 contributes ONLY the rendering technique and camera framing, never the garment's shape.`,
-      `8. Image 1's garment FABRIC MATERIAL and COLOR must be reproduced with ZERO deviation — do NOT change the material type (e.g. turning cotton into leather, knit into woven, matte into shiny, thin into padded/quilted), fabric weight or thickness, weave/knit pattern, sheen, or the exact color/shade/hue of the garment from Image 1. These are the most critical visual properties of the product and must never be altered under any circumstances.`,
-      `Ultra-photorealistic, 8K quality, professional e-commerce product photography.`,
-    ].join(' ')
+    const isProductCategory = category === 'SHOE' || category === 'BAG'
+    let prompt: string
 
-    const prompt = [
-      `GHOST MANNEQUIN PRODUCT PHOTOGRAPHY — combine an actual garment photo with a rendering-style reference from a DIFFERENT, UNRELATED product photo.`,
-      `Image 1 and Image 2 show TWO COMPLETELY DIFFERENT GARMENTS from two different products. They are NOT the same item and must NEVER be blended, merged, mixed, or averaged together.`,
-      `Image 1 = THE PRODUCT BEING SOLD — the ONLY source of what the garment looks like AND its exact shape. Every visual detail (color, pattern, print, texture, fabric weave, stitching, buttons, zippers, collar, cuffs, hem, logo placement, print scale) AND every structural detail (overall length, cut, silhouette, fit, proportions — e.g. a cropped jacket stays cropped, it must NOT become a long coat) must be reproduced EXACTLY as shown in Image 1, with zero alteration.`,
-      `Image 2 = an UNRELATED product photo used SOLELY for the RENDERING TECHNIQUE and camera framing — NEVER for shape. Take from Image 2 ONLY: how a garment is rendered with the invisible-mannequin (ghost) effect (naturally filled/worn by an invisible body, realistic volumetric fill and fabric drape — no visible mannequin, no visible model, no human body or hands, no headless-torso form) and the camera framing/crop/angle. Do NOT take Image 2's garment length, cut, silhouette, proportions, design, color, pattern, print, fabric, background, or lighting — none of that belongs to this product and must have ZERO influence on the output. Image 1's garment keeps its own exact length and shape unchanged; only the rendering method is borrowed from Image 2.`,
-      `BACKGROUND & LIGHTING — MANDATORY, OVERRIDES Image 2 entirely: Pure solid white (#FFFFFF) seamless studio background, completely flat and even, no gradient, no vignette, no visible floor line or horizon. Even, shadowless studio lighting on the garment — DO NOT render any drop shadow, contact shadow, cast shadow, or reflection anywhere on or around the garment. The garment must appear to float cleanly on pure white with ZERO shadow, regardless of what background or lighting Image 2 shows.`,
-      `REMINDER before finalizing: the garment's appearance AND shape (length, cut, silhouette, proportions) in your output must both come from Image 1 unchanged — resize nothing, reshape nothing, only render it using the invisible-mannequin technique and framing shown in Image 2. If your output's garment is longer, shorter, or differently proportioned than Image 1, or resembles Image 2's garment in any way, that is WRONG.`,
-      `FINAL OUTPUT: A single professional e-commerce ghost-mannequin product photograph on a pure white, completely shadowless background — Image 1's exact garment (color, pattern, fabric, design, length, cut, silhouette, all unchanged), rendered using Image 2's invisible-mannequin technique and camera framing only. The garment must look naturally filled with realistic fabric drape and natural wrinkles at shoulders/sleeves/hem, as if worn by an invisible body — NOT flat-lay, NOT laid on a table, NOT on a visible mannequin or hanger.`,
-      GHOSTCUT_HARD_CONSTRAINTS,
-    ].join(' ')
+    if (isProductCategory) {
+      // ── 신발/가방 — 2026-10-30 추가 ──
+      // 의류용 "고스트 마네킹"(투명 인체가 입은 것처럼 패브릭 드레이프) 프롬프트를
+      // 그대로 쓰면 신발/가방처럼 몸에 걸치지 않는 단단한 제품에는 말이 안 맞아서
+      // (투명한 발/손이 들고 있는 것처럼 왜곡될 위험), 같은 "Image1=제품/Image2=연출
+      // 기법 참고용" 구조는 유지하되 "보이지 않는 인체가 착용" 표현을 전부 빼고
+      // 일반 제품 사진(흰 배경, 조명/구도만 참고) 톤으로 새로 작성했다.
+      const productLabel = category === 'SHOE' ? 'shoe' : 'bag'
+      const PRODUCT_HARD_CONSTRAINTS = [
+        `ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,
+        `1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,
+        `2. DO NOT change, redesign, or substitute ANY detail of the ${productLabel} from Image 1: color, pattern, texture, material, hardware, stitching, straps/laces, sole/base, logo placement, and OVERALL SHAPE and PROPORTIONS must be reproduced EXACTLY as shown in Image 1.`,
+        `3. NO visible human body, face, hands, feet, mannequin form, or flat-lay surface anywhere in the output — the ${productLabel} must appear as a standalone clean product shot, not worn, not held, not placed on any body part.`,
+        `4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,
+        `5. Background MUST be pure solid white (#FFFFFF), completely flat and shadowless — NO drop shadow, NO contact shadow, NO reflection, NO gradient, NO vignette anywhere in the frame.`,
+        `6. The output ${productLabel}'s color, pattern, material, and overall design MUST come exclusively from Image 1. Image 1 and Image 2 show two different, unrelated products — if the output resembles Image 2's product instead of Image 1's, this is a CRITICAL FAILURE.`,
+        `7. Image 1's ${productLabel} SHAPE and PROPORTIONS must be preserved EXACTLY — do NOT resize, reshape, or otherwise alter it to match Image 2's proportions. Image 2 contributes ONLY the lighting style and camera framing, never the product's shape.`,
+        `8. Image 1's ${productLabel} MATERIAL and COLOR must be reproduced with ZERO deviation — do NOT change the material type (e.g. turning leather into canvas, matte into glossy), texture, or the exact color/shade/hue from Image 1. These are the most critical visual properties of the product and must never be altered under any circumstances.`,
+        `Ultra-photorealistic, 8K quality, professional e-commerce product photography.`,
+      ].join(' ')
+
+      prompt = [
+        `PRODUCT PHOTOGRAPHY — combine an actual ${productLabel} photo with a lighting/framing reference from a DIFFERENT, UNRELATED product photo.`,
+        `Image 1 and Image 2 show TWO COMPLETELY DIFFERENT ${productLabel.toUpperCase()}S from two different products. They are NOT the same item and must NEVER be blended, merged, mixed, or averaged together.`,
+        `Image 1 = THE PRODUCT BEING SOLD — the ONLY source of what the ${productLabel} looks like AND its exact shape. Every visual detail (color, pattern, texture, material, hardware, stitching, straps/laces, sole/base, logo placement) AND every structural detail (overall shape, proportions, silhouette) must be reproduced EXACTLY as shown in Image 1, with zero alteration.`,
+        `Image 2 = an UNRELATED product photo used SOLELY for the LIGHTING STYLE and camera framing — NEVER for shape. Take from Image 2 ONLY: how the product is lit and angled for a clean e-commerce product shot (no visible mannequin, no visible model, no human body, hands, or feet). Do NOT take Image 2's product shape, design, color, pattern, material, background, or lighting subject matter — none of that belongs to this product and must have ZERO influence on the output. Image 1's ${productLabel} keeps its own exact shape unchanged; only the lighting/framing style is borrowed from Image 2.`,
+        `BACKGROUND & LIGHTING — MANDATORY, OVERRIDES Image 2 entirely: Pure solid white (#FFFFFF) seamless studio background, completely flat and even, no gradient, no vignette, no visible floor line or horizon. Even, shadowless studio lighting on the product — DO NOT render any drop shadow, contact shadow, cast shadow, or reflection anywhere on or around the product. The product must appear to float cleanly on pure white with ZERO shadow, regardless of what background or lighting Image 2 shows.`,
+        `REMINDER before finalizing: the product's appearance AND shape in your output must both come from Image 1 unchanged — resize nothing, reshape nothing, only apply the lighting style and framing shown in Image 2. If your output's product is differently shaped than Image 1, or resembles Image 2's product in any way, that is WRONG.`,
+        `FINAL OUTPUT: A single professional e-commerce product photograph on a pure white, completely shadowless background — Image 1's exact ${productLabel} (color, pattern, material, design, shape, all unchanged), styled using Image 2's lighting and camera framing only. No human body, hands, or feet in frame — a standalone clean product shot, NOT worn, NOT held, NOT on a mannequin.`,
+        PRODUCT_HARD_CONSTRAINTS,
+      ].join(' ')
+    } else {
+      const GHOSTCUT_HARD_CONSTRAINTS = [
+        `ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,
+        `1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,
+        `2. DO NOT change, redesign, or substitute ANY detail of the garment from Image 1: color, pattern, print, texture, collar, neckline, sleeve length, hem, buttons, zippers, pockets, stitching, OVERALL LENGTH, CUT, and SILHOUETTE must be reproduced EXACTLY as shown in Image 1.`,
+        `3. NO visible human body, face, hands, mannequin form, hanger, or flat-lay surface anywhere in the output — only the invisible-mannequin (ghost) effect.`,
+        `4. NO watermarks. NO overlaid captions. NO decorative text. NO brand insignia added by AI.`,
+        `5. Background MUST be pure solid white (#FFFFFF), completely flat and shadowless — NO drop shadow, NO contact shadow, NO reflection, NO gradient, NO vignette anywhere in the frame.`,
+        `6. The output garment's color, pattern, print, fabric, and overall design MUST come exclusively from Image 1. Image 1 and Image 2 show two different, unrelated products — if the output resembles Image 2's garment instead of Image 1's, this is a CRITICAL FAILURE.`,
+        `7. Image 1's garment LENGTH and SILHOUETTE (e.g., a cropped/short jacket must stay cropped/short, a long coat must stay long) must be preserved EXACTLY — do NOT lengthen, shorten, widen, or otherwise reshape it to match Image 2's proportions. Image 2 contributes ONLY the rendering technique and camera framing, never the garment's shape.`,
+        `8. Image 1's garment FABRIC MATERIAL and COLOR must be reproduced with ZERO deviation — do NOT change the material type (e.g. turning cotton into leather, knit into woven, matte into shiny, thin into padded/quilted), fabric weight or thickness, weave/knit pattern, sheen, or the exact color/shade/hue of the garment from Image 1. These are the most critical visual properties of the product and must never be altered under any circumstances.`,
+        `Ultra-photorealistic, 8K quality, professional e-commerce product photography.`,
+      ].join(' ')
+
+      prompt = [
+        `GHOST MANNEQUIN PRODUCT PHOTOGRAPHY — combine an actual garment photo with a rendering-style reference from a DIFFERENT, UNRELATED product photo.`,
+        `Image 1 and Image 2 show TWO COMPLETELY DIFFERENT GARMENTS from two different products. They are NOT the same item and must NEVER be blended, merged, mixed, or averaged together.`,
+        `Image 1 = THE PRODUCT BEING SOLD — the ONLY source of what the garment looks like AND its exact shape. Every visual detail (color, pattern, print, texture, fabric weave, stitching, buttons, zippers, collar, cuffs, hem, logo placement, print scale) AND every structural detail (overall length, cut, silhouette, fit, proportions — e.g. a cropped jacket stays cropped, it must NOT become a long coat) must be reproduced EXACTLY as shown in Image 1, with zero alteration.`,
+        `Image 2 = an UNRELATED product photo used SOLELY for the RENDERING TECHNIQUE and camera framing — NEVER for shape. Take from Image 2 ONLY: how a garment is rendered with the invisible-mannequin (ghost) effect (naturally filled/worn by an invisible body, realistic volumetric fill and fabric drape — no visible mannequin, no visible model, no human body or hands, no headless-torso form) and the camera framing/crop/angle. Do NOT take Image 2's garment length, cut, silhouette, proportions, design, color, pattern, print, fabric, background, or lighting — none of that belongs to this product and must have ZERO influence on the output. Image 1's garment keeps its own exact length and shape unchanged; only the rendering method is borrowed from Image 2.`,
+        `BACKGROUND & LIGHTING — MANDATORY, OVERRIDES Image 2 entirely: Pure solid white (#FFFFFF) seamless studio background, completely flat and even, no gradient, no vignette, no visible floor line or horizon. Even, shadowless studio lighting on the garment — DO NOT render any drop shadow, contact shadow, cast shadow, or reflection anywhere on or around the garment. The garment must appear to float cleanly on pure white with ZERO shadow, regardless of what background or lighting Image 2 shows.`,
+        `REMINDER before finalizing: the garment's appearance AND shape (length, cut, silhouette, proportions) in your output must both come from Image 1 unchanged — resize nothing, reshape nothing, only render it using the invisible-mannequin technique and framing shown in Image 2. If your output's garment is longer, shorter, or differently proportioned than Image 1, or resembles Image 2's garment in any way, that is WRONG.`,
+        `FINAL OUTPUT: A single professional e-commerce ghost-mannequin product photograph on a pure white, completely shadowless background — Image 1's exact garment (color, pattern, fabric, design, length, cut, silhouette, all unchanged), rendered using Image 2's invisible-mannequin technique and camera framing only. The garment must look naturally filled with realistic fabric drape and natural wrinkles at shoulders/sleeves/hem, as if worn by an invisible body — NOT flat-lay, NOT laid on a table, NOT on a visible mannequin or hanger.`,
+        GHOSTCUT_HARD_CONSTRAINTS,
+      ].join(' ')
+    }
 
     console.log('[GhostCut] category:', category, '| prompt(first 200):', prompt.substring(0, 200))
 
