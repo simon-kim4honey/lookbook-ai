@@ -11,6 +11,8 @@ import {
   buildCategoryTrees, buildCategoryStructureText, mergeCategoryBlocks,
   isAiGeneratedNode, flattenCategory, buildAiBlocksByModuleId, buildMissingModuleStructureText, type CategoryTree,
 } from './gov/generationAssembly.ts'
+import { buildGovSupportDocx } from './gov/docxExport.ts'
+import { Packer } from 'docx'
 import { rewriteForCardNews, renderCardSvg } from './card-image'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
@@ -5007,6 +5009,63 @@ app.get('/api/gov-support/projects/:id/visual-image/:key', async (c) => {
   }
 })
 
+// 2026-10-31: "생성된 자료를 워드/한글 파일로 다운받아 직접 수정할 수 있어야 한다"는
+// 요청 — .hwp는 비공개 포맷이라 생성 가능한 라이브러리가 사실상 없어(한글 2014+는
+// .docx를 그대로 열고 편집할 수 있음) .docx로 내보낸다. 변환 로직 자체는 docxExport.ts
+// (순수 함수)에 있고, 여기서는 D1에서 결과 페이지와 동일한 데이터(generated_content +
+// process_image_b64 + visual_images_b64)를 읽어 넘기기만 한다. <a download>가 커스텀
+// 헤더를 못 보내므로 process-image/visual-image와 같은 패턴으로 토큰을 쿼리스트링으로도 받는다.
+app.get('/api/gov-support/projects/:id/export-docx', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  try {
+    const sessionToken = c.req.header('X-Session-Token') || c.req.query('token') || ''
+    const sess = await db.prepare(
+      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
+    ).bind(sessionToken).first() as any
+    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+
+    const project = await db.prepare(
+      `SELECT program_name, status, generated_content, generated_at, process_image_b64, visual_images_b64 FROM gov_support_projects WHERE id = ? AND user_id = ?`
+    ).bind(c.req.param('id'), sess.user_id).first() as any
+    if (!project) return c.json({ success: false, message: '프로젝트를 찾을 수 없습니다.' }, 404)
+    if (project.status !== 'generated' || !project.generated_content) {
+      return c.json({ success: false, message: '아직 생성된 초안이 없습니다.' }, 400)
+    }
+
+    let visualImages: Record<string, string> = {}
+    if (project.visual_images_b64) {
+      try { visualImages = JSON.parse(project.visual_images_b64) } catch { /* 무시 — 이미지 없이 진행 */ }
+    }
+
+    const doc = buildGovSupportDocx({
+      programName: project.program_name,
+      generatedAt: project.generated_at,
+      content: JSON.parse(project.generated_content),
+      images: { process: project.process_image_b64 || null, visual: visualImages },
+    })
+    const buf = await Packer.toBuffer(doc)
+
+    const safeAscii = `gov-support-${c.req.param('id').slice(0, 8)}.docx`
+    const utf8Name = encodeURIComponent(`${project.program_name || '지원사업'}_사업계획서초안.docx`)
+    return new Response(buf, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': `attachment; filename="${safeAscii}"; filename*=UTF-8''${utf8Name}`,
+        'Cache-Control': 'private, no-store',
+      },
+    })
+  } catch (err: any) {
+    console.error('gov-support export-docx 실패:', err)
+    await logError(c.env as any, {
+      source: 'server',
+      message: `gov-support export-docx 실패: ${err?.message || err}`,
+      route: '/api/gov-support/projects/:id/export-docx',
+    }).catch(() => {})
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 app.patch('/api/gov-support/projects/:id/answers', async (c) => {
   const db: D1Database = c.env.LOOKBOOK_DB
   try {
@@ -7190,7 +7249,10 @@ app.get('/gov-support/result/:id', (c) => {
     ${govSupportTopNav(c, 794)}
     <div class="rs-header">
       <a href="/gov-support" class="rs-back">‹</a>
-      <button type="button" class="rs-print-btn" onclick="window.print()">인쇄 / PDF 저장</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <a id="rsDocxLink" href="#" class="rs-print-btn" style="background:#191F28;text-decoration:none;display:none;">워드로 다운로드</a>
+        <button type="button" class="rs-print-btn" onclick="window.print()">인쇄 / PDF 저장</button>
+      </div>
     </div>
     <div class="rs-inner">
       <div id="rsLoading" style="text-align:center;padding:60px 0;color:#8B95A1;font-size:14px;">불러오는 중...</div>
@@ -7424,6 +7486,15 @@ app.get('/gov-support/result/:id', (c) => {
         document.getElementById('rsDoc').innerHTML = html;
         document.getElementById('rsLoading').style.display = 'none';
         document.getElementById('rsContent').style.display = 'block';
+
+        // 2026-10-31: 편집 가능한 .docx 다운로드 — 인증이 필요한 GET이라 process-image와
+        // 같은 패턴으로 토큰을 쿼리스트링에 실어 보낸다(JS fetch+blob 대신 <a download>가
+        // 브라우저 기본 다운로드 UI를 그대로 쓸 수 있어 더 단순하고 안정적).
+        var rsDocxLink = document.getElementById('rsDocxLink');
+        if (rsDocxLink) {
+          rsDocxLink.href = '/api/gov-support/projects/' + RS_PROJECT_ID + '/export-docx?token=' + encodeURIComponent(token);
+          rsDocxLink.style.display = 'inline-block';
+        }
       } catch (e) {
         // 2026-10-27: 여기서 뭔가 던지면(네트워크 오류든 예상 못한 데이터 모양이든)
         // catch가 토스트만 띄우고 끝나서, rsLoading이 'none'으로 안 바뀌어 "불러오는
