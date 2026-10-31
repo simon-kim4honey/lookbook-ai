@@ -1842,9 +1842,17 @@ const GHOSTCUT_CATEGORIES: GhostCutCategory[] = [
   { code: 'SET',      group: '세트',   label: '세트' },
   // 2026-10-30: 신발/가방 추가 — 의류와 달리 "투명 마네킹이 입은 것처럼" 렌더링하는
   // 고스트 마네킹 방식이 안 맞아서(신발/가방은 몸에 걸치는 게 아니라 놓이는 제품),
-  // 생성 프롬프트 쪽은 /api/ghostcut/generate에서 category별로 분기 처리한다.
-  { code: 'SHOE',     group: '신발',   label: '신발' },
-  { code: 'BAG',      group: '가방',   label: '가방' },
+  // 생성 프롬프트 쪽은 /api/ghostcut/generate에서 group('신발'/'가방') 기준으로 분기 처리한다.
+  // 2026-10-31: 신발/가방을 세부 카테고리로 세분화(관리자가 유형별로 다른 샘플을
+  // 등록할 수 있도록) — group은 '신발'/'가방'으로 고정하고 label만 세부 유형을 나타낸다.
+  { code: 'SHOE_DRESS',    group: '신발', label: '구두' },
+  { code: 'SHOE_SNEAKERS', group: '신발', label: '운동화' },
+  { code: 'SHOE_BOOTS',    group: '신발', label: '부츠' },
+  { code: 'SHOE_SANDALS',  group: '신발', label: '샌들·슬리퍼' },
+  { code: 'BAG_TOTE',      group: '가방', label: '토트백' },
+  { code: 'BAG_CROSS',     group: '가방', label: '크로스백' },
+  { code: 'BAG_BACKPACK',  group: '가방', label: '백팩' },
+  { code: 'BAG_CLUTCH',    group: '가방', label: '클러치' },
 ]
 const GHOSTCUT_CODE_SET = new Set(GHOSTCUT_CATEGORIES.map(g => g.code))
 
@@ -10728,17 +10736,20 @@ app.post('/api/ghostcut/generate', async (c) => {
     //   AI가 Image 1 의류의 길이/디자인 자체를 Image 2 샘플에 맞춰 바꿔버렸다(숏패딩→롱패딩
     //   사례). Image 2는 "고스트 마네킹 렌더링 기법·카메라 구도"만 참고하고, 의류의 길이/컷/
     //   실루엣/비율은 반드시 Image 1 그대로 유지해야 한다 — 이 구분을 절대 흐리지 말 것.
-    const isProductCategory = category === 'SHOE' || category === 'BAG'
+    const isProductCategory = cat.group === '신발' || cat.group === '가방'
     let prompt: string
 
     if (isProductCategory) {
-      // ── 신발/가방 — 2026-10-30 추가 ──
+      // ── 신발/가방 — 2026-10-30 추가, 2026-10-31 세부 카테고리로 분기 조건 일반화 ──
       // 의류용 "고스트 마네킹"(투명 인체가 입은 것처럼 패브릭 드레이프) 프롬프트를
       // 그대로 쓰면 신발/가방처럼 몸에 걸치지 않는 단단한 제품에는 말이 안 맞아서
       // (투명한 발/손이 들고 있는 것처럼 왜곡될 위험), 같은 "Image1=제품/Image2=연출
       // 기법 참고용" 구조는 유지하되 "보이지 않는 인체가 착용" 표현을 전부 빼고
       // 일반 제품 사진(흰 배경, 조명/구도만 참고) 톤으로 새로 작성했다.
-      const productLabel = category === 'SHOE' ? 'shoe' : 'bag'
+      // ⚠️ category 코드 자체(SHOE_DRESS 등)가 아니라 cat.group으로 분기해야 신발/가방
+      //   세부 카테고리를 추가/변경해도 이 분기가 깨지지 않는다 — 코드 리터럴 비교로
+      //   되돌리지 말 것.
+      const productLabel = cat.group === '신발' ? 'shoe' : 'bag'
       const PRODUCT_HARD_CONSTRAINTS = [
         `ABSOLUTE RULES — NEVER VIOLATE UNDER ANY CIRCUMSTANCES:`,
         `1. DO NOT insert, overlay, embed, or render ANY text, letters, numbers, words, logos, watermarks, brand marks, or typographic elements ANYWHERE in the image.`,
