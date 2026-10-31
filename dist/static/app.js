@@ -2559,7 +2559,7 @@ function goToStep(step) {
 
 function nextStep(currentStep) {
   if (currentStep === 1) {
-    const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null);
+    const hasAny = SLOT_CATS.some(cat => slotData[cat] !== null) || accessoryData !== null;
     if (!hasAny) {
       showToast(t('uploadHint'), 'warning');
       return;
