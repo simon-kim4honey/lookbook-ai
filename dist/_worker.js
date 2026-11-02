@@ -213,7 +213,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mvyz5h8h`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mvyzg7ur`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2308,20 +2308,21 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           </div>
         </div>
 
-        <div class="wz-step" id="wzDoneStep" style="display:none;">
-          <div class="wz-done-box" id="wzDoneBoxIdle">
-            <div class="wz-done-icon">✅</div>
-            <h2>입력이 끝났어요</h2>
-            <p>입력하신 내용으로 AI가 초안을 만들어드릴게요.</p>
-            <button type="button" class="wz-nav-btn wz-nav-next" id="wzGenerateBtn" style="display:inline-block;padding:15px 28px;" onclick="wzStartGenerate()">AI 초안 생성하기</button>
-          </div>
-          <div class="wz-done-box" id="wzDoneBoxLoading" style="display:none;">
-            <div class="wz-done-icon">✨</div>
-            <h2>초안을 작성하고 있어요</h2>
-            <p>최대 1~2분 정도 걸릴 수 있어요.</p>
-          </div>
-        </div>
       </form>
+
+      <div class="wz-step" id="wzDoneStep" style="display:none;">
+        <div class="wz-done-box" id="wzDoneBoxIdle">
+          <div class="wz-done-icon">✅</div>
+          <h2>입력이 끝났어요</h2>
+          <p>입력하신 내용으로 AI가 초안을 만들어드릴게요.</p>
+          <button type="button" class="wz-nav-btn wz-nav-next" id="wzGenerateBtn" style="display:inline-block;padding:15px 28px;" onclick="wzStartGenerate()">AI 초안 생성하기</button>
+        </div>
+        <div class="wz-done-box" id="wzDoneBoxLoading" style="display:none;">
+          <div class="wz-done-icon">✨</div>
+          <h2>초안을 작성하고 있어요</h2>
+          <p>최대 1~2분 정도 걸릴 수 있어요.</p>
+        </div>
+      </div>
     </div>
 
     <div class="wz-nav-bar" id="wzNavBar" style="display:none;">
