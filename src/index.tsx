@@ -6148,8 +6148,30 @@ function calcGovSupportFinance(answers: any) {
     .map((c) => c.label)
   const stage1Items = gsBudgetItemsRanked.slice(0, 3)
   const stage2Items = gsBudgetItemsRanked.slice(0, 4)
-  const splitStage = (total: number, items: string[]) =>
-    items.map((item) => ({ item, amount: items.length ? Math.round(total / items.length) : 0 }))
+  // 2026-11-02: 사용자 지정 — 비목별 집행 금액이 전부 1/n 균등분할이라 "비현실적"이라는
+  // 피드백. 패션 제조 초기 창업 지원사업에서 통상적인 비중(샘플 제작·인건비가 크고,
+  // 홍보성 비목은 상대적으로 작음)으로 가중치를 두고, 선택된 비목 조합(3개/4개 — 위
+  // GS_BUDGET_ITEM_CANDIDATES 중 fundUse 매칭 결과에 따라 달라짐)에 맞게 정규화해
+  // 나눈다 — 어떤 조합이 와도 비중 순서는 유지된다.
+  const GS_BUDGET_ITEM_WEIGHT: Record<string, number> = {
+    '샘플 제작': 35,
+    '인건비': 25,
+    '광고 콘텐츠 제작': 15,
+    '온라인 홍보': 15,
+    '홈페이지 고도화': 10,
+    '박람회 참여': 10,
+  }
+  const splitStage = (total: number, items: string[]) => {
+    if (!items.length) return []
+    const weights = items.map((item) => GS_BUDGET_ITEM_WEIGHT[item] || 1)
+    const weightSum = weights.reduce((a, b) => a + b, 0)
+    // 만원 단위로 반올림해 깔끔한 숫자로 만들고, 반올림 오차는 마지막 항목에서
+    // 보정해 합계가 total과 정확히 일치하게 한다.
+    const rounded = weights.map((w) => Math.round((total * w / weightSum) / 10000) * 10000)
+    const diff = total - rounded.reduce((a, b) => a + b, 0)
+    rounded[rounded.length - 1] += diff
+    return items.map((item, i) => ({ item, amount: rounded[i] }))
+  }
   const budgetStages = {
     stage1Total: STAGE1_TOTAL, stage2Total: STAGE2_TOTAL,
     stage1Split: splitStage(STAGE1_TOTAL, stage1Items), stage2Split: splitStage(STAGE2_TOTAL, stage2Items),
@@ -6164,54 +6186,84 @@ function calcGovSupportFinance(answers: any) {
 // 바인딩이라 AI가 대신 채울 수 없으므로(재무 숫자처럼 재계산 금지 원칙과 같은
 // 이유로 AI 환각을 막기 위해 computed로 전환했었음), 실존 브랜드명을 지어내지
 // 않고 카테고리에 맞는 일반적인 "경쟁 유형" 2개를 서버가 결정론적으로 채운다.
+//
+// 2026-11-02: 사용자 지정 — "해외1곳 국내2곳을 실제 브랜드로 직접 분석해서 넣어달라"는
+// 요청. 위 일반 유형("대형 SPA 브랜드" 등)을 실제로 존재하고 검증한 브랜드로 교체한다
+// (각 feature 설명은 웹 검색으로 확인한 내용만 사용 — 매출·점유율 등 확인 안 된 구체
+// 수치는 넣지 않는다. 브랜드별 출처는 이 커밋의 PR 설명 참고). 카테고리마다 [해외 1곳,
+// 국내 2곳] 순서로 배열한다 — buildGsCompetitorTable이 index 0을 해외, 1~2를 국내로 쓴다.
 const GS_GENERIC_COMPETITOR_TYPES: Record<string, Array<{ name: string; feature: string }>> = {
   '의류(여성)': [
-    { name: '대형 SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
-    { name: '온라인 전문 브랜드(플랫폼 입점)', feature: '트렌드 반영 속도 빠름, SNS·인플루언서 마케팅 중심' },
+    { name: '유니클로(UNIQLO, 일본)', feature: '글로벌 SPA 브랜드 — 기능성 소재와 기본 아이템 중심의 압도적 가격경쟁력, 전국 오프라인 매장망' },
+    { name: '무신사 스탠다드', feature: '무신사 자체 PB 브랜드 — 심플한 기본 아이템을 합리적 가격에 온라인 중심으로 판매' },
+    { name: '마르디 메크르디(Mardi Mercredi)', feature: '2018년 출시, 시그니처 그래픽 디자인으로 무신사에서 급성장한 여성 중심 디자이너 캐주얼 브랜드 — 일본 등 해외 인지도도 높음' },
   ],
   '의류(남성)': [
-    { name: '대형 SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
-    { name: '온라인 전문 브랜드(플랫폼 입점)', feature: '트렌드 반영 속도 빠름, SNS·인플루언서 마케팅 중심' },
+    { name: '유니클로(UNIQLO, 일본)', feature: '글로벌 SPA 브랜드 — 기능성 소재와 기본 아이템 중심의 압도적 가격경쟁력, 전국 오프라인 매장망' },
+    { name: '무신사 스탠다드', feature: '무신사 자체 PB 브랜드 — 심플한 기본 아이템을 합리적 가격에 온라인 중심으로 판매' },
+    { name: '커버낫(COVERNAT)', feature: '2008년 설립된 국내 1세대 스트리트 브랜드 — 밀리터리·워크웨어를 재해석한 디자인과 C로고로 MZ세대에게 꾸준한 인기' },
   ],
   '의류(유니섹스)': [
-    { name: '대형 SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
-    { name: '온라인 전문 브랜드(플랫폼 입점)', feature: '트렌드 반영 속도 빠름, SNS·인플루언서 마케팅 중심' },
+    { name: '유니클로(UNIQLO, 일본)', feature: '글로벌 SPA 브랜드 — 기능성 소재와 기본 아이템 중심의 압도적 가격경쟁력, 전국 오프라인 매장망' },
+    { name: '무신사 스탠다드', feature: '무신사 자체 PB 브랜드 — 심플한 기본 아이템을 합리적 가격에 온라인 중심으로 판매' },
+    { name: '커버낫(COVERNAT)', feature: '2008년 설립된 국내 1세대 스트리트 브랜드 — 밀리터리·워크웨어를 재해석한 디자인과 C로고로 MZ세대에게 꾸준한 인기' },
   ],
   '가방': [
-    { name: '대형 SPA·잡화 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
-    { name: '온라인 편집숍 브랜드', feature: '소량 다품종, 디자인 차별화 중심' },
+    { name: '허쉘 서플라이(Herschel Supply, 캐나다)', feature: '글로벌 백팩 브랜드 — 미니멀한 헤리티지 디자인과 합리적 가격으로 전 세계 편집숍·온라인 판매' },
+    { name: '마르헨제이(MARHEN.J)', feature: '비건 가죽·캔버스 소재의 국내 가방 브랜드 — 사각형 실루엣이 시그니처이며 동남아 등 해외 수출에서도 성과' },
+    { name: '로우로우(RAWROW)', feature: '2011년 서울에서 시작한 라이프스타일 브랜드 — 장식을 덜어낸 미니멀 디자인과 내구성 중심의 백팩·가방 라인' },
   ],
   '잡화': [
-    { name: '대형 SPA·잡화 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
-    { name: '온라인 편집숍 브랜드', feature: '소량 다품종, 디자인 차별화 중심' },
+    { name: '피엘라벤(Fjällräven, 스웨덴)', feature: '스웨덴 아웃도어 브랜드 — 캔버스 소재 백팩(칸켄 등)으로 유명하며 실용성과 북유럽 감성의 디자인이 강점' },
+    { name: '키르시(KIRSH)', feature: '2008년 출시된 체리 로고의 국내 스트리트 캐주얼 브랜드 — 연예인 착용으로 알려지며 2030 고객층에게 인기' },
+    { name: '마르헨제이(MARHEN.J)', feature: '비건 가죽·캔버스 소재의 국내 가방·잡화 브랜드 — 사각형 실루엣이 시그니처, 동남아 등 해외 수출 성과' },
   ],
   '신발': [
-    { name: '대형 스포츠·SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
-    { name: '온라인 편집숍 브랜드', feature: '소량 다품종, 디자인 차별화 중심' },
+    { name: '컨버스(Converse, 미국)', feature: '글로벌 캐주얼 신발 브랜드 — 척테일러 올스타 등 클래식 디자인의 스테디셀러로 폭넓은 연령대에서 꾸준한 수요' },
+    { name: '프로스펙스(Prospecs)', feature: '1970년대부터 이어온 국내 신발 브랜드 — 워킹화 강점과 레트로 디자인의 오리지널 라인으로 재평가받는 중' },
+    { name: '트렉스타(TREKSTA)', feature: '1988년 부산에서 설립된 국내 아웃도어 신발 브랜드 — 자체 개발 기술(NestFIT·HyperGrip) 기반 등산화·기능화 전문' },
   ],
   '주얼리': [
-    { name: '로드샵·백화점 주얼리 브랜드', feature: '오프라인 신뢰도, 상대적으로 높은 가격대' },
-    { name: '온라인 액세서리 셀러', feature: '빠른 트렌드 반영, SNS 중심 저가 판매' },
+    { name: '판도라(Pandora, 덴마크)', feature: '글로벌 주얼리 브랜드 — 참(charm)을 조합하는 커스터마이징 콘셉트로 전 세계 매장·온라인에서 높은 인지도' },
+    { name: '제이에스티나(J.ESTINA)', feature: '2003년 출범한 국내 프리미엄 주얼리·핸드백 브랜드 — 티아라 로고와 일찍부터 구축한 자사몰로 온라인 선도' },
+    { name: '로만손(ROMANSON)', feature: '국내 시계·주얼리 브랜드(제이에스티나와 동일 그룹) — 합리적 가격대의 데일리 주얼리·시계 라인 운영' },
   ],
   '키즈': [
-    { name: '대형 유아동 전문 브랜드', feature: '안전·품질 인증 기반 신뢰도, 전국 매장 운영' },
-    { name: '온라인 키즈 편집숍', feature: '소량 다품종, 가성비·디자인 중심' },
+    { name: '압소바(Absorba, 프랑스)', feature: '1949년 설립된 프랑스 유아복 브랜드 — 유럽 감성의 디자인과 합리적인 가격대로 알려진 글로벌 베이비웨어' },
+    { name: '모이몰른', feature: '한세엠케이·드림스코가 전개하는 국내 유아동복 브랜드 — 캐릭터 협업 등으로 일본 등 해외에서도 높은 인기' },
+    { name: '국내 중소 유아동 전문 브랜드', feature: '온라인 중심 판매, 합리적 가격·안전 인증(KC)을 내세운 소규모 브랜드가 다수 경쟁' },
   ],
 }
 const GS_GENERIC_COMPETITOR_DEFAULT: Array<{ name: string; feature: string }> = [
-  { name: '대형 SPA 브랜드', feature: '대량생산 기반 가성비, 전국 매장·온라인 동시 운영' },
-  { name: '온라인 전문 브랜드(플랫폼 입점)', feature: '트렌드 반영 속도 빠름, SNS 마케팅 중심' },
+  { name: '유니클로(UNIQLO, 일본)', feature: '글로벌 SPA 브랜드 — 기능성 소재와 기본 아이템 중심의 압도적 가격경쟁력, 전국 오프라인 매장망' },
+  { name: '무신사 스탠다드', feature: '무신사 자체 PB 브랜드 — 심플한 기본 아이템을 합리적 가격에 온라인 중심으로 판매' },
+  { name: '온라인 전문 브랜드(플랫폼 입점)', feature: '트렌드 반영 속도가 빠르고 SNS·인플루언서 마케팅 중심' },
 ]
 
+// 2026-11-02: 사용자 지정 — "다.목표시장 현황"의 경쟁사 분석표가 [해외 1곳, 국내 2곳,
+// 우리 브랜드] 4행 구조를 항상 갖추도록 보완(이전엔 사용자가 경쟁사를 안다고 답한 경우
+// 사용자가 적은 국내 경쟁사만 최대 2곳 들어가고 해외 비교가 아예 없었다). 해외는
+// 설문에서 받지 않는 값이라 항상 위 GS_GENERIC_COMPETITOR_TYPES의 연구된 실제 브랜드를
+// 쓰고, 국내는 사용자가 직접 입력한 실제 경쟁사를 우선하되 1곳만 입력했거나 아예 모른다고
+// 답했으면 남은 자리를 같은 카테고리의 연구된 실제 브랜드로 채운다(지어내지 않음).
 function buildGsCompetitorTable(answers: any) {
-  const rows: string[][] = []
+  const generic = GS_GENERIC_COMPETITOR_TYPES[answers.category] || GS_GENERIC_COMPETITOR_DEFAULT
+  const overseas = generic[0]
+  const domesticFallback = generic.slice(1)
+
+  const domesticUser: string[][] = []
   if (!answers.competitorsUnknown) {
-    if (answers.competitor1_name) rows.push([answers.competitor1_name, answers.competitor1_feature || '-'])
-    if (answers.competitor2_name) rows.push([answers.competitor2_name, answers.competitor2_feature || '-'])
-  } else {
-    const generic = GS_GENERIC_COMPETITOR_TYPES[answers.category] || GS_GENERIC_COMPETITOR_DEFAULT
-    generic.forEach((g) => rows.push([g.name, g.feature]))
+    if (answers.competitor1_name) domesticUser.push([answers.competitor1_name, answers.competitor1_feature || '-'])
+    if (answers.competitor2_name) domesticUser.push([answers.competitor2_name, answers.competitor2_feature || '-'])
   }
+  const domesticRows = domesticUser.length ? domesticUser.slice() : domesticFallback.map((g) => [g.name, g.feature])
+  while (domesticRows.length < 2 && domesticFallback.length) {
+    const next = domesticFallback.find((g) => !domesticRows.some((r) => r[0] === g.name))
+    if (!next) break
+    domesticRows.push([next.name, next.feature])
+  }
+
+  const rows: string[][] = [[overseas.name, overseas.feature], ...domesticRows.slice(0, 2)]
   const selfFeature = (answers.differentiation || answers.concept || '').toString().slice(0, 60) || '-'
   rows.push([(answers.brandName || '본 브랜드') + ' (본 브랜드)', selfFeature])
   return { headers: ['브랜드', '특징'], rows, competitorsUnknown: !!answers.competitorsUnknown }
@@ -6443,7 +6495,8 @@ const GS_WRITING_PRINCIPLES = `[작성 원칙]
 20. founderAge(대표자 연령대)가 있으면 "가.대표자 보유역량"에서 자연스럽게 언급한다 — 나이 자체를 강조하기보다 그 연령대에 맞는 경력·소비자 공감대·네트워크 같은 맥락으로 녹여 쓴다.
 21. priceRange(목표 가격대)가 있으면 상품의 가격 책정 근거(원가 대비 판매가 적정성, 목표 고객의 구매력과의 정합성)를 다룰 때 반영한다 — 사용자가 price_product1 등으로 실제 가격을 입력했다면 그 값을 우선하고, priceRange는 보조 맥락으로만 쓴다.
 22. capital(보유 준비자본)이 있으면 "2-1 창업아이템 현황(준비정도)"에서 사업 수행을 위한 자기 재정 준비 상태를 보여주는 근거로 자연스럽게 언급한다 — 구체적인 금액을 지어내지 말고 선택한 구간 그대로 쓰고, 정부지원사업비와는 별개의 자기자본(매칭 투자)이라는 맥락으로 서술한다.
-23. "나.문제점"→"다.해결방안"→"2-1/2-2 실현 가능성"은 하나의 인과 사슬이다 — 뭉뚱그린 업계 통용 문구를 쓰지 말 것. 문제점은 "직장인 체형 고려 부족", "품질 편차 심각", "유사 상품 다수로 차별화 어려움"처럼 업종 전체에 두루 해당하는 일반론이 아니라, problemStatement·diffReason·diffStubborn·diffFeedback 등 사용자 답변에서 드러난 이 브랜드만의 구체적 상황(예: 정확히 어떤 체형·어떤 부위가 안 맞는지, 어떤 공정의 어느 단계에서 왜 품질이 흔들리는지, 경쟁 상품과 정확히 무엇이 같아서 구분이 안 되는지)까지 파고든다. 해결방안도 "특허로 해결한다", "품질 기준을 직접 관리한다"처럼 그 자체로는 구체적 수단이 되지 못하는 선언형 문장을 쓰지 말 것 — 방금 그 깊이 있는 문제점 하나하나를 정확히 겨냥해 "무엇을(구체적 방법·공정·기준·설계)" "어떻게" 바꾸는지까지 쓴다(예: "디자인 특허 보유"라는 사실만 적지 말고, 그 특허가 구체적으로 어떤 체형 문제를 어떤 설계로 해결하는지까지). 이렇게 구체화된 해결방안은 "2-1/2-2 창업아이템 현황·실현 및 구체화 방안"에서 그 방안을 실제로 어떻게 수행할지(공정 순서·설비·검수 기준·일정 등)를 상세히 풀어내는 토대가 되어야 한다 — 앞에서 뭉뚱그리면 뒤에서도 구체화할 근거가 없다. 다른 모든 섹션도 동일: 추상적 선언 대신 숫자·공정·기준·대상을 못박아 쓴다.`
+23. "나.문제점"→"다.해결방안"→"2-1/2-2 실현 가능성"은 하나의 인과 사슬이다 — 뭉뚱그린 업계 통용 문구를 쓰지 말 것. 문제점은 "직장인 체형 고려 부족", "품질 편차 심각", "유사 상품 다수로 차별화 어려움"처럼 업종 전체에 두루 해당하는 일반론이 아니라, problemStatement·diffReason·diffStubborn·diffFeedback 등 사용자 답변에서 드러난 이 브랜드만의 구체적 상황(예: 정확히 어떤 체형·어떤 부위가 안 맞는지, 어떤 공정의 어느 단계에서 왜 품질이 흔들리는지, 경쟁 상품과 정확히 무엇이 같아서 구분이 안 되는지)까지 파고든다. 해결방안도 "특허로 해결한다", "품질 기준을 직접 관리한다"처럼 그 자체로는 구체적 수단이 되지 못하는 선언형 문장을 쓰지 말 것 — 방금 그 깊이 있는 문제점 하나하나를 정확히 겨냥해 "무엇을(구체적 방법·공정·기준·설계)" "어떻게" 바꾸는지까지 쓴다(예: "디자인 특허 보유"라는 사실만 적지 말고, 그 특허가 구체적으로 어떤 체형 문제를 어떤 설계로 해결하는지까지). 이렇게 구체화된 해결방안은 "2-1/2-2 창업아이템 현황·실현 및 구체화 방안"에서 그 방안을 실제로 어떻게 수행할지(공정 순서·설비·검수 기준·일정 등)를 상세히 풀어내는 토대가 되어야 한다 — 앞에서 뭉뚱그리면 뒤에서도 구체화할 근거가 없다. 다른 모든 섹션도 동일: 추상적 선언 대신 숫자·공정·기준·대상을 못박아 쓴다.
+24. 날짜·연도를 언급할 때는 2027년을 이 사업계획서의 사업 수행 시작(기준) 연도로 삼는다 — "1차 출시 시기", "사업 추진 일정", "협약기간" 등 어디서든 2024년·2025년 같은 이미 지난 연도를 임의로 쓰지 말 것. 1차 출시·사업 개시는 2027년 내로, "+2년차"는 2028년, "+3년차"는 2029년처럼 2027년을 기준으로 한 상대 연도로 구체적으로 표기한다.`
 
 function gsBlockVariant(type: string, props: Record<string, any>, required: string[]) {
   return {
