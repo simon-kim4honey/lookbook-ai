@@ -237,7 +237,11 @@ export function buildCategoryStructureText(cat: CategoryTree, answers: Record<st
           const idSuffix = repeatIndex == null ? '' : ` (반복 ${repeatIndex + 1}번째)`
           lines.push(`${indent}- (moduleId="${moduleIdFor(n.id, repeatIndex)}") "${n.title || ''}"${idSuffix} [${def?.labelKo || n.expressionType}] — ${bindingInstruction(n)}`)
           if (isAiGeneratedNode(n) && def?.promptFragment) lines.push(`${indent}  지시: ${def.promptFragment}`)
-          const hint = n.payload?.text || n.payload?.caption
+          // 2026-11-02: bullets/bulletsSummary는 moduleTypes.ts 스키마상 관리자가 "AI 추가
+          // 지시"를 payload.hintToAI에 입력하도록 돼 있는데(어드민 빌더 UI 필드명), 여기서는
+          // text/caption만 읽어 그 값이 실제로는 한 번도 프롬프트에 전달되지 않았다 — 어드민이
+          // 힌트를 입력해도 조용히 무시되는 버그였다. hintToAI도 폴백으로 읽는다.
+          const hint = n.payload?.text || n.payload?.caption || n.payload?.hintToAI
           if (hint) lines.push(`${indent}  참고(관리자가 적어둔 힌트/제목/캡션): ${hint}`)
         })
       } else {
@@ -273,7 +277,7 @@ export function buildMissingModuleStructureText(cat: CategoryTree, answers: Reco
     const idSuffix = e.repeatIndex == null ? '' : ` (반복 ${e.repeatIndex + 1}번째)`
     lines.push(`- (moduleId="${e.moduleId}") "${e.node.title || ''}"${idSuffix} [${def?.labelKo || e.node.expressionType}] — 생성 대상.`)
     if (def?.promptFragment) lines.push(`  지시: ${def.promptFragment}`)
-    const hint = e.node.payload?.text || e.node.payload?.caption
+    const hint = e.node.payload?.text || e.node.payload?.caption || e.node.payload?.hintToAI
     if (hint) lines.push(`  참고(관리자가 적어둔 힌트/제목/캡션): ${hint}`)
   }
   return lines.join('\n')
