@@ -5118,12 +5118,15 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
   const marketingOptions = ['박람회', 'SNS', '온라인 홍보', '지원사업(온라인 홍보)', '해외 영업(바이어 외주)', '기타']
   const yearOptions = ['2024년', '2025년', '2026년']
 
-  const competitorRows = (prefix: string, label: string) => [1, 2, 3].map((i) => `
+  // 2026-11-03: 사용자 지정 — 빈칸만 있으면 뭘 써야 할지 모르겠다는 피드백. 패션 제조
+  // 브랜드 기준 예시 답변을 전부 placeholder로 채운다(기존 공유 위저드의 "예: ..." 관례와
+  // 동일). 국내/해외 경쟁업체는 이 세션에서 이미 실존 브랜드로 검증해둔 예시를 그대로 쓴다.
+  const competitorRows = (prefix: string, label: string, nameExamples: string[], featureExamples: string[]) => [1, 2, 3].map((i) => `
     <div class="wz-dynrow">
       <div class="wz-dynrow-head"><span>${label} ${i}</span></div>
       <div class="wz-dynrow-grid">
-        <div class="wz-dynrow-cell"><label>브랜드명</label><input type="text" class="wz-input" id="f_${prefix}${i}_name" maxlength="40" /></div>
-        <div class="wz-dynrow-cell"><label>특징</label><input type="text" class="wz-input" id="f_${prefix}${i}_feature" maxlength="80" /></div>
+        <div class="wz-dynrow-cell"><label>브랜드명</label><input type="text" class="wz-input" id="f_${prefix}${i}_name" maxlength="40" placeholder="${nameExamples[i - 1]}" /></div>
+        <div class="wz-dynrow-cell"><label>특징</label><input type="text" class="wz-input" id="f_${prefix}${i}_feature" maxlength="80" placeholder="${featureExamples[i - 1]}" /></div>
       </div>
     </div>
   `).join('')
@@ -5132,8 +5135,8 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
     <div class="wz-dynrow">
       <div class="wz-dynrow-head"><span>전담인력 ${i}${i === 1 ? ' (대표자)' : ''}</span></div>
       <div class="wz-dynrow-grid">
-        <div class="wz-dynrow-cell"><label>이름/직책</label><input type="text" class="wz-input" id="f_staff${i}_name" maxlength="30" /></div>
-        <div class="wz-dynrow-cell"><label>담당 역할</label><input type="text" class="wz-input" id="f_staff${i}_role" maxlength="30" /></div>
+        <div class="wz-dynrow-cell"><label>이름/직책</label><input type="text" class="wz-input" id="f_staff${i}_name" maxlength="30" placeholder="${i === 1 ? '예: 김대표' : '예: 이수출'}" /></div>
+        <div class="wz-dynrow-cell"><label>담당 역할</label><input type="text" class="wz-input" id="f_staff${i}_role" maxlength="30" placeholder="${i === 1 ? '예: 대표, 전체 총괄' : '예: 해외영업 담당'}" /></div>
         <div class="wz-dynrow-cell" style="grid-column:1/-1;"><label>관련 경력</label><input type="text" class="wz-input" id="f_staff${i}_career" maxlength="80" placeholder="예: 해외 바이어 미팅 5회, 무역영어 자격 보유" /></div>
       </div>
     </div>
@@ -5226,7 +5229,7 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           <h2>어떤 기업인가요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">회사명 <span class="wz-required">*</span></div>
-            <input type="text" class="wz-input" id="f_companyName" maxlength="60" data-required="1" />
+            <input type="text" class="wz-input" id="f_companyName" placeholder="예: (주)페브릭스튜디오" maxlength="60" data-required="1" />
           </div>
           <div class="wz-field">
             <div class="wz-field-label">주생산품 <span class="wz-required">*</span></div>
@@ -5251,7 +5254,7 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           <div class="wz-field">
             <div class="wz-field-label">용도·특성, 수출현황, 수출 가능성 <span class="wz-required">*</span></div>
             <div class="wz-field-hint" style="margin:0 0 8px;">제품의 용도·특성, 현재 수출 현황, 앞으로의 수출 가능성을 3~4줄로.</div>
-            <textarea class="wz-textarea" id="f_productDetail" maxlength="400" data-required="1"></textarea>
+            <textarea class="wz-textarea" id="f_productDetail" placeholder="예: 사무직 여성을 위한 오버핏 셔츠로, 신축성 원단과 여유 패턴이 특징이다. 현재는 국내 온라인 판매만 하고 있으며, 일본 편집숍 바이어로부터 샘플 요청을 받아 수출 가능성을 타진 중이다." maxlength="400" data-required="1"></textarea>
           </div>
         </div>
 
@@ -5283,11 +5286,11 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           <div class="wz-field-hint" style="margin:-10px 0 16px;">아는 만큼만 적어주세요. 비워두면 동종 업계 일반적인 경쟁 유형으로 채워드려요.</div>
           <div class="wz-field">
             <div class="wz-field-label">국내 경쟁업체 (최대 3곳)</div>
-            ${competitorRows('domesticCompetitor', '국내 경쟁업체')}
+            ${competitorRows('domesticCompetitor', '국내 경쟁업체', ['예: 무신사 스탠다드', '예: 커버낫', '예: 마르디 메크르디'], ['예: 온라인 중심, 합리적 가격', '예: 스트릿 캐주얼, C로고', '예: 그래픽 디자인, 무신사 간판 브랜드'])}
           </div>
           <div class="wz-field">
             <div class="wz-field-label">국외 경쟁업체 (최대 3곳)</div>
-            ${competitorRows('overseasCompetitor', '국외 경쟁업체')}
+            ${competitorRows('overseasCompetitor', '국외 경쟁업체', ['예: 유니클로', '예: 자라(ZARA)', '예: H&M'], ['예: 글로벌 SPA, 기본 아이템 중심', '예: 트렌드 반영 빠른 패스트패션', '예: 저가·대량생산 SPA'])}
           </div>
         </div>
 
@@ -5297,7 +5300,7 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           <div class="wz-field">
             <div class="wz-field-label">수출 필요성 및 우리 업체만의 차별점 <span class="wz-required">*</span></div>
             <div class="wz-field-hint" style="margin:0 0 8px;">왜 지금 수출이 필요한지, 경쟁사 대비 우리만의 차별점은 무엇인지 자유롭게 적어주세요 — AI가 차별점 3가지로 정리해드려요.</div>
-            <textarea class="wz-textarea" id="f_exportDiffPoints" maxlength="400" data-required="1"></textarea>
+            <textarea class="wz-textarea" id="f_exportDiffPoints" placeholder="예: 국내 온라인 시장이 포화 상태라 해외 판로 확대가 필요하다. 경쟁사 대비 특허 기반 패턴 설계로 핏 완성도가 높고, 소량 생산 체계라 트렌드 반영 속도가 빠르다." maxlength="400" data-required="1"></textarea>
           </div>
         </div>
 
@@ -5319,12 +5322,12 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           <div class="wz-field">
             <div class="wz-field-label">국가 선정 사유 <span class="wz-required">*</span></div>
             <div class="wz-field-hint" style="margin:0 0 8px;">선택한 국가마다 왜 그 국가를 선택했는지 적어주세요.</div>
-            <textarea class="wz-textarea" id="f_countryReason" maxlength="400" data-required="1"></textarea>
+            <textarea class="wz-textarea" id="f_countryReason" placeholder="예: 베트남은 한류 영향으로 K-패션 수요가 빠르게 늘고 있고, 미국은 사이즈 다양성을 갖춘 온라인 셀러 수요가 높아 선정했다." maxlength="400" data-required="1"></textarea>
           </div>
           <div class="wz-field">
             <div class="wz-field-label">자체 진행현황 <span class="wz-required">*</span></div>
             <div class="wz-field-hint" style="margin:0 0 8px;">현재 우리 기업의 해외 진출 준비정도를 구체적으로.</div>
-            <textarea class="wz-textarea" id="f_selfProgress" maxlength="300" data-required="1"></textarea>
+            <textarea class="wz-textarea" id="f_selfProgress" placeholder="예: 샘플 5종 제작 완료, 영문 상세페이지 제작 중, 해외 배송 대행사와 계약 체결 완료" maxlength="300" data-required="1"></textarea>
           </div>
         </div>
 
@@ -5338,7 +5341,7 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           <div class="wz-field">
             <div class="wz-field-label">선정 사유 <span class="wz-required">*</span></div>
             <div class="wz-field-hint" style="margin:0 0 8px;">제품·진출시장 특성상 이 목표고객을 설정한 이유.</div>
-            <textarea class="wz-textarea" id="f_customerReason" maxlength="300" data-required="1"></textarea>
+            <textarea class="wz-textarea" id="f_customerReason" placeholder="예: 당사 제품의 체형 보정 설계가 해당 시장 고객의 체형·사이즈 고민과 맞닿아 있어 타깃으로 설정했다." maxlength="300" data-required="1"></textarea>
           </div>
         </div>
 
@@ -5348,7 +5351,7 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           <div class="wz-field">
             <div class="wz-field-label">수출인프라 구축도 <span class="wz-required">*</span></div>
             <div class="wz-field-hint" style="margin:0 0 8px;">수출하기 위한 준비 정도를 자유롭게 적어주세요 — AI가 4가지 개조식으로 정리해드려요.</div>
-            <textarea class="wz-textarea" id="f_exportInfra" maxlength="400" data-required="1"></textarea>
+            <textarea class="wz-textarea" id="f_exportInfra" placeholder="예: 해외 배송 대행 계약 완료, 영문 쇼핑몰 구축 중, 수출 관련 정부 교육 이수, 무역영어 가능 인력 보유" maxlength="400" data-required="1"></textarea>
           </div>
           <div class="wz-field">
             <div class="wz-field-label">전담인력 <span class="wz-required">*</span></div>
