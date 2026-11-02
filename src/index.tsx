@@ -4472,6 +4472,13 @@ const GOV_SUPPORT_PROGRAMS = [
     criteria: [['지역자원 활용방안', 40], ['사업성', 30], ['신청자 역량·실행가능성', 30]],
   },
   {
+    id: 'export-voucher', name: '수출바우처', agency: '중소벤처기업부 · 중소기업유통센터', formType: '수출역량진단 + 사업계획서형',
+    funding: '기업당 최대 3,000만 원(자기부담률 수출입실적 등에 따라 20~70%, 바우처 포인트로 사용처 선택)',
+    target: '해외 진출(수출)을 준비·확대하려는 중소기업',
+    eligibility: ['중소기업기본법상 중소기업', '수출역량진단 참여 후 통합관리기관 심의를 통과한 기업', '한국무역협회 등 사업수행기관 등록 절차 필요(세부 요건 공고 확인)'],
+    criteria: [['수출 준비도·필요성', 35], ['목표시장 전략의 구체성', 35], ['사업화 실행가능성', 30]],
+  },
+  {
     id: 'innov-sop', name: '혁신소상공인 창업지원', agency: '중소벤처기업부 · 소상공인시장진흥공단', formType: '신청서 + 창업 아이템 계획 (오디션 발표 포함)',
     funding: '창업교육 + 사업화 자금 (560명 내외 선정)',
     target: '예비창업자 (교육 이수 후 오디션 통과자가 사업화 자금 대상)',
@@ -4713,7 +4720,7 @@ app.get('/gov-support', (c) => {
       document.getElementById('gsEtcForm').classList.toggle('open');
     }
 
-    var GS_WIZARD_READY = ['yebi','choi','hope-return','youth-academy','local-creator','innov-sop'];
+    var GS_WIZARD_READY = ['yebi','choi','hope-return','youth-academy','local-creator','innov-sop','export-voucher'];
 
     async function goToGsWizard() {
       if (!gsSelected) return;
@@ -4832,7 +4839,7 @@ app.post('/api/gov-support/custom-request', async (c) => {
 // AI 섹션 초안 생성/재무 계산기/시각화/인쇄 미리보기는 이 단계엔 없다(다음 단계에서 구현).
 // 여기서는 입력 수집 + 중간 저장(자동 저장 + 수동 "임시저장" 버튼)까지만 다룬다.
 // ────────────────────────────────────────────────────
-const GS_WIZARD_READY_IDS = ['yebi', 'choi', 'hope-return', 'youth-academy', 'local-creator', 'innov-sop']
+const GS_WIZARD_READY_IDS = ['yebi', 'choi', 'hope-return', 'youth-academy', 'local-creator', 'innov-sop', 'export-voucher']
 
 app.post('/api/gov-support/projects', async (c) => {
   const db: D1Database = c.env.LOOKBOOK_DB
@@ -5096,9 +5103,542 @@ app.patch('/api/gov-support/projects/:id/answers', async (c) => {
   }
 })
 
+// 2026-11-02: "수출바우처" 메뉴 추가 요청 — 기존 12단계 공유 위저드(yebi/choi/
+// hope-return/youth-academy/local-creator/innov-sop)는 패션 브랜드 창업 정보
+// (브랜드명/카테고리/원가 등)를 모으는 전용 설계라 수출바우처가 필요로 하는 정보
+// (수출 품목/해외 시장규모/해외 경쟁사/진출국가/전담인력/단기·중기·장기 수출목표
+// 등)와 전혀 겹치지 않는다. 기존 위저드의 거대한 공용 <script>를 억지로 분기하면
+// 실수로 다른 6개 사업의 위저드를 깨뜨릴 위험이 크므로, 완전히 별도의 독립된
+// 페이지(HTML+script 전부 자체 포함)로 만든다 — CSS 클래스명(.wz-*)만 기존과
+// 맞춰 톤을 통일하고, 로직은 공유하지 않는다.
+function gsExportVoucherWizardHtml(c: any, projectId: string): string {
+  const countryOptions = ['중국', '일본', '베트남', '미국', '프랑스', '독일', '이탈리아']
+  const categoryOptions = ['패션브랜드', '패션제조', '의류', '주얼리', '잡화', '가방', '신발', '기타']
+  const marketInfoOptions = ['박람회', '온라인 서치', '지원사업(해외진출 컨설팅)', '해외 바이어 네트워크', '기타']
+  const marketingOptions = ['박람회', 'SNS', '온라인 홍보', '지원사업(온라인 홍보)', '해외 영업(바이어 외주)', '기타']
+  const yearOptions = ['2024년', '2025년', '2026년']
+
+  const competitorRows = (prefix: string, label: string) => [1, 2, 3].map((i) => `
+    <div class="wz-dynrow">
+      <div class="wz-dynrow-head"><span>${label} ${i}</span></div>
+      <div class="wz-dynrow-grid">
+        <div class="wz-dynrow-cell"><label>브랜드명</label><input type="text" class="wz-input" id="f_${prefix}${i}_name" maxlength="40" /></div>
+        <div class="wz-dynrow-cell"><label>특징</label><input type="text" class="wz-input" id="f_${prefix}${i}_feature" maxlength="80" /></div>
+      </div>
+    </div>
+  `).join('')
+
+  const staffRows = [1, 2, 3].map((i) => `
+    <div class="wz-dynrow">
+      <div class="wz-dynrow-head"><span>전담인력 ${i}${i === 1 ? ' (대표자)' : ''}</span></div>
+      <div class="wz-dynrow-grid">
+        <div class="wz-dynrow-cell"><label>이름/직책</label><input type="text" class="wz-input" id="f_staff${i}_name" maxlength="30" /></div>
+        <div class="wz-dynrow-cell"><label>담당 역할</label><input type="text" class="wz-input" id="f_staff${i}_role" maxlength="30" /></div>
+        <div class="wz-dynrow-cell" style="grid-column:1/-1;"><label>관련 경력</label><input type="text" class="wz-input" id="f_staff${i}_career" maxlength="80" placeholder="예: 해외 바이어 미팅 5회, 무역영어 자격 보유" /></div>
+      </div>
+    </div>
+  `).join('')
+
+  const horizonStep = (prefix: string, stepNo: number, title: string, hint: string) => `
+    <div class="wz-step" data-step="${stepNo}">
+      <div class="wz-step-label">${stepNo} / 12 · 수출 마케팅 목표</div>
+      <h2>${title}</h2>
+      <div class="wz-field-hint" style="margin:-10px 0 16px;">${hint}</div>
+      <div class="wz-field">
+        <div class="wz-field-label">온라인 입점 계획 <span class="wz-required">*</span></div>
+        <input type="text" class="wz-input" id="f_${prefix}Online" placeholder="예: 아마존 재팬, 라자다(베트남) 입점" maxlength="100" data-required="1" />
+      </div>
+      <div class="wz-field">
+        <div class="wz-field-label">오프라인 입점 계획 <span class="wz-required">*</span></div>
+        <div class="wz-field-hint" style="margin:0 0 8px;">해당 국가 백화점명 등 구체적으로.</div>
+        <input type="text" class="wz-input" id="f_${prefix}Offline" placeholder="예: 이세탄(일본) 편집숍 입점 협의" maxlength="100" data-required="1" />
+      </div>
+      <div class="wz-field">
+        <div class="wz-field-label">해외 바이어 수 <span class="wz-required">*</span></div>
+        <input type="text" class="wz-input" id="f_${prefix}BuyerCount" placeholder="예: 5개사" maxlength="30" data-required="1" />
+      </div>
+      <div class="wz-field">
+        <div class="wz-field-label">해외 박람회 참가 계획 <span class="wz-required">*</span></div>
+        <div class="wz-field-hint" style="margin:0 0 8px;">참가 국가와 횟수를 포함해서.</div>
+        <input type="text" class="wz-input" id="f_${prefix}TradeShow" placeholder="예: 일본 도쿄 패션위크 연 1회" maxlength="100" data-required="1" />
+      </div>
+      <div class="wz-field">
+        <div class="wz-field-label">목표 매출 <span class="wz-required">*</span></div>
+        <input type="text" class="wz-input" id="f_${prefix}Revenue" placeholder="예: 1억 원" maxlength="40" data-required="1" />
+      </div>
+    </div>
+  `
+
+  return `
+  <div class="toast-container" id="toastContainer"></div>
+
+  <style>
+    body { background: #F2F4F6; }
+    .wz-wrap { min-height: 100vh; padding: 0 0 100px; background: #F2F4F6; }
+    .wz-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
+    .wz-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 14px 16px; display: flex; align-items: center; gap: 10px; max-width: 480px; margin: 0 auto; }
+    .wz-progress { flex: 1; height: 6px; background: #E5E8EB; border-radius: 999px; overflow: hidden; }
+    .wz-progress-bar { height: 100%; background: #3182F6; border-radius: 999px; transition: width .2s; width: 9%; }
+    .wz-save-btn { font-size: 12.5px; font-weight: 700; color: #3182F6; background: #EAF2FF; border: none; border-radius: 999px; padding: 7px 12px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+    .wz-step { display: none; }
+    .wz-step.active { display: block; }
+    .wz-step-label { font-size: 12.5px; font-weight: 700; color: #3182F6; margin: 8px 0 4px; }
+    .wz-step h2 { font-size: 21px; font-weight: 800; color: #191F28; margin: 0 0 20px; line-height: 1.3; }
+    .wz-field { margin-bottom: 18px; }
+    .wz-field-label { font-size: 13.5px; font-weight: 700; color: #333D4B; margin-bottom: 8px; }
+    .wz-field-hint { font-size: 12px; color: #8B95A1; margin-top: 6px; line-height: 1.5; }
+    .wz-required { color: #F04452; font-weight: 800; }
+    .wz-char-counter { text-align: right; font-size: 11px; color: #B0B8C1; margin-top: 4px; }
+    .wz-char-counter.wz-char-counter-near { color: #F04452; font-weight: 600; }
+    .wz-input.wz-invalid, .wz-chip-row.wz-invalid { border-color: #F04452 !important; box-shadow: 0 0 0 2px rgba(240,68,82,0.15); border-radius: 12px; }
+    .wz-input, .wz-textarea, .wz-select { width: 100%; box-sizing: border-box; padding: 13px 14px; border: 1px solid #E5E8EB; border-radius: 12px; font-size: 15px; color: #191F28; background: #FFFFFF; font-family: inherit; }
+    .wz-textarea { min-height: 90px; resize: vertical; line-height: 1.5; }
+    .wz-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .wz-chip { padding: 10px 16px; border: 1px solid #E5E8EB; border-radius: 999px; background: #FFFFFF; font-size: 13.5px; color: #4E5968; cursor: pointer; }
+    .wz-chip.on { background: #3182F6; border-color: #3182F6; color: #fff; font-weight: 700; }
+    .wz-dynrow { background: #F9FAFB; border: 1px solid #E5E8EB; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+    .wz-dynrow-head { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: #4E5968; margin-bottom: 8px; }
+    .wz-dynrow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .wz-dynrow-cell label { display: block; font-size: 11px; color: #8B95A1; font-weight: 600; margin-bottom: 3px; }
+    .wz-nav-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #E5E8EB; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 20; display: flex; gap: 8px; max-width: 480px; margin: 0 auto; }
+    .wz-nav-btn { flex: 1; padding: 15px; border-radius: 14px; font-size: 15.5px; font-weight: 700; cursor: pointer; border: none; }
+    .wz-nav-prev { background: #F2F4F6; color: #4E5968; flex: 0 0 90px; }
+    .wz-nav-next { background: #3182F6; color: #fff; }
+    .wz-done-box { text-align: center; padding: 40px 10px; }
+    .wz-done-box .wz-done-icon { font-size: 44px; margin-bottom: 14px; }
+    .wz-done-box h2 { font-size: 20px; margin-bottom: 10px; }
+    .wz-done-box p { font-size: 14px; color: #4E5968; line-height: 1.6; margin-bottom: 24px; }
+  </style>
+
+  <div class="wz-wrap">
+    ${govSupportTopNav(c, 480)}
+    <div class="wz-header">
+      <div class="wz-progress"><div class="wz-progress-bar" id="wzProgressBar"></div></div>
+      <button type="button" class="wz-save-btn" onclick="wzManualSave()">임시 저장</button>
+    </div>
+
+    <div class="wz-inner">
+      <div id="wzLoading" style="text-align:center;padding:60px 0;color:#8B95A1;font-size:14px;">불러오는 중...</div>
+      <form id="wzForm" style="display:none;">
+
+        <div class="wz-step active" data-step="1">
+          <div class="wz-step-label">1 / 12 · 기업 개요</div>
+          <h2>어떤 기업인가요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">회사명 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_companyName" maxlength="60" data-required="1" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">주생산품 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_mainProduct" placeholder="예: 여성 오버핏 캐주얼 의류" maxlength="60" data-required="1" />
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="2">
+          <div class="wz-step-label">2 / 12 · 수출 품목</div>
+          <h2>어떤 제품을 수출하시나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">생산 취급 품목 <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">해외진출 대상 제품을 한 줄로 구체적으로.</div>
+            <input type="text" class="wz-input" id="f_exportItem" placeholder="예: 여성 오버핏 셔츠·원피스 라인" maxlength="80" data-required="1" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">제품 개발현황 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="devStatus" data-required="1">
+              ${['개발중', '개발완료', '시제품 생산', '양산단계'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">용도·특성, 수출현황, 수출 가능성 <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">제품의 용도·특성, 현재 수출 현황, 앞으로의 수출 가능성을 3~4줄로.</div>
+            <textarea class="wz-textarea" id="f_productDetail" maxlength="400" data-required="1"></textarea>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="3">
+          <div class="wz-step-label">3 / 12 · 시장 규모</div>
+          <h2>국내외 시장 규모가 어느 정도인가요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">국내 시장 규모 <span class="wz-required">*</span></div>
+            <textarea class="wz-textarea" id="f_domesticMarketSize" placeholder="예: 국내 여성 캐주얼 시장 약 5조원, 연 2~3% 성장" maxlength="200" data-required="1"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">국내 시장 점유율(목표치) <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">세그먼트를 좁혀 구체적인 목표치로.</div>
+            <input type="text" class="wz-input" id="f_domesticMarketShare" placeholder="예: 20대 여성 온라인 캐주얼 세그먼트 내 0.5%" maxlength="150" data-required="1" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">국외 시장 규모 <span class="wz-required">*</span></div>
+            <textarea class="wz-textarea" id="f_overseasMarketSize" placeholder="예: 일본 여성 캐주얼 시장 약 10조원 규모" maxlength="200" data-required="1"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">국외 시장 점유율(목표치) <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_overseasMarketShare" placeholder="예: 일본 온라인 편집숍 입점 브랜드 중 0.1%" maxlength="150" data-required="1" />
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="4">
+          <div class="wz-step-label">4 / 12 · 경쟁업체 현황</div>
+          <h2>국내외 경쟁업체를 알려주세요</h2>
+          <div class="wz-field-hint" style="margin:-10px 0 16px;">아는 만큼만 적어주세요. 비워두면 동종 업계 일반적인 경쟁 유형으로 채워드려요.</div>
+          <div class="wz-field">
+            <div class="wz-field-label">국내 경쟁업체 (최대 3곳)</div>
+            ${competitorRows('domesticCompetitor', '국내 경쟁업체')}
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">국외 경쟁업체 (최대 3곳)</div>
+            ${competitorRows('overseasCompetitor', '국외 경쟁업체')}
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="5">
+          <div class="wz-step-label">5 / 12 · 수출 필요성</div>
+          <h2>왜 지금 수출이 필요한가요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">수출 필요성 및 우리 업체만의 차별점 <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">왜 지금 수출이 필요한지, 경쟁사 대비 우리만의 차별점은 무엇인지 자유롭게 적어주세요 — AI가 차별점 3가지로 정리해드려요.</div>
+            <textarea class="wz-textarea" id="f_exportDiffPoints" maxlength="400" data-required="1"></textarea>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="6">
+          <div class="wz-step-label">6 / 12 · 목표시장</div>
+          <h2>어디로 진출하고 싶으신가요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">희망 진출시장 카테고리 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="targetCategory" data-multi="1" data-required="1">
+              ${categoryOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">진출 희망 국가 (최대 3개) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="targetCountries" data-multi="1" data-max="3" data-required="1">
+              ${countryOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">국가 선정 사유 <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">선택한 국가마다 왜 그 국가를 선택했는지 적어주세요.</div>
+            <textarea class="wz-textarea" id="f_countryReason" maxlength="400" data-required="1"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">자체 진행현황 <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">현재 우리 기업의 해외 진출 준비정도를 구체적으로.</div>
+            <textarea class="wz-textarea" id="f_selfProgress" maxlength="300" data-required="1"></textarea>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="7">
+          <div class="wz-step-label">7 / 12 · 목표고객군</div>
+          <h2>누구에게 팔 계획인가요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">목표고객군 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_targetCustomer" placeholder="예: 일본 20~30대 온라인 쇼핑 여성" maxlength="80" data-required="1" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">선정 사유 <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">제품·진출시장 특성상 이 목표고객을 설정한 이유.</div>
+            <textarea class="wz-textarea" id="f_customerReason" maxlength="300" data-required="1"></textarea>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="8">
+          <div class="wz-step-label">8 / 12 · 수출 준비현황</div>
+          <h2>수출 인프라와 전담인력은요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">수출인프라 구축도 <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">수출하기 위한 준비 정도를 자유롭게 적어주세요 — AI가 4가지 개조식으로 정리해드려요.</div>
+            <textarea class="wz-textarea" id="f_exportInfra" maxlength="400" data-required="1"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">전담인력 <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">최소 대표자 1명은 적어주세요.</div>
+            ${staffRows}
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="9">
+          <div class="wz-step-label">9 / 12 · 해외마케팅 활동</div>
+          <h2>해외 정보·마케팅은 어떻게 하시나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">해외 시장정보 획득 경로 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="marketInfoChannels" data-multi="1" data-required="1">
+              ${marketInfoOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">해외 마케팅 활동(온오프라인·홍보) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="marketingActivities" data-multi="1" data-required="1">
+              ${marketingOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">기수출 여부 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="exportHistory" data-required="1">
+              ${['수출 전(준비중)', '수출 경험 있음'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <div id="f_exportYearsWrap" style="display:none;margin-top:10px;">
+              <div class="wz-field-hint" style="margin:0 0 8px;">수출했던 연도를 모두 선택해주세요.</div>
+              <div class="wz-chip-row" data-field="exportYears" data-multi="1">
+                ${yearOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+              </div>
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">기타 사전 준비사항 (선택)</div>
+            <textarea class="wz-textarea" id="f_etcPrep" placeholder="추가로 해외 마케팅을 위해 준비하고 있는 것이 있다면 적어주세요." maxlength="200"></textarea>
+          </div>
+        </div>
+
+        ${horizonStep('short', 10, '단기(1년 내) 목표', '협약기간 내 1년 동안의 수출 마케팅 목표입니다.')}
+        ${horizonStep('mid', 11, '중기(2~3년) 목표', '2~3년 후를 내다본 수출 마케팅 목표입니다.')}
+        ${horizonStep('long', 12, '장기(5년) 목표', '5년 후를 내다본 수출 마케팅 목표입니다.')}
+
+        <div class="wz-step" id="wzDoneStep" style="display:none;">
+          <div class="wz-done-box" id="wzDoneBoxIdle">
+            <div class="wz-done-icon">✅</div>
+            <h2>입력이 끝났어요</h2>
+            <p>입력하신 내용으로 AI가 초안을 만들어드릴게요.</p>
+            <button type="button" class="wz-nav-btn wz-nav-next" id="wzGenerateBtn" style="display:inline-block;padding:15px 28px;" onclick="wzStartGenerate()">AI 초안 생성하기</button>
+          </div>
+          <div class="wz-done-box" id="wzDoneBoxLoading" style="display:none;">
+            <div class="wz-done-icon">✨</div>
+            <h2>초안을 작성하고 있어요</h2>
+            <p>최대 1~2분 정도 걸릴 수 있어요.</p>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="wz-nav-bar" id="wzNavBar" style="display:none;">
+      <button type="button" class="wz-nav-btn wz-nav-prev" id="wzPrevBtn" onclick="wzPrevStep()">이전</button>
+      <button type="button" class="wz-nav-btn wz-nav-next" id="wzNextBtn" onclick="wzNextStep()">다음</button>
+    </div>
+  </div>
+
+  <script>
+    var WZ_PROJECT_ID = ${JSON.stringify(projectId)};
+    var WZ_TOTAL_STEPS = 12;
+    var wzCurrentStep = 1;
+    var wzAnswers = {};
+
+    function authHeaders() {
+      var token = localStorage.getItem('lookbook_token') || '';
+      return { 'X-Session-Token': token, 'Content-Type': 'application/json' };
+    }
+    function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+
+    async function wzLoad() {
+      var token = localStorage.getItem('lookbook_token') || '';
+      if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); location.href = '/'; return; }
+      try {
+        var res = await fetch('/api/gov-support/projects/' + WZ_PROJECT_ID, { headers: authHeaders() });
+        if (res.status === 401) { showToast('로그인 후 이용할 수 있어요.', 'error'); location.href = '/'; return; }
+        var data = await res.json();
+        if (!data.success) { showToast(data.message || '불러오기에 실패했어요.', 'error'); location.href = '/gov-support'; return; }
+
+        wzAnswers = data.project.answers || {};
+        wzFillFormFromAnswers();
+
+        document.getElementById('wzLoading').style.display = 'none';
+        document.getElementById('wzForm').style.display = 'block';
+        document.getElementById('wzNavBar').style.display = 'flex';
+        wzShowStep(1);
+      } catch (e) {
+        showToast('네트워크 오류가 발생했어요.', 'error');
+      }
+    }
+
+    function wzEnsureCharCounter(el) {
+      var max = parseInt(el.getAttribute('maxlength') || '', 10);
+      if (!max) return;
+      var next = el.nextElementSibling;
+      var counter = (next && next.classList && next.classList.contains('wz-char-counter')) ? next : null;
+      if (!counter) {
+        counter = document.createElement('div');
+        counter.className = 'wz-char-counter';
+        el.insertAdjacentElement('afterend', counter);
+      }
+      function update() {
+        var len = el.value.length;
+        counter.textContent = len + ' / ' + max;
+        counter.classList.toggle('wz-char-counter-near', len >= max * 0.9);
+      }
+      if (!el.dataset.wzCounterBound) {
+        el.addEventListener('input', update);
+        el.dataset.wzCounterBound = '1';
+      }
+      update();
+    }
+
+    function wzFillFormFromAnswers() {
+      document.querySelectorAll('#wzForm input[id^="f_"], #wzForm textarea[id^="f_"]').forEach(function (el) {
+        var key = el.id.slice(2);
+        if (wzAnswers[key] !== undefined) el.value = wzAnswers[key];
+        wzEnsureCharCounter(el);
+      });
+      document.querySelectorAll('.wz-chip-row').forEach(function (row) {
+        var field = row.getAttribute('data-field');
+        var val2 = wzAnswers[field];
+        if (val2 === undefined) return;
+        var selected = Array.isArray(val2) ? val2 : [val2];
+        row.querySelectorAll('.wz-chip').forEach(function (chip) {
+          chip.classList.toggle('on', selected.indexOf(chip.getAttribute('data-value')) !== -1);
+        });
+      });
+      wzUpdateExportYearsVisibility();
+    }
+
+    function wzUpdateExportYearsVisibility() {
+      var row = document.querySelector('.wz-chip-row[data-field="exportHistory"]');
+      var wrap = document.getElementById('f_exportYearsWrap');
+      if (!row || !wrap) return;
+      var selected = row.querySelector('.wz-chip.on');
+      var value = selected ? selected.getAttribute('data-value') : '';
+      wrap.style.display = (value === '수출 경험 있음') ? 'block' : 'none';
+    }
+
+    document.addEventListener('click', function (e) {
+      var chip = e.target.closest('.wz-chip');
+      if (!chip) return;
+      var row = chip.parentElement;
+      var multi = row.getAttribute('data-multi');
+      var max = Number(row.getAttribute('data-max') || 0);
+      if (multi) {
+        if (!chip.classList.contains('on') && max > 0) {
+          var onCount = row.querySelectorAll('.wz-chip.on').length;
+          if (onCount >= max) { showToast('최대 ' + max + '개까지 선택할 수 있어요.', 'info'); return; }
+        }
+        chip.classList.toggle('on');
+      } else {
+        row.querySelectorAll('.wz-chip').forEach(function (c) { c.classList.remove('on'); });
+        chip.classList.add('on');
+      }
+      if (row.getAttribute('data-field') === 'exportHistory') wzUpdateExportYearsVisibility();
+    });
+
+    function wzCollectStep(stepNum) {
+      var stepEl = document.querySelector('.wz-step[data-step="' + stepNum + '"]');
+      if (!stepEl) return;
+      var patch = {};
+      stepEl.querySelectorAll('input[id^="f_"], textarea[id^="f_"]').forEach(function (el) {
+        patch[el.id.slice(2)] = el.value;
+      });
+      stepEl.querySelectorAll('.wz-chip-row').forEach(function (row) {
+        var field = row.getAttribute('data-field');
+        var multi = row.getAttribute('data-multi');
+        var onChips = Array.prototype.slice.call(row.querySelectorAll('.wz-chip.on')).map(function (ch) { return ch.getAttribute('data-value'); });
+        patch[field] = multi ? onChips : (onChips[0] || '');
+      });
+      Object.assign(wzAnswers, patch);
+      return patch;
+    }
+
+    function wzAutoSave() {
+      fetch('/api/gov-support/projects/' + WZ_PROJECT_ID + '/answers', {
+        method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ answers: wzAnswers }),
+      }).catch(function () {});
+    }
+
+    function wzManualSave() {
+      wzCollectStep(wzCurrentStep);
+      wzAutoSave();
+      showToast('임시 저장됐어요.', 'success');
+    }
+
+    function wzShowStep(n) {
+      document.querySelectorAll('.wz-step[data-step]').forEach(function (el) {
+        el.classList.toggle('active', Number(el.getAttribute('data-step')) === n);
+      });
+      wzCurrentStep = n;
+      document.getElementById('wzProgressBar').style.width = (n / WZ_TOTAL_STEPS * 100) + '%';
+      document.getElementById('wzPrevBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
+      document.getElementById('wzNextBtn').textContent = n === WZ_TOTAL_STEPS ? '완료' : '다음';
+      window.scrollTo(0, 0);
+    }
+
+    function wzValidateStep(stepNum) {
+      var stepEl = document.querySelector('.wz-step[data-step="' + stepNum + '"]');
+      if (!stepEl) return true;
+      var firstInvalid = null;
+      stepEl.querySelectorAll('[data-required="1"]').forEach(function (el) {
+        var ok;
+        if (el.classList.contains('wz-chip-row')) {
+          ok = !!el.querySelector('.wz-chip.on');
+        } else {
+          ok = !!(el.value && el.value.trim());
+        }
+        el.classList.toggle('wz-invalid', !ok);
+        if (!ok && !firstInvalid) firstInvalid = el;
+      });
+      if (firstInvalid) {
+        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        showToast('필수 항목(*)을 채워주세요.', 'error');
+        return false;
+      }
+      return true;
+    }
+
+    function wzNextStep() {
+      wzCollectStep(wzCurrentStep);
+      if (!wzValidateStep(wzCurrentStep)) return;
+      wzAutoSave();
+      if (wzCurrentStep === WZ_TOTAL_STEPS) {
+        document.getElementById('wzForm').style.display = 'none';
+        document.getElementById('wzNavBar').style.display = 'none';
+        document.getElementById('wzDoneStep').style.display = 'block';
+        return;
+      }
+      wzShowStep(wzCurrentStep + 1);
+    }
+
+    async function wzStartGenerate() {
+      document.getElementById('wzDoneBoxIdle').style.display = 'none';
+      document.getElementById('wzDoneBoxLoading').style.display = 'block';
+      try {
+        var res = await fetch('/api/gov-support/projects/' + WZ_PROJECT_ID + '/generate', {
+          method: 'POST', headers: authHeaders(),
+        });
+        var data = await res.json();
+        if (!data.success) {
+          showToast(data.message || '초안 생성에 실패했어요.', 'error');
+          document.getElementById('wzDoneBoxLoading').style.display = 'none';
+          document.getElementById('wzDoneBoxIdle').style.display = 'block';
+          return;
+        }
+        location.href = '/gov-support/result/' + WZ_PROJECT_ID;
+      } catch (e) {
+        showToast('네트워크 오류가 발생했어요.', 'error');
+        document.getElementById('wzDoneBoxLoading').style.display = 'none';
+        document.getElementById('wzDoneBoxIdle').style.display = 'block';
+      }
+    }
+
+    function wzPrevStep() {
+      if (wzCurrentStep === 1) return;
+      wzCollectStep(wzCurrentStep);
+      wzShowStep(wzCurrentStep - 1);
+    }
+
+    wzLoad();
+  </script>
+  `
+}
+
 app.get('/gov-support/wizard/:id', async (c) => {
   const projectId = c.req.param('id')
   c.header('Cache-Control', 'no-store')
+
+  // 2026-11-02: 수출바우처는 전용 위저드(gsExportVoucherWizardHtml)로 완전히 분리된
+  // 경로다 — 아래 공유 위저드(yebi 등 6종)의 거대한 <script>와는 전혀 다른 질문/필드를
+  // 쓰므로, 프로그램 확인 후 그쪽 로직을 전혀 거치지 않고 바로 반환한다.
+  const wzProject = await c.env.LOOKBOOK_DB.prepare(
+    `SELECT program_id FROM gov_support_projects WHERE id = ?`
+  ).bind(projectId).first() as any
+  if (wzProject?.program_id === 'export-voucher') {
+    return c.html(htmlShell('수출바우처 작성', gsExportVoucherWizardHtml(c, projectId), '', '수출바우처 사업계획서 작성 — EZlook 지원사업 도우미', c.env.GA4_MEASUREMENT_ID))
+  }
+
   // 어드민이 gov_support_sections에 구조를 등록한 프로그램은 코드 배포 없이 바로 생성 가능
   // 목록에 포함되도록 DB에서 동적으로 조회(GS_GENERATION_READY_IDS 하드코딩과 합집합).
   const dbReadyRows = (await c.env.LOOKBOOK_DB.prepare(`SELECT DISTINCT program_id FROM gov_support_sections`).all()).results as any[]
@@ -6768,7 +7308,35 @@ async function gsCallGroupWithRetry(
 // 만들어둔 표를 그대로 꽂아준다 — AI가 브랜드명을 지어내는 걸 막기 위해(§8) 처음부터
 // "참고자료"로만 쓰던 걸, 경쟁사 분석표를 실제 블록으로도 보여달라는 요청에 맞춰 computed
 // 모듈로도 노출한다.
-function gsResolveComputedValue(bindingKey: string | null | undefined, finance: any, competitorTable?: any): any {
+// 2026-11-02: 수출바우처(export-voucher) 경쟁업체/전담인력 표 — 빈 슬롯이면 AI가
+// 그럴듯한 이름을 지어내지 않도록(§8과 같은 이유) computed로 결정론적으로 만든다.
+// 전부 채워진 슬롯이 하나도 없으면 teamMembers/partners 빈 슬롯 처리(원칙 3의
+// 예외)와 같은 방식으로 "미정" 한 줄만 남긴다.
+function gsEvRowsFromSlots(slots: Array<[string, string]>, headers: [string, string], emptyLabel: string): any {
+  const rows = slots.filter(([a]) => a).map(([a, b]) => [a, b || '-'])
+  return { headers, rows: rows.length ? rows : [[emptyLabel, '-']] }
+}
+function gsEvStaffTable(answers: any): any {
+  const rows = [1, 2, 3]
+    .map((i) => [answers[`staff${i}_name`], answers[`staff${i}_role`], answers[`staff${i}_career`]])
+    .filter(([name]) => name)
+    .map(([name, role, career]) => [name, role || '-', career || '-'])
+  return { headers: ['이름/직책', '담당 역할', '관련 경력'], rows: rows.length ? rows : [['전담인력 미정', '-', '-']] }
+}
+function gsEvHorizonTable(answers: any, prefix: string): any {
+  const headers = ['온라인 입점', '오프라인 입점', '해외 바이어 수', '해외 박람회', '목표 매출']
+  const cells = ['Online', 'Offline', 'BuyerCount', 'TradeShow', 'Revenue'].map((k) => answers[`${prefix}${k}`] || '-')
+  return { headers, rows: [cells] }
+}
+function gsEvExportHistoryText(answers: any): any {
+  if (answers?.exportHistory === '수출 경험 있음') {
+    const years: string[] = Array.isArray(answers.exportYears) ? answers.exportYears : []
+    return { text: years.length ? years.join(', ') : '수출 경험 있음' }
+  }
+  return { text: '(준비중)' }
+}
+
+function gsResolveComputedValue(bindingKey: string | null | undefined, finance: any, competitorTable: any, answers?: any): any {
   if (!bindingKey) return null
   switch (bindingKey) {
     case 'fundUse.stage1':
@@ -6783,6 +7351,38 @@ function gsResolveComputedValue(bindingKey: string | null | undefined, finance: 
       return finance?.scenario
     case 'competitorTable':
       return competitorTable ? { rows: competitorTable.rows } : null
+    case 'exportVoucher.companyName':
+      return { text: answers?.companyName || '' }
+    case 'exportVoucher.mainProduct':
+      return { text: answers?.mainProduct || '' }
+    case 'exportVoucher.exportItem':
+      return { text: answers?.exportItem || '' }
+    case 'exportVoucher.devStatus':
+      return { text: answers?.devStatus || '' }
+    case 'exportVoucher.domesticMarketShare':
+      return { text: answers?.domesticMarketShare || '' }
+    case 'exportVoucher.overseasMarketShare':
+      return { text: answers?.overseasMarketShare || '' }
+    case 'exportVoucher.targetCustomer':
+      return { text: answers?.targetCustomer || '' }
+    case 'exportVoucher.targetCategory':
+      return { text: Array.isArray(answers?.targetCategory) ? answers.targetCategory.join(', ') : (answers?.targetCategory || '') }
+    case 'exportVoucher.targetCountries':
+      return { text: Array.isArray(answers?.targetCountries) ? answers.targetCountries.join(', ') : (answers?.targetCountries || '') }
+    case 'exportVoucher.exportHistory':
+      return gsEvExportHistoryText(answers)
+    case 'exportVoucher.domesticCompetitors':
+      return gsEvRowsFromSlots([1, 2, 3].map((i) => [answers?.[`domesticCompetitor${i}_name`], answers?.[`domesticCompetitor${i}_feature`]]), ['브랜드명', '특징'], '국내 경쟁업체 미정')
+    case 'exportVoucher.overseasCompetitors':
+      return gsEvRowsFromSlots([1, 2, 3].map((i) => [answers?.[`overseasCompetitor${i}_name`], answers?.[`overseasCompetitor${i}_feature`]]), ['브랜드명', '특징'], '국외 경쟁업체 미정')
+    case 'exportVoucher.staff':
+      return gsEvStaffTable(answers || {})
+    case 'exportVoucher.shortHorizon':
+      return gsEvHorizonTable(answers || {}, 'short')
+    case 'exportVoucher.midHorizon':
+      return gsEvHorizonTable(answers || {}, 'mid')
+    case 'exportVoucher.longHorizon':
+      return gsEvHorizonTable(answers || {}, 'long')
     default:
       return null
   }
@@ -6907,7 +7507,7 @@ ${GS_NODES_JSON_FORMAT}
   // 최종 병합을 다시 한다(재시도로 aiBlocksByModuleId가 바뀌므로).
   const retryTargets = catBuilds
     .map((cb) => {
-      const { warnings } = mergeCategoryBlocks(cb.cat, cb.aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), cb.l1Index)
+      const { warnings } = mergeCategoryBlocks(cb.cat, cb.aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable, answers), cb.l1Index)
       const missingIds = warnings.filter((w) => w.reason === 'AI 응답에 해당 moduleId가 없음').map((w) => w.moduleId)
       return { cb, missingIds }
     })
@@ -6941,7 +7541,7 @@ ${GS_NODES_JSON_FORMAT}
   // 최종 병합 — 재시도로도 못 채운 moduleId만 경고로 남긴다.
   const mergeWarningsByCategory: { category: string; warnings: any[] }[] = []
   for (const { cat: c, aiBlocksByModuleId, l1Index, aiResult, groupResult } of catBuilds) {
-    const { blocks, warnings } = mergeCategoryBlocks(c, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), l1Index)
+    const { blocks, warnings } = mergeCategoryBlocks(c, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable, answers), l1Index)
     if (warnings.length) {
       console.error(`gov-support(nodes) "${c.node.title}" 병합 경고(재시도 후):`, JSON.stringify(warnings).slice(0, 500))
       // 2026-10-26: 403도 아니고 JSON 파싱 실패도 아닌데 moduleId가 통째로 비는 사례가
@@ -6977,7 +7577,7 @@ ${GS_NODES_JSON_FORMAT}
   if (groupResults.every((r) => r !== null)) {
     const summaryHasAi = flattenCategory(summaryCat, answers).some((e) => isAiGeneratedNode(e.node))
     if (!summaryHasAi) {
-      const { blocks } = mergeCategoryBlocks(summaryCat, new Map(), answers, (key) => gsResolveComputedValue(key, finance, competitorTable), 0)
+      const { blocks } = mergeCategoryBlocks(summaryCat, new Map(), answers, (key) => gsResolveComputedValue(key, finance, competitorTable, answers), 0)
       summarySection = { sectionId: summaryCat.node.id, headline: summaryCat.node.title, lead: '', blocks }
     } else {
       const structureBlock = buildCategoryStructureText(summaryCat, answers)
@@ -6999,7 +7599,7 @@ ${GS_NODES_JSON_FORMAT}`
       } else {
         const aiResult: any = result[0]
         const aiBlocksByModuleId = buildAiBlocksByModuleId(summaryCat, answers, aiResult?.blocks || [])
-        const { blocks } = mergeCategoryBlocks(summaryCat, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable), 0)
+        const { blocks } = mergeCategoryBlocks(summaryCat, aiBlocksByModuleId, answers, (key) => gsResolveComputedValue(key, finance, competitorTable, answers), 0)
         summarySection = { sectionId: summaryCat.node.id, headline: summaryCat.node.title, lead: '', blocks }
       }
     }
