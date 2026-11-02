@@ -119,6 +119,17 @@ test('buildCategoryStructureText — payload.text가 없고 caption만 있는 �
   assert.match(text, /참고\(관리자가 적어둔 힌트\/제목\/캡션\): 창업아이템 배경 핵심 수치/)
 })
 
+test('buildCategoryStructureText — bullets 노드의 payload.hintToAI(어드민 빌더 UI의 "AI 추가 지시" 필드)도 힌트로 전달된다', () => {
+  // 2026-11-02: moduleTypes.ts의 bullets payloadSchema는 어드민이 hintToAI 필드에 "AI 추가
+  // 지시"를 입력하도록 돼 있는데, buildCategoryStructureText가 text/caption만 읽어 그 값이
+  // 조용히 무시되던 버그 — hintToAI도 폴백으로 읽어야 한다.
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '1. 문제 인식', payload: {}, binding: 'static', targetChars: 1000 })
+  const l3bullets = node({ id: 'l3b', level: 3, parentId: 'l1', expressionType: 'bullets', title: '배경 설명', payload: { items: [], hintToAI: '어드민이 입력한 추가 지시' }, binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l3bullets])[0]
+  const text = buildCategoryStructureText(cat, {})
+  assert.match(text, /참고\(관리자가 적어둔 힌트\/제목\/캡션\): 어드민이 입력한 추가 지시/)
+})
+
 test('buildMissingModuleStructureText — 지정한 moduleId만 나열하고 그 외 리프·그룹 노드는 제외한다', () => {
   const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '3. 성장전략', payload: {}, binding: 'static', targetChars: 1000 })
   const l2 = node({ id: 'l2', level: 2, parentId: 'l1', expressionType: 'subhead', title: '가. 고객 확보 방안', payload: {}, binding: 'static' })
