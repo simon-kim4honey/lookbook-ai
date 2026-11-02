@@ -48,13 +48,11 @@ export const COMPUTED_KEY_WHITELIST = [
   'costBreakdown', 'channelMargin', 'revenueScenario', 'fundUse.stage1', 'fundUse.stage2',
   'competitorTable',
   // 2026-11-02: 수출바우처(export-voucher) — 회사명·주요 제품 등 단순 사실 echo와
-  // 경쟁업체/전담인력/단기·중기·장기 목표처럼 사용자가 직접 입력한 구조화 값을
-  // AI가 지어내지 않고 그대로 표로 옮기기 위한 computed 키.
+  // 전담인력처럼 사용자가 직접 입력한 구조화 값을 AI가 지어내지 않고 그대로
+  // 표로 옮기기 위한 computed 키.
   'exportVoucher.companyName', 'exportVoucher.mainProduct', 'exportVoucher.exportItem',
-  'exportVoucher.devStatus', 'exportVoucher.domesticMarketShare', 'exportVoucher.overseasMarketShare',
-  'exportVoucher.targetCustomer', 'exportVoucher.targetCategory', 'exportVoucher.targetCountries',
-  'exportVoucher.exportHistory', 'exportVoucher.domesticCompetitors', 'exportVoucher.overseasCompetitors',
-  'exportVoucher.staff', 'exportVoucher.shortHorizon', 'exportVoucher.midHorizon', 'exportVoucher.longHorizon',
+  'exportVoucher.devStatus', 'exportVoucher.targetCustomer', 'exportVoucher.targetCategory',
+  'exportVoucher.targetCountries', 'exportVoucher.exportHistory', 'exportVoucher.staff',
 ] as const
 
 // binding='answer' 및 repeat.source / condition.when이 허용하는 위저드 답변 키 —
