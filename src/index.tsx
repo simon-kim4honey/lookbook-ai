@@ -5114,22 +5114,10 @@ app.patch('/api/gov-support/projects/:id/answers', async (c) => {
 function gsExportVoucherWizardHtml(c: any, projectId: string): string {
   const countryOptions = ['중국', '일본', '베트남', '미국', '프랑스', '독일', '이탈리아']
   const categoryOptions = ['패션브랜드', '패션제조', '의류', '주얼리', '잡화', '가방', '신발', '기타']
-  const marketInfoOptions = ['박람회', '온라인 서치', '지원사업(해외진출 컨설팅)', '해외 바이어 네트워크', '기타']
-  const marketingOptions = ['박람회', 'SNS', '온라인 홍보', '지원사업(온라인 홍보)', '해외 영업(바이어 외주)', '기타']
   const yearOptions = ['2024년', '2025년', '2026년']
-
-  // 2026-11-03: 사용자 지정 — 빈칸만 있으면 뭘 써야 할지 모르겠다는 피드백. 패션 제조
-  // 브랜드 기준 예시 답변을 전부 placeholder로 채운다(기존 공유 위저드의 "예: ..." 관례와
-  // 동일). 국내/해외 경쟁업체는 이 세션에서 이미 실존 브랜드로 검증해둔 예시를 그대로 쓴다.
-  const competitorRows = (prefix: string, label: string, nameExamples: string[], featureExamples: string[]) => [1, 2, 3].map((i) => `
-    <div class="wz-dynrow">
-      <div class="wz-dynrow-head"><span>${label} ${i}</span></div>
-      <div class="wz-dynrow-grid">
-        <div class="wz-dynrow-cell"><label>브랜드명</label><input type="text" class="wz-input" id="f_${prefix}${i}_name" maxlength="40" placeholder="${nameExamples[i - 1]}" /></div>
-        <div class="wz-dynrow-cell"><label>특징</label><input type="text" class="wz-input" id="f_${prefix}${i}_feature" maxlength="80" placeholder="${featureExamples[i - 1]}" /></div>
-      </div>
-    </div>
-  `).join('')
+  // 2026-11-03: 사용자 지정 — "수출인프라 구축도"를 자유 서술로 물으면 답을 못 한다는
+  // 피드백. 차별점 질문과 같은 이유로, 뭘 적어야 할지 보기로 유도한다.
+  const infraOptions = ['해외 배송 대행 계약', '영문 쇼핑몰·상세페이지 준비', '수출 관련 교육 이수', '무역영어 가능 인력 보유', '해외 바이어 상담 경험', '수출 인증 준비(위생허가 등)', '아직 준비된 것 없음']
 
   const staffRows = [1, 2, 3].map((i) => `
     <div class="wz-dynrow">
@@ -5141,36 +5129,6 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
       </div>
     </div>
   `).join('')
-
-  const horizonStep = (prefix: string, stepNo: number, title: string, hint: string) => `
-    <div class="wz-step" data-step="${stepNo}">
-      <div class="wz-step-label">${stepNo} / 12 · 수출 마케팅 목표</div>
-      <h2>${title}</h2>
-      <div class="wz-field-hint" style="margin:-10px 0 16px;">${hint}</div>
-      <div class="wz-field">
-        <div class="wz-field-label">온라인 입점 계획 <span class="wz-required">*</span></div>
-        <input type="text" class="wz-input" id="f_${prefix}Online" placeholder="예: 아마존 재팬, 라자다(베트남) 입점" maxlength="100" data-required="1" />
-      </div>
-      <div class="wz-field">
-        <div class="wz-field-label">오프라인 입점 계획 <span class="wz-required">*</span></div>
-        <div class="wz-field-hint" style="margin:0 0 8px;">해당 국가 백화점명 등 구체적으로.</div>
-        <input type="text" class="wz-input" id="f_${prefix}Offline" placeholder="예: 이세탄(일본) 편집숍 입점 협의" maxlength="100" data-required="1" />
-      </div>
-      <div class="wz-field">
-        <div class="wz-field-label">해외 바이어 수 <span class="wz-required">*</span></div>
-        <input type="text" class="wz-input" id="f_${prefix}BuyerCount" placeholder="예: 5개사" maxlength="30" data-required="1" />
-      </div>
-      <div class="wz-field">
-        <div class="wz-field-label">해외 박람회 참가 계획 <span class="wz-required">*</span></div>
-        <div class="wz-field-hint" style="margin:0 0 8px;">참가 국가와 횟수를 포함해서.</div>
-        <input type="text" class="wz-input" id="f_${prefix}TradeShow" placeholder="예: 일본 도쿄 패션위크 연 1회" maxlength="100" data-required="1" />
-      </div>
-      <div class="wz-field">
-        <div class="wz-field-label">목표 매출 <span class="wz-required">*</span></div>
-        <input type="text" class="wz-input" id="f_${prefix}Revenue" placeholder="예: 1억 원" maxlength="40" data-required="1" />
-      </div>
-    </div>
-  `
 
   return `
   <div class="toast-container" id="toastContainer"></div>
@@ -5199,6 +5157,9 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
     .wz-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .wz-chip { padding: 10px 16px; border: 1px solid #E5E8EB; border-radius: 999px; background: #FFFFFF; font-size: 13.5px; color: #4E5968; cursor: pointer; }
     .wz-chip.on { background: #3182F6; border-color: #3182F6; color: #fff; font-weight: 700; }
+    .wz-highlight-box { background: #FFF8E1; border: 1.5px solid #F5C842; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
+    .wz-highlight-box .wz-highlight-title { font-size: 13px; font-weight: 800; color: #8A6D1D; margin-bottom: 4px; }
+    .wz-highlight-box .wz-highlight-desc { font-size: 12.5px; color: #8A6D1D; line-height: 1.5; }
     .wz-dynrow { background: #F9FAFB; border: 1px solid #E5E8EB; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
     .wz-dynrow-head { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: #4E5968; margin-bottom: 8px; }
     .wz-dynrow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -5225,7 +5186,7 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
       <form id="wzForm" style="display:none;">
 
         <div class="wz-step active" data-step="1">
-          <div class="wz-step-label">1 / 12 · 기업 개요</div>
+          <div class="wz-step-label">1 / 7 · 기업 개요</div>
           <h2>어떤 기업인가요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">회사명 <span class="wz-required">*</span></div>
@@ -5238,7 +5199,7 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
         </div>
 
         <div class="wz-step" data-step="2">
-          <div class="wz-step-label">2 / 12 · 수출 품목</div>
+          <div class="wz-step-label">2 / 7 · 수출 품목</div>
           <h2>어떤 제품을 수출하시나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">생산 취급 품목 <span class="wz-required">*</span></div>
@@ -5259,53 +5220,28 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
         </div>
 
         <div class="wz-step" data-step="3">
-          <div class="wz-step-label">3 / 12 · 시장 규모</div>
-          <h2>국내외 시장 규모가 어느 정도인가요?</h2>
+          <div class="wz-step-label">3 / 7 · 차별점</div>
+          <h2>왜 지금 수출이 필요한가요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">국내 시장 규모 <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_domesticMarketSize" placeholder="예: 국내 여성 캐주얼 시장 약 5조원, 연 2~3% 성장" maxlength="200" data-required="1"></textarea>
+            <div class="wz-highlight-box">
+              <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
+              <div class="wz-highlight-desc">"차별점이 뭔가요?"라고 물으면 막막할 수 있어요. 대신 아래 질문에 답해보세요 — 해외 바이어에게 보여줄 우리만의 강점이 드러나는 경우가 많아요.</div>
+            </div>
+            <div class="wz-field-label">해외 바이어나 고객이 경쟁사 제품이 아닌 굳이 우리 제품을 선택할 이유는 무엇인가요? <span class="wz-required">*</span></div>
+            <textarea class="wz-textarea" id="f_exportDiffReason" placeholder="예: 가격은 비슷해도 원단 품질과 마감 디테일에서 차이가 느껴진다는 평을 듣는다" maxlength="200" data-required="1"></textarea>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">국내 시장 점유율(목표치) <span class="wz-required">*</span></div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">세그먼트를 좁혀 구체적인 목표치로.</div>
-            <input type="text" class="wz-input" id="f_domesticMarketShare" placeholder="예: 20대 여성 온라인 캐주얼 세그먼트 내 0.5%" maxlength="150" data-required="1" />
+            <div class="wz-field-label">생산 공정에서 "이 부분은 남들이 안 해도 우리는 꼭 지킨다"고 느낀 게 있나요? (선택)</div>
+            <textarea class="wz-textarea" id="f_exportDiffProcess" placeholder="예: 원단 입고 시 전량 육안 검수를 직접 한다, 샘플을 최소 3회 이상 수정해 핏을 맞춘다" maxlength="200"></textarea>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">국외 시장 규모 <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_overseasMarketSize" placeholder="예: 일본 여성 캐주얼 시장 약 10조원 규모" maxlength="200" data-required="1"></textarea>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">국외 시장 점유율(목표치) <span class="wz-required">*</span></div>
-            <input type="text" class="wz-input" id="f_overseasMarketShare" placeholder="예: 일본 온라인 편집숍 입점 브랜드 중 0.1%" maxlength="150" data-required="1" />
+            <div class="wz-field-label">해외 바이어나 고객이 제품을 보고 가장 많이 하는 말이 있나요? (선택)</div>
+            <textarea class="wz-textarea" id="f_exportDiffFeedback" placeholder="예: 가격 대비 마감이 좋다, 핏이 다르다, 소재가 고급스럽다 등" maxlength="200"></textarea>
           </div>
         </div>
 
         <div class="wz-step" data-step="4">
-          <div class="wz-step-label">4 / 12 · 경쟁업체 현황</div>
-          <h2>국내외 경쟁업체를 알려주세요</h2>
-          <div class="wz-field-hint" style="margin:-10px 0 16px;">아는 만큼만 적어주세요. 비워두면 동종 업계 일반적인 경쟁 유형으로 채워드려요.</div>
-          <div class="wz-field">
-            <div class="wz-field-label">국내 경쟁업체 (최대 3곳)</div>
-            ${competitorRows('domesticCompetitor', '국내 경쟁업체', ['예: 무신사 스탠다드', '예: 커버낫', '예: 마르디 메크르디'], ['예: 온라인 중심, 합리적 가격', '예: 스트릿 캐주얼, C로고', '예: 그래픽 디자인, 무신사 간판 브랜드'])}
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">국외 경쟁업체 (최대 3곳)</div>
-            ${competitorRows('overseasCompetitor', '국외 경쟁업체', ['예: 유니클로', '예: 자라(ZARA)', '예: H&M'], ['예: 글로벌 SPA, 기본 아이템 중심', '예: 트렌드 반영 빠른 패스트패션', '예: 저가·대량생산 SPA'])}
-          </div>
-        </div>
-
-        <div class="wz-step" data-step="5">
-          <div class="wz-step-label">5 / 12 · 수출 필요성</div>
-          <h2>왜 지금 수출이 필요한가요?</h2>
-          <div class="wz-field">
-            <div class="wz-field-label">수출 필요성 및 우리 업체만의 차별점 <span class="wz-required">*</span></div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">왜 지금 수출이 필요한지, 경쟁사 대비 우리만의 차별점은 무엇인지 자유롭게 적어주세요 — AI가 차별점 3가지로 정리해드려요.</div>
-            <textarea class="wz-textarea" id="f_exportDiffPoints" placeholder="예: 국내 온라인 시장이 포화 상태라 해외 판로 확대가 필요하다. 경쟁사 대비 특허 기반 패턴 설계로 핏 완성도가 높고, 소량 생산 체계라 트렌드 반영 속도가 빠르다." maxlength="400" data-required="1"></textarea>
-          </div>
-        </div>
-
-        <div class="wz-step" data-step="6">
-          <div class="wz-step-label">6 / 12 · 목표시장</div>
+          <div class="wz-step-label">4 / 7 · 목표시장</div>
           <h2>어디로 진출하고 싶으신가요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">희망 진출시장 카테고리 <span class="wz-required">*</span></div>
@@ -5331,8 +5267,8 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           </div>
         </div>
 
-        <div class="wz-step" data-step="7">
-          <div class="wz-step-label">7 / 12 · 목표고객군</div>
+        <div class="wz-step" data-step="5">
+          <div class="wz-step-label">5 / 7 · 목표고객군</div>
           <h2>누구에게 팔 계획인가요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">목표고객군 <span class="wz-required">*</span></div>
@@ -5345,13 +5281,15 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           </div>
         </div>
 
-        <div class="wz-step" data-step="8">
-          <div class="wz-step-label">8 / 12 · 수출 준비현황</div>
+        <div class="wz-step" data-step="6">
+          <div class="wz-step-label">6 / 7 · 수출 준비현황</div>
           <h2>수출 인프라와 전담인력은요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">수출인프라 구축도 <span class="wz-required">*</span></div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">수출하기 위한 준비 정도를 자유롭게 적어주세요 — AI가 4가지 개조식으로 정리해드려요.</div>
-            <textarea class="wz-textarea" id="f_exportInfra" placeholder="예: 해외 배송 대행 계약 완료, 영문 쇼핑몰 구축 중, 수출 관련 정부 교육 이수, 무역영어 가능 인력 보유" maxlength="400" data-required="1"></textarea>
+            <div class="wz-field-label">수출인프라 구축도 (해당하는 것 모두 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="exportInfraItems" data-multi="1" data-required="1">
+              ${infraOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <textarea class="wz-textarea" id="f_exportInfraEtc" placeholder="추가로 준비하고 있는 것이 있다면 적어주세요 (선택)" maxlength="150" style="margin-top:10px;min-height:60px;"></textarea>
           </div>
           <div class="wz-field">
             <div class="wz-field-label">전담인력 <span class="wz-required">*</span></div>
@@ -5360,21 +5298,9 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           </div>
         </div>
 
-        <div class="wz-step" data-step="9">
-          <div class="wz-step-label">9 / 12 · 해외마케팅 활동</div>
-          <h2>해외 정보·마케팅은 어떻게 하시나요?</h2>
-          <div class="wz-field">
-            <div class="wz-field-label">해외 시장정보 획득 경로 <span class="wz-required">*</span></div>
-            <div class="wz-chip-row" data-field="marketInfoChannels" data-multi="1" data-required="1">
-              ${marketInfoOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
-            </div>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">해외 마케팅 활동(온오프라인·홍보) <span class="wz-required">*</span></div>
-            <div class="wz-chip-row" data-field="marketingActivities" data-multi="1" data-required="1">
-              ${marketingOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
-            </div>
-          </div>
+        <div class="wz-step" data-step="7">
+          <div class="wz-step-label">7 / 7 · 수출 현황</div>
+          <h2>지금까지 수출 경험이 있나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">기수출 여부 <span class="wz-required">*</span></div>
             <div class="wz-chip-row" data-field="exportHistory" data-required="1">
@@ -5392,10 +5318,6 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
             <textarea class="wz-textarea" id="f_etcPrep" placeholder="추가로 해외 마케팅을 위해 준비하고 있는 것이 있다면 적어주세요." maxlength="200"></textarea>
           </div>
         </div>
-
-        ${horizonStep('short', 10, '단기(1년 내) 목표', '협약기간 내 1년 동안의 수출 마케팅 목표입니다.')}
-        ${horizonStep('mid', 11, '중기(2~3년) 목표', '2~3년 후를 내다본 수출 마케팅 목표입니다.')}
-        ${horizonStep('long', 12, '장기(5년) 목표', '5년 후를 내다본 수출 마케팅 목표입니다.')}
 
         <div class="wz-step" id="wzDoneStep" style="display:none;">
           <div class="wz-done-box" id="wzDoneBoxIdle">
@@ -5421,7 +5343,7 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
 
   <script>
     var WZ_PROJECT_ID = ${JSON.stringify(projectId)};
-    var WZ_TOTAL_STEPS = 12;
+    var WZ_TOTAL_STEPS = 7;
     var wzCurrentStep = 1;
     var wzAnswers = {};
 
@@ -7315,21 +7237,12 @@ async function gsCallGroupWithRetry(
 // 그럴듯한 이름을 지어내지 않도록(§8과 같은 이유) computed로 결정론적으로 만든다.
 // 전부 채워진 슬롯이 하나도 없으면 teamMembers/partners 빈 슬롯 처리(원칙 3의
 // 예외)와 같은 방식으로 "미정" 한 줄만 남긴다.
-function gsEvRowsFromSlots(slots: Array<[string, string]>, headers: [string, string], emptyLabel: string): any {
-  const rows = slots.filter(([a]) => a).map(([a, b]) => [a, b || '-'])
-  return { headers, rows: rows.length ? rows : [[emptyLabel, '-']] }
-}
 function gsEvStaffTable(answers: any): any {
   const rows = [1, 2, 3]
     .map((i) => [answers[`staff${i}_name`], answers[`staff${i}_role`], answers[`staff${i}_career`]])
     .filter(([name]) => name)
     .map(([name, role, career]) => [name, role || '-', career || '-'])
   return { headers: ['이름/직책', '담당 역할', '관련 경력'], rows: rows.length ? rows : [['전담인력 미정', '-', '-']] }
-}
-function gsEvHorizonTable(answers: any, prefix: string): any {
-  const headers = ['온라인 입점', '오프라인 입점', '해외 바이어 수', '해외 박람회', '목표 매출']
-  const cells = ['Online', 'Offline', 'BuyerCount', 'TradeShow', 'Revenue'].map((k) => answers[`${prefix}${k}`] || '-')
-  return { headers, rows: [cells] }
 }
 function gsEvExportHistoryText(answers: any): any {
   if (answers?.exportHistory === '수출 경험 있음') {
@@ -7362,10 +7275,6 @@ function gsResolveComputedValue(bindingKey: string | null | undefined, finance: 
       return { text: answers?.exportItem || '' }
     case 'exportVoucher.devStatus':
       return { text: answers?.devStatus || '' }
-    case 'exportVoucher.domesticMarketShare':
-      return { text: answers?.domesticMarketShare || '' }
-    case 'exportVoucher.overseasMarketShare':
-      return { text: answers?.overseasMarketShare || '' }
     case 'exportVoucher.targetCustomer':
       return { text: answers?.targetCustomer || '' }
     case 'exportVoucher.targetCategory':
@@ -7374,18 +7283,8 @@ function gsResolveComputedValue(bindingKey: string | null | undefined, finance: 
       return { text: Array.isArray(answers?.targetCountries) ? answers.targetCountries.join(', ') : (answers?.targetCountries || '') }
     case 'exportVoucher.exportHistory':
       return gsEvExportHistoryText(answers)
-    case 'exportVoucher.domesticCompetitors':
-      return gsEvRowsFromSlots([1, 2, 3].map((i) => [answers?.[`domesticCompetitor${i}_name`], answers?.[`domesticCompetitor${i}_feature`]]), ['브랜드명', '특징'], '국내 경쟁업체 미정')
-    case 'exportVoucher.overseasCompetitors':
-      return gsEvRowsFromSlots([1, 2, 3].map((i) => [answers?.[`overseasCompetitor${i}_name`], answers?.[`overseasCompetitor${i}_feature`]]), ['브랜드명', '특징'], '국외 경쟁업체 미정')
     case 'exportVoucher.staff':
       return gsEvStaffTable(answers || {})
-    case 'exportVoucher.shortHorizon':
-      return gsEvHorizonTable(answers || {}, 'short')
-    case 'exportVoucher.midHorizon':
-      return gsEvHorizonTable(answers || {}, 'mid')
-    case 'exportVoucher.longHorizon':
-      return gsEvHorizonTable(answers || {}, 'long')
     default:
       return null
   }
