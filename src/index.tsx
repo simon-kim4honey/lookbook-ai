@@ -5319,20 +5319,21 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
           </div>
         </div>
 
-        <div class="wz-step" id="wzDoneStep" style="display:none;">
-          <div class="wz-done-box" id="wzDoneBoxIdle">
-            <div class="wz-done-icon">✅</div>
-            <h2>입력이 끝났어요</h2>
-            <p>입력하신 내용으로 AI가 초안을 만들어드릴게요.</p>
-            <button type="button" class="wz-nav-btn wz-nav-next" id="wzGenerateBtn" style="display:inline-block;padding:15px 28px;" onclick="wzStartGenerate()">AI 초안 생성하기</button>
-          </div>
-          <div class="wz-done-box" id="wzDoneBoxLoading" style="display:none;">
-            <div class="wz-done-icon">✨</div>
-            <h2>초안을 작성하고 있어요</h2>
-            <p>최대 1~2분 정도 걸릴 수 있어요.</p>
-          </div>
-        </div>
       </form>
+
+      <div class="wz-step" id="wzDoneStep" style="display:none;">
+        <div class="wz-done-box" id="wzDoneBoxIdle">
+          <div class="wz-done-icon">✅</div>
+          <h2>입력이 끝났어요</h2>
+          <p>입력하신 내용으로 AI가 초안을 만들어드릴게요.</p>
+          <button type="button" class="wz-nav-btn wz-nav-next" id="wzGenerateBtn" style="display:inline-block;padding:15px 28px;" onclick="wzStartGenerate()">AI 초안 생성하기</button>
+        </div>
+        <div class="wz-done-box" id="wzDoneBoxLoading" style="display:none;">
+          <div class="wz-done-icon">✨</div>
+          <h2>초안을 작성하고 있어요</h2>
+          <p>최대 1~2분 정도 걸릴 수 있어요.</p>
+        </div>
+      </div>
     </div>
 
     <div class="wz-nav-bar" id="wzNavBar" style="display:none;">
