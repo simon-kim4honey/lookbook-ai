@@ -160,14 +160,21 @@ function renderBlockToDocx(b: any, images: DocxImages): (Paragraph | Table)[] {
       for (const item of (b.items || [])) out.push(new Paragraph({ bullet: { level: 0 }, children: markedRuns(item) }))
       return out
     }
-    case 'paragraph':
+    case 'paragraph': {
       if (!b.text) return []
-      return [new Paragraph({ spacing: { after: 160 }, children: markedRuns(b.text) })]
+      const out: (Paragraph | Table)[] = []
+      if (b.label) out.push(new Paragraph({ heading: HeadingLevel.HEADING_3, children: [new TextRun(plainText(b.label))] }))
+      out.push(new Paragraph({ spacing: { after: 160 }, children: markedRuns(b.text) }))
+      return out
+    }
     case 'table': {
       const headers: string[] = b.headers || []
       const rows: string[][] = b.rows || []
       if (!headers.length && !rows.length) return []
-      return [simpleTable(headers, rows), new Paragraph({ text: '' })]
+      const out: (Paragraph | Table)[] = []
+      if (b.label) out.push(new Paragraph({ heading: HeadingLevel.HEADING_3, children: [new TextRun(plainText(b.label))] }))
+      out.push(simpleTable(headers, rows), new Paragraph({ text: '' }))
+      return out
     }
     case 'timeline': {
       const cols: string[] = b.columns || ['구분', '추진 내용', '추진 기간', '세부 내용']
