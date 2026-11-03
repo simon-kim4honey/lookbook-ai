@@ -7984,12 +7984,12 @@ app.get('/gov-support/result/:id', (c) => {
           return '<div class="rs-icon-stat tone-' + tone + '"><div class="rs-icon-stat-icon">' + rsEsc(it.icon||'📌') + '</div><div class="rs-icon-stat-value">' + rsMarkArb(it.value) + '</div>' + barHtml + '<div class="rs-icon-stat-label">' + rsMarkArb(it.label) + '</div></div>';
         }).join('') + '</div>';
       }
-      if (b.type === 'paragraph') return '<p class="rs-paragraph">' + rsMarkArb(b.text) + '</p>';
+      if (b.type === 'paragraph') return (b.label ? '<div class="rs-subhead2">' + rsEsc(b.label) + '</div>' : '') + '<p class="rs-paragraph">' + rsMarkArb(b.text) + '</p>';
       if (b.type === 'bullets') return (b.label ? '<div class="rs-subhead2">' + rsEsc(b.label) + '</div>' : '') + '<ul class="rs-bullets">' + (b.items||[]).map(function(i){ return '<li>' + rsMarkArb(i) + '</li>'; }).join('') + '</ul>';
       if (b.type === 'table') {
         var head = '<tr>' + (b.headers||[]).map(function(h){ return '<th>' + rsEsc(h) + '</th>'; }).join('') + '</tr>';
         var rows = (b.rows||[]).map(function(r){ return '<tr>' + r.map(function(cell){ return '<td>' + rsMarkArb(cell) + '</td>'; }).join('') + '</tr>'; }).join('');
-        return '<table class="rs-table">' + head + rows + '</table>';
+        return (b.label ? '<div class="rs-subhead2">' + rsEsc(b.label) + '</div>' : '') + '<table class="rs-table">' + head + rows + '</table>';
       }
       if (b.type === 'chart') {
         var chartHtml = b.chartId === 'channel-margin' ? rsChartChannelMargin(window.RS_FINANCE)

@@ -177,6 +177,29 @@ test('mergeCategoryBlocks — bullets는 payload.showLabel이 켜져 있을 때�
   assert.equal(bulletsBlocks[1].label, undefined)
 })
 
+test('mergeCategoryBlocks — paragraph/table도 payload.showLabel이 켜져 있을 때만 node.title을 label로 실어 보낸다(바인딩 종류 무관)', () => {
+  // 2026-11-03: 수출바우처 실사용자 리포트 — "(1) 생산 취급 품목", "(2) 제품
+  // 개발현황"처럼 소분류 리프가 paragraph/table인 경우 label 장치가 bullets에만
+  // 있어 제목이 통째로 안 보였다(값만 나열됨). bullets와 동일하게 showLabel로
+  // 명시한 경우에만 보여준다.
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '가. 기업현황', payload: {}, binding: 'static', targetChars: 1000 })
+  const l2p = node({ id: 'l2p', level: 2, parentId: 'l1', expressionType: 'paragraph', title: '1) 회사명', payload: { text: '', showLabel: true }, binding: 'computed', bindingKey: 'exportVoucher.companyName' })
+  const l2pNoLabel = node({ id: 'l2pn', level: 2, parentId: 'l1', expressionType: 'paragraph', title: '내부용 설명', payload: { text: '' }, binding: 'computed', bindingKey: 'exportVoucher.mainProduct' })
+  const l2t = node({ id: 'l2t', level: 2, parentId: 'l1', expressionType: 'table', title: '(2) 전담인력', payload: { columns: [{ key: 'name', label: '이름' }], showLabel: true }, binding: 'computed', bindingKey: 'exportVoucher.staff' })
+  const cat = buildCategoryTrees([l1, l2p, l2pNoLabel, l2t])[0]
+  const { blocks } = mergeCategoryBlocks(cat, new Map(), {}, (key) => {
+    if (key === 'exportVoucher.companyName') return { text: '벌거벗은' }
+    if (key === 'exportVoucher.mainProduct') return { text: '캐주얼의류' }
+    if (key === 'exportVoucher.staff') return { rows: [['김대표']] }
+    return null
+  }, 1)
+  const paragraphBlocks = blocks.filter((b) => b.type === 'paragraph')
+  assert.equal(paragraphBlocks[0].label, '1) 회사명')
+  assert.equal(paragraphBlocks[1].label, undefined)
+  const tableBlocks = blocks.filter((b) => b.type === 'table')
+  assert.equal(tableBlocks[0].label, '(2) 전담인력')
+})
+
 test('mergeCategoryBlocks — table은 payload.columns에서 헤더를 뽑아 base.headers로 싣는다(바인딩 종류 무관)', () => {
   // 2026-10-26: 렌더러(rsRenderBlock)가 b.headers를 읽는데, 이걸 payload.columns
   // (label)에서 채워 넣는 코드가 어디에도 없어 모든 table이 헤더 없이 렌더되고
