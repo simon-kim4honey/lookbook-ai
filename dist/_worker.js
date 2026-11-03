@@ -213,7 +213,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mvyzfrsh`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mvzxio1k`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3495,19 +3495,19 @@ blocks의 각 원소는 moduleId와 함께, 그 모듈의 표현방법(타입)�
 - diagram: {moduleId, nodes:[{id,label}], edges:[{from,to}]}
 - iconStats: {moduleId, tiles:[{icon:string(이모지 1개), value:string, label:string}]}
 - visual: {moduleId, caption:string, alt:string}
-"생성 대상"이 아닌(고정값/답변값/서버계산값) 모듈은 blocks에 포함하지 말 것 — 위 구조에 생성 대상이라고 표시된 moduleId만 작성한다.`;async function Ox(e,t,n,r,i,a,o,s){let l=px(r,i,a,o),u=`당신은 한국 정부지원사업(${t}) 심사 경험이 10년 이상인 패션 제조 전문 컨설턴트다. 실제로 선정된 사업계획서를 여러 건 써온 사람처럼, 자연스럽고 전문적인 문장으로 아래 소상공인의 답변을 바탕으로 공식 사업계획서 양식의 섹션을 작성한다.`,d=e=>/요약/.test(e.node.title||``),f=n.find(d),p=n.filter(e=>!d(e)),m=fx(p,2),h=new Map(p.map((e,t)=>[e.node.id,t+1])),g=await Promise.all(m.map(async(t,n)=>{let i=t.map(e=>e.node.id),a=t.map(e=>e.node.title).join(`·`);if(!t.some(e=>wn(e,r).some(e=>Cn(e.node))))return t.map(e=>({categoryId:e.node.id,blocks:[]}));n>0&&await new Promise(e=>setTimeout(e,n*400));let o=t.map(e=>jn(e,r)).join(`
+"생성 대상"이 아닌(고정값/답변값/서버계산값) 모듈은 blocks에 포함하지 말 것 — 위 구조에 생성 대상이라고 표시된 moduleId만 작성한다.`;async function Ox(e,t,n,r,i,a,o,s){let l=px(r,i,a,o),u=`당신은 한국 정부지원사업(${t}) 심사 경험이 10년 이상인 패션 제조 전문 컨설턴트다. 실제로 선정된 사업계획서를 여러 건 써온 사람처럼, 자연스럽고 전문적인 문장으로 아래 소상공인의 답변을 바탕으로 공식 사업계획서 양식의 섹션을 작성한다.`,d=e=>/요약/.test(e.node.title||``),f=n.find(d),p=n.filter(e=>!d(e)),m=fx(p,2),h=new Map(p.map((e,t)=>[e.node.id,t+1])),g=await Promise.all(m.map(async(t,n)=>{let i=t.filter(e=>wn(e,r).some(e=>Cn(e.node))),a=t.filter(e=>!i.includes(e)).map(e=>({categoryId:e.node.id,blocks:[]}));if(!i.length)return a;n>0&&await new Promise(e=>setTimeout(e,n*400));let o=i.map(e=>e.node.id),d=i.map(e=>e.node.title).join(`·`),f=i.map(e=>jn(e,r)).join(`
 
-`);return Cx(e,`${u}
+`),p=await Cx(e,`${u}
 
 ${mx}
 
 ${l}
 [대분류 구조 — moduleId별로 지정된 표현방법·바인딩·지시를 그대로 따를 것]
-${o}
+${f}
 
 ${Dx}
 
-입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "[[AI]]" 토큰과 함께 내용을 채워서라도 ${i.join(`, `)} 전부(이 순서로) 완전하게 작성한다.`,null,t.length,16e3,1e5,s,a)})),_=[],v=new Map;m.forEach((e,t)=>{let n=g[t];if(!n){for(let t of e)v.set(t.node.id,Sx(t,`AI 초안 생성 실패(${e.map(e=>e.node.title).join(`·`)}) — 관리자에게 문의해주세요.`));return}let i=new Map;for(let e of n){if(!e||!e.categoryId)continue;let t=i.get(e.categoryId);t?t.blocks=[...t.blocks||[],...e.blocks||[]]:i.set(e.categoryId,{...e,blocks:[...e.blocks||[]]})}for(let t of e){let e=i.get(t.node.id),a=Nn(t,r,e?.blocks||[]),o=h.get(t.node.id)||1;_.push({cat:t,aiBlocksByModuleId:a,l1Index:o,aiResult:e,groupResult:n})}});let y=_.map(e=>{let{warnings:t}=Fn(e.cat,e.aiBlocksByModuleId,r,e=>Ex(e,i,a,r),e.l1Index);return{cb:e,missingIds:t.filter(e=>e.reason===`AI 응답에 해당 moduleId가 없음`).map(e=>e.moduleId)}}).filter(e=>e.missingIds.length>0);y.length&&await Promise.all(y.map(async(t,n)=>{n>0&&await new Promise(e=>setTimeout(e,n*400));let i=new Set(t.missingIds),a=Mn(t.cb.cat,r,i),o=await vx(e,`${u}
+입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "[[AI]]" 토큰과 함께 내용을 채워서라도 ${o.join(`, `)} 전부(이 순서로) 완전하게 작성한다.`,null,i.length,16e3,1e5,s,d);return p?[...a,...p]:null})),_=[],v=new Map;m.forEach((e,t)=>{let n=g[t];if(!n){for(let t of e)v.set(t.node.id,Sx(t,`AI 초안 생성 실패(${e.map(e=>e.node.title).join(`·`)}) — 관리자에게 문의해주세요.`));return}let i=new Map;for(let e of n){if(!e||!e.categoryId)continue;let t=i.get(e.categoryId);t?t.blocks=[...t.blocks||[],...e.blocks||[]]:i.set(e.categoryId,{...e,blocks:[...e.blocks||[]]})}for(let t of e){let e=i.get(t.node.id),a=Nn(t,r,e?.blocks||[]),o=h.get(t.node.id)||1;_.push({cat:t,aiBlocksByModuleId:a,l1Index:o,aiResult:e,groupResult:n})}});let y=_.map(e=>{let{warnings:t}=Fn(e.cat,e.aiBlocksByModuleId,r,e=>Ex(e,i,a,r),e.l1Index);return{cb:e,missingIds:t.filter(e=>e.reason===`AI 응답에 해당 moduleId가 없음`).map(e=>e.moduleId)}}).filter(e=>e.missingIds.length>0);y.length&&await Promise.all(y.map(async(t,n)=>{n>0&&await new Promise(e=>setTimeout(e,n*400));let i=new Set(t.missingIds),a=Mn(t.cb.cat,r,i),o=await vx(e,`${u}
 
 ${mx}
 

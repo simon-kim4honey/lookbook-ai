@@ -7336,14 +7336,25 @@ async function generateGovSupportSectionsFromNodes(
   // 즉시 재시도하는 지금 패턴이 순간적인 버스트 요청으로 보여 어뷰징 방지 로직을 건드렸을
   // 가능성이다. 그룹별로 약간씩(인덱스 * 400ms) 시차를 둬 동시 발사를 완화한다.
   const groupResults = await Promise.all(groups.map(async (group, i) => {
-    const ids = group.map((c) => c.node.id)
-    const label = group.map((c) => c.node.title).join('·')
-    const hasAiNode = group.some((c) => flattenCategory(c, answers).some((e) => isAiGeneratedNode(e.node)))
-    if (!hasAiNode) return group.map((c) => ({ categoryId: c.node.id, blocks: [] })) // AI 모듈이 없으면 호출 자체 생략
+    // 2026-11-02: group 안에 AI 생성 모듈이 하나도 없는 대분류(예: 수출바우처 "가.
+    // 기업현황" — computed echo 필드뿐)가 섞여 있으면, 그 대분류를 API 호출에
+    // 그대로 끼워 보냈을 때 모델이 "생성할 게 없다"고 판단해 sections 배열에서
+    // 통째로 빼먹는 사례가 실사용자 리포트로 확인됐다(error_logs: "결과 개수 부족
+    // 1(기대 2)"). expectCount(=group.length)와 실제 응답 개수가 어긋나 그룹
+    // 전체가 "AI 초안 생성 실패"로 처리되면서, 정작 AI 생성이 필요했던 다른
+    // 대분류의 정상 응답까지 통째로 버려졌다. 그런 대분류는 애초에 API 호출
+    // 대상에서 빼고(어차피 AI가 채울 내용이 없다) 결정론적으로 blocks:[]를
+    // 직접 부여해, expectCount가 "실제로 AI에게 요청한 대분류 수"와 항상 일치하게 한다.
+    const apiCats = group.filter((c) => flattenCategory(c, answers).some((e) => isAiGeneratedNode(e.node)))
+    const staticCats = group.filter((c) => !apiCats.includes(c))
+    const staticSections = staticCats.map((c) => ({ categoryId: c.node.id, blocks: [] }))
+    if (!apiCats.length) return staticSections // 그룹 전체에 AI 모듈이 없으면 호출 자체 생략
 
     if (i > 0) await new Promise((r) => setTimeout(r, i * 400))
 
-    const structureBlock = group.map((c) => buildCategoryStructureText(c, answers)).join('\n\n')
+    const ids = apiCats.map((c) => c.node.id)
+    const label = apiCats.map((c) => c.node.title).join('·')
+    const structureBlock = apiCats.map((c) => buildCategoryStructureText(c, answers)).join('\n\n')
     const prompt = `${intro}
 
 ${GS_WRITING_PRINCIPLES}
@@ -7355,7 +7366,9 @@ ${structureBlock}
 ${GS_NODES_JSON_FORMAT}
 
 입력 데이터가 부족하더라도 그 사실을 설명하는 문장이나 되묻는 문장을 쓰지 말 것 — 대신 원칙 3에 따라 "[[AI]]" 토큰과 함께 내용을 채워서라도 ${ids.join(', ')} 전부(이 순서로) 완전하게 작성한다.`
-    return gsCallGroupWithRetry(apiKey, prompt, null, group.length, 16000, 100000, env, label)
+    const apiResult = await gsCallGroupWithRetry(apiKey, prompt, null, apiCats.length, 16000, 100000, env, label)
+    if (!apiResult) return null
+    return [...staticSections, ...apiResult]
   }))
 
   // 2026-10-26: moduleId 누락 경고는 지금까지 console.error로만 남아 error_logs/자동
