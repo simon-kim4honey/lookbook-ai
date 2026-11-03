@@ -355,16 +355,22 @@ function buildOneBlock(
   const def = getExpressionType(node.expressionType)
   const base: MergedBlock = { type: node.expressionType }
 
-  // bullets는 payloadSchema에 제목 필드가 없어(items만 있음) 렌더될 때 아무 라벨도
-  // 안 보인다. 소소분류(L4)에 "1) 외부적 배경 및 동기"처럼 제목이 꼭 필요한 리프를
-  // bullets로 둬야 하는 경우(그 아래로 더 못 내려가는 4단계 한계) 관리자가 지어둔
+  // bullets/paragraph/table은 payloadSchema에 제목 필드가 없어(items/text/rows만
+  // 있음) 렌더될 때 아무 라벨도 안 보인다. 소분류·소소분류 리프(예: "(1) 생산
+  // 취급 품목", "(2) 제품 개발현황")에 제목이 꼭 필요한 경우 관리자가 지어둔
   // node.title을 라벨로 그대로 보여준다 — 렌더러(rsRenderBlock)가 label이 있으면
-  // timeline/table처럼 소제목 스타일로 먼저 보여주고 그 아래 불릿을 보여준다.
+  // timeline처럼 소제목 스타일로 먼저 보여주고 그 아래 본문/표/불릿을 보여준다.
   // 2026-10-26: node.title이 있으면 무조건 보여줬더니, "OOO 개조식 설명"·"OOO
   // 중분류별 서술"처럼 관리자가 편의상 붙인 내부 이름까지 전부 생성물에 그대로
   // 노출됐다 — payload.showLabel로 관리자가 명시적으로 켠 경우에만 보여주도록
   // 좁힌다(기본값 false).
-  if (node.expressionType === 'bullets' && node.title && node.payload?.showLabel) {
+  // 2026-11-03: bullets에만 있던 이 장치를 paragraph/table에도 넓혔다 — 수출바우처
+  // 실사용자 리포트로 확인(대분류 바로 아래 소분류·소소분류 제목들이 통째로
+  // 안 보여 "벌거벗은"/"캐주얼의류"처럼 라벨 없는 값만 나열돼 있었다).
+  if (
+    (node.expressionType === 'bullets' || node.expressionType === 'paragraph' || node.expressionType === 'table') &&
+    node.title && node.payload?.showLabel
+  ) {
     base.label = node.title
   }
 
