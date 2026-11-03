@@ -6856,6 +6856,37 @@ async function generateGovSupportVisualInfographic(
   }
 }
 
+// 2026-11-03: 수출바우처 시각화 3슬롯(수출 필요성 요약/목표고객군 선정사유/수출인프라
+// 구축도) — iconStats 4타일 그리드(generateGovSupportVisualInfographic)와 달리 각
+// 슬롯이 AI가 쓴 캡션 문장 하나(b.caption)로 의미를 담고 있어 "타일 N개" 포맷이 맞지
+// 않는다. 그 캡션 문장을 그대로 인포그래픽 설명으로 써서 1패널짜리 아이콘형 인포그래픽을
+// 생성한다 — 공정 흐름도와 동일하게 images를 비워 순수 텍스트→이미지 모드로 호출해야
+// 요청한 가로 비율이 지켜진다. 처음 보류됐던 이유(22:9는 AtlasCloud가 거부하는 비율)와
+// 같은 이유로 aspect_ratio는 유효값 목록 중 가장 가까운 '21:9'를 쓴다.
+async function generateGovSupportCaptionInfographic(
+  apiKey: string | undefined,
+  caption: string,
+  brandContext: string,
+  aspectRatio: string
+): Promise<{ url: string | null; error: string | null }> {
+  if (!apiKey) return { url: null, error: 'ATLAS_API_KEY 미설정' }
+  const stripToken = (s: string) => String(s || '').split('[[AI')[0].trim()
+  const captionText = stripToken(caption)
+  if (!captionText) return { url: null, error: '캡션 데이터 없음' }
+  try {
+    const prompt = `Create a clean, professional single-panel infographic for a Korean government startup/export grant business plan document, minimalist corporate style, white or very light background, no watermarks, no extra decorative text beyond what is specified. Context: ${brandContext || '한국 소상공인 브랜드'}. The panel should visually convey the following idea using simple flat-design icons, short Korean labels, and (if relevant) a simple diagram or arrows — no photorealistic people or products: "${captionText}". All Korean text must be rendered exactly as implied, clearly legible.`
+    const result = await atlasGenerateAndWaitDetailed({ images: [], prompt, aspect_ratio: aspectRatio, resolution: '1K', apiKey })
+    if (!result.url) return result
+    const dataUri = await urlToBase64(result.url)
+    if (dataUri) return { url: dataUri, error: null }
+    console.error('generateGovSupportCaptionInfographic: base64 변환 실패, 원본 URL로 폴백:', result.url)
+    return result
+  } catch (e) {
+    console.error('generateGovSupportCaptionInfographic 실패:', e)
+    return { url: null, error: 'AI 이미지 생성 중 오류: ' + (e instanceof Error ? e.message : String(e)).slice(0, 150) }
+  }
+}
+
 // 자사몰 URL이 있으면 실제 페이지 텍스트를 가져와 AI 프롬프트의 참고 자료로 넣는다
 // (브랜드 톤·실제 판매 중인 문구 등을 반영하기 위함) — 실패해도 생성 자체는 그대로
 // 진행되도록 모든 예외를 삼키고 null을 반환한다. 외부 사이트에서 가져온 텍스트는
@@ -7685,6 +7716,49 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
           source: 'server',
           message: `시각화 인포그래픽 생성 실패(${t.block.visualId}): ${r.error}`,
           route: '/api/gov-support/projects/:id/generate (visualImage)',
+          extra: { programId: project.program_id, projectId: project.id, visualId: t.block.visualId },
+        })
+      }
+    }
+
+    // 2026-11-03: iconStats(타일 4개) 기반 시각화와 별개로, 어드민이 visual 노드
+    // payload에 kind:'placeholder' + visualId를 직접 설정해둔 "캡션 한 줄짜리"
+    // 시각화 슬롯(예: 수출바우처의 수출 필요성 요약/목표고객군 선정사유/수출인프라
+    // 구축도)도 같은 방식으로 실제 이미지를 생성한다 — AI가 이미 써둔 b.caption을
+    // 그대로 인포그래픽 설명으로 쓴다(generateGovSupportCaptionInfographic). 성공한
+    // 슬롯만 같은 visualImagesMap에 합쳐 저장하고(키 충돌 없음 — iconStats 쪽은
+    // 'vis-*', 이쪽은 어드민이 지정한 별도 visualId), 실패 시 원래 placeholder
+    // 블록을 그대로 둔다(콘텐츠 유실 없이 우아하게 폴백 — iconStats 경로와 동일 원칙).
+    const brandContext = [answers.companyName, answers.mainProduct].filter(Boolean).join(' · ')
+    const captionVisualTargets: Array<{ sIdx: number; bIdx: number; block: any }> = []
+    ;(sections as any[]).forEach((s: any, sIdx: number) => {
+      (s.blocks || []).forEach((b: any, bIdx: number) => {
+        if (b?.type === 'visual' && b.kind === 'placeholder' && b.visualId) {
+          captionVisualTargets.push({ sIdx, bIdx, block: b })
+        }
+      })
+    })
+    const captionVisualResults = await Promise.all(captionVisualTargets.map((t) =>
+      generateGovSupportCaptionInfographic(c.env.ATLAS_API_KEY, t.block.caption, brandContext, '21:9')
+    ))
+    for (let vi = 0; vi < captionVisualTargets.length; vi++) {
+      const t = captionVisualTargets[vi]
+      const r = captionVisualResults[vi]
+      const isVisData = typeof r.url === 'string' && r.url.startsWith('data:')
+      if (isVisData) {
+        visualImagesMap[t.block.visualId] = r.url as string
+        ;(sections as any[])[t.sIdx].blocks[t.bIdx] = {
+          type: 'visual',
+          visualId: t.block.visualId,
+          visualUrl: `/api/gov-support/projects/${project.id}/visual-image/${t.block.visualId}`,
+          caption: t.block.caption,
+          alt: t.block.alt || t.block.caption,
+        }
+      } else if (r.error) {
+        await logError(c.env, {
+          source: 'server',
+          message: `시각화 인포그래픽 생성 실패(${t.block.visualId}): ${r.error}`,
+          route: '/api/gov-support/projects/:id/generate (captionVisualImage)',
           extra: { programId: project.program_id, projectId: project.id, visualId: t.block.visualId },
         })
       }
