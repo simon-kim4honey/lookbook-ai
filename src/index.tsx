@@ -5564,43 +5564,13 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
 // 목표시장/차별점/개선점/사업화전략/팀구성 등)과 yebi 공유 위저드의 질문이 달라
 // 전용 위저드로 완전히 분리한다.
 function gsChoiWizardHtml(c: any, projectId: string): string {
-  const categoryOptions = ['패션브랜드', '패션제조', '의류', '잡화', '뷰티', '액세서리', '기타']
-  const devStatusOptions = ['아이디어 단계', '기획 중', '시제품 개발 중', '개발 완료', '양산 준비 중']
-  // 2026-11-04: "고객 확보 방안"을 자유 서술로 물으면 뭘 적어야 할지 막막하다는
-  // 수출바우처 피드백과 같은 이유로, 뭘 적어야 할지 보기로 유도한다.
+  // 2026-11-04: 사용자 지시 — 예비창업패키지(yebi) 위저드가 더 완성도 높다고 판단해
+  // 예비창업패키지의 1~12번 질문 페이지를 그대로 가져오고(동일 필드/옵션/문구/조건부
+  // 로직), 예비창업패키지에 없는 초기창업패키지 고유 질문 2개(준비현황/사업화 전략)만
+  // 13~14번으로 덧붙인다(중복 질문은 예비창업패키지 쪽을 우선해 삭제 — 기존 itemName/
+  // devStatus/targetMarket/targetCustomer/customerBenefit/improvementPlan/revenueModel/
+  // threeYearGoal/selfMallUrl 등은 전부 제거되고 예비창업패키지의 동등한 필드로 대체됨).
   const acquisitionOptions = ['SNS 기반 고객 유치', '협력사 확보', '체험단 운영', '기업 콜라보레이션', 'B2B 고객 유치', '오프라인 팝업', '기타']
-  // 2026-11-04: 예비창업패키지 위저드와 비교해 초기창업패키지가 완성도가 떨어진다는
-  // 실사용자 피드백 — 예비창업패키지에서 "아이템 개발 현황"/"차별점" 생성을 실제로
-  // 더 풍부하게 만들어준 질문(생산 방식·초기 생산 규모 칩, 차별화 유형 칩)을 그대로
-  // 가져온다. 옵션 문구도 예비창업패키지와 동일하게 맞췄다.
-  const productionMethodOptions = ['자체 제작(공방)', '자체 공장(일반)', '자체 공장(스마트팩토리)', '국내 OEM·CMT 위탁', '소량생산 전문업체', '해외 생산', '미정(추천 원함)']
-  const productionScaleOptions = ['샘플만', '10~30장', '50~100장', '100장+', '프리오더']
-  const differentiationTypesOptions = ['원단·소재', '제작 방식', '검수·품질관리', '디자인·패턴', '친환경·지속가능성', '납기·속도', '가격·접근성', '기타']
-
-  const teamLabels = ['대표자', '팀원 2', '팀원 3']
-  const teamRows = [1, 2, 3].map((i) => `
-    <div class="wz-dynrow">
-      <div class="wz-dynrow-head"><span>${teamLabels[i - 1]}</span></div>
-      <div class="wz-dynrow-grid">
-        <div class="wz-dynrow-cell"><label>직위</label><input type="text" class="wz-input" id="f_team${i}_position" maxlength="30" placeholder="${i === 1 ? '예: 대표' : '예: 디자인 담당'}" /></div>
-        <div class="wz-dynrow-cell"><label>담당업무</label><input type="text" class="wz-input" id="f_team${i}_task" maxlength="30" placeholder="${i === 1 ? '예: 전체 총괄, 영업' : '예: 제품 디자인, 생산 관리'}" /></div>
-        <div class="wz-dynrow-cell"><label>보유역량</label><input type="text" class="wz-input" id="f_team${i}_capability" maxlength="60" placeholder="예: 패턴디자인 10년 경력, 패션디자인 학사" /></div>
-        <div class="wz-dynrow-cell"><label>구성상태</label><input type="text" class="wz-input" id="f_team${i}_status" maxlength="20" placeholder="예: 확정 / 채용 예정" /></div>
-      </div>
-    </div>
-  `).join('')
-
-  const partnerRows = [1, 2, 3].map((i) => `
-    <div class="wz-dynrow">
-      <div class="wz-dynrow-head"><span>협력기관 ${i}</span></div>
-      <div class="wz-dynrow-grid">
-        <div class="wz-dynrow-cell" style="grid-column:1/-1;"><label>파트너명(기업명)</label><input type="text" class="wz-input" id="f_partner${i}_name" maxlength="40" placeholder="예: (주)원단컴퍼니" /></div>
-        <div class="wz-dynrow-cell"><label>보유역량</label><input type="text" class="wz-input" id="f_partner${i}_capability" maxlength="60" placeholder="예: 친환경 원단 소싱 전문" /></div>
-        <div class="wz-dynrow-cell"><label>협업 방안</label><input type="text" class="wz-input" id="f_partner${i}_plan" maxlength="60" placeholder="예: 원단 공동 개발 및 우선 공급" /></div>
-        <div class="wz-dynrow-cell" style="grid-column:1/-1;"><label>협력 시기(년.월)</label><input type="text" class="wz-input" id="f_partner${i}_timing" maxlength="20" placeholder="예: 2027.05" /></div>
-      </div>
-    </div>
-  `).join('')
 
   return `
   <div class="toast-container" id="toastContainer"></div>
@@ -5611,7 +5581,7 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
     .wz-inner { max-width: 480px; margin: 0 auto; padding: 0 16px; }
     .wz-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 14px 16px; display: flex; align-items: center; gap: 10px; max-width: 480px; margin: 0 auto; }
     .wz-progress { flex: 1; height: 6px; background: #E5E8EB; border-radius: 999px; overflow: hidden; }
-    .wz-progress-bar { height: 100%; background: #3182F6; border-radius: 999px; transition: width .2s; width: 9%; }
+    .wz-progress-bar { height: 100%; background: #3182F6; border-radius: 999px; transition: width .2s; width: 7%; }
     .wz-save-btn { font-size: 12.5px; font-weight: 700; color: #3182F6; background: #EAF2FF; border: none; border-radius: 999px; padding: 7px 12px; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
     .wz-step { display: none; }
     .wz-step.active { display: block; }
@@ -5629,11 +5599,22 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
     .wz-chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .wz-chip { padding: 10px 16px; border: 1px solid #E5E8EB; border-radius: 999px; background: #FFFFFF; font-size: 13.5px; color: #4E5968; cursor: pointer; }
     .wz-chip.on { background: #3182F6; border-color: #3182F6; color: #fff; font-weight: 700; }
+    .wz-sub3 { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .wz-info-box { background: #EAF2FF; border-radius: 10px; padding: 12px 14px; font-size: 12.5px; color: #3182F6; line-height: 1.6; margin-top: 10px; }
+    .wz-competitor-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .wz-unknown-btn { width: 100%; padding: 12px; border: 1px dashed #B0B8C1; border-radius: 12px; background: #FAFBFC; color: #4E5968; font-size: 13.5px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+    .wz-unknown-btn.on { background: #EAF2FF; border: 1px solid #3182F6; border-style: solid; color: #3182F6; }
     .wz-highlight-box { background: #FFF8E1; border: 1.5px solid #F5C842; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; }
     .wz-highlight-box .wz-highlight-title { font-size: 13px; font-weight: 800; color: #8A6D1D; margin-bottom: 4px; }
     .wz-highlight-box .wz-highlight-desc { font-size: 12.5px; color: #8A6D1D; line-height: 1.5; }
+    .wz-elig-warning { background: #FDEDEE; border: 1.5px solid #F04452; border-radius: 12px; padding: 13px 15px; margin-top: 10px; font-size: 13px; color: #C81E2C; line-height: 1.5; font-weight: 600; }
+    .wz-chip-sm { padding: 8px 13px; border: 1px solid #E5E8EB; border-radius: 999px; background: #FFFFFF; font-size: 12.5px; color: #4E5968; cursor: pointer; }
+    .wz-chip-sm.on { background: #191F28; border-color: #191F28; color: #fff; font-weight: 700; }
+    .wz-product-cost-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .wz-product-cost-row .wz-product-label { font-size: 12.5px; color: #4E5968; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .wz-dynrow { background: #F9FAFB; border: 1px solid #E5E8EB; border-radius: 12px; padding: 12px; margin-bottom: 10px; }
     .wz-dynrow-head { display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: #4E5968; margin-bottom: 8px; }
+    .wz-dynrow-remove { color: #F04452; font-size: 12px; font-weight: 600; cursor: pointer; }
     .wz-dynrow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .wz-dynrow-cell label { display: block; font-size: 11px; color: #8B95A1; font-weight: 600; margin-bottom: 3px; }
     .wz-nav-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #E5E8EB; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 20; display: flex; gap: 8px; max-width: 480px; margin: 0 auto; }
@@ -5658,104 +5639,141 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
       <form id="wzForm" style="display:none;">
 
         <div class="wz-step active" data-step="1">
-          <div class="wz-step-label">1 / 11 · 아이템 개요</div>
-          <h2>어떤 아이템인가요?</h2>
+          <div class="wz-step-label">1 / 14 · 기본 정보</div>
+          <h2>브랜드를 소개해주세요</h2>
           <div class="wz-field">
-            <div class="wz-field-label">아이템명 <span class="wz-required">*</span></div>
-            <input type="text" class="wz-input" id="f_itemName" placeholder="예: 체형보정 오버핏 셔츠 브랜드 '핏플로우'" maxlength="60" data-required="1" />
+            <div class="wz-field-label">브랜드명 (가칭 가능) <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_brandName" maxlength="60" data-required="1" />
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">아이템 한 줄 컨셉 <span class="wz-required">*</span></div>
-            <input type="text" class="wz-input" id="f_concept" placeholder="예: 체형 고민이 있는 20대 직장인을 위한 맞춤 핏 셔츠" maxlength="80" data-required="1" />
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">카테고리 <span class="wz-required">*</span></div>
-            <div class="wz-chip-row" data-field="category" data-required="1">
-              ${categoryOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            <div class="wz-field-label">대표자 연령대 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="founderAge" data-required="1">
+              ${['20대 이하', '30대', '40대', '50대 이상'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">개발 현황 <span class="wz-required">*</span></div>
-            <div class="wz-chip-row" data-field="devStatus" data-required="1">
-              ${devStatusOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            <div class="wz-field-label">창업 단계 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="stage" data-required="1">
+              ${['사업자등록 전', '사업자등록 후 3년 이내', '사업자등록 후 3년 이상'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">생산 방식 <span class="wz-required">*</span></div>
-            <div class="wz-chip-row" data-field="productionMethod" data-required="1">
-              ${productionMethodOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
-            </div>
-            <div class="wz-field-hint">공방은 소규모 수작업, 자체 공장은 직접 소유한 생산 설비를 뜻해요.</div>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">초기 생산 규모 <span class="wz-required">*</span></div>
-            <div class="wz-chip-row" data-field="productionScale" data-required="1">
-              ${productionScaleOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
-            </div>
+            <div class="wz-elig-warning" id="wzStageWarning" style="display:none;">초기창업패키지 지원사업은 사업자등록 후 3년 이내 기업만 신청할 수 있습니다 — 사업자등록 전이라면 예비창업패키지를, 3년을 초과했다면 다른 지원사업을 확인해주세요.</div>
           </div>
         </div>
 
         <div class="wz-step" data-step="2">
-          <div class="wz-step-label">2 / 11 · 아이템 배경</div>
-          <h2>왜 지금 이 아이템인가요?</h2>
+          <div class="wz-step-label">2 / 14 · 아이템</div>
+          <h2>어떤 제품을 만드시나요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">외부적 배경 (시장·트렌드 변화) <span class="wz-required">*</span></div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">정량 숫자를 포함해 구체적으로.</div>
-            <textarea class="wz-textarea" id="f_externalBackground" placeholder="예: 온라인 패션 플랫폼 중심으로 소비가 이동하며, 체형에 맞는 맞춤형 핏 수요가 늘고 있다. 2025년 캐주얼 의류 시장은 전년 대비 6% 성장했다." maxlength="400" data-required="1"></textarea>
+            <div class="wz-field-label">주력 카테고리 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="category" data-required="1">
+              ${['의류(여성)', '의류(남성)', '의류(유니섹스)', '가방', '잡화', '신발', '주얼리', '키즈'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">내부적 배경 (창업 동기) <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_motivation" placeholder="예: 직접 기성복 핏에 불편을 느껴오다, 패턴 설계를 공부하며 체형 보정 디자인의 가능성을 확인했다." maxlength="300" data-required="1"></textarea>
+            <div class="wz-field-label">주력 상품 3개 (최소 1개 필수) <span class="wz-required">*</span></div>
+            <div class="wz-sub3">
+              <input type="text" class="wz-input" id="f_product1" placeholder="예: 오버핏 셔츠" maxlength="40" data-required="1" />
+              <input type="text" class="wz-input" id="f_product2" placeholder="예: 와이드 슬랙스" maxlength="40" />
+              <input type="text" class="wz-input" id="f_product3" placeholder="예: 니트 가디건" maxlength="40" />
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">브랜드 컨셉 한 줄 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_concept" placeholder="예: 30대 직장인을 위한 출퇴근 캡슐 워드로브" maxlength="80" data-required="1" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">목표 가격대 (선택)</div>
+            <div class="wz-chip-row" data-field="priceRange">
+              ${['2~5만', '5~10만', '10~20만', '20만+'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
           </div>
         </div>
 
         <div class="wz-step" data-step="3">
-          <div class="wz-step-label">3 / 11 · 문제인식</div>
-          <h2>고객이 겪는 문제는 무엇인가요?</h2>
+          <div class="wz-step-label">3 / 14 · 준비 현황</div>
+          <h2>지금까지 준비한 게 있나요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">문제점 <span class="wz-required">*</span></div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">정량 숫자를 포함해 구체적으로.</div>
-            <textarea class="wz-textarea" id="f_problemStatement" placeholder="예: 기성복 사이즈 체계가 평균 체형 기준이라, 어깨가 좁거나 허리가 짧은 체형은 맞는 옷을 찾기 어렵다. 온라인 구매 시 반품률이 30%를 넘는다." maxlength="400" data-required="1"></textarea>
+            <div class="wz-field-label">지식재산권 보유·출원 현황 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">상표·디자인권·특허 등 출원했거나 보유한 게 있다면 적어주세요. 없으면 비워두셔도 됩니다.</div>
+            <input type="text" class="wz-input" id="f_ipStatus" placeholder="예: 브랜드명 상표 출원 완료, 패턴 디자인권 출원 준비 중" maxlength="150" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">지금까지 진행한 시장 검증 활동 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">팝업스토어, 사전 주문, SNS 반응 테스트 등 아이템을 검증해본 활동이 있다면 적어주세요.</div>
+            <textarea class="wz-textarea" id="f_validationEfforts" placeholder="예: 인스타그램에 시제품 사진을 올려 사전 주문 32건 접수, 성수동 팝업스토어 3일 운영" maxlength="200"></textarea>
           </div>
         </div>
 
         <div class="wz-step" data-step="4">
-          <div class="wz-step-label">4 / 11 · 목표시장과 고객</div>
-          <h2>누구에게, 어떤 가치를 제공하나요?</h2>
+          <div class="wz-step-label">4 / 14 · 고객과 경쟁</div>
+          <h2>누가, 왜 사나요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">목표시장 (타깃 특징·주요 관심사) <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_targetMarket" placeholder="예: 20~30대 직장인 여성, 온라인 쇼핑 비중이 높고 핏과 소재에 민감하다. 체형 고민을 SNS에서 적극적으로 공유하는 세대다." maxlength="300" data-required="1"></textarea>
+            <div class="wz-field-label">타겟 고객 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_target" placeholder="예: 20대 후반~30대 직장 여성" maxlength="80" data-required="1" />
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">목표고객군 (한 줄로) <span class="wz-required">*</span></div>
-            <input type="text" class="wz-input" id="f_targetCustomer" placeholder="예: 체형 고민이 있는 20~30대 직장인 여성" maxlength="80" data-required="1" />
+            <div class="wz-field-label">해결하려는 문제 <span class="wz-required">*</span></div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">타겟 고객이 지금 겪고 있는 불편함·미충족 니즈가 무엇인가요?</div>
+            <textarea class="wz-textarea" id="f_problemStatement" placeholder="예: 20대 여성이 입을 만한 오버핏 셔츠는 디자이너 브랜드는 너무 비싸고, 저가 브랜드는 핏과 내구성이 떨어진다" maxlength="300" data-required="1"></textarea>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">제공할 혜택/가치 <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_customerBenefit" placeholder="예: 체형별 맞춤 패턴으로 핏 만족도를 높이고, 반품 없이 바로 입을 수 있는 확신을 준다." maxlength="300" data-required="1"></textarea>
+            <div class="wz-field-label">고객이 사는 이유 (최대 2개) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="buyReason" data-multi="1" data-max="2" data-required="1">
+              ${['핏/사이즈', '가성비', '스토리·취향', '지속가능성', '기능성', '디자인'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <div id="wzBuyReasonDetails"></div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">경쟁사·유사 브랜드 (선택, 비교표에 쓰여요)</div>
+            <div id="wzCompetitorInputs">
+              <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor1_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor1_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+              <div class="wz-competitor-row"><input type="text" class="wz-input" id="f_competitor2_name" placeholder="브랜드명" maxlength="30" /><input type="text" class="wz-input" id="f_competitor2_feature" placeholder="특징(가격·소재 등)" maxlength="40" /></div>
+            </div>
+            <button type="button" class="wz-unknown-btn" id="wzCompetitorUnknownBtn" onclick="wzToggleCompetitorUnknown()">🔍 경쟁사를 잘 모르겠어요 — 찾아주세요</button>
           </div>
         </div>
 
         <div class="wz-step" data-step="5">
-          <div class="wz-step-label">5 / 11 · 준비현황</div>
-          <h2>지금까지 어디까지 준비됐나요?</h2>
+          <div class="wz-step-label">5 / 14 · 생산 방식</div>
+          <h2>어떻게 만드시나요?</h2>
           <div class="wz-field">
-            <div class="wz-field-label">고객 확보 현황 <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_customerStatus" placeholder="예: 인스타그램 팔로워 1,200명, 사전 예약 신청 35건 확보" maxlength="300" data-required="1"></textarea>
+            <div class="wz-field-label">생산 방식 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="productionMethod" data-required="1">
+              ${['자체 제작(공방)', '자체 공장(일반)', '자체 공장(스마트팩토리)', '국내 OEM·CMT 위탁', '소량생산 전문업체', '해외 생산', '미정(추천 원함)'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <div class="wz-field-hint">공방은 소규모 수작업, 자체 공장은 직접 소유한 생산 설비를 뜻해요. 스마트팩토리는 자동화·IoT 설비를 갖춘 공장이에요.</div>
+          </div>
+          <div class="wz-field" id="f_productionDetailField" style="display:none;">
+            <div class="wz-field-label" id="f_productionDetailLabel">세부 내용 (선택)</div>
+            <input type="text" class="wz-input" id="f_productionDetail" maxlength="150" />
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">판매채널 확보 현황 <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_salesChannelStatus" placeholder="예: 스마트스토어 입점 준비 중, 크라우드펀딩 플랫폼 오픈 예정 협의 완료" maxlength="300" data-required="1"></textarea>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">자사몰 URL (선택)</div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">있다면 실제 브랜드 톤과 판매 문구를 참고해 더 자연스러운 초안을 만들어드려요.</div>
-            <input type="text" class="wz-input" id="f_selfMallUrl" placeholder="예: https://mystore.com" maxlength="150" />
+            <div class="wz-field-label">초기 생산 규모 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="productionScale" data-required="1">
+              ${['샘플만', '10~30장', '50~100장', '100장+', '프리오더'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <div class="wz-field-hint">매출 시나리오·초기 생산 수량 계산에 쓰여요.</div>
           </div>
         </div>
 
         <div class="wz-step" data-step="6">
-          <div class="wz-step-label">6 / 11 · 차별점</div>
+          <div class="wz-step-label">6 / 14 · 제작 공정</div>
+          <h2>어떤 과정을 거쳐 만드나요?</h2>
+          <div class="wz-field">
+            <div class="wz-highlight-box">
+              <div class="wz-highlight-title">⭐ 가장 중요한 질문이에요</div>
+              <div class="wz-highlight-desc">공정 하나하나가 심사에서 "실행 가능성"을 보여주는 근거가 됩니다. 해당되는 단계만 골라주시면 돼요.</div>
+            </div>
+            <div class="wz-field-label">제작 공정 (해당되는 단계 모두 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="processSteps" data-multi="1" data-required="1">
+              ${['기획/디자인', '원단·부자재 소싱', '패턴 설계', '샘플 제작', '가봉/보정', '재단·봉제(생산)', '품질 검수', '포장·출고'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <textarea class="wz-textarea" id="f_processNote" placeholder="추가로 설명하고 싶은 점이 있다면 적어주세요 (선택)" style="margin-top:10px;min-height:60px;"></textarea>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="7">
+          <div class="wz-step-label">7 / 14 · 차별성</div>
           <h2>남들과 다르게 만드나요?</h2>
           <div class="wz-field">
             <div class="wz-highlight-box">
@@ -5776,33 +5794,127 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
           <div class="wz-field">
             <div class="wz-field-label">위 답변이 주로 어느 쪽에 가까운가요? (선택, 복수 선택 가능)</div>
             <div class="wz-chip-row" data-field="differentiationTypes" data-multi="1">
-              ${differentiationTypesOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+              ${['원단·소재', '제작 방식', '검수·품질관리', '디자인·패턴', '친환경·지속가능성', '납기·속도', '가격·접근성', '기타'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">지식재산권 보유·출원 현황 (선택)</div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">상표·디자인권·특허 등 출원했거나 보유한 게 있다면 적어주세요.</div>
-            <input type="text" class="wz-input" id="f_ipStatus" placeholder="예: 브랜드명 상표 출원 완료, 패턴 디자인권 출원 준비 중" maxlength="150" />
-          </div>
-        </div>
-
-        <div class="wz-step" data-step="7">
-          <div class="wz-step-label">7 / 11 · 개선점</div>
-          <h2>문제를 해결하기 위해 무엇을 개선하나요?</h2>
-          <div class="wz-field">
-            <div class="wz-field-label">기존 문제점 해결을 위한 개선점 <span class="wz-required">*</span></div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">앞서 적은 문제점을 구체적으로 어떻게 풀어내는지.</div>
-            <textarea class="wz-textarea" id="f_improvementPlan" placeholder="예: 체형 데이터를 반영한 10단계 사이즈 체계를 도입하고, 온라인 핏 시뮬레이터를 제공해 구매 전 핏을 미리 확인할 수 있게 한다." maxlength="400" data-required="1"></textarea>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">기대 효과 (선택)</div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">이 개선으로 기대하는 효과(매출·고객만족·사회적 가치 등)가 있다면 적어주세요.</div>
-            <textarea class="wz-textarea" id="f_expectedImpact" placeholder="예: 반품률 30%를 10%대로 낮추고, 체형 고민 고객층의 재구매율 상승" maxlength="200"></textarea>
           </div>
         </div>
 
         <div class="wz-step" data-step="8">
-          <div class="wz-step-label">8 / 11 · 사업화 전략</div>
+          <div class="wz-step-label">8 / 14 · 상품별 원가</div>
+          <h2>원가와 판매가는요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">상품별 원가 / 판매가 (선택)</div>
+            <div id="wzProductCostRows"></div>
+            <button type="button" class="wz-unknown-btn" id="wzAddProductCostBtn" onclick="wzAddProductCostRow()">+ 상품 추가</button>
+            <button type="button" class="wz-unknown-btn" id="wzPreSaleBtn" onclick="wzTogglePreSale()" style="margin-top:8px;">🚧 아직 판매 전이에요 (원가·판매가 생략)</button>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="9">
+          <div class="wz-step-label">9 / 14 · 판매 채널</div>
+          <h2>어디서 파시나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">판매 채널 (복수 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="channels" data-multi="1" data-required="1">
+              ${['자사몰', '무신사', '지그재그', '에이블리', '스마트스토어', '도매·위탁', '팝업', '오프라인 매장'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <input type="text" class="wz-input" id="f_selfMallUrl" placeholder="자사몰 URL (예: https://mystore.com)" style="display:none;margin-top:10px;" />
+            <div class="wz-info-box">선택한 채널의 수수료율로 예상 마진을 자동 계산해드려요 — 자사몰 3~5% · 패션 플랫폼 8~15%+광고비 · 도매 납품 40~50%</div>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="10">
+          <div class="wz-step-label">10 / 14 · 자금 계획</div>
+          <h2>지원금을 어디에 쓰실 건가요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">보유 준비자본 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="capital" data-required="1">
+              ${['300만 미만', '300~1000만', '1000~3000만', '3000만+'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">지원금 사용 항목 (복수 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="fundUse" data-multi="1" data-required="1">
+              ${['소재·부자재', '샘플·가봉', '생산(봉제)비', '포장·라벨', '촬영·마케팅', '인건비', '임대료·장비'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="11">
+          <div class="wz-step-label">11 / 14 · 역량과 비전</div>
+          <h2>왜 대표님이어야 하나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">관련 경력 (복수 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="experience" data-multi="1" data-required="1">
+              ${['봉제/재단 경험', '패션 전공·교육', '업계 근무', '쇼핑몰 운영·판매', '없음'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field" id="f_experienceDetailField" style="display:none;">
+            <div class="wz-field-label">관련 경력 설명 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">선택하신 경력에 대해 조금 더 구체적으로 적어주세요.</div>
+            <textarea class="wz-textarea" id="f_experienceDetail" placeholder="예: 의류학과 졸업 후 2년간 OO 브랜드 생산관리팀에서 근무" maxlength="200"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">창업 배경 — 시장·트렌드 변화 (선택)</div>
+            <input type="text" class="wz-input" id="f_externalBackground" placeholder="예: 고물가로 '합리적 소비'가 확산되는 추세" maxlength="100" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">창업 동기 한 줄 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_motivation" placeholder="예: 내가 입고 싶은 옷이 시장에 없어서 직접 만들기 시작했다" maxlength="100" data-required="1" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">기대 효과 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">이 사업으로 기대하는 효과(매출·고용·사회적 가치 등)가 있다면 적어주세요.</div>
+            <textarea class="wz-textarea" id="f_expectedImpact" placeholder="예: 연 매출 성장, 지역 봉제업체와의 상생, 친환경 소재 확산"></textarea>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="12">
+          <div class="wz-step-label">12 / 14 · 팀 구성</div>
+          <h2>함께하는 팀이 있나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">협약기간 내 목표 산출물 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_productOutput" placeholder="예: 자사몰 웹사이트 1개, 샘플 의류 5종" maxlength="80" data-required="1" />
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">대표자 현재 직업 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="founderJob" data-required="1">
+              ${['일반인', '사무직', '대학생', '연구원', '교수', '기타'].map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">팀원 구성 (대표자 본인 제외, 선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">팀원이 있다면 한 명씩 입력해주세요. 없으면 비워두셔도 됩니다.</div>
+            <div id="wzTeamRows"></div>
+            <button type="button" class="wz-unknown-btn" id="wzAddTeamBtn" onclick="wzAddTeamRow()">+ 팀원 추가</button>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">협력기관 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">협업 중이거나 협업 예정인 기관이 있다면 입력해주세요.</div>
+            <div id="wzPartnerRows"></div>
+            <button type="button" class="wz-unknown-btn" id="wzAddPartnerBtn" onclick="wzAddPartnerRow()">+ 협력기관 추가</button>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">3년 후 목표 (선택)</div>
+            <textarea class="wz-textarea" id="f_threeYearGoal" placeholder="예: 연매출 3억, 자사몰+플랫폼 2곳 입점, 오프라인 쇼룸 1호점 — 자유롭게 적어주세요"></textarea>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="13">
+          <div class="wz-step-label">13 / 14 · 준비현황</div>
+          <h2>지금까지 어디까지 준비됐나요?</h2>
+          <div class="wz-field">
+            <div class="wz-field-label">고객 확보 현황 <span class="wz-required">*</span></div>
+            <textarea class="wz-textarea" id="f_customerStatus" placeholder="예: 인스타그램 팔로워 1,200명, 사전 예약 신청 35건 확보" maxlength="300" data-required="1"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">판매채널 확보 현황 <span class="wz-required">*</span></div>
+            <textarea class="wz-textarea" id="f_salesChannelStatus" placeholder="예: 스마트스토어 입점 준비 중, 크라우드펀딩 플랫폼 오픈 예정 협의 완료" maxlength="300" data-required="1"></textarea>
+          </div>
+        </div>
+
+        <div class="wz-step" data-step="14">
+          <div class="wz-step-label">14 / 14 · 사업화 전략</div>
           <h2>고객을 어떻게 확보하고 제품을 발전시키나요?</h2>
           <div class="wz-field">
             <div class="wz-field-label">고객 확보 방안 (해당하는 것 모두 선택) <span class="wz-required">*</span></div>
@@ -5813,43 +5925,6 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
           <div class="wz-field">
             <div class="wz-field-label">제품 고도화 방안 <span class="wz-required">*</span></div>
             <textarea class="wz-textarea" id="f_productUpgradePlan" placeholder="예: 1차 출시 후 고객 피드백을 반영해 원단을 업그레이드하고, 사이즈 라인을 5종에서 8종으로 확대한다." maxlength="300" data-required="1"></textarea>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">3년 후 목표 (선택)</div>
-            <textarea class="wz-textarea" id="f_threeYearGoal" placeholder="예: 연매출 3억, 자사몰+플랫폼 2곳 입점, 오프라인 쇼룸 1호점 — 자유롭게 적어주세요"></textarea>
-          </div>
-        </div>
-
-        <div class="wz-step" data-step="9">
-          <div class="wz-step-label">9 / 11 · 비즈니스모델</div>
-          <h2>어떻게 수익을 만드나요?</h2>
-          <div class="wz-field">
-            <div class="wz-field-label">수익모델 <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_revenueModel" placeholder="예: 자사몰·플랫폼 직접 판매가 주 수익원이며, 추후 B2B 납품과 구독형 정기배송도 함께 운영할 계획이다." maxlength="300" data-required="1"></textarea>
-          </div>
-        </div>
-
-        <div class="wz-step" data-step="10">
-          <div class="wz-step-label">10 / 11 · 대표자·팀구성</div>
-          <h2>대표자와 팀을 소개해주세요</h2>
-          <div class="wz-field">
-            <div class="wz-field-label">대표자 보유역량 (경력·강점) <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_experienceDetail" placeholder="예: 패턴디자인 전공, 봉제공장 3년 근무 경험 보유, SNS 마케팅 자격 보유" maxlength="300" data-required="1"></textarea>
-          </div>
-          <div class="wz-field">
-            <div class="wz-field-label">팀구성 (대표자 포함 최대 3명)</div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">최소 대표자 1명은 적어주세요.</div>
-            ${teamRows}
-          </div>
-        </div>
-
-        <div class="wz-step" data-step="11">
-          <div class="wz-step-label">11 / 11 · 협력기관</div>
-          <h2>함께하는 협력기관이 있나요?</h2>
-          <div class="wz-field">
-            <div class="wz-field-label">협력기관 현황 및 협업 방안 (최대 3개)</div>
-            <div class="wz-field-hint" style="margin:0 0 8px;">아직 없다면 비워두셔도 돼요.</div>
-            ${partnerRows}
           </div>
         </div>
 
@@ -5878,15 +5953,16 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
 
   <script>
     var WZ_PROJECT_ID = ${JSON.stringify(projectId)};
-    var WZ_TOTAL_STEPS = 11;
+    var WZ_TOTAL_STEPS = 14;
     var wzCurrentStep = 1;
     var wzAnswers = {};
+    var wzTeamRows = [{}];
+    var wzPartnerRows = [{}];
 
     function authHeaders() {
       var token = localStorage.getItem('lookbook_token') || '';
       return { 'X-Session-Token': token, 'Content-Type': 'application/json' };
     }
-    function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
 
     async function wzLoad() {
       var token = localStorage.getItem('lookbook_token') || '';
@@ -5930,22 +6006,53 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
       }
       update();
     }
+    function wzAttachCharCounters(root) {
+      var scope = root || document.getElementById('wzForm');
+      if (!scope) return;
+      scope.querySelectorAll('input[maxlength], textarea[maxlength]').forEach(wzEnsureCharCounter);
+    }
 
     function wzFillFormFromAnswers() {
-      document.querySelectorAll('#wzForm input[id^="f_"], #wzForm textarea[id^="f_"]').forEach(function (el) {
-        var key = el.id.slice(2);
-        if (wzAnswers[key] !== undefined) el.value = wzAnswers[key];
-        wzEnsureCharCounter(el);
+      var simpleFields = ['brandName','product1','product2','product3','concept','ipStatus','validationEfforts','target','problemStatement','productionDetail','processNote','diffReason','diffStubborn','diffFeedback','experienceDetail','externalBackground','motivation','expectedImpact','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl','productOutput','customerStatus','salesChannelStatus','productUpgradePlan'];
+      simpleFields.forEach(function (k) {
+        var el = document.getElementById('f_' + k);
+        if (el && wzAnswers[k] !== undefined) el.value = wzAnswers[k];
       });
+      wzTeamRows = (wzAnswers.teamMembers && wzAnswers.teamMembers.length) ? wzAnswers.teamMembers.slice() : [{}];
+      wzPartnerRows = (wzAnswers.partners && wzAnswers.partners.length) ? wzAnswers.partners.slice() : [{}];
+      wzRenderTeamRows();
+      wzRenderPartnerRows();
       document.querySelectorAll('.wz-chip-row').forEach(function (row) {
         var field = row.getAttribute('data-field');
-        var val2 = wzAnswers[field];
-        if (val2 === undefined) return;
-        var selected = Array.isArray(val2) ? val2 : [val2];
-        row.querySelectorAll('.wz-chip').forEach(function (chip) {
-          chip.classList.toggle('on', selected.indexOf(chip.getAttribute('data-value')) !== -1);
+        var multi = row.getAttribute('data-multi');
+        var val = wzAnswers[field];
+        if (val === undefined) return;
+        var chips = row.querySelectorAll('.wz-chip');
+        chips.forEach(function (chip) {
+          var v = chip.getAttribute('data-value');
+          var on = multi ? (Array.isArray(val) && val.indexOf(v) !== -1) : (val === v);
+          chip.classList.toggle('on', on);
         });
       });
+      wzRenderProductCostRows();
+      wzUpdateSelfMallUrlVisibility();
+      wzApplyCompetitorUnknownUI();
+      wzUpdateExperienceDetailVisibility();
+      wzUpdateStageWarning();
+      wzUpdateProductionDetailVisibility();
+      wzRenderBuyReasonDetails();
+      wzAttachCharCounters();
+    }
+
+    // 초기창업패키지는 사업자등록 후 3년 이내 기업만 지원 가능 — "사업자등록 전"이나
+    // "3년 이상"을 고르면 경고한다(예비창업패키지의 반대 방향 경고와 동일한 패턴).
+    function wzUpdateStageWarning() {
+      var warn = document.getElementById('wzStageWarning');
+      if (!warn) return;
+      var row = document.querySelector('.wz-chip-row[data-field="stage"]');
+      var selected = row ? row.querySelector('.wz-chip.on') : null;
+      var value = selected ? selected.getAttribute('data-value') : '';
+      warn.style.display = (value && value !== '사업자등록 후 3년 이내') ? 'block' : 'none';
     }
 
     document.addEventListener('click', function (e) {
@@ -5964,24 +6071,258 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
         row.querySelectorAll('.wz-chip').forEach(function (c) { c.classList.remove('on'); });
         chip.classList.add('on');
       }
+      if (row.getAttribute('data-field') === 'channels') wzUpdateSelfMallUrlVisibility();
+      if (row.getAttribute('data-field') === 'experience') wzUpdateExperienceDetailVisibility();
+      if (row.getAttribute('data-field') === 'stage') wzUpdateStageWarning();
+      if (row.getAttribute('data-field') === 'productionMethod') wzUpdateProductionDetailVisibility();
+      if (row.getAttribute('data-field') === 'buyReason') wzRenderBuyReasonDetails();
     });
 
+    var WZ_PRODUCTION_DETAIL_META = {
+      '자체 제작(공방)': { label: '작업 공간 규모·보유 설비 (선택)', placeholder: '예: 서울 성수동 15평 작업실, 재봉틀 4대 보유' },
+      '자체 공장(일반)': { label: '공장 규모·보유 설비·인력 (선택)', placeholder: '예: 경기 안산 50평 공장, 재단기 2대·오버록 5대, 생산인력 4명' },
+      '자체 공장(스마트팩토리)': { label: '도입한 자동화 설비·시스템 (선택)', placeholder: '예: CAD 자동 재단 시스템, IoT 생산관리 솔루션, 스마트공장 확인서 보유' },
+      '국내 OEM·CMT 위탁': { label: '협력(예정) 생산처 (선택)', placeholder: '예: 동대문 OEM 업체와 샘플 제작 협의 중, 최소발주수량 50장' },
+      '소량생산 전문업체': { label: '협력 업체·생산 조건 (선택)', placeholder: '예: 소량생산 전문 OO업체, 최소수량 10장부터 가능' },
+      '해외 생산': { label: '생산국·선택 이유 (선택)', placeholder: '예: 중국 광저우, 원가 절감 및 다품종 소량생산 용이' },
+    };
+    function wzUpdateProductionDetailVisibility() {
+      var row = document.querySelector('.wz-chip-row[data-field="productionMethod"]');
+      var field = document.getElementById('f_productionDetailField');
+      if (!row || !field) return;
+      var selected = row.querySelector('.wz-chip.on');
+      var value = selected ? selected.getAttribute('data-value') : '';
+      var meta = WZ_PRODUCTION_DETAIL_META[value];
+      if (meta) {
+        document.getElementById('f_productionDetailLabel').textContent = meta.label;
+        document.getElementById('f_productionDetail').placeholder = meta.placeholder;
+        field.style.display = 'block';
+      } else {
+        field.style.display = 'none';
+      }
+    }
+
+    var wzBuyReasonDraft = {};
+    function wzEsc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function wzRenderBuyReasonDetails() {
+      var row = document.querySelector('.wz-chip-row[data-field="buyReason"]');
+      var container = document.getElementById('wzBuyReasonDetails');
+      if (!row || !container) return;
+      container.querySelectorAll('textarea[data-reason]').forEach(function (el) {
+        wzBuyReasonDraft[el.getAttribute('data-reason')] = el.value;
+      });
+      var selected = Array.prototype.slice.call(row.querySelectorAll('.wz-chip.on')).map(function (c) { return c.getAttribute('data-value'); });
+      container.innerHTML = selected.map(function (reason) {
+        var saved = (wzAnswers.buyReasonDetails && wzAnswers.buyReasonDetails[reason]) || '';
+        var val = wzBuyReasonDraft[reason] !== undefined ? wzBuyReasonDraft[reason] : saved;
+        return '<div class="wz-field" style="margin-top:10px;">' +
+          '<div class="wz-field-label" style="font-size:12.5px;color:#4E5968;">' + wzEsc(reason) + ' — 그렇게 생각하시는 이유 (선택)</div>' +
+          '<textarea class="wz-textarea" data-reason="' + wzEsc(reason) + '" maxlength="150" placeholder="예: 구체적인 이유를 자유롭게 적어주세요" style="min-height:56px;">' + wzEsc(val) + '</textarea>' +
+          '</div>';
+      }).join('');
+      wzAttachCharCounters(container);
+    }
+    function wzCollectBuyReasonDetails() {
+      var container = document.getElementById('wzBuyReasonDetails');
+      var result = {};
+      if (!container) return result;
+      container.querySelectorAll('textarea[data-reason]').forEach(function (el) {
+        var v = el.value.trim();
+        if (v) result[el.getAttribute('data-reason')] = v;
+      });
+      return result;
+    }
+
+    function wzUpdateSelfMallUrlVisibility() {
+      var row = document.querySelector('.wz-chip-row[data-field="channels"]');
+      if (!row) return;
+      var selfMallOn = row.querySelector('.wz-chip[data-value="자사몰"]');
+      var urlInput = document.getElementById('f_selfMallUrl');
+      if (urlInput) urlInput.style.display = (selfMallOn && selfMallOn.classList.contains('on')) ? 'block' : 'none';
+    }
+
+    function wzUpdateExperienceDetailVisibility() {
+      var row = document.querySelector('.wz-chip-row[data-field="experience"]');
+      var field = document.getElementById('f_experienceDetailField');
+      if (!row || !field) return;
+      var onValues = Array.prototype.slice.call(row.querySelectorAll('.wz-chip.on')).map(function (c) { return c.getAttribute('data-value'); });
+      var hasRealExperience = onValues.some(function (v) { return v !== '없음'; });
+      field.style.display = hasRealExperience ? 'block' : 'none';
+    }
+
+    function wzApplyCompetitorUnknownUI() {
+      var btn = document.getElementById('wzCompetitorUnknownBtn');
+      var inputs = document.getElementById('wzCompetitorInputs');
+      btn.classList.toggle('on', !!wzAnswers.competitorsUnknown);
+      inputs.style.opacity = wzAnswers.competitorsUnknown ? '0.4' : '1';
+      inputs.querySelectorAll('input').forEach(function (el) { el.disabled = !!wzAnswers.competitorsUnknown; });
+    }
+
+    function wzRenderTeamRows() {
+      var container = document.getElementById('wzTeamRows');
+      if (!container) return;
+      container.innerHTML = wzTeamRows.map(function (row, i) {
+        var removeBtn = wzTeamRows.length > 1 ? '<span class="wz-dynrow-remove" onclick="wzRemoveTeamRow(' + i + ')">삭제</span>' : '';
+        return '<div class="wz-dynrow">' +
+          '<div class="wz-dynrow-head"><span>팀원 ' + (i + 1) + '</span>' + removeBtn + '</div>' +
+          '<div class="wz-dynrow-grid">' +
+          '<div class="wz-dynrow-cell"><label>직위</label><input type="text" class="wz-input" id="f_team_position_' + i + '" placeholder="예: 공동대표" maxlength="30" value="' + (row.position || '') + '" /></div>' +
+          '<div class="wz-dynrow-cell"><label>담당업무</label><input type="text" class="wz-input" id="f_team_task_' + i + '" placeholder="예: S/W 개발 총괄" maxlength="40" value="' + (row.task || '') + '" /></div>' +
+          '<div class="wz-dynrow-cell"><label>보유역량</label><input type="text" class="wz-input" id="f_team_capability_' + i + '" placeholder="예: OO학 박사" maxlength="40" value="' + (row.capability || '') + '" /></div>' +
+          '<div class="wz-dynrow-cell"><label>구성상태</label><select class="wz-input" id="f_team_status_' + i + '">' +
+          '<option value="">선택</option>' +
+          '<option value="완료"' + (row.status === '완료' ? ' selected' : '') + '>완료</option>' +
+          '<option value="예정"' + (row.status === '예정' ? ' selected' : '') + '>예정</option>' +
+          '</select></div>' +
+          '</div></div>';
+      }).join('');
+      wzAttachCharCounters(container);
+    }
+    function wzSyncTeamRowsFromDom() {
+      wzTeamRows = wzTeamRows.map(function (_, i) {
+        return { position: val('f_team_position_' + i), task: val('f_team_task_' + i), capability: val('f_team_capability_' + i), status: val('f_team_status_' + i) };
+      });
+    }
+    function wzAddTeamRow() { wzSyncTeamRowsFromDom(); wzTeamRows.push({}); wzRenderTeamRows(); }
+    function wzRemoveTeamRow(i) { wzSyncTeamRowsFromDom(); wzTeamRows.splice(i, 1); if (!wzTeamRows.length) wzTeamRows = [{}]; wzRenderTeamRows(); }
+
+    function wzRenderPartnerRows() {
+      var container = document.getElementById('wzPartnerRows');
+      if (!container) return;
+      container.innerHTML = wzPartnerRows.map(function (row, i) {
+        var removeBtn = wzPartnerRows.length > 1 ? '<span class="wz-dynrow-remove" onclick="wzRemovePartnerRow(' + i + ')">삭제</span>' : '';
+        return '<div class="wz-dynrow">' +
+          '<div class="wz-dynrow-head"><span>협력기관 ' + (i + 1) + '</span>' + removeBtn + '</div>' +
+          '<div class="wz-dynrow-grid">' +
+          '<div class="wz-dynrow-cell"><label>파트너명</label><input type="text" class="wz-input" id="f_partner_name_' + i + '" placeholder="예: OO봉제공장 / OO홍보대행사" maxlength="30" value="' + (row.name || '') + '" /></div>' +
+          '<div class="wz-dynrow-cell"><label>보유역량</label><input type="text" class="wz-input" id="f_partner_capability_' + i + '" placeholder="예: 의류 샘플 제작 설비 / SNS 마케팅 채널 운영" maxlength="40" value="' + (row.capability || '') + '" /></div>' +
+          '<div class="wz-dynrow-cell"><label>협업방안</label><input type="text" class="wz-input" id="f_partner_plan_' + i + '" placeholder="예: 샘플 제작 위탁 / 콘텐츠 제작·광고 집행" maxlength="40" value="' + (row.plan || '') + '" /></div>' +
+          '<div class="wz-dynrow-cell"><label>협력시기</label><input type="text" class="wz-input" id="f_partner_timing_' + i + '" placeholder="예: 협약기간 내" maxlength="30" value="' + (row.timing || '') + '" /></div>' +
+          '</div></div>';
+      }).join('');
+      wzAttachCharCounters(container);
+    }
+    function wzSyncPartnerRowsFromDom() {
+      wzPartnerRows = wzPartnerRows.map(function (_, i) {
+        return { name: val('f_partner_name_' + i), capability: val('f_partner_capability_' + i), plan: val('f_partner_plan_' + i), timing: val('f_partner_timing_' + i) };
+      });
+    }
+    function wzAddPartnerRow() { wzSyncPartnerRowsFromDom(); wzPartnerRows.push({}); wzRenderPartnerRows(); }
+    function wzRemovePartnerRow(i) { wzSyncPartnerRowsFromDom(); wzPartnerRows.splice(i, 1); if (!wzPartnerRows.length) wzPartnerRows = [{}]; wzRenderPartnerRows(); }
+
+    function wzToggleCompetitorUnknown() {
+      wzAnswers.competitorsUnknown = !wzAnswers.competitorsUnknown;
+      wzApplyCompetitorUnknownUI();
+    }
+
+    var GS_PRODUCT_FIELDS = ['product1', 'product2', 'product3'];
+    var wzVisibleProductCostCount = 2;
+    function wzRenderProductCostRows() {
+      var container = document.getElementById('wzProductCostRows');
+      if (!container) return;
+      if (wzAnswers['cost_product3'] || wzAnswers['price_product3']) wzVisibleProductCostCount = 3;
+      var visibleFields = GS_PRODUCT_FIELDS.slice(0, wzVisibleProductCostCount);
+      var html = visibleFields.map(function (key, i) {
+        var name = wzAnswers[key] || ('상품 ' + (i + 1));
+        var cost = wzAnswers['cost_' + key] || '';
+        var price = wzAnswers['price_' + key] || '';
+        return '<div class="wz-product-cost-row">' +
+          '<div class="wz-product-label">' + name + '</div>' +
+          '<input type="number" class="wz-input" id="f_cost_' + key + '" placeholder="원가" value="' + cost + '" />' +
+          '<input type="number" class="wz-input" id="f_price_' + key + '" placeholder="판매가" value="' + price + '" />' +
+          '</div>';
+      }).join('');
+      container.innerHTML = html;
+      var addBtn = document.getElementById('wzAddProductCostBtn');
+      if (addBtn) addBtn.style.display = wzVisibleProductCostCount >= GS_PRODUCT_FIELDS.length ? 'none' : 'block';
+      wzApplyPreSaleUI();
+    }
+    function wzTogglePreSale() {
+      wzAnswers.preSale = !wzAnswers.preSale;
+      wzApplyPreSaleUI();
+    }
+    function wzApplyPreSaleUI() {
+      var btn = document.getElementById('wzPreSaleBtn');
+      var container = document.getElementById('wzProductCostRows');
+      if (!btn || !container) return;
+      btn.classList.toggle('on', !!wzAnswers.preSale);
+      container.style.opacity = wzAnswers.preSale ? '0.4' : '1';
+      container.querySelectorAll('input').forEach(function (el) { el.disabled = !!wzAnswers.preSale; });
+    }
+
+    function wzAddProductCostRow() {
+      GS_PRODUCT_FIELDS.slice(0, wzVisibleProductCostCount).forEach(function (key) {
+        wzAnswers['cost_' + key] = val('f_cost_' + key);
+        wzAnswers['price_' + key] = val('f_price_' + key);
+      });
+      wzVisibleProductCostCount = Math.min(wzVisibleProductCostCount + 1, GS_PRODUCT_FIELDS.length);
+      wzRenderProductCostRows();
+    }
+
     function wzCollectStep(stepNum) {
-      var stepEl = document.querySelector('.wz-step[data-step="' + stepNum + '"]');
-      if (!stepEl) return;
       var patch = {};
-      stepEl.querySelectorAll('input[id^="f_"], textarea[id^="f_"]').forEach(function (el) {
-        patch[el.id.slice(2)] = el.value;
-      });
-      stepEl.querySelectorAll('.wz-chip-row').forEach(function (row) {
-        var field = row.getAttribute('data-field');
-        var multi = row.getAttribute('data-multi');
-        var onChips = Array.prototype.slice.call(row.querySelectorAll('.wz-chip.on')).map(function (ch) { return ch.getAttribute('data-value'); });
-        patch[field] = multi ? onChips : (onChips[0] || '');
-      });
+      if (stepNum === 1) {
+        patch.brandName = val('f_brandName');
+      } else if (stepNum === 2) {
+        patch.product1 = val('f_product1'); patch.product2 = val('f_product2'); patch.product3 = val('f_product3');
+        patch.concept = val('f_concept');
+      } else if (stepNum === 3) {
+        patch.ipStatus = val('f_ipStatus');
+        patch.validationEfforts = val('f_validationEfforts');
+      } else if (stepNum === 4) {
+        patch.target = val('f_target');
+        patch.problemStatement = val('f_problemStatement');
+        patch.buyReasonDetails = wzCollectBuyReasonDetails();
+        patch.competitor1_name = val('f_competitor1_name'); patch.competitor1_feature = val('f_competitor1_feature');
+        patch.competitor2_name = val('f_competitor2_name'); patch.competitor2_feature = val('f_competitor2_feature');
+        patch.competitorsUnknown = !!wzAnswers.competitorsUnknown;
+      } else if (stepNum === 5) {
+        patch.productionDetail = val('f_productionDetail');
+      } else if (stepNum === 6) {
+        patch.processNote = val('f_processNote');
+      } else if (stepNum === 7) {
+        patch.diffReason = val('f_diffReason');
+        patch.diffStubborn = val('f_diffStubborn');
+        patch.diffFeedback = val('f_diffFeedback');
+      } else if (stepNum === 8) {
+        patch.preSale = !!wzAnswers.preSale;
+        GS_PRODUCT_FIELDS.slice(0, wzVisibleProductCostCount).forEach(function (key) {
+          patch['cost_' + key] = val('f_cost_' + key);
+          patch['price_' + key] = val('f_price_' + key);
+        });
+      } else if (stepNum === 9) {
+        patch.selfMallUrl = val('f_selfMallUrl');
+      } else if (stepNum === 11) {
+        patch.experienceDetail = val('f_experienceDetail');
+        patch.externalBackground = val('f_externalBackground');
+        patch.motivation = val('f_motivation');
+        patch.expectedImpact = val('f_expectedImpact');
+      } else if (stepNum === 12) {
+        patch.productOutput = val('f_productOutput');
+        wzSyncTeamRowsFromDom(); wzSyncPartnerRowsFromDom();
+        patch.teamMembers = wzTeamRows.filter(function (r) { return r.position || r.task || r.capability; });
+        patch.partners = wzPartnerRows.filter(function (r) { return r.name || r.capability || r.plan; });
+        patch.threeYearGoal = val('f_threeYearGoal');
+      } else if (stepNum === 13) {
+        patch.customerStatus = val('f_customerStatus');
+        patch.salesChannelStatus = val('f_salesChannelStatus');
+      } else if (stepNum === 14) {
+        patch.productUpgradePlan = val('f_productUpgradePlan');
+      }
+      var stepEl = document.querySelector('.wz-step[data-step="' + stepNum + '"]');
+      if (stepEl) {
+        stepEl.querySelectorAll('.wz-chip-row').forEach(function (row) {
+          var field = row.getAttribute('data-field');
+          var multi = row.getAttribute('data-multi');
+          var onChips = Array.prototype.slice.call(row.querySelectorAll('.wz-chip.on')).map(function (c) { return c.getAttribute('data-value'); });
+          patch[field] = multi ? onChips : (onChips[0] || '');
+        });
+      }
       Object.assign(wzAnswers, patch);
       return patch;
     }
+
+    function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
 
     function wzAutoSave() {
       fetch('/api/gov-support/projects/' + WZ_PROJECT_ID + '/answers', {
@@ -6003,6 +6344,7 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
       document.getElementById('wzProgressBar').style.width = (n / WZ_TOTAL_STEPS * 100) + '%';
       document.getElementById('wzPrevBtn').style.visibility = n === 1 ? 'hidden' : 'visible';
       document.getElementById('wzNextBtn').textContent = n === WZ_TOTAL_STEPS ? '완료' : '다음';
+      if (n === 8) wzRenderProductCostRows();
       window.scrollTo(0, 0);
     }
 
@@ -7828,22 +8170,23 @@ function gsEvExportHistoryText(answers: any): any {
 
 // 2026-11-04: 초기창업패키지(choi) — 팀구성/협력기관 표도 수출바우처 전담인력 표와
 // 같은 이유(§8)로 AI가 이름을 지어내지 않도록 computed로 결정론적으로 만든다.
-// "구분"(대표자/팀원2/팀원3, 협력기관1~3) 열은 사용자 입력이 아니라 행 순서로
+// "구분"(대표자/팀원2/팀원3.../협력기관1~N) 열은 사용자 입력이 아니라 행 순서로
 // 서버가 직접 붙인다 — 스펙 표에 명시된 열(구분/직위/담당업무/보유역량/구성상태,
 // 구분/파트너명/보유역량/협업방안/협력시기)과 정확히 일치시키기 위함.
+// 위저드를 예비창업패키지와 동일한 동적 추가/삭제 행(teamMembers/partners 배열)
+// 방식으로 교체하면서, 고정 3슬롯(team${i}_position 등) 대신 배열을 그대로 순회한다.
 function gsIcpTeamTable(answers: any): any {
-  const labels = ['대표자', '팀원2', '팀원3']
-  const rows = [1, 2, 3]
-    .map((i, idx) => [labels[idx], answers[`team${i}_position`], answers[`team${i}_task`], answers[`team${i}_capability`], answers[`team${i}_status`]])
-    .filter(([, position]) => position)
-    .map(([label, position, task, capability, status]) => [label, position || '-', task || '-', capability || '-', status || '-'])
+  const members: any[] = Array.isArray(answers?.teamMembers) ? answers.teamMembers : []
+  const rows = members
+    .filter((m) => m && m.position)
+    .map((m, idx) => [idx === 0 ? '대표자' : `팀원${idx + 1}`, m.position || '-', m.task || '-', m.capability || '-', m.status || '-'])
   return { headers: ['구분', '직위', '담당업무', '보유역량', '구성상태'], rows: rows.length ? rows : [['대표자', '-', '-', '-', '-']] }
 }
 function gsIcpPartnerTable(answers: any): any {
-  const rows = [1, 2, 3]
-    .map((i) => [`협력기관${i}`, answers[`partner${i}_name`], answers[`partner${i}_capability`], answers[`partner${i}_plan`], answers[`partner${i}_timing`]])
-    .filter(([, name]) => name)
-    .map(([label, name, capability, plan, timing]) => [label, name || '-', capability || '-', plan || '-', timing || '-'])
+  const partners: any[] = Array.isArray(answers?.partners) ? answers.partners : []
+  const rows = partners
+    .filter((p) => p && p.name)
+    .map((p, idx) => [`협력기관${idx + 1}`, p.name || '-', p.capability || '-', p.plan || '-', p.timing || '-'])
   return { headers: ['구분', '파트너명', '보유역량', '협업방안', '협력시기'], rows: rows.length ? rows : [['협력기관1', '협력기관 추후 발굴 예정', '-', '-', '-']] }
 }
 
