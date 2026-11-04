@@ -213,7 +213,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mw1tgfhd`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mw1ttndi`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2537,9 +2537,9 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
 
     wzLoad();
   <\/script>
-  `}function Qb(e,t){let n=[`패션브랜드`,`패션제조`,`의류`,`잡화`,`뷰티`,`액세서리`,`기타`],r=[`아이디어 단계`,`기획 중`,`시제품 개발 중`,`개발 완료`,`양산 준비 중`],i=[`SNS 기반 고객 유치`,`협력사 확보`,`체험단 운영`,`기업 콜라보레이션`,`B2B 고객 유치`,`오프라인 팝업`,`기타`],a=[`대표자`,`팀원 2`,`팀원 3`],o=[1,2,3].map(e=>`
+  `}function Qb(e,t){let n=[`패션브랜드`,`패션제조`,`의류`,`잡화`,`뷰티`,`액세서리`,`기타`],r=[`아이디어 단계`,`기획 중`,`시제품 개발 중`,`개발 완료`,`양산 준비 중`],i=[`SNS 기반 고객 유치`,`협력사 확보`,`체험단 운영`,`기업 콜라보레이션`,`B2B 고객 유치`,`오프라인 팝업`,`기타`],a=[`자체 제작(공방)`,`자체 공장(일반)`,`자체 공장(스마트팩토리)`,`국내 OEM·CMT 위탁`,`소량생산 전문업체`,`해외 생산`,`미정(추천 원함)`],o=[`샘플만`,`10~30장`,`50~100장`,`100장+`,`프리오더`],s=[`원단·소재`,`제작 방식`,`검수·품질관리`,`디자인·패턴`,`친환경·지속가능성`,`납기·속도`,`가격·접근성`,`기타`],l=[`대표자`,`팀원 2`,`팀원 3`],u=[1,2,3].map(e=>`
     <div class="wz-dynrow">
-      <div class="wz-dynrow-head"><span>${a[e-1]}</span></div>
+      <div class="wz-dynrow-head"><span>${l[e-1]}</span></div>
       <div class="wz-dynrow-grid">
         <div class="wz-dynrow-cell"><label>직위</label><input type="text" class="wz-input" id="f_team${e}_position" maxlength="30" placeholder="${e===1?`예: 대표`:`예: 디자인 담당`}" /></div>
         <div class="wz-dynrow-cell"><label>담당업무</label><input type="text" class="wz-input" id="f_team${e}_task" maxlength="30" placeholder="${e===1?`예: 전체 총괄, 영업`:`예: 제품 디자인, 생산 관리`}" /></div>
@@ -2547,7 +2547,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         <div class="wz-dynrow-cell"><label>구성상태</label><input type="text" class="wz-input" id="f_team${e}_status" maxlength="20" placeholder="예: 확정 / 채용 예정" /></div>
       </div>
     </div>
-  `).join(``),s=[1,2,3].map(e=>`
+  `).join(``),d=[1,2,3].map(e=>`
     <div class="wz-dynrow">
       <div class="wz-dynrow-head"><span>협력기관 ${e}</span></div>
       <div class="wz-dynrow-grid">
@@ -2620,6 +2620,10 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
             <input type="text" class="wz-input" id="f_itemName" placeholder="예: 체형보정 오버핏 셔츠 브랜드 '핏플로우'" maxlength="60" data-required="1" />
           </div>
           <div class="wz-field">
+            <div class="wz-field-label">아이템 한 줄 컨셉 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_concept" placeholder="예: 체형 고민이 있는 20대 직장인을 위한 맞춤 핏 셔츠" maxlength="80" data-required="1" />
+          </div>
+          <div class="wz-field">
             <div class="wz-field-label">카테고리 <span class="wz-required">*</span></div>
             <div class="wz-chip-row" data-field="category" data-required="1">
               ${n.map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
@@ -2629,6 +2633,19 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
             <div class="wz-field-label">개발 현황 <span class="wz-required">*</span></div>
             <div class="wz-chip-row" data-field="devStatus" data-required="1">
               ${r.map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">생산 방식 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="productionMethod" data-required="1">
+              ${a.map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
+            </div>
+            <div class="wz-field-hint">공방은 소규모 수작업, 자체 공장은 직접 소유한 생산 설비를 뜻해요.</div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">초기 생산 규모 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="productionScale" data-required="1">
+              ${o.map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
             </div>
           </div>
         </div>
@@ -2685,6 +2702,11 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
             <div class="wz-field-label">판매채널 확보 현황 <span class="wz-required">*</span></div>
             <textarea class="wz-textarea" id="f_salesChannelStatus" placeholder="예: 스마트스토어 입점 준비 중, 크라우드펀딩 플랫폼 오픈 예정 협의 완료" maxlength="300" data-required="1"></textarea>
           </div>
+          <div class="wz-field">
+            <div class="wz-field-label">자사몰 URL (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">있다면 실제 브랜드 톤과 판매 문구를 참고해 더 자연스러운 초안을 만들어드려요.</div>
+            <input type="text" class="wz-input" id="f_selfMallUrl" placeholder="예: https://mystore.com" maxlength="150" />
+          </div>
         </div>
 
         <div class="wz-step" data-step="6">
@@ -2706,6 +2728,17 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
             <div class="wz-field-label">주변 사람이나 고객이 제품을 보고 가장 많이 하는 말이 있나요? (선택)</div>
             <textarea class="wz-textarea" id="f_diffFeedback" placeholder="예: 핏이 다르다, 생각보다 고급스럽다, 이 가격에 이 정도면 괜찮다 등" maxlength="200"></textarea>
           </div>
+          <div class="wz-field">
+            <div class="wz-field-label">위 답변이 주로 어느 쪽에 가까운가요? (선택, 복수 선택 가능)</div>
+            <div class="wz-chip-row" data-field="differentiationTypes" data-multi="1">
+              ${s.map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">지식재산권 보유·출원 현황 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">상표·디자인권·특허 등 출원했거나 보유한 게 있다면 적어주세요.</div>
+            <input type="text" class="wz-input" id="f_ipStatus" placeholder="예: 브랜드명 상표 출원 완료, 패턴 디자인권 출원 준비 중" maxlength="150" />
+          </div>
         </div>
 
         <div class="wz-step" data-step="7">
@@ -2715,6 +2748,11 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
             <div class="wz-field-label">기존 문제점 해결을 위한 개선점 <span class="wz-required">*</span></div>
             <div class="wz-field-hint" style="margin:0 0 8px;">앞서 적은 문제점을 구체적으로 어떻게 풀어내는지.</div>
             <textarea class="wz-textarea" id="f_improvementPlan" placeholder="예: 체형 데이터를 반영한 10단계 사이즈 체계를 도입하고, 온라인 핏 시뮬레이터를 제공해 구매 전 핏을 미리 확인할 수 있게 한다." maxlength="400" data-required="1"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">기대 효과 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">이 개선으로 기대하는 효과(매출·고객만족·사회적 가치 등)가 있다면 적어주세요.</div>
+            <textarea class="wz-textarea" id="f_expectedImpact" placeholder="예: 반품률 30%를 10%대로 낮추고, 체형 고민 고객층의 재구매율 상승" maxlength="200"></textarea>
           </div>
         </div>
 
@@ -2730,6 +2768,10 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           <div class="wz-field">
             <div class="wz-field-label">제품 고도화 방안 <span class="wz-required">*</span></div>
             <textarea class="wz-textarea" id="f_productUpgradePlan" placeholder="예: 1차 출시 후 고객 피드백을 반영해 원단을 업그레이드하고, 사이즈 라인을 5종에서 8종으로 확대한다." maxlength="300" data-required="1"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">3년 후 목표 (선택)</div>
+            <textarea class="wz-textarea" id="f_threeYearGoal" placeholder="예: 연매출 3억, 자사몰+플랫폼 2곳 입점, 오프라인 쇼룸 1호점 — 자유롭게 적어주세요"></textarea>
           </div>
         </div>
 
@@ -2752,7 +2794,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           <div class="wz-field">
             <div class="wz-field-label">팀구성 (대표자 포함 최대 3명)</div>
             <div class="wz-field-hint" style="margin:0 0 8px;">최소 대표자 1명은 적어주세요.</div>
-            ${o}
+            ${u}
           </div>
         </div>
 
@@ -2762,7 +2804,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           <div class="wz-field">
             <div class="wz-field-label">협력기관 현황 및 협업 방안 (최대 3개)</div>
             <div class="wz-field-hint" style="margin:0 0 8px;">아직 없다면 비워두셔도 돼요.</div>
-            ${s}
+            ${d}
           </div>
         </div>
 
