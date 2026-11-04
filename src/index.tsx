@@ -5569,6 +5569,13 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
   // 2026-11-04: "고객 확보 방안"을 자유 서술로 물으면 뭘 적어야 할지 막막하다는
   // 수출바우처 피드백과 같은 이유로, 뭘 적어야 할지 보기로 유도한다.
   const acquisitionOptions = ['SNS 기반 고객 유치', '협력사 확보', '체험단 운영', '기업 콜라보레이션', 'B2B 고객 유치', '오프라인 팝업', '기타']
+  // 2026-11-04: 예비창업패키지 위저드와 비교해 초기창업패키지가 완성도가 떨어진다는
+  // 실사용자 피드백 — 예비창업패키지에서 "아이템 개발 현황"/"차별점" 생성을 실제로
+  // 더 풍부하게 만들어준 질문(생산 방식·초기 생산 규모 칩, 차별화 유형 칩)을 그대로
+  // 가져온다. 옵션 문구도 예비창업패키지와 동일하게 맞췄다.
+  const productionMethodOptions = ['자체 제작(공방)', '자체 공장(일반)', '자체 공장(스마트팩토리)', '국내 OEM·CMT 위탁', '소량생산 전문업체', '해외 생산', '미정(추천 원함)']
+  const productionScaleOptions = ['샘플만', '10~30장', '50~100장', '100장+', '프리오더']
+  const differentiationTypesOptions = ['원단·소재', '제작 방식', '검수·품질관리', '디자인·패턴', '친환경·지속가능성', '납기·속도', '가격·접근성', '기타']
 
   const teamLabels = ['대표자', '팀원 2', '팀원 3']
   const teamRows = [1, 2, 3].map((i) => `
@@ -5658,6 +5665,10 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
             <input type="text" class="wz-input" id="f_itemName" placeholder="예: 체형보정 오버핏 셔츠 브랜드 '핏플로우'" maxlength="60" data-required="1" />
           </div>
           <div class="wz-field">
+            <div class="wz-field-label">아이템 한 줄 컨셉 <span class="wz-required">*</span></div>
+            <input type="text" class="wz-input" id="f_concept" placeholder="예: 체형 고민이 있는 20대 직장인을 위한 맞춤 핏 셔츠" maxlength="80" data-required="1" />
+          </div>
+          <div class="wz-field">
             <div class="wz-field-label">카테고리 <span class="wz-required">*</span></div>
             <div class="wz-chip-row" data-field="category" data-required="1">
               ${categoryOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
@@ -5667,6 +5678,19 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
             <div class="wz-field-label">개발 현황 <span class="wz-required">*</span></div>
             <div class="wz-chip-row" data-field="devStatus" data-required="1">
               ${devStatusOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">생산 방식 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="productionMethod" data-required="1">
+              ${productionMethodOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+            <div class="wz-field-hint">공방은 소규모 수작업, 자체 공장은 직접 소유한 생산 설비를 뜻해요.</div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">초기 생산 규모 <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="productionScale" data-required="1">
+              ${productionScaleOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
           </div>
         </div>
@@ -5723,6 +5747,11 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
             <div class="wz-field-label">판매채널 확보 현황 <span class="wz-required">*</span></div>
             <textarea class="wz-textarea" id="f_salesChannelStatus" placeholder="예: 스마트스토어 입점 준비 중, 크라우드펀딩 플랫폼 오픈 예정 협의 완료" maxlength="300" data-required="1"></textarea>
           </div>
+          <div class="wz-field">
+            <div class="wz-field-label">자사몰 URL (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">있다면 실제 브랜드 톤과 판매 문구를 참고해 더 자연스러운 초안을 만들어드려요.</div>
+            <input type="text" class="wz-input" id="f_selfMallUrl" placeholder="예: https://mystore.com" maxlength="150" />
+          </div>
         </div>
 
         <div class="wz-step" data-step="6">
@@ -5744,6 +5773,17 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
             <div class="wz-field-label">주변 사람이나 고객이 제품을 보고 가장 많이 하는 말이 있나요? (선택)</div>
             <textarea class="wz-textarea" id="f_diffFeedback" placeholder="예: 핏이 다르다, 생각보다 고급스럽다, 이 가격에 이 정도면 괜찮다 등" maxlength="200"></textarea>
           </div>
+          <div class="wz-field">
+            <div class="wz-field-label">위 답변이 주로 어느 쪽에 가까운가요? (선택, 복수 선택 가능)</div>
+            <div class="wz-chip-row" data-field="differentiationTypes" data-multi="1">
+              ${differentiationTypesOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">지식재산권 보유·출원 현황 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">상표·디자인권·특허 등 출원했거나 보유한 게 있다면 적어주세요.</div>
+            <input type="text" class="wz-input" id="f_ipStatus" placeholder="예: 브랜드명 상표 출원 완료, 패턴 디자인권 출원 준비 중" maxlength="150" />
+          </div>
         </div>
 
         <div class="wz-step" data-step="7">
@@ -5753,6 +5793,11 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
             <div class="wz-field-label">기존 문제점 해결을 위한 개선점 <span class="wz-required">*</span></div>
             <div class="wz-field-hint" style="margin:0 0 8px;">앞서 적은 문제점을 구체적으로 어떻게 풀어내는지.</div>
             <textarea class="wz-textarea" id="f_improvementPlan" placeholder="예: 체형 데이터를 반영한 10단계 사이즈 체계를 도입하고, 온라인 핏 시뮬레이터를 제공해 구매 전 핏을 미리 확인할 수 있게 한다." maxlength="400" data-required="1"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">기대 효과 (선택)</div>
+            <div class="wz-field-hint" style="margin:0 0 8px;">이 개선으로 기대하는 효과(매출·고객만족·사회적 가치 등)가 있다면 적어주세요.</div>
+            <textarea class="wz-textarea" id="f_expectedImpact" placeholder="예: 반품률 30%를 10%대로 낮추고, 체형 고민 고객층의 재구매율 상승" maxlength="200"></textarea>
           </div>
         </div>
 
@@ -5768,6 +5813,10 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
           <div class="wz-field">
             <div class="wz-field-label">제품 고도화 방안 <span class="wz-required">*</span></div>
             <textarea class="wz-textarea" id="f_productUpgradePlan" placeholder="예: 1차 출시 후 고객 피드백을 반영해 원단을 업그레이드하고, 사이즈 라인을 5종에서 8종으로 확대한다." maxlength="300" data-required="1"></textarea>
+          </div>
+          <div class="wz-field">
+            <div class="wz-field-label">3년 후 목표 (선택)</div>
+            <textarea class="wz-textarea" id="f_threeYearGoal" placeholder="예: 연매출 3억, 자사몰+플랫폼 2곳 입점, 오프라인 쇼룸 1호점 — 자유롭게 적어주세요"></textarea>
           </div>
         </div>
 
