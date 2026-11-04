@@ -4994,14 +4994,17 @@ app.get('/api/gov-support/projects/:id/visual-image/:key', async (c) => {
     ).bind(sessionToken).first() as any
     if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
 
+    // 2026-11-04: visual_images_b64는 슬롯 4~7개 분량의 base64 이미지를 전부 담은
+    // {visualId: dataUri} JSON 맵이라(실측: 최대 2.4MB) 컬럼 전체를 매번 통째로
+    // D1→Worker로 퍼오고 JS에서 JSON.parse한 뒤 키 하나만 꺼내 쓰고 있었다 — 이미지
+    // 슬롯 수만큼(N개) 이 2.4MB 전체를 N번 중복 전송/파싱하는 꼴이라, 슬롯이 많은
+    // 프로그램(수출바우처 3개·초기창업패키지 7개)일수록 "내 사업계획서"에서 다시 열 때
+    // 이미지 로딩이 눈에 띄게 느렸다(실사용자 리포트로 확인). D1(SQLite)의 json_extract로
+    // 필요한 키 값만 D1 엔진 안에서 뽑아 보내게 해 전송량을 슬롯 1개 크기로 줄인다.
     const project = await db.prepare(
-      `SELECT visual_images_b64 FROM gov_support_projects WHERE id = ? AND user_id = ?`
-    ).bind(c.req.param('id'), sess.user_id).first() as any
-    if (!project || !project.visual_images_b64) return c.json({ success: false, message: '이미지를 찾을 수 없습니다.' }, 404)
-
-    let images: Record<string, string> = {}
-    try { images = JSON.parse(project.visual_images_b64) } catch { /* 무시 — 아래서 404 처리 */ }
-    const dataUri = images[c.req.param('key')]
+      `SELECT json_extract(visual_images_b64, ?) as data_uri FROM gov_support_projects WHERE id = ? AND user_id = ? AND visual_images_b64 IS NOT NULL`
+    ).bind(`$."${c.req.param('key')}"`, c.req.param('id'), sess.user_id).first() as any
+    const dataUri: string | undefined = project?.data_uri
     if (!dataUri) return c.json({ success: false, message: '이미지를 찾을 수 없습니다.' }, 404)
 
     const match = dataUri.match(/^data:([^;]+);base64,([\s\S]*)$/)
