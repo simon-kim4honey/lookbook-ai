@@ -373,6 +373,14 @@ function buildOneBlock(
   ) {
     base.label = node.title
   }
+  // 2026-11-04: 회사명/주생산품처럼 답변이 한 단어·한 줄짜리인 paragraph 리프는
+  // 라벨을 줄 바꿔 보여주면("1) 회사명" 다음 줄에 "벌거벗은"만 덩그러니) 어색하고
+  // 공간만 차지한다는 실사용자 피드백 — payload.inlineLabel이 켜져 있으면 라벨과
+  // 본문을 "1) 회사명: 벌거벗은"처럼 한 줄에 같이 보여준다.
+  if (node.expressionType === 'paragraph' && node.title && node.payload?.inlineLabel) {
+    base.label = node.title
+    base.inlineLabel = true
+  }
 
   // table은 AI가 rows만 채우고 헤더(컬럼명)는 관리자가 payload.columns로 미리
   // 정해둔다(§5 — "컬럼 추가·삭제·순서변경 절대 금지"). 그런데 렌더러는 b.headers를

@@ -1338,11 +1338,15 @@ app.get('/api/admin/gov-support/programs', adminAuth, async (c) => {
     ).all()).results as any[]
     const countByProgram: Record<string, number> = {}
     for (const r of rows || []) countByProgram[r.program_id] = r.section_count
-    const programs = GOV_SUPPORT_PROGRAMS.map((p) => ({
+    // 2026-11-04: 이 배지가 예전 CRUD 구조(gov_support_sections)만 보고 있었다 — 수출바우처처럼
+    // 신규 노드 기반 구조 모듈 빌더(gov_support_nodes, structure_status='published')로
+    // 실제로는 생성 가능한 프로그램이 "(미설정)"으로 잘못 떠 있었다(실사용자 리포트로 확인).
+    // 실제 생성 라우트가 쓰는 gsIsGenerationReady()와 동일한 판정 기준으로 맞춘다.
+    const programs = await Promise.all(GOV_SUPPORT_PROGRAMS.map(async (p) => ({
       id: p.id, name: p.name,
       sectionCount: countByProgram[p.id] || 0,
-      generationReady: GS_GENERATION_READY_IDS.includes(p.id) || !!countByProgram[p.id],
-    }))
+      generationReady: await gsIsGenerationReady(db, p.id),
+    })))
     return c.json({ success: true, programs })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
@@ -7836,6 +7840,7 @@ app.get('/gov-support/result/:id', (c) => {
     .rs-lead { font-size: 13.5px; color: #4E5968; line-height: 1.6; margin: 0 0 16px; }
     .rs-subhead { font-size: 15px; font-weight: 700; color: #191F28; margin: 18px 0 8px; }
     .rs-subhead2 { font-size: 13.5px; font-weight: 700; color: #4E5968; margin: 14px 0 6px 4px; padding-left: 8px; border-left: 2px solid #D1D6DB; }
+    .rs-inline-label { font-weight: 700; color: #4E5968; }
     .rs-headline-box { background: #EAF2FF; border-radius: 10px; padding: 14px 16px; font-size: 14px; font-weight: 700; color: #1B64DA; text-align: center; line-height: 1.5; margin: 0 0 14px; }
     .rs-icon-stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
     .rs-icon-stat { flex: 1 1 calc(50% - 10px); min-width: 120px; background: #F8F9FA; border: 1px solid #EDEFF2; border-radius: 14px; padding: 16px 10px 14px; text-align: center; box-shadow: 0 1px 2px rgba(15,23,42,0.03); }
@@ -8058,7 +8063,10 @@ app.get('/gov-support/result/:id', (c) => {
           return '<div class="rs-icon-stat tone-' + tone + '"><div class="rs-icon-stat-icon">' + rsEsc(it.icon||'📌') + '</div><div class="rs-icon-stat-value">' + rsMarkArb(it.value) + '</div>' + barHtml + '<div class="rs-icon-stat-label">' + rsMarkArb(it.label) + '</div></div>';
         }).join('') + '</div>';
       }
-      if (b.type === 'paragraph') return (b.label ? '<div class="rs-subhead2">' + rsEsc(b.label) + '</div>' : '') + '<p class="rs-paragraph">' + rsMarkArb(b.text) + '</p>';
+      if (b.type === 'paragraph') {
+        if (b.inlineLabel && b.label) return '<p class="rs-paragraph"><span class="rs-inline-label">' + rsEsc(b.label) + ':</span> ' + rsMarkArb(b.text) + '</p>';
+        return (b.label ? '<div class="rs-subhead2">' + rsEsc(b.label) + '</div>' : '') + '<p class="rs-paragraph">' + rsMarkArb(b.text) + '</p>';
+      }
       if (b.type === 'bullets') return (b.label ? '<div class="rs-subhead2">' + rsEsc(b.label) + '</div>' : '') + '<ul class="rs-bullets">' + (b.items||[]).map(function(i){ return '<li>' + rsMarkArb(i) + '</li>'; }).join('') + '</ul>';
       if (b.type === 'table') {
         var head = '<tr>' + (b.headers||[]).map(function(h){ return '<th>' + rsEsc(h) + '</th>'; }).join('') + '</tr>';

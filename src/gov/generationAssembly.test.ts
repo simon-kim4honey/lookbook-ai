@@ -200,6 +200,25 @@ test('mergeCategoryBlocks — paragraph/table도 payload.showLabel이 켜져 있
   assert.equal(tableBlocks[0].label, '(2) 전담인력')
 })
 
+test('mergeCategoryBlocks — paragraph는 payload.inlineLabel이 켜져 있으면 label을 싣고 inlineLabel도 같이 true로 표시한다', () => {
+  // 2026-11-04: "1) 회사명" 다음 줄에 "벌거벗은"만 덩그러니 나오는 게 어색하다는
+  // 실사용자 피드백 — 짧은 한 줄짜리 답변(회사명/주생산품 등)은 라벨과 같은 줄에
+  // "1) 회사명: 벌거벗은"처럼 붙여 보여준다. showLabel(줄바꿈 라벨)과는 별개 플래그.
+  const l1 = node({ id: 'l1', level: 1, parentId: null, expressionType: 'categoryHeader', title: '가. 기업현황', payload: {}, binding: 'static', targetChars: 1000 })
+  const l2inline = node({ id: 'l2i', level: 2, parentId: 'l1', expressionType: 'paragraph', title: '1) 회사명', payload: { text: '', inlineLabel: true }, binding: 'computed', bindingKey: 'exportVoucher.companyName' })
+  const l2block = node({ id: 'l2b', level: 2, parentId: 'l1', expressionType: 'paragraph', title: '(3) 용도 특성', payload: { text: '', showLabel: true }, binding: 'ai' })
+  const cat = buildCategoryTrees([l1, l2inline, l2block])[0]
+  const { blocks } = mergeCategoryBlocks(cat, new Map([['l2b', { moduleId: 'l2b', text: '긴 서술형 설명' }]]), {}, (key) => {
+    if (key === 'exportVoucher.companyName') return { text: '벌거벗은' }
+    return null
+  }, 1)
+  const paragraphBlocks = blocks.filter((b) => b.type === 'paragraph')
+  assert.equal(paragraphBlocks[0].label, '1) 회사명')
+  assert.equal(paragraphBlocks[0].inlineLabel, true)
+  assert.equal(paragraphBlocks[1].label, '(3) 용도 특성')
+  assert.equal(paragraphBlocks[1].inlineLabel, undefined)
+})
+
 test('mergeCategoryBlocks — table은 payload.columns에서 헤더를 뽑아 base.headers로 싣는다(바인딩 종류 무관)', () => {
   // 2026-10-26: 렌더러(rsRenderBlock)가 b.headers를 읽는데, 이걸 payload.columns
   // (label)에서 채워 넣는 코드가 어디에도 없어 모든 table이 헤더 없이 렌더되고

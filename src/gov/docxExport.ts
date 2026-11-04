@@ -163,6 +163,10 @@ function renderBlockToDocx(b: any, images: DocxImages): (Paragraph | Table)[] {
     case 'paragraph': {
       if (!b.text) return []
       const out: (Paragraph | Table)[] = []
+      if (b.inlineLabel && b.label) {
+        out.push(new Paragraph({ spacing: { after: 160 }, children: [new TextRun({ text: plainText(b.label) + ': ', bold: true }), ...markedRuns(b.text)] }))
+        return out
+      }
       if (b.label) out.push(new Paragraph({ heading: HeadingLevel.HEADING_3, children: [new TextRun(plainText(b.label))] }))
       out.push(new Paragraph({ spacing: { after: 160 }, children: markedRuns(b.text) }))
       return out
