@@ -2611,10 +2611,17 @@ async function atlasGenerateAndWaitDetailed(params: {
   const jobId = startData.data.id
   console.log('atlasGenerateAndWait jobId:', jobId)
 
-  // 2) 폴링 (최대 30회 × 3초 = 90초)
+  // 2) 폴링 (최대 18회 × 5초 = 90초)
+  // 2026-11-04: 초기창업패키지(시각화 슬롯 7개)에서 "Too many subrequests by single
+  // Worker invocation" 실패가 실사용자 리포트로 확인됨 — 이미지 1개당 시작 1회+폴링
+  // 최대 30회+다운로드 1회(최대 32 서브리퀘스트)를 한 요청(생성 라우트) 안에서 순차로
+  // 여러 이미지에 반복하다 보니, 이미지 슬롯이 많은 프로그램일수록 Cloudflare의
+  // 요청당 서브리퀘스트 상한에 걸릴 위험이 커진다. 총 대기 시간(90초)은 그대로
+  // 유지하면서 폴링 간격을 3초→5초로 늘려 이미지당 최대 서브리퀘스트 수를 32→20으로
+  // 줄인다(완료까지 걸리는 실제 시간은 바뀌지 않음 — 단지 더 적은 횟수로 확인할 뿐).
   const terminalStatuses = new Set(['completed', 'succeeded', 'failed', 'timeout', 'canceled', 'error'])
-  for (let i = 0; i < 30; i++) {
-    await new Promise(r => setTimeout(r, 3000))
+  for (let i = 0; i < 18; i++) {
+    await new Promise(r => setTimeout(r, 5000))
     const pollRes: any = await fetch(`${ATLAS_API_BASE}/api/v1/model/prediction/${jobId}`, {
       headers: { 'Authorization': `Bearer ${apiKey}` },
     }).then(r => r.json())
