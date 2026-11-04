@@ -3612,7 +3612,7 @@ async function verifyTechpackServerToken(secret: string, token: string): Promise
 // ────────────────────────────────────────────────────
 // 추천인(제휴사) 목록 — 회원가입 드롭다운/할인·보너스 정책에서 공통 사용
 const REFERRER_OPTIONS = ['BFM회원', '코오롱 FnC', '한섬'] as const
-const REFERRER_SIGNUP_BONUS_CREDITS = 500 // BFM 추천 시 가입 크레딧 (일반 200 대신 500 지급)
+const REFERRER_SIGNUP_BONUS_CREDITS = 10000 // BFM 추천 시 가입 크레딧(구 500 → ×20, 일반 4,000 대신 10,000 지급)
 const REFERRER_DISCOUNT_RATE: Record<string, number> = { 'BFM회원': 0.2 } // 유료 결제 시 20% 할인
 
 // 어필리에이트 링크 코드 → 추천인 표시값 매핑. "aifashion.co.kr/?ref=bfm"로 들어와서
@@ -3640,7 +3640,7 @@ app.post('/api/auth/signup', async (c) => {
     const id = genUserId()
     const hash = await hashPassword(password)
     const marketingFlag = agreeMarketing ? 1 : 0
-    const initialCredits = referrer === 'BFM회원' ? REFERRER_SIGNUP_BONUS_CREDITS : 200
+    const initialCredits = referrer === 'BFM회원' ? REFERRER_SIGNUP_BONUS_CREDITS : 4000
     await db.prepare(`
       INSERT INTO users (id, email, name, password_hash, provider, status, credits, role, agree_marketing, referrer)
       VALUES (?, ?, ?, ?, 'email', 'active', ?, 'user', ?, ?)
@@ -3958,9 +3958,9 @@ app.get('/trend-weekly', (c) => {
         <button type="button" class="tw-toggle-opt" data-plan="annual" onclick="twSelectModalPlan('annual')">연 구독 · 20%↓</button>
       </div>
       <div id="twModalPriceLine" style="font-size:13px;color:#82828E;margin:-6px 0 14px;">
-        <span style="text-decoration:line-through;">정가 300크레딧</span> → 150크레딧 <span style="color:#F87171;font-weight:700;">50%↓</span>
+        <span style="text-decoration:line-through;">정가 6000크레딧</span> → 3000크레딧 <span style="color:#F87171;font-weight:700;">50%↓</span>
       </div>
-      <button class="tw-cta" id="twModalSubscribeBtn" onclick="twSubscribeFromModal()">150크레딧으로 구독하기</button>
+      <button class="tw-cta" id="twModalSubscribeBtn" onclick="twSubscribeFromModal()">3000크레딧으로 구독하기</button>
     </div>
   </div>
 
@@ -4338,11 +4338,11 @@ app.get('/trend-weekly', (c) => {
       var btn = document.getElementById('twModalSubscribeBtn');
       var priceLine = document.getElementById('twModalPriceLine');
       if (plan === 'annual') {
-        btn.textContent = '1440크레딧으로 구독하기(월 120)';
-        priceLine.innerHTML = '<span style="text-decoration:line-through;">정가 300크레딧</span> → 월 120크레딧 <span style="color:#F87171;font-weight:700;">60%↓</span> <span style="color:#82828E;">(월 구독가에서 20% 추가할인)</span>';
+        btn.textContent = '28800크레딧으로 구독하기(월 2400)';
+        priceLine.innerHTML = '<span style="text-decoration:line-through;">정가 6000크레딧</span> → 월 2400크레딧 <span style="color:#F87171;font-weight:700;">60%↓</span> <span style="color:#82828E;">(월 구독가에서 20% 추가할인)</span>';
       } else {
-        btn.textContent = '150크레딧으로 구독하기';
-        priceLine.innerHTML = '<span style="text-decoration:line-through;">정가 300크레딧</span> → 150크레딧 <span style="color:#F87171;font-weight:700;">50%↓</span>';
+        btn.textContent = '3000크레딧으로 구독하기';
+        priceLine.innerHTML = '<span style="text-decoration:line-through;">정가 6000크레딧</span> → 3000크레딧 <span style="color:#F87171;font-weight:700;">50%↓</span>';
       }
     };
 
@@ -8380,7 +8380,7 @@ app.get('/api/auth/kakao/callback', async (c) => {
         await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ?, phone_number = COALESCE(?, phone_number) WHERE id = ?`).bind(providerId, kakaoAvatar, kakaoPhone, user.id).run()
       } else {
         const id = genUserId()
-        const initialCredits = linkReferrer === 'BFM회원' ? REFERRER_SIGNUP_BONUS_CREDITS : 200
+        const initialCredits = linkReferrer === 'BFM회원' ? REFERRER_SIGNUP_BONUS_CREDITS : 4000
         await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, phone_number, status, credits, role, referrer) VALUES (?, ?, ?, 'kakao', ?, ?, ?, 'active', ?, 'user', ?)`).bind(id, kakaoEmail, kakaoName, providerId, kakaoAvatar, kakaoPhone, initialCredits, linkReferrer).run()
         await db.prepare(
           `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
@@ -8547,7 +8547,7 @@ app.get('/api/auth/google/callback', async (c) => {
         await db.prepare(`UPDATE users SET provider_id = ?, avatar_url = ? WHERE id = ?`).bind(providerId, googleAvatar, user.id).run()
       } else {
         const id = genUserId()
-        const initialCredits = linkReferrer === 'BFM회원' ? REFERRER_SIGNUP_BONUS_CREDITS : 200
+        const initialCredits = linkReferrer === 'BFM회원' ? REFERRER_SIGNUP_BONUS_CREDITS : 4000
         await db.prepare(`INSERT INTO users (id, email, name, provider, provider_id, avatar_url, status, credits, role, referrer) VALUES (?, ?, ?, 'google', ?, ?, 'active', ?, 'user', ?)`).bind(id, googleEmail, googleName, providerId, googleAvatar, initialCredits, linkReferrer).run()
         await db.prepare(
           `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
@@ -8723,11 +8723,11 @@ app.post('/api/auth/toss', async (c) => {
         const id = genUserId()
         await db.prepare(
           `INSERT INTO users (id, email, name, provider, provider_id, phone_number, status, credits, role)
-           VALUES (?, ?, ?, 'toss', ?, ?, 'active', 200, 'user')`
+           VALUES (?, ?, ?, 'toss', ?, ?, 'active', 4000, 'user')`
         ).bind(id, tossEmail, tossName, providerId, phone).run()
         await db.prepare(
           `INSERT INTO credit_logs (user_id, type, amount, balance, reason, ref_id)
-           VALUES (?, 'grant', 200, 200, 'signup_bonus', ?)`
+           VALUES (?, 'grant', 4000, 4000, 'signup_bonus', ?)`
         ).bind(id, `signup_${id}`).run()
         user = await db.prepare(`SELECT * FROM users WHERE id = ?`).bind(id).first()
       }
@@ -9292,14 +9292,14 @@ app.delete('/api/generation/history/:id', async (c) => {
 // ────────────────────────────────────────────────────
 
 // 크레딧 패키지 정의
-// 크레딧 티어(1,000 / 2,300 / 4,000)는 전 세계 공통, 가격만 시장별로 별도 책정
-// (환율 환산이 아니라 각 시장 심리적 가격대에 맞춰 별도 설정 — 글로벌 로컬라이제이션 기획 참고)
-// 미국/일본은 원화 환산 대비 더 높게 책정(결정 사항) — 국내가 아닌 해외 시장 프리미엄 반영
-// usdCents/jpyAmount는 Stripe에 그대로 넘기는 최소 결제 단위 (USD=센트, JPY=엔 그대로 — Stripe 무소수점 통화)
+// 2026-11-04: 크레딧:원화 비율을 1:1로 통일(1크레딧=1원, 기본 크레딧 = 원화 금액).
+// 기존에는 큰 패키지일수록 크레딧이 "원가 대비 볼륨 할인"된 수량으로 더 들어있었는데
+// (40,000원 패키지 +15%, 60,000원 패키지 +33%), 기본 크레딧을 1:1로 바꾸면서 그 할인분을
+// 보너스 크레딧으로 그대로 얹어 유지했다 — 실질 가치(이미지 환산 장수)는 기존과 거의 동일.
 const CREDIT_PACKAGES: Record<string, { amount: number; credits: number; label: string; usdCents: number; jpyAmount: number }> = {
-  pkg_20000: { amount: 20000, credits: 1000,  label: '20,000원 → 1,000크레딧', usdCents: 1999, jpyAmount: 2980 },
-  pkg_40000: { amount: 40000, credits: 2300,  label: '40,000원 → 2,300크레딧', usdCents: 3499, jpyAmount: 4980 },
-  pkg_60000: { amount: 60000, credits: 4000,  label: '60,000원 → 4,000크레딧', usdCents: 4999, jpyAmount: 7980 },
+  pkg_20000: { amount: 20000, credits: 20000,  label: '20,000원 → 20,000크레딧', usdCents: 1999, jpyAmount: 2980 },
+  pkg_40000: { amount: 40000, credits: 46000,  label: '40,000원 → 46,000크레딧(기본 40,000 + 15% 보너스)', usdCents: 3499, jpyAmount: 4980 },
+  pkg_60000: { amount: 60000, credits: 79800,  label: '60,000원 → 79,800크레딧(기본 60,000 + 33% 보너스)', usdCents: 4999, jpyAmount: 7980 },
 }
 
 // GET /api/payments/packages — 패키지 목록
@@ -10084,9 +10084,9 @@ app.get('/api/payments/history', async (c) => {
 // 콘텐츠(기사/검색어트렌드/쇼핑인사이트) 자체는 /api/admin/content-digest에서
 // 생성·검토하며, 여기서는 "누가 구독 중인지"와 열람 권한만 다룬다.
 // ────────────────────────────────────────────────────
-const TREND_LIST_PRICE_CREDITS = 300   // 정가(표시용) — 실제 차감되지 않음
-const TREND_MONTHLY_CREDITS = 150      // 정가 300 대비 50% 할인
-const TREND_ANNUAL_CREDITS = 1440      // 월환산 120(월 구독가 150에서 추가 20% 할인) × 12, 연 1회 차감
+const TREND_LIST_PRICE_CREDITS = 6000  // 정가(표시용) — 실제 차감되지 않음
+const TREND_MONTHLY_CREDITS = 3000     // 정가 6000 대비 50% 할인
+const TREND_ANNUAL_CREDITS = 28800     // 월환산 2400(월 구독가 3000에서 추가 20% 할인) × 12, 연 1회 차감
 const TREND_TRIAL_DAYS = 30
 
 async function requireTrendSession(db: D1Database, token: string): Promise<any> {
@@ -10822,13 +10822,15 @@ function buildClothingReplaceInstructions(
 }
 
 // ── 크레딧 상수 ──
-const CREDITS_PER_IMAGE = 90  // 이미지 1장당 차감 크레딧 (1,800원 / 20원 = 90)
-const CREDITS_PER_GHOSTCUT_IMAGE = 70  // 누끼컷 이미지 1장당 차감 크레딧(140의 50% 할인) — 모델컷과 별도 요금
-const CREDITS_PER_VIDEO = 600 // 영상 1개(7초)당 차감 크레딧 — 생성 시점에 즉시 차감
+// 2026-11-04: 크레딧:원화 비율을 20:1 → 1:1로 전환(1크레딧=1원) — 아래 상수는 모두
+// 기존 값(괄호 안)의 20배로, 실제 원화 가격은 변하지 않는다.
+const CREDITS_PER_IMAGE = 1800  // 이미지 1장당 차감 크레딧 (구 90 → ×20, 1,800원 그대로)
+const CREDITS_PER_GHOSTCUT_IMAGE = 1400  // 누끼컷 이미지 1장당 차감 크레딧(구 70 → ×20, 2800의 50% 할인) — 모델컷과 별도 요금
+const CREDITS_PER_VIDEO = 12000 // 영상 1개(7초)당 차감 크레딧(구 600 → ×20) — 생성 시점에 즉시 차감
 
-// 누끼컷 디테일컷(클로즈업) — 1장당 120의 50% 할인 60크레딧, 장수와 무관하게 항상 동일(볼륨 할인 없음).
+// 누끼컷 디테일컷(클로즈업) — 1장당 2400의 50% 할인 1200크레딧(구 60 → ×20), 장수와 무관하게 항상 동일(볼륨 할인 없음).
 // 다른 이미지 생성과 동일하게 생성 자체는 무료이고, "다운로드 시점"에 장당 차감된다.
-const CREDITS_PER_GHOSTCUT_DETAIL_IMAGE = 60
+const CREDITS_PER_GHOSTCUT_DETAIL_IMAGE = 1200
 
 // 영상 생성 실패(또는 15분 이상 응답 없음) 확인 시 크레딧을 환불하고 생성내역을
 // 'failed'로 전환한다. status='processing' → 'failed' 전환은 원자적 UPDATE로 수행해
@@ -10846,8 +10848,8 @@ async function markVideoFailedAndRefund(db: D1Database, jobId: string): Promise<
   if ((upd.meta?.changes ?? 0) === 0) return {} // 다른 요청이 먼저 처리함 — 중복 환불 방지
 
   // 이 작업에서 실제로 차감된 금액을 credit_logs에서 그대로 조회해 환불한다.
-  // 모델컷(600)과 누끼컷(250)은 차감액이 다르므로, 고정값으로 환불하면 누끼컷
-  // 실패 시 350크레딧을 더 얹어주는 과다 환불 버그가 생긴다.
+  // 모델컷(12000)과 누끼컷(5000)은 차감액이 다르므로, 고정값으로 환불하면 누끼컷
+  // 실패 시 7000크레딧을 더 얹어주는 과다 환불 버그가 생긴다.
   const deductLog: any = await db.prepare(
     `SELECT amount FROM credit_logs WHERE ref_id = ? AND reason = 'video_generation' ORDER BY id DESC LIMIT 1`
   ).bind(jobId).first()
@@ -12106,7 +12108,7 @@ ${bodyContent}
            style="background:#F2F4F6;border:2px solid #E5E8EB;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">1,000 크레딧</div>
+            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">20,000 크레딧</div>
             <div style="font-size:13px;color:#6B7684;" data-i18n="pkg-11">이미지 <strong style="color:#3182F6;">11장</strong> 다운로드 가능</div>
           </div>
           <div style="text-align:right;">
@@ -12120,7 +12122,7 @@ ${bodyContent}
         <div style="position:absolute;top:0;right:20px;background:#3182F6;color:white;font-size:10px;font-weight:700;padding:3px 10px;border-radius:0 0 8px 8px;" data-i18n="pkg-popular">인기</div>
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">2,300 크레딧</div>
+            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">46,000 크레딧</div>
             <div style="font-size:13px;color:#6B7684;" data-i18n="pkg-25">이미지 <strong style="color:#1B64DA;">25장</strong> 다운로드 가능</div>
             <div style="font-size:11px;color:#1B64DA;margin-top:4px;" data-i18n="pkg-bonus15">✨ 기본 대비 15% 더 받기</div>
           </div>
@@ -12134,7 +12136,7 @@ ${bodyContent}
            style="background:#F2F4F6;border:2px solid #E5E8EB;border-radius:16px;padding:18px 20px;cursor:pointer;transition:all 0.2s;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">4,000 크레딧</div>
+            <div style="font-size:20px;font-weight:800;color:#191F28;margin-bottom:4px;">79,800 크레딧</div>
             <div style="font-size:13px;color:#6B7684;" data-i18n="pkg-44">이미지 <strong style="color:#3182F6;">44장</strong> 다운로드 가능</div>
             <div style="font-size:11px;color:#1B64DA;margin-top:4px;" data-i18n="pkg-bonus33">🚀 기본 대비 33% 더 받기</div>
           </div>
@@ -12523,8 +12525,8 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 - 룩북 세트 일괄 생성 및 다운로드
 
 ## 요금
-- 이미지 생성 자체는 무료. 다운로드 시에만 장당 90크레딧 차감
-- 크레딧 충전: 스타터(₩20,000 · 1,000크레딧) ~ 베스트 밸류(₩60,000 · 4,000크레딧)
+- 이미지 생성 자체는 무료. 다운로드 시에만 장당 1,800크레딧 차감
+- 크레딧 충전: 스타터(₩20,000 · 20,000크레딧) ~ 베스트 밸류(₩60,000 · 79,800크레딧, 보너스 포함)
 - 회원가입 시 무료 크레딧 지급, 신용카드 등록 불필요
 
 ## 링크
@@ -12539,11 +12541,11 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 // ── 홈페이지 GEO/SEO용 구조화 데이터 (Organization/WebSite/Service/FAQPage) ──
 const HOME_FAQ: { q: string; a: string }[] = [
   { q: 'EZlook은 어떤 서비스인가요?', a: '의류 이미지 한 장을 업로드하면 AI가 온모델 피팅컷과 룩북 세트를 자동으로 생성해주는 AI 패션 이미지 생성 플랫폼입니다. 촬영 스튜디오나 모델 섭외 없이 몇 번의 클릭만으로 전문적인 착용샷을 만들 수 있습니다.' },
-  { q: '이미지 생성에 비용이 드나요?', a: '이미지 생성 자체는 무료입니다. 마음에 드는 결과물을 실제 파일로 다운로드할 때만 장당 90크레딧이 차감됩니다.' },
+  { q: '이미지 생성에 비용이 드나요?', a: '이미지 생성 자체는 무료입니다. 마음에 드는 결과물을 실제 파일로 다운로드할 때만 장당 1,800크레딧이 차감됩니다.' },
   { q: '무료로 체험할 수 있나요?', a: '네, 신용카드 등록 없이 회원가입만 하면 무료 크레딧이 바로 지급되어 AI 룩북 제작을 체험해볼 수 있습니다.' },
   { q: '영상도 만들 수 있나요?', a: '네, 생성된 피팅컷 이미지를 기반으로 모델이 자연스럽게 포즈를 취하는 7초 분량의 세로형(9:16) 영상을 만들 수 있습니다.' },
   { q: '결과물은 얼마나 빨리 나오나요?', a: '평균 30초, 최대 90초 이내에 고품질 온모델 피팅컷 이미지가 생성됩니다.' },
-  { q: '크레딧은 어떻게 충전하나요?', a: '월 정액 없이 필요한 만큼만 충전하는 방식입니다. 스타터(₩20,000 · 1,000크레딧)부터 베스트 밸류(₩60,000 · 4,000크레딧)까지 선택할 수 있습니다.' },
+  { q: '크레딧은 어떻게 충전하나요?', a: '월 정액 없이 필요한 만큼만 충전하는 방식입니다. 스타터(₩20,000 · 20,000크레딧)부터 베스트 밸류(₩60,000 · 79,800크레딧, 보너스 포함)까지 선택할 수 있습니다.' },
 ]
 
 const homeStructuredData = () => {
@@ -12578,9 +12580,9 @@ const homeStructuredData = () => {
     provider: org,
     areaServed: 'KR',
     offers: [
-      { '@type': 'Offer', name: '스타터', price: '20000', priceCurrency: 'KRW', description: '1,000 크레딧 · 이미지 최대 11장' },
-      { '@type': 'Offer', name: '인기 충전권', price: '40000', priceCurrency: 'KRW', description: '2,300 크레딧 · 이미지 최대 25장' },
-      { '@type': 'Offer', name: '베스트 밸류', price: '60000', priceCurrency: 'KRW', description: '4,000 크레딧 · 이미지 최대 44장' },
+      { '@type': 'Offer', name: '스타터', price: '20000', priceCurrency: 'KRW', description: '20,000 크레딧 · 이미지 최대 11장' },
+      { '@type': 'Offer', name: '인기 충전권', price: '40000', priceCurrency: 'KRW', description: '46,000 크레딧 · 이미지 최대 25장' },
+      { '@type': 'Offer', name: '베스트 밸류', price: '60000', priceCurrency: 'KRW', description: '79,800 크레딧 · 이미지 최대 44장' },
     ],
   }
   const faq = {
@@ -12872,7 +12874,7 @@ app.get('/about', (c) => {
       <div class="section-header">
         <div class="section-tag"><i class="fas fa-tags"></i> 요금제</div>
         <h2 class="section-title">쓴 만큼만 내는<br />크레딧 충전제</h2>
-        <p class="section-desc">월정액 없이, 필요한 만큼만 충전해서 쓰세요. 가입 즉시 무료 크레딧이 지급됩니다.<br />이미지 1장 다운로드 시 90크레딧이 차감됩니다.</p>
+        <p class="section-desc">월정액 없이, 필요한 만큼만 충전해서 쓰세요. 가입 즉시 무료 크레딧이 지급됩니다.<br />이미지 1장 다운로드 시 1,800크레딧이 차감됩니다.</p>
       </div>
       <div class="pricing-single-wrap">
         <div class="pricing-single-card">
@@ -12881,32 +12883,32 @@ app.get('/about', (c) => {
             <span class="amount" id="pricingAmount">₩20,000</span>
             <span class="period">1회 충전</span>
           </div>
-          <p class="pricing-desc" id="pricingDesc">1,000 크레딧 · 이미지 최대 11장</p>
+          <p class="pricing-desc" id="pricingDesc">20,000 크레딧 · 이미지 최대 11장</p>
 
           <div class="pricing-select" id="pricingSelect">
             <button type="button" class="pricing-select-trigger" onclick="togglePricingSelect()" id="pricingSelectTrigger" aria-expanded="false">
-              <span id="pricingSelectTriggerLabel">20,000원 · 1,000 크레딧</span>
+              <span id="pricingSelectTriggerLabel">20,000원 · 20,000 크레딧</span>
               <i class="fas fa-chevron-down"></i>
             </button>
             <div class="pricing-select-menu" id="pricingSelectMenu">
-              <div class="pricing-select-item selected" data-amount="20000" data-credits="1000" data-images="11" data-bonus="" onclick="selectPricingTier(this)">
+              <div class="pricing-select-item selected" data-amount="20000" data-credits="20000" data-images="11" data-bonus="" onclick="selectPricingTier(this)">
                 <div>
                   <div class="pricing-select-item-title">20,000원</div>
-                  <div class="pricing-select-item-sub">1,000 크레딧</div>
+                  <div class="pricing-select-item-sub">20,000 크레딧</div>
                 </div>
                 <i class="fas fa-check"></i>
               </div>
-              <div class="pricing-select-item" data-amount="40000" data-credits="2300" data-images="25" data-bonus="✨ 기본 대비 15% 더 받기" onclick="selectPricingTier(this)">
+              <div class="pricing-select-item" data-amount="40000" data-credits="46000" data-images="25" data-bonus="✨ 기본 대비 15% 더 받기" onclick="selectPricingTier(this)">
                 <div>
                   <div class="pricing-select-item-title">40,000원 <span class="pricing-select-item-tag">인기</span></div>
-                  <div class="pricing-select-item-sub">2,300 크레딧</div>
+                  <div class="pricing-select-item-sub">46,000 크레딧</div>
                 </div>
                 <i class="fas fa-check" style="visibility:hidden;"></i>
               </div>
-              <div class="pricing-select-item" data-amount="60000" data-credits="4000" data-images="44" data-bonus="🚀 기본 대비 33% 더 받기" onclick="selectPricingTier(this)">
+              <div class="pricing-select-item" data-amount="60000" data-credits="79800" data-images="44" data-bonus="🚀 기본 대비 33% 더 받기" onclick="selectPricingTier(this)">
                 <div>
                   <div class="pricing-select-item-title">60,000원</div>
-                  <div class="pricing-select-item-sub">4,000 크레딧</div>
+                  <div class="pricing-select-item-sub">79,800 크레딧</div>
                 </div>
                 <i class="fas fa-check" style="visibility:hidden;"></i>
               </div>
@@ -12949,7 +12951,7 @@ app.get('/about', (c) => {
     <div class="container">
       <div class="cta-content">
         <h2 class="cta-title">지금 바로 <span class="highlight">무료로 체험</span>하세요</h2>
-        <p class="cta-desc">신용카드 없이 200크레딧을 무료로 받고<br />AI 룩북 제작을 경험해보세요.</p>
+        <p class="cta-desc">신용카드 없이 4,000크레딧을 무료로 받고<br />AI 룩북 제작을 경험해보세요.</p>
         <div class="cta-actions">
           <button class="btn btn-primary btn-lg" onclick="location.href='/'">
             <i class="fas fa-rocket"></i>
@@ -13348,7 +13350,7 @@ app.get('/dashboard', (c) => {
         <div>
           <div class="db-credit-label">현재 크레딧</div>
           <div class="db-credit-val" id="dbCredits">-</div>
-          <div class="db-credit-sub">이미지 1장 = 90크레딧</div>
+          <div class="db-credit-sub">이미지 1장 = 1,800크레딧</div>
         </div>
         <button class="db-charge-btn" onclick="openChargePanel()" data-i18n="nav-charge">충전</button>
       </div>
@@ -13492,7 +13494,7 @@ app.get('/dashboard', (c) => {
       <button id="histModalVideoBtn" class="result-nav-btn primary" onclick="startHistVideoGeneration()" style="display:none;flex:1;">
         <span class="rnb-badge">50%↓</span>
         <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
-        <span class="rnb-sub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
+        <span class="rnb-sub">7초 · <s class="rnb-strike">24000</s> <i class="fas fa-coins"></i> 12000</span>
       </button>
     </div>
   </div>
@@ -13691,7 +13693,7 @@ app.get('/dashboard', (c) => {
       if (startRes.status === 402) {
         _hideVideoGeneratingView();
         const errData = await startRes.json();
-        showToast(\`크레딧이 부족합니다. (보유: \${errData.available ?? 0}크레딧 / 필요: \${errData.required ?? 600}크레딧)\`, 'error');
+        showToast(\`크레딧이 부족합니다. (보유: \${errData.available ?? 0}크레딧 / 필요: \${errData.required ?? 12000}크레딧)\`, 'error');
         if (btn) btn.disabled = false;
         return;
       }
@@ -13995,7 +13997,7 @@ app.get('/dashboard', (c) => {
       if (deductRes.status === 402) {
         closeActionProgress();
         const errData = await deductRes.json();
-        showToast(\`크레딧 부족 (보유: \${errData.available ?? 0}크레딧 / 필요: 90크레딧)\`, 'error');
+        showToast(\`크레딧 부족 (보유: \${errData.available ?? 0}크레딧 / 필요: 1800크레딧)\`, 'error');
         return;
       }
       if (!deductRes.ok) { closeActionProgress(); showToast('크레딧 처리 오류', 'error'); return; }
@@ -14466,12 +14468,12 @@ const generatorPageHandler = (c: any, mode: 'model' | 'ghostcut' = 'model') => {
             <button class="result-nav-btn primary" onclick="downloadWithCreditCheck(0)">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-download"></i> 이미지 다운</span>
-              <span class="rnb-sub" id="downloadActionSub"><s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90</span>
+              <span class="rnb-sub" id="downloadActionSub"><s class="rnb-strike">3600</s> <i class="fas fa-coins"></i> 1800</span>
             </button>
             <button class="result-nav-btn primary" id="videoActionBtn" onclick="startVideoGeneration()">
               <span class="rnb-badge">50%↓</span>
               <span class="rnb-main"><i class="fas fa-film"></i> 2K 영상 생성</span>
-              <span class="rnb-sub" id="videoActionSub">7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600</span>
+              <span class="rnb-sub" id="videoActionSub">7초 · <s class="rnb-strike">24000</s> <i class="fas fa-coins"></i> 12000</span>
             </button>
             <button class="result-nav-btn" id="newProjectBtnCard" onclick="window.location.href='/'">
               <span class="rnb-main"><i class="fas fa-plus"></i> 새 프로젝트</span>

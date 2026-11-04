@@ -151,11 +151,11 @@ const I18N = {
     creditsUnit: (n) => `${n.toLocaleString()} 크레딧`,
     creditShort: (n) => `${n.toLocaleString()}`,
     creditInsufficient: (need, have) => `크레딧이 부족합니다. 필요: ${need}크레딧 / 보유: ${have}크레딧`,
-    creditInsufficientDetail: (have) => `크레딧이 부족합니다. (보유: ${have}크레딧 / 필요: 90크레딧) 대시보드에서 충전해 주세요.`,
-    creditDeductDone: (remain) => `다운로드 완료! (90크레딧 차감, 잔액: ${remain}크레딧)`,
+    creditInsufficientDetail: (have) => `크레딧이 부족합니다. (보유: ${have}크레딧 / 필요: 1800크레딧) 대시보드에서 충전해 주세요.`,
+    creditDeductDone: (remain) => `다운로드 완료! (1800크레딧 차감, 잔액: ${remain}크레딧)`,
     creditRedownloadDone: '재다운로드 완료! (크레딧 차감 없음)',
     creditError: '크레딧 처리 중 오류가 발생했습니다.',
-    creditLackPartial: (n, have) => `크레딧 부족으로 ${n}장만 다운로드했습니다. (보유: ${have}크레딧 / 필요: 90크레딧)`,
+    creditLackPartial: (n, have) => `크레딧 부족으로 ${n}장만 다운로드했습니다. (보유: ${have}크레딧 / 필요: 1800크레딧)`,
     creditErrNum: (n) => `${n}번 이미지 크레딧 처리 오류`,
     selectPackage: '패키지를 선택하세요',
     // 업로드
@@ -204,7 +204,7 @@ const I18N = {
     downloadStart: (n) => `피팅컷 #${n} 다운로드를 시작합니다.`,
     downloadNoImg: '다운로드할 이미지가 없습니다.',
     downloadImgNotFound: '이미지를 찾을 수 없습니다.',
-    downloadMultiStart: (n) => `${n}장 다운로드를 시작합니다. 이미지당 90크레딧이 차감됩니다.`,
+    downloadMultiStart: (n) => `${n}장 다운로드를 시작합니다. 이미지당 1800크레딧이 차감됩니다.`,
     downloadDone: (n) => `${n}장 다운로드 완료!`,
     downloadErr: '다운로드 중 오류가 발생했습니다.',
     downloadIng: '<i class="fas fa-spinner fa-spin"></i> 처리 중...',
@@ -241,11 +241,11 @@ const I18N = {
     creditsUnit: (n) => `${n.toLocaleString()} credits`,
     creditShort: (n) => `${n.toLocaleString()}`,
     creditInsufficient: (need, have) => `Insufficient credits. Need: ${need} / Have: ${have}`,
-    creditInsufficientDetail: (have) => `Insufficient credits. (Have: ${have} / Need: 90) Please top up on the dashboard.`,
-    creditDeductDone: (remain) => `Download complete! (90 credits used, balance: ${remain})`,
+    creditInsufficientDetail: (have) => `Insufficient credits. (Have: ${have} / Need: 1800) Please top up on the dashboard.`,
+    creditDeductDone: (remain) => `Download complete! (1800 credits used, balance: ${remain})`,
     creditRedownloadDone: 'Re-download complete! (no credits charged)',
     creditError: 'An error occurred while processing credits.',
-    creditLackPartial: (n, have) => `Only ${n} image(s) downloaded due to insufficient credits. (Have: ${have} / Need: 90)`,
+    creditLackPartial: (n, have) => `Only ${n} image(s) downloaded due to insufficient credits. (Have: ${have} / Need: 1800)`,
     creditErrNum: (n) => `Credit processing error for image #${n}`,
     selectPackage: 'Select a package',
     uploadFormatErr: 'Only JPG, PNG, WEBP formats are supported.',
@@ -290,7 +290,7 @@ const I18N = {
     downloadStart: (n) => `Starting download of fitting shot #${n}.`,
     downloadNoImg: 'No images to download.',
     downloadImgNotFound: 'Image not found.',
-    downloadMultiStart: (n) => `Starting download of ${n} image(s). 90 credits per image.`,
+    downloadMultiStart: (n) => `Starting download of ${n} image(s). 1800 credits per image.`,
     downloadDone: (n) => `${n} image(s) downloaded!`,
     downloadErr: 'An error occurred while downloading.',
     downloadIng: '<i class="fas fa-spinner fa-spin"></i> Processing...',
@@ -324,11 +324,11 @@ const I18N = {
     creditsUnit: (n) => `${n.toLocaleString()}クレジット`,
     creditShort: (n) => `${n.toLocaleString()}`,
     creditInsufficient: (need, have) => `クレジットが不足しています。必要: ${need} / 保有: ${have}`,
-    creditInsufficientDetail: (have) => `クレジットが不足しています。(保有: ${have} / 必要: 90) ダッシュボードでチャージしてください。`,
-    creditDeductDone: (remain) => `ダウンロード完了！(90クレジット消費、残高: ${remain})`,
+    creditInsufficientDetail: (have) => `クレジットが不足しています。(保有: ${have} / 必要: 1800) ダッシュボードでチャージしてください。`,
+    creditDeductDone: (remain) => `ダウンロード完了！(1800クレジット消費、残高: ${remain})`,
     creditRedownloadDone: '再ダウンロード完了！(クレジット消費なし)',
     creditError: 'クレジット処理中にエラーが発生しました。',
-    creditLackPartial: (n, have) => `クレジット不足のため${n}枚のみダウンロードしました。(保有: ${have} / 必要: 90)`,
+    creditLackPartial: (n, have) => `クレジット不足のため${n}枚のみダウンロードしました。(保有: ${have} / 必要: 1800)`,
     creditErrNum: (n) => `画像${n}番のクレジット処理エラー`,
     selectPackage: 'パッケージを選択',
     uploadFormatErr: 'JPG、PNG、WEBP形式のみ対応しています。',
@@ -373,7 +373,7 @@ const I18N = {
     downloadStart: (n) => `フィッティングショット #${n} のダウンロードを開始します。`,
     downloadNoImg: 'ダウンロードする画像がありません。',
     downloadImgNotFound: '画像が見つかりません。',
-    downloadMultiStart: (n) => `${n}枚のダウンロードを開始します。1枚あたり90クレジット消費。`,
+    downloadMultiStart: (n) => `${n}枚のダウンロードを開始します。1枚あたり1800クレジット消費。`,
     downloadDone: (n) => `${n}枚のダウンロード完了！`,
     downloadErr: 'ダウンロード中にエラーが発生しました。',
     downloadIng: '<i class="fas fa-spinner fa-spin"></i> 処理中...',
@@ -3757,7 +3757,7 @@ async function startGeneration() {
     }
     if (startRes.status === 402) {
       const errData = await startRes.json();
-      const need = errData.required ?? 90;
+      const need = errData.required ?? 1800;
       const have = errData.available ?? 0;
       showToast(t('creditInsufficient', need, have), 'error');
       // 드롭다운 열어서 충전 버튼 유도
@@ -4566,7 +4566,7 @@ function _renderDetailCutResults(jobId, images) {
       <button class="result-nav-btn primary" style="width:100%;border-radius:0;" onclick="downloadDetailCutImage('${jobId}', ${idx}, '${proxied}')">
         <span class="rnb-badge">50%↓</span>
         <span class="rnb-main"><i class="fas fa-download"></i> 저장</span>
-        <span class="rnb-sub"><s class="rnb-strike">120</s> <i class="fas fa-coins"></i> 60</span>
+        <span class="rnb-sub"><s class="rnb-strike">2400</s> <i class="fas fa-coins"></i> 1200</span>
       </button>
     `;
     grid.appendChild(card);
@@ -4635,16 +4635,16 @@ function _videoSubHtml(withStrike) {
       : '5초 · <i class="fas fa-coins"></i> 250';
   }
   return withStrike
-    ? '7초 · <s class="rnb-strike">1200</s> <i class="fas fa-coins"></i> 600'
-    : '7초 · <i class="fas fa-coins"></i> 600';
+    ? '7초 · <s class="rnb-strike">24000</s> <i class="fas fa-coins"></i> 12000'
+    : '7초 · <i class="fas fa-coins"></i> 12000';
 }
 
-// 모델컷(180→90)과 누끼컷(140→70) 이미지 다운로드 요금 표기
+// 모델컷(3600→1800)과 누끼컷(2800→1400) 이미지 다운로드 요금 표기
 function _downloadSubHtml() {
   if (window.__EZLOOK_MODE__ === 'ghostcut') {
-    return '<s class="rnb-strike">140</s> <i class="fas fa-coins"></i> 70';
+    return '<s class="rnb-strike">2800</s> <i class="fas fa-coins"></i> 1400';
   }
-  return '<s class="rnb-strike">180</s> <i class="fas fa-coins"></i> 90';
+  return '<s class="rnb-strike">3600</s> <i class="fas fa-coins"></i> 1800';
 }
 
 function _resetVideoBtn() {
