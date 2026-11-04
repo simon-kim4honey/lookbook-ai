@@ -53,6 +53,10 @@ export const COMPUTED_KEY_WHITELIST = [
   'exportVoucher.companyName', 'exportVoucher.mainProduct', 'exportVoucher.exportItem',
   'exportVoucher.devStatus', 'exportVoucher.targetCustomer', 'exportVoucher.targetCategory',
   'exportVoucher.targetCountries', 'exportVoucher.exportHistory', 'exportVoucher.staff',
+  // 2026-11-04: 초기창업패키지(choi) — 아이템명·카테고리 등 단순 사실 echo와
+  // 팀구성/협력기관처럼 사용자가 직접 입력한 구조화 값을 AI가 지어내지 않고
+  // 그대로 표로 옮기기 위한 computed 키.
+  'icp.itemName', 'icp.category', 'icp.devStatus', 'icp.targetCustomer', 'icp.team', 'icp.partners',
 ] as const
 
 // binding='answer' 및 repeat.source / condition.when이 허용하는 위저드 답변 키 —
