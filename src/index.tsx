@@ -5578,6 +5578,10 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
   // devStatus/targetMarket/targetCustomer/customerBenefit/improvementPlan/revenueModel/
   // threeYearGoal/selfMallUrl 등은 전부 제거되고 예비창업패키지의 동등한 필드로 대체됨).
   const acquisitionOptions = ['SNS 기반 고객 유치', '협력사 확보', '체험단 운영', '기업 콜라보레이션', 'B2B 고객 유치', '오프라인 팝업', '기타']
+  // 2026-11-05: 사용자 지정 — "판매채널 확보 현황"이 주관식이라 답하기 막막하다는
+  // 피드백으로 "해외 판매채널 확보현황"으로 초점을 좁히고 객관식(칩 다중선택)으로
+  // 전환했다. "기타" 포함.
+  const salesChannelStatusOptions = ['아직 없음', '해외 오픈마켓 입점 준비 중(아마존·쇼피 등)', '해외 오픈마켓 입점 완료', '해외 바이어·에이전시 상담 중', '해외 전시회·박람회 참가 예정', '기타']
 
   return `
   <div class="toast-container" id="toastContainer"></div>
@@ -5915,8 +5919,10 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
             <textarea class="wz-textarea" id="f_customerStatus" placeholder="예: 인스타그램 팔로워 1,200명, 사전 예약 신청 35건 확보" maxlength="300" data-required="1"></textarea>
           </div>
           <div class="wz-field">
-            <div class="wz-field-label">판매채널 확보 현황 <span class="wz-required">*</span></div>
-            <textarea class="wz-textarea" id="f_salesChannelStatus" placeholder="예: 스마트스토어 입점 준비 중, 크라우드펀딩 플랫폼 오픈 예정 협의 완료" maxlength="300" data-required="1"></textarea>
+            <div class="wz-field-label">해외 판매채널 확보현황 (해당하는 것 모두 선택) <span class="wz-required">*</span></div>
+            <div class="wz-chip-row" data-field="salesChannelStatus" data-multi="1" data-required="1">
+              ${salesChannelStatusOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
+            </div>
           </div>
         </div>
 
@@ -6020,7 +6026,7 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
     }
 
     function wzFillFormFromAnswers() {
-      var simpleFields = ['brandName','product1','product2','product3','concept','ipStatus','validationEfforts','target','problemStatement','productionDetail','processNote','diffReason','diffStubborn','diffFeedback','experienceDetail','externalBackground','motivation','expectedImpact','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl','productOutput','customerStatus','salesChannelStatus','productUpgradePlan'];
+      var simpleFields = ['brandName','product1','product2','product3','concept','ipStatus','validationEfforts','target','problemStatement','productionDetail','processNote','diffReason','diffStubborn','diffFeedback','experienceDetail','externalBackground','motivation','expectedImpact','threeYearGoal','competitor1_name','competitor1_feature','competitor2_name','competitor2_feature','selfMallUrl','productOutput','customerStatus','productUpgradePlan'];
       simpleFields.forEach(function (k) {
         var el = document.getElementById('f_' + k);
         if (el && wzAnswers[k] !== undefined) el.value = wzAnswers[k];
@@ -6312,7 +6318,6 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
         patch.threeYearGoal = val('f_threeYearGoal');
       } else if (stepNum === 13) {
         patch.customerStatus = val('f_customerStatus');
-        patch.salesChannelStatus = val('f_salesChannelStatus');
       } else if (stepNum === 14) {
         patch.productUpgradePlan = val('f_productUpgradePlan');
       }
@@ -8609,7 +8614,7 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
       'icp-target-market': '목표시장 현황(타깃 특징과 기회)을 요약하는 패널',
       'icp-item-status': '아이템 개발 현황을 요약하는 패널',
       'icp-customer-status': '고객 확보 현황을 요약하는 패널',
-      'icp-sales-channel': '판매채널 확보 현황을 요약하는 패널',
+      'icp-sales-channel': '해외 판매채널 확보현황을 요약하는 패널',
       'icp-customer-acquisition': '고객 확보 방안을 요약하는 패널',
     }
     const visualTargets: Array<{ sIdx: number; bIdx: number; block: any }> = []
