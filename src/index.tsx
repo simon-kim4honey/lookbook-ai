@@ -5581,7 +5581,7 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
   // 2026-11-05: 사용자 지정 — "판매채널 확보 현황"이 주관식이라 답하기 막막하다는
   // 피드백으로 "해외 판매채널 확보현황"으로 초점을 좁히고 객관식(칩 다중선택)으로
   // 전환했다. "기타" 포함.
-  const salesChannelStatusOptions = ['아직 없음', '해외 오픈마켓 입점 준비 중(아마존·쇼피 등)', '해외 오픈마켓 입점 완료', '해외 바이어·에이전시 상담 중', '해외 전시회·박람회 참가 예정', '기타']
+  const salesChannelStatusOptions = ['아직 없음', '해외 오픈마켓 입점 준비 중(아마존·쇼피 등)', '해외 오픈마켓 입점 완료', '해외 오프라인매장 입점 완료', '해외 바이어·에이전시 상담 중', '해외 전시회·박람회 참가 예정', '기타']
 
   return `
   <div class="toast-container" id="toastContainer"></div>
@@ -5923,6 +5923,7 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
             <div class="wz-chip-row" data-field="salesChannelStatus" data-multi="1" data-required="1">
               ${salesChannelStatusOptions.map((v) => `<div class="wz-chip" data-value="${v}">${v}</div>`).join('')}
             </div>
+            <div id="wzSalesChannelDetails"></div>
           </div>
         </div>
 
@@ -6054,6 +6055,7 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
       wzUpdateStageWarning();
       wzUpdateProductionDetailVisibility();
       wzRenderBuyReasonDetails();
+      wzRenderSalesChannelDetails();
       wzAttachCharCounters();
     }
 
@@ -6089,6 +6091,7 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
       if (row.getAttribute('data-field') === 'stage') wzUpdateStageWarning();
       if (row.getAttribute('data-field') === 'productionMethod') wzUpdateProductionDetailVisibility();
       if (row.getAttribute('data-field') === 'buyReason') wzRenderBuyReasonDetails();
+      if (row.getAttribute('data-field') === 'salesChannelStatus') wzRenderSalesChannelDetails();
     });
 
     var WZ_PRODUCTION_DETAIL_META = {
@@ -6142,6 +6145,46 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
       container.querySelectorAll('textarea[data-reason]').forEach(function (el) {
         var v = el.value.trim();
         if (v) result[el.getAttribute('data-reason')] = v;
+      });
+      return result;
+    }
+
+    // 2026-11-05: "해외 오픈마켓 입점 완료"/"해외 오프라인매장 입점 완료"/"기타"처럼
+    // 선택만으로는 구체성이 부족한 보기를 고르면, 그 보기에 한해서만(buyReason처럼
+    // 선택한 전부가 아니라) 짧은 보조 입력칸을 보여준다.
+    var WZ_SALES_CHANNEL_DETAIL_META = {
+      '해외 오픈마켓 입점 완료': { label: '어느 오픈마켓인지 (선택)', placeholder: '예: 아마존, 쇼피, 라자다' },
+      '해외 오프라인매장 입점 완료': { label: '어떤 매장인지 (선택)', placeholder: '예: 현지 편집샵 OO, 백화점 OO 입점' },
+      '기타': { label: '어떤 판매채널인지 (선택)', placeholder: '예: 자사 해외배송몰, 현지 유통사 등' },
+    };
+    var wzSalesChannelDraft = {};
+    function wzRenderSalesChannelDetails() {
+      var row = document.querySelector('.wz-chip-row[data-field="salesChannelStatus"]');
+      var container = document.getElementById('wzSalesChannelDetails');
+      if (!row || !container) return;
+      container.querySelectorAll('input[data-channel]').forEach(function (el) {
+        wzSalesChannelDraft[el.getAttribute('data-channel')] = el.value;
+      });
+      var selected = Array.prototype.slice.call(row.querySelectorAll('.wz-chip.on')).map(function (c) { return c.getAttribute('data-value'); });
+      var targets = selected.filter(function (v) { return WZ_SALES_CHANNEL_DETAIL_META[v]; });
+      container.innerHTML = targets.map(function (v) {
+        var meta = WZ_SALES_CHANNEL_DETAIL_META[v];
+        var saved = (wzAnswers.salesChannelDetails && wzAnswers.salesChannelDetails[v]) || '';
+        var dval = wzSalesChannelDraft[v] !== undefined ? wzSalesChannelDraft[v] : saved;
+        return '<div class="wz-field" style="margin-top:10px;">' +
+          '<div class="wz-field-label" style="font-size:12.5px;color:#4E5968;">' + wzEsc(v) + ' — ' + wzEsc(meta.label) + '</div>' +
+          '<input type="text" class="wz-input" data-channel="' + wzEsc(v) + '" maxlength="80" placeholder="' + wzEsc(meta.placeholder) + '" value="' + wzEsc(dval) + '" />' +
+          '</div>';
+      }).join('');
+      wzAttachCharCounters(container);
+    }
+    function wzCollectSalesChannelDetails() {
+      var container = document.getElementById('wzSalesChannelDetails');
+      var result = {};
+      if (!container) return result;
+      container.querySelectorAll('input[data-channel]').forEach(function (el) {
+        var v = el.value.trim();
+        if (v) result[el.getAttribute('data-channel')] = v;
       });
       return result;
     }
@@ -6318,6 +6361,7 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
         patch.threeYearGoal = val('f_threeYearGoal');
       } else if (stepNum === 13) {
         patch.customerStatus = val('f_customerStatus');
+        patch.salesChannelDetails = wzCollectSalesChannelDetails();
       } else if (stepNum === 14) {
         patch.productUpgradePlan = val('f_productUpgradePlan');
       }
@@ -8608,14 +8652,20 @@ app.post('/api/gov-support/projects/:id/generate', async (c) => {
       'vis-problem': '고객이 겪고 있는 문제점을 요약하는 패널',
       'vis-solution': '그 문제에 대한 해결방안을 요약하는 패널',
       'vis-scaleup': '창업 아이템의 사업화 추진 전략과 목표시장을 요약하는 패널',
-      // 2026-11-04: 초기창업패키지(choi) — yebi와 동일한 2x2 그리드 아이콘 인포그래픽 7슬롯.
+      // 2026-11-04: 초기창업패키지(choi) — yebi와 동일한 2x2 그리드 아이콘 인포그래픽 5슬롯
+      // (고객 확보 현황/해외 판매채널 확보현황은 2026-11-05 사용자 지시로 시각화 자체를
+      // 삭제 — 아래 icp-customer-status/icp-sales-channel 제거 참고).
       'icp-problem': '고객이 겪고 있는 문제점을 요약하는 패널',
       'icp-solution': '그 문제에 대한 해결방안을 요약하는 패널',
       'icp-target-market': '목표시장 현황(타깃 특징과 기회)을 요약하는 패널',
       'icp-item-status': '아이템 개발 현황을 요약하는 패널',
-      'icp-customer-status': '고객 확보 현황을 요약하는 패널',
-      'icp-sales-channel': '해외 판매채널 확보현황을 요약하는 패널',
       'icp-customer-acquisition': '고객 확보 방안을 요약하는 패널',
+      // 2026-11-05: 사용자 지시 — "1-1.아이템 배경 및 필요성"·"2-2.차별점" 시각화를
+      // 기존 단일 캡션 기반 아이콘 인포그래픽(generateGovSupportCaptionInfographic)에서
+      // 이 2x2(3슬롯) 그리드 파이프라인으로 옮기고, 아이콘이 아닌 실사(photo) 스타일로
+      // 바꿨다 — D1 payload.visualStyle='photo'가 바로 아래 dispatch에서 읽힌다.
+      'icp-diff': '우리 업체의 차별점을 요약하는 실사 이미지 패널',
+      'icp-background': '창업 아이템의 배경과 필요성을 요약하는 실사 이미지 패널',
     }
     const visualTargets: Array<{ sIdx: number; bIdx: number; block: any }> = []
     ;(sections as any[]).forEach((s: any, sIdx: number) => {
