@@ -5548,7 +5548,7 @@ function gsExportVoucherWizardHtml(c: any, projectId: string): string {
         }
         location.href = '/gov-support/result/' + WZ_PROJECT_ID;
       } catch (e) {
-        showToast('네트워크 오류가 발생했어요.', 'error');
+        showToast('네트워크 오류가 발생했어요. 잠시 후 생성 버튼을 다시 눌러주세요.', 'error');
         document.getElementById('wzDoneBoxLoading').style.display = 'none';
         document.getElementById('wzDoneBoxIdle').style.display = 'block';
       }
@@ -6455,7 +6455,7 @@ function gsChoiWizardHtml(c: any, projectId: string): string {
         }
         location.href = '/gov-support/result/' + WZ_PROJECT_ID;
       } catch (e) {
-        showToast('네트워크 오류가 발생했어요.', 'error');
+        showToast('네트워크 오류가 발생했어요. 잠시 후 생성 버튼을 다시 눌러주세요.', 'error');
         document.getElementById('wzDoneBoxLoading').style.display = 'none';
         document.getElementById('wzDoneBoxIdle').style.display = 'block';
       }
@@ -7312,7 +7312,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
         }
         location.href = '/gov-support/result/' + WZ_PROJECT_ID;
       } catch (e) {
-        showToast('네트워크 오류가 발생했어요.', 'error');
+        showToast('네트워크 오류가 발생했어요. 잠시 후 생성 버튼을 다시 눌러주세요.', 'error');
         document.getElementById('wzDoneBoxLoading').style.display = 'none';
         document.getElementById('wzDoneBoxIdle').style.display = 'block';
       }

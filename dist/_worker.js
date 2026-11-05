@@ -221,7 +221,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${my}" font-size="128" font-weight="800" fill="${fy(e.statColor||`#ffffff`)}">${fy(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${my}" font-size="64" font-weight="800" fill="#ffffff">${fy(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${my}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${fy(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var gy=`mw2v2d0k`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${my}" font-size="128" font-weight="800" fill="${fy(e.statColor||`#ffffff`)}">${fy(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${my}" font-size="64" font-weight="800" fill="#ffffff">${fy(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${my}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${fy(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var gy=`mw2w6f8i`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2531,7 +2531,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         }
         location.href = '/gov-support/result/' + WZ_PROJECT_ID;
       } catch (e) {
-        showToast('네트워크 오류가 발생했어요.', 'error');
+        showToast('네트워크 오류가 발생했어요. 잠시 후 생성 버튼을 다시 눌러주세요.', 'error');
         document.getElementById('wzDoneBoxLoading').style.display = 'none';
         document.getElementById('wzDoneBoxIdle').style.display = 'block';
       }
@@ -3417,7 +3417,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         }
         location.href = '/gov-support/result/' + WZ_PROJECT_ID;
       } catch (e) {
-        showToast('네트워크 오류가 발생했어요.', 'error');
+        showToast('네트워크 오류가 발생했어요. 잠시 후 생성 버튼을 다시 눌러주세요.', 'error');
         document.getElementById('wzDoneBoxLoading').style.display = 'none';
         document.getElementById('wzDoneBoxIdle').style.display = 'block';
       }
@@ -4248,7 +4248,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         }
         location.href = '/gov-support/result/' + WZ_PROJECT_ID;
       } catch (e) {
-        showToast('네트워크 오류가 발생했어요.', 'error');
+        showToast('네트워크 오류가 발생했어요. 잠시 후 생성 버튼을 다시 눌러주세요.', 'error');
         document.getElementById('wzDoneBoxLoading').style.display = 'none';
         document.getElementById('wzDoneBoxIdle').style.display = 'block';
       }
