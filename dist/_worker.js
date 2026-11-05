@@ -213,7 +213,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mw2slhb6`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mw2v0x95`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -2875,8 +2875,9 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           <div class="wz-field">
             <div class="wz-field-label">해외 판매채널 확보현황 (해당하는 것 모두 선택) <span class="wz-required">*</span></div>
             <div class="wz-chip-row" data-field="salesChannelStatus" data-multi="1" data-required="1">
-              ${[`아직 없음`,`해외 오픈마켓 입점 준비 중(아마존·쇼피 등)`,`해외 오픈마켓 입점 완료`,`해외 바이어·에이전시 상담 중`,`해외 전시회·박람회 참가 예정`,`기타`].map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
+              ${[`아직 없음`,`해외 오픈마켓 입점 준비 중(아마존·쇼피 등)`,`해외 오픈마켓 입점 완료`,`해외 오프라인매장 입점 완료`,`해외 바이어·에이전시 상담 중`,`해외 전시회·박람회 참가 예정`,`기타`].map(e=>`<div class="wz-chip" data-value="${e}">${e}</div>`).join(``)}
             </div>
+            <div id="wzSalesChannelDetails"></div>
           </div>
         </div>
 
@@ -3008,6 +3009,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       wzUpdateStageWarning();
       wzUpdateProductionDetailVisibility();
       wzRenderBuyReasonDetails();
+      wzRenderSalesChannelDetails();
       wzAttachCharCounters();
     }
 
@@ -3043,6 +3045,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       if (row.getAttribute('data-field') === 'stage') wzUpdateStageWarning();
       if (row.getAttribute('data-field') === 'productionMethod') wzUpdateProductionDetailVisibility();
       if (row.getAttribute('data-field') === 'buyReason') wzRenderBuyReasonDetails();
+      if (row.getAttribute('data-field') === 'salesChannelStatus') wzRenderSalesChannelDetails();
     });
 
     var WZ_PRODUCTION_DETAIL_META = {
@@ -3096,6 +3099,46 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       container.querySelectorAll('textarea[data-reason]').forEach(function (el) {
         var v = el.value.trim();
         if (v) result[el.getAttribute('data-reason')] = v;
+      });
+      return result;
+    }
+
+    // 2026-11-05: "해외 오픈마켓 입점 완료"/"해외 오프라인매장 입점 완료"/"기타"처럼
+    // 선택만으로는 구체성이 부족한 보기를 고르면, 그 보기에 한해서만(buyReason처럼
+    // 선택한 전부가 아니라) 짧은 보조 입력칸을 보여준다.
+    var WZ_SALES_CHANNEL_DETAIL_META = {
+      '해외 오픈마켓 입점 완료': { label: '어느 오픈마켓인지 (선택)', placeholder: '예: 아마존, 쇼피, 라자다' },
+      '해외 오프라인매장 입점 완료': { label: '어떤 매장인지 (선택)', placeholder: '예: 현지 편집샵 OO, 백화점 OO 입점' },
+      '기타': { label: '어떤 판매채널인지 (선택)', placeholder: '예: 자사 해외배송몰, 현지 유통사 등' },
+    };
+    var wzSalesChannelDraft = {};
+    function wzRenderSalesChannelDetails() {
+      var row = document.querySelector('.wz-chip-row[data-field="salesChannelStatus"]');
+      var container = document.getElementById('wzSalesChannelDetails');
+      if (!row || !container) return;
+      container.querySelectorAll('input[data-channel]').forEach(function (el) {
+        wzSalesChannelDraft[el.getAttribute('data-channel')] = el.value;
+      });
+      var selected = Array.prototype.slice.call(row.querySelectorAll('.wz-chip.on')).map(function (c) { return c.getAttribute('data-value'); });
+      var targets = selected.filter(function (v) { return WZ_SALES_CHANNEL_DETAIL_META[v]; });
+      container.innerHTML = targets.map(function (v) {
+        var meta = WZ_SALES_CHANNEL_DETAIL_META[v];
+        var saved = (wzAnswers.salesChannelDetails && wzAnswers.salesChannelDetails[v]) || '';
+        var dval = wzSalesChannelDraft[v] !== undefined ? wzSalesChannelDraft[v] : saved;
+        return '<div class="wz-field" style="margin-top:10px;">' +
+          '<div class="wz-field-label" style="font-size:12.5px;color:#4E5968;">' + wzEsc(v) + ' — ' + wzEsc(meta.label) + '</div>' +
+          '<input type="text" class="wz-input" data-channel="' + wzEsc(v) + '" maxlength="80" placeholder="' + wzEsc(meta.placeholder) + '" value="' + wzEsc(dval) + '" />' +
+          '</div>';
+      }).join('');
+      wzAttachCharCounters(container);
+    }
+    function wzCollectSalesChannelDetails() {
+      var container = document.getElementById('wzSalesChannelDetails');
+      var result = {};
+      if (!container) return result;
+      container.querySelectorAll('input[data-channel]').forEach(function (el) {
+        var v = el.value.trim();
+        if (v) result[el.getAttribute('data-channel')] = v;
       });
       return result;
     }
@@ -3272,6 +3315,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         patch.threeYearGoal = val('f_threeYearGoal');
       } else if (stepNum === 13) {
         patch.customerStatus = val('f_customerStatus');
+        patch.salesChannelDetails = wzCollectSalesChannelDetails();
       } else if (stepNum === 14) {
         patch.productUpgradePlan = val('f_productUpgradePlan');
       }
@@ -4381,7 +4425,7 @@ ${JSON.stringify(_)}
 [섹션별 필수 구조]
 [summary] ${d.summary||``}
 
-응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것.`,[`summary`],4e3,6e4,s,m.title);v=t&&t[0]||fx(u,`AI 초안 생성 실패(요약) — 관리자에게 문의해주세요.`,[`summary`])[0]}else v=fx(u,`다른 섹션 생성이 실패해 요약을 만들 수 없습니다 — 관리자에게 문의해주세요.`,[`summary`])[0];return[..._,v]}Q.post(`/api/gov-support/projects/:id/generate`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT id, program_id, program_name, answers FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();if(!i)return e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404);if(!await ex(t,i.program_id))return e.json({success:!1,message:`이 사업은 초안 생성을 아직 지원하지 않습니다.`},400);let a=JSON.parse(i.answers||`{}`),o=ix(a),s=sx(a),l=await dx(a.selfMallUrl),[u,d]=await Promise.all([Nx(e.env.ANTHROPIC_API_KEY,i.program_id,i.program_name,a,o,s,l,e.env),cx(e.env.ATLAS_API_KEY,a.processSteps,a.processNote,a.category,a.differentiationTypes,[a.diffReason,a.diffStubborn].filter(Boolean).join(` / `))]),f={"vis-1-1-necessity":`창업 아이템의 배경과 필요성(왜 이 사업이 필요한가)을 요약하는 패널`,"vis-problem":`고객이 겪고 있는 문제점을 요약하는 패널`,"vis-solution":`그 문제에 대한 해결방안을 요약하는 패널`,"vis-scaleup":`창업 아이템의 사업화 추진 전략과 목표시장을 요약하는 패널`,"icp-problem":`고객이 겪고 있는 문제점을 요약하는 패널`,"icp-solution":`그 문제에 대한 해결방안을 요약하는 패널`,"icp-target-market":`목표시장 현황(타깃 특징과 기회)을 요약하는 패널`,"icp-item-status":`아이템 개발 현황을 요약하는 패널`,"icp-customer-status":`고객 확보 현황을 요약하는 패널`,"icp-sales-channel":`해외 판매채널 확보현황을 요약하는 패널`,"icp-customer-acquisition":`고객 확보 방안을 요약하는 패널`},p=[];u.forEach((e,t)=>{(e.blocks||[]).forEach((e,n)=>{e?.type===`iconStats`&&e.visualId&&f[e.visualId]&&p.push({sIdx:t,bIdx:n,block:e})})});let m=await Promise.all(p.map(t=>lx(e.env.ATLAS_API_KEY,t.block.tiles,f[t.block.visualId],t.block.visualStyle===`photo`?`photo`:`icon`,t.block.visualLayout===`row`?`row`:`grid`,t.block.visualAspect||`21:9`))),h={};for(let t=0;t<p.length;t++){let n=p[t],r=m[t];typeof r.url==`string`&&r.url.startsWith(`data:`)?(h[n.block.visualId]=r.url,u[n.sIdx].blocks[n.bIdx]={type:`visual`,visualId:n.block.visualId,visualUrl:`/api/gov-support/projects/${i.id}/visual-image/${n.block.visualId}`,caption:f[n.block.visualId],alt:f[n.block.visualId]}):r.error&&await by(e.env,{source:`server`,message:`시각화 인포그래픽 생성 실패(${n.block.visualId}): ${r.error}`,route:`/api/gov-support/projects/:id/generate (visualImage)`,extra:{programId:i.program_id,projectId:i.id,visualId:n.block.visualId}})}let g=[a.companyName,a.mainProduct].filter(Boolean).join(` · `),_=[];u.forEach((e,t)=>{(e.blocks||[]).forEach((e,n)=>{e?.type===`visual`&&e.kind===`placeholder`&&e.visualId&&_.push({sIdx:t,bIdx:n,block:e})})});let v=await Promise.all(_.map(t=>ux(e.env.ATLAS_API_KEY,t.block.caption,g,`21:9`)));for(let t=0;t<_.length;t++){let n=_[t],r=v[t];typeof r.url==`string`&&r.url.startsWith(`data:`)?(h[n.block.visualId]=r.url,u[n.sIdx].blocks[n.bIdx]={type:`visual`,visualId:n.block.visualId,visualUrl:`/api/gov-support/projects/${i.id}/visual-image/${n.block.visualId}`,caption:n.block.caption,alt:n.block.alt||n.block.caption}):r.error&&await by(e.env,{source:`server`,message:`시각화 인포그래픽 생성 실패(${n.block.visualId}): ${r.error}`,route:`/api/gov-support/projects/:id/generate (captionVisualImage)`,extra:{programId:i.program_id,projectId:i.id,visualId:n.block.visualId}})}let y=typeof d.url==`string`&&d.url.startsWith(`data:`),b=y?d.url:null,x={sections:u,finance:o,competitorTable:s,processImageUrl:y?`/api/gov-support/projects/${i.id}/process-image`:d.url,processImageError:d.error};d.error&&a.processSteps?.length&&await by(e.env,{source:`server`,message:`공정 순서도 이미지 생성 실패: ${d.error}`,route:`/api/gov-support/projects/:id/generate (processImage)`,extra:{programId:i.program_id,projectId:i.id}});let S=Object.keys(h).length>0?JSON.stringify(h):null;return await t.prepare(`UPDATE gov_support_projects SET finance = ?, generated_content = ?, process_image_b64 = ?, visual_images_b64 = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).bind(JSON.stringify(o),JSON.stringify(x),b,S,i.id).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),Q.get(`/gov-support/result/:id`,e=>{let t=e.req.param(`id`);return e.header(`Cache-Control`,`no-store`),e.html(gS(`지원사업 초안`,`
+응답 형식은 JSON 스키마로 강제되므로 형식 걱정 없이 내용에 집중할 것.`,[`summary`],4e3,6e4,s,m.title);v=t&&t[0]||fx(u,`AI 초안 생성 실패(요약) — 관리자에게 문의해주세요.`,[`summary`])[0]}else v=fx(u,`다른 섹션 생성이 실패해 요약을 만들 수 없습니다 — 관리자에게 문의해주세요.`,[`summary`])[0];return[..._,v]}Q.post(`/api/gov-support/projects/:id/generate`,async e=>{let t=e.env.LOOKBOOK_DB;try{let n=e.req.header(`X-Session-Token`)||``,r=await t.prepare(`SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`).bind(n).first();if(!r)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let i=await t.prepare(`SELECT id, program_id, program_name, answers FROM gov_support_projects WHERE id = ? AND user_id = ?`).bind(e.req.param(`id`),r.user_id).first();if(!i)return e.json({success:!1,message:`프로젝트를 찾을 수 없습니다.`},404);if(!await ex(t,i.program_id))return e.json({success:!1,message:`이 사업은 초안 생성을 아직 지원하지 않습니다.`},400);let a=JSON.parse(i.answers||`{}`),o=ix(a),s=sx(a),l=await dx(a.selfMallUrl),[u,d]=await Promise.all([Nx(e.env.ANTHROPIC_API_KEY,i.program_id,i.program_name,a,o,s,l,e.env),cx(e.env.ATLAS_API_KEY,a.processSteps,a.processNote,a.category,a.differentiationTypes,[a.diffReason,a.diffStubborn].filter(Boolean).join(` / `))]),f={"vis-1-1-necessity":`창업 아이템의 배경과 필요성(왜 이 사업이 필요한가)을 요약하는 패널`,"vis-problem":`고객이 겪고 있는 문제점을 요약하는 패널`,"vis-solution":`그 문제에 대한 해결방안을 요약하는 패널`,"vis-scaleup":`창업 아이템의 사업화 추진 전략과 목표시장을 요약하는 패널`,"icp-problem":`고객이 겪고 있는 문제점을 요약하는 패널`,"icp-solution":`그 문제에 대한 해결방안을 요약하는 패널`,"icp-target-market":`목표시장 현황(타깃 특징과 기회)을 요약하는 패널`,"icp-item-status":`아이템 개발 현황을 요약하는 패널`,"icp-customer-acquisition":`고객 확보 방안을 요약하는 패널`,"icp-diff":`우리 업체의 차별점을 요약하는 실사 이미지 패널`,"icp-background":`창업 아이템의 배경과 필요성을 요약하는 실사 이미지 패널`},p=[];u.forEach((e,t)=>{(e.blocks||[]).forEach((e,n)=>{e?.type===`iconStats`&&e.visualId&&f[e.visualId]&&p.push({sIdx:t,bIdx:n,block:e})})});let m=await Promise.all(p.map(t=>lx(e.env.ATLAS_API_KEY,t.block.tiles,f[t.block.visualId],t.block.visualStyle===`photo`?`photo`:`icon`,t.block.visualLayout===`row`?`row`:`grid`,t.block.visualAspect||`21:9`))),h={};for(let t=0;t<p.length;t++){let n=p[t],r=m[t];typeof r.url==`string`&&r.url.startsWith(`data:`)?(h[n.block.visualId]=r.url,u[n.sIdx].blocks[n.bIdx]={type:`visual`,visualId:n.block.visualId,visualUrl:`/api/gov-support/projects/${i.id}/visual-image/${n.block.visualId}`,caption:f[n.block.visualId],alt:f[n.block.visualId]}):r.error&&await by(e.env,{source:`server`,message:`시각화 인포그래픽 생성 실패(${n.block.visualId}): ${r.error}`,route:`/api/gov-support/projects/:id/generate (visualImage)`,extra:{programId:i.program_id,projectId:i.id,visualId:n.block.visualId}})}let g=[a.companyName,a.mainProduct].filter(Boolean).join(` · `),_=[];u.forEach((e,t)=>{(e.blocks||[]).forEach((e,n)=>{e?.type===`visual`&&e.kind===`placeholder`&&e.visualId&&_.push({sIdx:t,bIdx:n,block:e})})});let v=await Promise.all(_.map(t=>ux(e.env.ATLAS_API_KEY,t.block.caption,g,`21:9`)));for(let t=0;t<_.length;t++){let n=_[t],r=v[t];typeof r.url==`string`&&r.url.startsWith(`data:`)?(h[n.block.visualId]=r.url,u[n.sIdx].blocks[n.bIdx]={type:`visual`,visualId:n.block.visualId,visualUrl:`/api/gov-support/projects/${i.id}/visual-image/${n.block.visualId}`,caption:n.block.caption,alt:n.block.alt||n.block.caption}):r.error&&await by(e.env,{source:`server`,message:`시각화 인포그래픽 생성 실패(${n.block.visualId}): ${r.error}`,route:`/api/gov-support/projects/:id/generate (captionVisualImage)`,extra:{programId:i.program_id,projectId:i.id,visualId:n.block.visualId}})}let y=typeof d.url==`string`&&d.url.startsWith(`data:`),b=y?d.url:null,x={sections:u,finance:o,competitorTable:s,processImageUrl:y?`/api/gov-support/projects/${i.id}/process-image`:d.url,processImageError:d.error};d.error&&a.processSteps?.length&&await by(e.env,{source:`server`,message:`공정 순서도 이미지 생성 실패: ${d.error}`,route:`/api/gov-support/projects/:id/generate (processImage)`,extra:{programId:i.program_id,projectId:i.id}});let S=Object.keys(h).length>0?JSON.stringify(h):null;return await t.prepare(`UPDATE gov_support_projects SET finance = ?, generated_content = ?, process_image_b64 = ?, visual_images_b64 = ?, status = 'generated', generated_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`).bind(JSON.stringify(o),JSON.stringify(x),b,S,i.id).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),Q.get(`/gov-support/result/:id`,e=>{let t=e.req.param(`id`);return e.header(`Cache-Control`,`no-store`),e.html(gS(`지원사업 초안`,`
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
