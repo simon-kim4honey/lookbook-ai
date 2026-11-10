@@ -4462,7 +4462,7 @@ const GOV_SUPPORT_PROGRAMS = [
     criteria: [['사업성', 40], ['실행가능성', 40], ['자기효능감', 20]],
   },
   {
-    id: 'hope-return', name: '희망리턴패키지', agency: '소상공인시장진흥공단', formType: '자기역량기술서 + 사업계획서',
+    id: 'hope-return', name: '희망리턴패키지(재창업)', agency: '소상공인시장진흥공단', formType: '자기역량기술서 + 사업계획서',
     funding: '최대 4,000만 원 (트랙·기관별 상이)',
     target: '경영위기·폐업(예정) 소상공인',
     eligibility: ['경영상 어려움(폐업 예정 포함) 또는 폐업 후 재기를 준비하는 소상공인', '자립지원 트랙: 장기실업 청년 등 (요건 공고 확인)', '사전 진단·교육 이수가 선결 조건인 트랙 있음'],
@@ -4685,7 +4685,7 @@ app.get('/gov-support', (c) => {
 
       <div class="gs-prog-grid">
         ${buttonsHtml}
-        <button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-etc" onclick="toggleGsEtcForm()">기타 (원하는 지원사업이 없어요)</button>
+        <button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-etc" onclick="toggleGsEtcForm()">기타(사업계획서 표준형)</button>
       </div>
 
       <div class="gs-etc-form" id="gsEtcForm">
@@ -4731,7 +4731,7 @@ app.get('/gov-support', (c) => {
       document.getElementById('gsEtcForm').classList.toggle('open');
     }
 
-    var GS_WIZARD_READY = ['yebi','choi','hope-return','youth-academy','local-creator','innov-sop','export-voucher'];
+    var GS_WIZARD_READY = ['yebi','choi','hope-return','youth-academy','local-creator','innov-sop','export-voucher','smart-store','online-channel','innov-voucher'];
 
     async function goToGsWizard() {
       if (!gsSelected) return;
@@ -4841,16 +4841,18 @@ app.post('/api/gov-support/custom-request', async (c) => {
 
 // ────────────────────────────────────────────────────
 // 지원사업 도우미 — 위저드(입력 수집) API + 화면
-// 9개 사업 중 "사업계획서형" 6종(예비/초기/희망리턴/청년사관학교/로컬크리에이터/혁신소상공인)은
-// 공통 12단계 위저드를 공유한다(수집해야 하는 사업 정보 자체는 비슷하고, 사업별로 갈리는
-// 부분은 다음 단계인 "AI 섹션 생성"에서 각 프로그램의 sections 구조를 따라간다).
-// 스마트상점·온라인판로·혁신바우처(경량 신청서형 3종)는 별도 3단계 위저드가 필요해 아직
-// 미구현 — /gov-support에서 "준비 중" 안내만 하고 이 위저드로 들어오지 않는다.
+// 수출바우처/초기창업패키지/희망리턴패키지는 질문이 달라 전용 위저드로 분리됐고,
+// 나머지 전체(예비창업패키지/청년사관학교/로컬크리에이터/혁신소상공인/스마트상점/
+// 온라인판로/중소기업 혁신바우처)는 공통 12단계 위저드(예비창업패키지 질문 세트)를
+// 그대로 공유한다. 2026-11-10 사용자 지시 — "경량 신청서형" 3종(스마트상점/온라인판로/
+// 혁신바우처)도 별도 축약 위저드를 새로 만들지 않고 우선 이 공통 위저드로 입력을
+// 받는다 — 사업별 특화 질문/생성 구조는 추후 각각 별도로 전달받아 반영 예정.
 //
-// AI 섹션 초안 생성/재무 계산기/시각화/인쇄 미리보기는 이 단계엔 없다(다음 단계에서 구현).
+// AI 섹션 생성 구조(gov_support_nodes)가 아직 없는 프로그램은 위저드 입력은 받되
+// "AI가 초안을 만들어주는 기능은 아직 준비 중"으로 안내한다(gsIsGenerationReady 참고).
 // 여기서는 입력 수집 + 중간 저장(자동 저장 + 수동 "임시저장" 버튼)까지만 다룬다.
 // ────────────────────────────────────────────────────
-const GS_WIZARD_READY_IDS = ['yebi', 'choi', 'hope-return', 'youth-academy', 'local-creator', 'innov-sop', 'export-voucher']
+const GS_WIZARD_READY_IDS = ['yebi', 'choi', 'hope-return', 'youth-academy', 'local-creator', 'innov-sop', 'export-voucher', 'smart-store', 'online-channel', 'innov-voucher']
 
 app.post('/api/gov-support/projects', async (c) => {
   const db: D1Database = c.env.LOOKBOOK_DB
@@ -7310,7 +7312,7 @@ app.get('/gov-support/wizard/:id', async (c) => {
   }
   // 2026-11-06: 희망리턴패키지도 같은 이유로 전용 위저드로 분리한다.
   if (wzProject?.program_id === 'hope-return') {
-    return c.html(htmlShell('희망리턴패키지 작성', gsHopeReturnWizardHtml(c, projectId), '', '희망리턴패키지 사업계획서 작성 — EZlook 지원사업 도우미', c.env.GA4_MEASUREMENT_ID))
+    return c.html(htmlShell('희망리턴패키지(재창업) 작성', gsHopeReturnWizardHtml(c, projectId), '', '희망리턴패키지(재창업) 사업계획서 작성 — EZlook 지원사업 도우미', c.env.GA4_MEASUREMENT_ID))
   }
 
   // 어드민이 gov_support_sections에 구조를 등록한 프로그램은 코드 배포 없이 바로 생성 가능
