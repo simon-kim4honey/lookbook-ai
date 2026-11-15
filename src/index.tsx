@@ -16832,6 +16832,65 @@ app.patch('/api/workspace/history/:id', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// ── 알림 — 운영팀(admin)과 고객사(client) 양쪽에 이벤트 기반으로 쌓인다.
+async function wsNotify(db: D1Database, audience: 'admin' | 'client', message: string, clientUserId?: string | null) {
+  await db.prepare(`INSERT INTO workspace_notifications (id, audience, client_user_id, message) VALUES (?, ?, ?, ?)`)
+    .bind(crypto.randomUUID(), audience, clientUserId || null, message).run()
+}
+
+app.get('/api/workspace/notifications', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const status = c.req.query('status') || ''
+  let sql = `SELECT * FROM workspace_notifications WHERE audience = 'admin'`
+  if (status === 'unread') sql += ' AND is_read = 0'
+  if (status === 'read') sql += ' AND is_read = 1'
+  sql += ' ORDER BY created_at DESC LIMIT 100'
+  const { results } = await db.prepare(sql).all()
+  return c.json({ success: true, notifications: results || [] })
+})
+
+app.post('/api/workspace/notifications/:id/read', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  await db.prepare(`UPDATE workspace_notifications SET is_read = 1 WHERE id = ?`).bind(c.req.param('id')).run()
+  return c.json({ success: true })
+})
+
+app.post('/api/workspace/notifications/read-all', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  await db.prepare(`UPDATE workspace_notifications SET is_read = 1 WHERE audience = 'admin' AND is_read = 0`).run()
+  return c.json({ success: true })
+})
+
+app.get('/api/my/notifications', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const user = await wsRequireUser(c)
+  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  const status = c.req.query('status') || ''
+  let sql = `SELECT * FROM workspace_notifications WHERE audience = 'client' AND client_user_id = ?`
+  const binds: any[] = [user.id]
+  if (status === 'unread') sql += ' AND is_read = 0'
+  if (status === 'read') sql += ' AND is_read = 1'
+  sql += ' ORDER BY created_at DESC LIMIT 100'
+  const { results } = await db.prepare(sql).bind(...binds).all()
+  return c.json({ success: true, notifications: results || [] })
+})
+
+app.post('/api/my/notifications/:id/read', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const user = await wsRequireUser(c)
+  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  await db.prepare(`UPDATE workspace_notifications SET is_read = 1 WHERE id = ? AND client_user_id = ?`).bind(c.req.param('id'), user.id).run()
+  return c.json({ success: true })
+})
+
+app.post('/api/my/notifications/read-all', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const user = await wsRequireUser(c)
+  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  await db.prepare(`UPDATE workspace_notifications SET is_read = 1 WHERE audience = 'client' AND client_user_id = ? AND is_read = 0`).bind(user.id).run()
+  return c.json({ success: true })
+})
+
 // ────────────────────────────────────────────────────
 // 생산 문의 — 이지룩 ADMIN(상담 접수) ↔ 이지룩 USER(문의 작성) 연결 1단계.
 // 고객사 계정은 별도 체계 없이 기존 EZlook 로그인(users 테이블)을 그대로 쓴다.
@@ -16915,6 +16974,10 @@ app.post('/api/workspace/inquiries/:id/convert', adminAuth, async (c) => {
 
   await db.prepare(`UPDATE workspace_inquiries SET status = 'done', converted_order_id = ?, updated_at = datetime('now') WHERE id = ?`).bind(orderId, id).run()
 
+  if (inquiry.client_user_id) {
+    await wsNotify(db, 'client', '발주서 ' + orderCode + '_' + productCode + '가 접수되어 생산이 시작되었습니다.', inquiry.client_user_id)
+  }
+
   return c.json({ success: true, orderId, orderCode })
 })
 
@@ -16940,6 +17003,7 @@ app.post('/api/my/inquiries', async (c) => {
   const id = crypto.randomUUID()
   await db.prepare(`INSERT INTO workspace_inquiries (id, client_user_id, industry, title, design_note, desired_qty, desired_price) VALUES (?, ?, ?, ?, ?, ?, ?)`)
     .bind(id, user.id, industry, title, designNote, desiredQty, desiredPrice).run()
+  await wsNotify(db, 'admin', (user.name || user.email) + '님의 새 생산 문의가 접수되었습니다: ' + title)
   return c.json({ success: true, id })
 })
 
@@ -17051,6 +17115,7 @@ app.get('/my-production', (c) => {
         <div class="mp-tabs">
           <button class="mp-tab-btn active" data-tab="inquiry" onclick="mpSwitchTab('inquiry')">생산 문의</button>
           <button class="mp-tab-btn" data-tab="orders" onclick="mpSwitchTab('orders')">내 발주 현황</button>
+          <button class="mp-tab-btn" data-tab="notify" onclick="mpSwitchTab('notify')">알림 <span id="mpNotifyBadge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:2px;"></span></button>
         </div>
 
         <div class="mp-section active" id="mpSection-inquiry">
@@ -17070,6 +17135,10 @@ app.get('/my-production', (c) => {
 
         <div class="mp-section" id="mpSection-orders">
           <div id="mpOrderList"></div>
+        </div>
+
+        <div class="mp-section" id="mpSection-notify">
+          <div id="mpNotifyList"></div>
         </div>
       </div>
     </div>
@@ -17094,6 +17163,39 @@ app.get('/my-production', (c) => {
       document.getElementById('mpSection-' + name).classList.add('active');
       if (name === 'inquiry') mpLoadInquiries();
       if (name === 'orders') mpLoadOrders();
+      if (name === 'notify') mpLoadNotifications();
+    }
+
+    async function mpRefreshNotifyBadge() {
+      try {
+        var res = await fetch('/api/my/notifications?status=unread', { headers: mpHeaders() });
+        var data = await res.json();
+        if (!data.success) return;
+        var badge = document.getElementById('mpNotifyBadge');
+        if (data.notifications.length) { badge.textContent = data.notifications.length; badge.style.display = 'inline-block'; }
+        else { badge.style.display = 'none'; }
+      } catch (e) { console.error(e); }
+    }
+
+    async function mpLoadNotifications() {
+      try {
+        var res = await fetch('/api/my/notifications', { headers: mpHeaders() });
+        var data = await res.json();
+        if (!data.success) return;
+        var list = document.getElementById('mpNotifyList');
+        if (!data.notifications.length) { list.innerHTML = '<div class="mp-empty">알림이 없어요.</div>'; return; }
+        list.innerHTML = data.notifications.map(function (n) {
+          return '<div class="mp-card">' +
+            '<div style="font-size:13px;color:#F2F2F5;font-weight:' + (n.is_read ? '400' : '700') + ';">' + mpEsc(n.message) + '</div>' +
+            '<div class="mp-meta">' + n.created_at + '</div>' +
+            (n.is_read ? '' : '<button class="mp-cta" style="width:auto;padding:4px 12px;margin-top:6px;font-size:12px;" onclick="mpMarkNotificationRead(\\'' + n.id + '\\')">읽음</button>') +
+            '</div>';
+        }).join('');
+      } catch (e) { console.error(e); }
+    }
+
+    async function mpMarkNotificationRead(id) {
+      try { await fetch('/api/my/notifications/' + id + '/read', { method: 'POST', headers: mpHeaders() }); mpLoadNotifications(); mpRefreshNotifyBadge(); } catch (e) {}
     }
 
     async function mpInit() {
@@ -17105,6 +17207,7 @@ app.get('/my-production', (c) => {
         document.getElementById('mpMain').style.display = 'block';
         mpRenderInquiries(await res.json());
         mpLoadAnnouncements();
+        mpRefreshNotifyBadge();
       } catch (e) {
         document.getElementById('mpLoading').style.display = 'none';
         document.getElementById('mpNeedLogin').style.display = 'block';
@@ -17405,6 +17508,8 @@ app.post('/api/workspace/invoices', adminAuth, async (c) => {
   const invoiceCode = 'INV-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + id.slice(0, 6)
   await db.prepare(`INSERT INTO workspace_invoices (id, invoice_code, client_user_id, order_ids_json, total_amount, note) VALUES (?, ?, ?, ?, ?, ?)`)
     .bind(id, invoiceCode, clientUserId, JSON.stringify(orderIds), totalAmount, String(body.note || '').trim() || null).run()
+
+  await wsNotify(db, 'client', '제품이 출고되어 거래명세서(' + invoiceCode + ')가 생성되었습니다. 확인해주세요.', clientUserId)
 
   return c.json({ success: true, id, invoiceCode, totalAmount })
 })
@@ -17721,6 +17826,7 @@ app.get('/workspace', (c) => {
   <div class="ws-body">
     <div class="ws-sidebar">
       <button class="ws-nav-btn active" data-panel="home" onclick="wsSwitchPanel('home')">홈</button>
+      <button class="ws-nav-btn" data-panel="notify" onclick="wsSwitchPanel('notify')">알림 <span id="wsNotifyBadge" style="display:none;background:#ef4444;color:#fff;font-size:11px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:4px;"></span></button>
       <button class="ws-nav-btn" data-panel="inquiry" onclick="wsSwitchPanel('inquiry')">생산문의</button>
       <button class="ws-nav-btn" data-panel="board" onclick="wsSwitchPanel('board')">공정보드</button>
       <button class="ws-nav-btn" data-panel="inspection" onclick="wsSwitchPanel('inspection')">검수</button>
@@ -17739,6 +17845,15 @@ app.get('/workspace', (c) => {
       <div class="ws-panel active" id="wsPanel-home">
         <h1>오늘의 공정 현황</h1>
         <div class="ws-cards" id="wsHomeCards"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-notify">
+        <h1>알림</h1>
+        <div class="ws-tabs" id="wsNotifyTabs"></div>
+        <div class="ws-toolbar">
+          <button class="ws-btn secondary" onclick="wsMarkAllNotificationsRead()">전체 읽음 처리</button>
+        </div>
+        <div id="wsNotifyList"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-inquiry">
@@ -18074,6 +18189,7 @@ function wsSwitchPanel(name) {
   if (name === 'stats') wsLoadStats();
   if (name === 'announce') wsLoadAnnouncements();
   if (name === 'options') { wsRenderNewTemplateOptions(); wsLoadTemplateList(); }
+  if (name === 'notify') wsLoadNotifications();
 }
 
 async function wsLoadOrdersList() {
@@ -18181,7 +18297,53 @@ async function wsSubmitConvert() {
   } catch (e) { alert('서버 오류가 발생했습니다.'); }
 }
 
-function wsInit() { wsLoadStageSets().then(function () { wsRenderIndustryTabs(); wsLoadHome(); }); }
+function wsInit() { wsLoadStageSets().then(function () { wsRenderIndustryTabs(); wsLoadHome(); }); wsRefreshNotifyBadge(); }
+
+async function wsRefreshNotifyBadge() {
+  try {
+    var res = await fetch('/api/workspace/notifications?status=unread', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var badge = document.getElementById('wsNotifyBadge');
+    if (data.notifications.length) { badge.textContent = data.notifications.length; badge.style.display = 'inline-block'; }
+    else { badge.style.display = 'none'; }
+  } catch (e) { console.error(e); }
+}
+
+var wsNotifyTab = 'unread';
+function wsRenderNotifyTabs() {
+  var el = document.getElementById('wsNotifyTabs');
+  var tabs = [['unread', '안읽은 알림'], ['read', '읽은 알림'], ['', '전체 알림']];
+  el.innerHTML = tabs.map(function (t) {
+    return '<button class="ws-tab-btn' + (t[0] === wsNotifyTab ? ' active' : '') + '" onclick="wsSelectNotifyTab(\\'' + t[0] + '\\')">' + t[1] + '</button>';
+  }).join('');
+}
+function wsSelectNotifyTab(tab) { wsNotifyTab = tab; wsRenderNotifyTabs(); wsLoadNotifications(); }
+
+async function wsLoadNotifications() {
+  wsRenderNotifyTabs();
+  try {
+    var res = await fetch('/api/workspace/notifications' + (wsNotifyTab ? ('?status=' + wsNotifyTab) : ''), { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var list = document.getElementById('wsNotifyList');
+    if (!data.notifications.length) { list.innerHTML = '<div class="ws-empty">알림이 없습니다.</div>'; return; }
+    list.innerHTML = data.notifications.map(function (n) {
+      return '<div class="ws-inquiry-card">' +
+        '<div class="top"><div><div class="title" style="font-size:13px;font-weight:' + (n.is_read ? '400' : '700') + '">' + wsEsc(n.message) + '</div><div class="meta">' + n.created_at + '</div></div>' +
+        (n.is_read ? '' : '<button class="ws-btn secondary" style="padding:4px 10px;font-size:12px;" onclick="wsMarkNotificationRead(\\'' + n.id + '\\')">읽음</button>') +
+        '</div></div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function wsMarkNotificationRead(id) {
+  try { await fetch('/api/workspace/notifications/' + id + '/read', { method: 'POST', headers: wsHeaders() }); wsLoadNotifications(); wsRefreshNotifyBadge(); } catch (e) {}
+}
+
+async function wsMarkAllNotificationsRead() {
+  try { await fetch('/api/workspace/notifications/read-all', { method: 'POST', headers: wsHeaders() }); wsLoadNotifications(); wsRefreshNotifyBadge(); } catch (e) {}
+}
 
 async function wsLoadStageSets() {
   try {
