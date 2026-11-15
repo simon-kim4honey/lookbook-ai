@@ -213,7 +213,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mwhj2rqw`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mwhjd8wr`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -8176,8 +8176,8 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       window.location.replace(${JSON.stringify(hy)})
     }
   <\/script>
-  `,t,`AI가 상품 사진을 분석해 기술도식화(플랫 스케치)를 자동 생성합니다. PC 전용 기능입니다.`,e.env.GA4_MEASUREMENT_ID))});var SS=[`clothing`,`jewelry`,`bag`,`shoe`],CS={clothing:`의류`,jewelry:`주얼리`,bag:`가방`,shoe:`신발`};async function wS(e,t){let{results:n}=await e.prepare(`SELECT id, key, label FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC`).bind(t).all();return n||[]}async function TS(e){let{results:t}=await e.prepare(`SELECT industry, id, key, label FROM workspace_stage_defs ORDER BY industry ASC, sort_order ASC`).all(),n={};for(let e of SS)n[e]=[];for(let e of t||[])n[e.industry]||(n[e.industry]=[]),n[e.industry].push({id:e.id,key:e.key,label:e.label});return n}Q.get(`/api/workspace/stages`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`industry`)||``;return n?SS.includes(n)?e.json({success:!0,stages:await wS(t,n)}):e.json({success:!1,message:`잘못된 업종입니다.`},400):e.json({success:!0,stageSets:await TS(t)})}),Q.post(`/api/workspace/stages`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=await e.req.json().catch(()=>({})),r=n.industry,i=String(n.label||``).trim();if(!SS.includes(r))return e.json({success:!1,message:`잘못된 업종입니다.`},400);if(!i)return e.json({success:!1,message:`단계 이름을 입력해주세요.`},400);let a=`custom_`+crypto.randomUUID().replace(/-/g,``).slice(0,10),o=crypto.randomUUID(),s=await t.prepare(`SELECT key, sort_order FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order DESC LIMIT 1`).bind(r).first();return s?(await t.prepare(`UPDATE workspace_stage_defs SET sort_order = sort_order + 1 WHERE industry = ? AND key = ?`).bind(r,s.key).run(),await t.prepare(`INSERT INTO workspace_stage_defs (id, industry, key, label, sort_order) VALUES (?, ?, ?, ?, ?)`).bind(o,r,a,i,s.sort_order).run()):await t.prepare(`INSERT INTO workspace_stage_defs (id, industry, key, label, sort_order) VALUES (?, ?, ?, ?, 1)`).bind(o,r,a,i).run(),e.json({success:!0,id:o,key:a,label:i})}),Q.delete(`/api/workspace/stages/:id`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=await t.prepare(`SELECT * FROM workspace_stage_defs WHERE id = ?`).bind(n).first();return r?((await t.prepare(`SELECT COUNT(*) AS cnt FROM workspace_stage_defs WHERE industry = ?`).bind(r.industry).first())?.cnt||0)<=1?e.json({success:!1,message:`최소 1개의 공정 단계는 있어야 합니다.`},400):((await t.prepare(`SELECT COUNT(*) AS cnt FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE COALESCE(p.category, 'clothing') = ? AND o.stage = ?`).bind(r.industry,r.key).first())?.cnt||0)>0?e.json({success:!1,message:`이 단계에 있는 발주가 있어 삭제할 수 없습니다. 먼저 다른 단계로 옮겨주세요.`},400):(await t.prepare(`DELETE FROM workspace_stage_defs WHERE id = ?`).bind(n).run(),e.json({success:!0})):e.json({success:!1,message:`단계를 찾을 수 없습니다.`},404)});function ES(e){return{id:e.id,orderCode:e.order_code,productId:e.product_id,productCode:e.product_code,productName:e.product_name,clientName:e.client_name,factoryName:e.factory_name,quantity:e.quantity,stage:e.stage,industry:e.industry||`clothing`,assignedTeam:e.assigned_team,expectedCompleteAt:e.expected_complete_at,note:e.note,createdAt:e.created_at,updatedAt:e.updated_at}}Q.get(`/api/workspace/summary`,$,async e=>{let{results:t}=await e.env.LOOKBOOK_DB.prepare(`SELECT COALESCE(p.category, 'clothing') AS industry, COUNT(*) AS cnt FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id GROUP BY COALESCE(p.category, 'clothing')`).all(),n={};for(let e of SS)n[e]=0;for(let e of t||[])n[e.industry]=e.cnt;let r=Object.values(n).reduce((e,t)=>e+t,0);return e.json({success:!0,counts:n,total:r})}),Q.get(`/api/workspace/orders`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`industry`)||``,r=e.req.query(`stage`)||``,i=(e.req.query(`q`)||``).trim(),a=`SELECT o.*, p.product_code AS product_code, p.name AS product_name, p.client_name AS client_name, COALESCE(p.category, 'clothing') AS industry
-             FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id`,o=[],s=[];n&&SS.includes(n)&&(o.push(`COALESCE(p.category, 'clothing') = ?`),s.push(n)),r&&(o.push(`o.stage = ?`),s.push(r)),i&&(o.push(`(o.order_code LIKE ? OR p.product_code LIKE ? OR p.client_name LIKE ?)`),s.push(`%${i}%`,`%${i}%`,`%${i}%`)),o.length&&(a+=` WHERE `+o.join(` AND `)),a+=` ORDER BY o.created_at DESC LIMIT 500`;let{results:l}=await t.prepare(a).bind(...s).all();return e.json({success:!0,orders:(l||[]).map(ES)})}),Q.post(`/api/workspace/orders`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=await e.req.json().catch(()=>({})),r=String(n.productCode||``).trim(),i=String(n.productName||``).trim();if(!r||!i)return e.json({success:!1,message:`제품코드와 제품명은 필수입니다.`},400);let a=SS.includes(n.industry)?n.industry:`clothing`,o=Number(n.quantity)||0,s=String(n.clientName||``).trim()||null,l=String(n.factoryName||``).trim()||null,u=n.expectedCompleteAt||null,d=String(n.note||``).trim()||null,f=await t.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(r).first(),p=a;if(f)p=f.category||a;else{let e=crypto.randomUUID();await t.prepare(`INSERT INTO workspace_products (id, product_code, name, client_name, category, is_sample) VALUES (?, ?, ?, ?, ?, ?)`).bind(e,r,i,s,a,+!!n.isSample).run(),f={id:e}}let m=(await t.prepare(`SELECT key FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC LIMIT 1`).bind(p).first())?.key||`receipt`,h=crypto.randomUUID(),g=String(n.orderCode||``).trim()||`WO-`+new Date().toISOString().slice(0,10).replace(/-/g,``)+`-`+h.slice(0,6);return await t.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(h,g,f.id,l,o,m,u,d).run(),e.json({success:!0,orderId:h,orderCode:g})}),Q.patch(`/api/workspace/orders/:id`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=await e.req.json().catch(()=>({})),i=[],a=[];if(r.stage!==void 0){let o=await t.prepare(`SELECT COALESCE(p.category, 'clothing') AS industry FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE o.id = ?`).bind(n).first();if(!o)return e.json({success:!1,message:`발주를 찾을 수 없습니다.`},404);if(!(await wS(t,o.industry)).some(e=>e.key===r.stage))return e.json({success:!1,message:`잘못된 공정 단계입니다.`},400);i.push(`stage = ?`),a.push(r.stage)}return r.assignedTeam!==void 0&&(i.push(`assigned_team = ?`),a.push(r.assignedTeam||null)),r.expectedCompleteAt!==void 0&&(i.push(`expected_complete_at = ?`),a.push(r.expectedCompleteAt||null)),r.note!==void 0&&(i.push(`note = ?`),a.push(r.note||null)),r.quantity!==void 0&&(i.push(`quantity = ?`),a.push(Number(r.quantity)||0)),i.length?(i.push(`updated_at = datetime('now')`),a.push(n),await t.prepare(`UPDATE workspace_orders SET ${i.join(`, `)} WHERE id = ?`).bind(...a).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 값이 없습니다.`},400)}),Q.get(`/api/workspace/products`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=(e.req.query(`q`)||``).trim(),r=`SELECT * FROM workspace_products`,i=[];n&&(r+=` WHERE product_code LIKE ? OR name LIKE ?`,i.push(`%${n}%`,`%${n}%`)),r+=` ORDER BY updated_at DESC LIMIT 200`;let{results:a}=await t.prepare(r).bind(...i).all();return e.json({success:!0,products:a||[]})}),Q.get(`/api/workspace/products/:code/history`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`code`),r=await t.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(n).first();if(!r)return e.json({success:!1,message:`제품을 찾을 수 없습니다.`},404);let i=await t.prepare(`SELECT * FROM workspace_product_history WHERE product_id = ? ORDER BY created_at DESC LIMIT 200`).bind(r.id).all(),a=await t.prepare(`SELECT * FROM workspace_orders WHERE product_id = ? ORDER BY created_at DESC LIMIT 50`).bind(r.id).all();return e.json({success:!0,product:r,history:i.results||[],orders:a.results||[]})}),Q.post(`/api/workspace/products/:code/history`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`code`),r=await e.req.json().catch(()=>({})),i=r.type,a=String(r.content||``).trim();if(![`issue`,`resolution`,`caution`,`memo`,`stock`].includes(i))return e.json({success:!1,message:`잘못된 기록 유형입니다.`},400);if(!a)return e.json({success:!1,message:`내용을 입력해주세요.`},400);let o=await t.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(n).first();if(!o)return e.json({success:!1,message:`제품을 찾을 수 없습니다.`},404);let s=crypto.randomUUID();return await t.prepare(`INSERT INTO workspace_product_history (id, product_id, type, content) VALUES (?, ?, ?, ?)`).bind(s,o.id,i,a).run(),e.json({success:!0,id:s})}),Q.patch(`/api/workspace/history/:id`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=await e.req.json().catch(()=>({}));return r.resolved===void 0?e.json({success:!1,message:`변경할 값이 없습니다.`},400):(await t.prepare(`UPDATE workspace_product_history SET resolved = ? WHERE id = ?`).bind(+!!r.resolved,n).run(),e.json({success:!0}))});function DS(e){return{id:e.id,industry:e.industry,title:e.title,designNote:e.design_note,desiredQty:e.desired_qty,desiredPrice:e.desired_price,status:e.status,adminNote:e.admin_note,convertedOrderId:e.converted_order_id,clientName:e.client_name,clientEmail:e.client_email,createdAt:e.created_at,updatedAt:e.updated_at}}Q.get(`/api/workspace/inquiries`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`status`)||``,r=`SELECT i.*, u.name AS client_name, u.email AS client_email
+  `,t,`AI가 상품 사진을 분석해 기술도식화(플랫 스케치)를 자동 생성합니다. PC 전용 기능입니다.`,e.env.GA4_MEASUREMENT_ID))});var SS=[`clothing`,`jewelry`,`bag`,`shoe`],CS={clothing:`의류`,jewelry:`주얼리`,bag:`가방`,shoe:`신발`};async function wS(e,t){let{results:n}=await e.prepare(`SELECT id, key, label FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC`).bind(t).all();return n||[]}async function TS(e){let{results:t}=await e.prepare(`SELECT industry, id, key, label FROM workspace_stage_defs ORDER BY industry ASC, sort_order ASC`).all(),n={};for(let e of SS)n[e]=[];for(let e of t||[])n[e.industry]||(n[e.industry]=[]),n[e.industry].push({id:e.id,key:e.key,label:e.label});return n}Q.get(`/api/workspace/stages`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`industry`)||``;return n?SS.includes(n)?e.json({success:!0,stages:await wS(t,n)}):e.json({success:!1,message:`잘못된 업종입니다.`},400):e.json({success:!0,stageSets:await TS(t)})}),Q.post(`/api/workspace/stages`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=await e.req.json().catch(()=>({})),r=n.industry,i=String(n.label||``).trim();if(!SS.includes(r))return e.json({success:!1,message:`잘못된 업종입니다.`},400);if(!i)return e.json({success:!1,message:`단계 이름을 입력해주세요.`},400);let a=`custom_`+crypto.randomUUID().replace(/-/g,``).slice(0,10),o=crypto.randomUUID(),s=await t.prepare(`SELECT key, sort_order FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order DESC LIMIT 1`).bind(r).first();return s?(await t.prepare(`UPDATE workspace_stage_defs SET sort_order = sort_order + 1 WHERE industry = ? AND key = ?`).bind(r,s.key).run(),await t.prepare(`INSERT INTO workspace_stage_defs (id, industry, key, label, sort_order) VALUES (?, ?, ?, ?, ?)`).bind(o,r,a,i,s.sort_order).run()):await t.prepare(`INSERT INTO workspace_stage_defs (id, industry, key, label, sort_order) VALUES (?, ?, ?, ?, 1)`).bind(o,r,a,i).run(),e.json({success:!0,id:o,key:a,label:i})}),Q.delete(`/api/workspace/stages/:id`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=await t.prepare(`SELECT * FROM workspace_stage_defs WHERE id = ?`).bind(n).first();return r?((await t.prepare(`SELECT COUNT(*) AS cnt FROM workspace_stage_defs WHERE industry = ?`).bind(r.industry).first())?.cnt||0)<=1?e.json({success:!1,message:`최소 1개의 공정 단계는 있어야 합니다.`},400):((await t.prepare(`SELECT COUNT(*) AS cnt FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE COALESCE(p.category, 'clothing') = ? AND o.stage = ?`).bind(r.industry,r.key).first())?.cnt||0)>0?e.json({success:!1,message:`이 단계에 있는 발주가 있어 삭제할 수 없습니다. 먼저 다른 단계로 옮겨주세요.`},400):(await t.prepare(`DELETE FROM workspace_stage_defs WHERE id = ?`).bind(n).run(),e.json({success:!0})):e.json({success:!1,message:`단계를 찾을 수 없습니다.`},404)});function ES(e){let t=[];if(e.options_json)try{t=JSON.parse(e.options_json)}catch{t=[]}return{id:e.id,orderCode:e.order_code,productId:e.product_id,productCode:e.product_code,productName:e.product_name,clientName:e.client_name,factoryName:e.factory_name,quantity:e.quantity,stage:e.stage,industry:e.industry||`clothing`,assignedTeam:e.assigned_team,expectedCompleteAt:e.expected_complete_at,note:e.note,createdAt:e.created_at,updatedAt:e.updated_at,options:t,unitPrice:e.unit_price??null,totalAmount:e.total_amount??null,shippingAddress:e.shipping_address??null}}Q.get(`/api/workspace/summary`,$,async e=>{let{results:t}=await e.env.LOOKBOOK_DB.prepare(`SELECT COALESCE(p.category, 'clothing') AS industry, COUNT(*) AS cnt FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id GROUP BY COALESCE(p.category, 'clothing')`).all(),n={};for(let e of SS)n[e]=0;for(let e of t||[])n[e.industry]=e.cnt;let r=Object.values(n).reduce((e,t)=>e+t,0);return e.json({success:!0,counts:n,total:r})}),Q.get(`/api/workspace/orders`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`industry`)||``,r=e.req.query(`stage`)||``,i=(e.req.query(`q`)||``).trim(),a=`SELECT o.*, p.product_code AS product_code, p.name AS product_name, p.client_name AS client_name, COALESCE(p.category, 'clothing') AS industry
+             FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id`,o=[],s=[];n&&SS.includes(n)&&(o.push(`COALESCE(p.category, 'clothing') = ?`),s.push(n)),r&&(o.push(`o.stage = ?`),s.push(r)),i&&(o.push(`(o.order_code LIKE ? OR p.product_code LIKE ? OR p.client_name LIKE ?)`),s.push(`%${i}%`,`%${i}%`,`%${i}%`)),o.length&&(a+=` WHERE `+o.join(` AND `)),a+=` ORDER BY o.created_at DESC LIMIT 500`;let{results:l}=await t.prepare(a).bind(...s).all();return e.json({success:!0,orders:(l||[]).map(ES)})}),Q.post(`/api/workspace/orders`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=await e.req.json().catch(()=>({})),r=String(n.productCode||``).trim(),i=String(n.productName||``).trim();if(!r||!i)return e.json({success:!1,message:`제품코드와 제품명은 필수입니다.`},400);let a=SS.includes(n.industry)?n.industry:`clothing`,o=Number(n.quantity)||0,s=String(n.clientName||``).trim()||null,l=String(n.factoryName||``).trim()||null,u=n.expectedCompleteAt||null,d=String(n.note||``).trim()||null,f=await t.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(r).first(),p=a;if(f)p=f.category||a;else{let e=crypto.randomUUID();await t.prepare(`INSERT INTO workspace_products (id, product_code, name, client_name, category, is_sample) VALUES (?, ?, ?, ?, ?, ?)`).bind(e,r,i,s,a,+!!n.isSample).run(),f={id:e}}let m=(await t.prepare(`SELECT key FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC LIMIT 1`).bind(p).first())?.key||`receipt`,h=crypto.randomUUID(),g=String(n.orderCode||``).trim()||`WO-`+new Date().toISOString().slice(0,10).replace(/-/g,``)+`-`+h.slice(0,6);return await t.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(h,g,f.id,l,o,m,u,d).run(),e.json({success:!0,orderId:h,orderCode:g})}),Q.patch(`/api/workspace/orders/:id`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=await e.req.json().catch(()=>({})),i=[],a=[];if(r.stage!==void 0){let o=await t.prepare(`SELECT COALESCE(p.category, 'clothing') AS industry FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE o.id = ?`).bind(n).first();if(!o)return e.json({success:!1,message:`발주를 찾을 수 없습니다.`},404);if(!(await wS(t,o.industry)).some(e=>e.key===r.stage))return e.json({success:!1,message:`잘못된 공정 단계입니다.`},400);i.push(`stage = ?`),a.push(r.stage)}if(r.assignedTeam!==void 0&&(i.push(`assigned_team = ?`),a.push(r.assignedTeam||null)),r.expectedCompleteAt!==void 0&&(i.push(`expected_complete_at = ?`),a.push(r.expectedCompleteAt||null)),r.note!==void 0&&(i.push(`note = ?`),a.push(r.note||null)),r.quantity!==void 0&&(i.push(`quantity = ?`),a.push(Number(r.quantity)||0)),r.options!==void 0){let e=Array.isArray(r.options)?r.options.filter(e=>e&&(e.label||e.value)):[];i.push(`options_json = ?`),a.push(e.length?JSON.stringify(e):null)}return r.unitPrice!==void 0&&(i.push(`unit_price = ?`),a.push(r.unitPrice===``||r.unitPrice===null?null:Number(r.unitPrice))),r.totalAmount!==void 0&&(i.push(`total_amount = ?`),a.push(r.totalAmount===``||r.totalAmount===null?null:Number(r.totalAmount))),r.shippingAddress!==void 0&&(i.push(`shipping_address = ?`),a.push(r.shippingAddress||null)),i.length?(i.push(`updated_at = datetime('now')`),a.push(n),await t.prepare(`UPDATE workspace_orders SET ${i.join(`, `)} WHERE id = ?`).bind(...a).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 값이 없습니다.`},400)}),Q.get(`/api/workspace/products`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=(e.req.query(`q`)||``).trim(),r=`SELECT * FROM workspace_products`,i=[];n&&(r+=` WHERE product_code LIKE ? OR name LIKE ?`,i.push(`%${n}%`,`%${n}%`)),r+=` ORDER BY updated_at DESC LIMIT 200`;let{results:a}=await t.prepare(r).bind(...i).all();return e.json({success:!0,products:a||[]})}),Q.get(`/api/workspace/products/:code/history`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`code`),r=await t.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(n).first();if(!r)return e.json({success:!1,message:`제품을 찾을 수 없습니다.`},404);let i=await t.prepare(`SELECT * FROM workspace_product_history WHERE product_id = ? ORDER BY created_at DESC LIMIT 200`).bind(r.id).all(),a=await t.prepare(`SELECT * FROM workspace_orders WHERE product_id = ? ORDER BY created_at DESC LIMIT 50`).bind(r.id).all();return e.json({success:!0,product:r,history:i.results||[],orders:a.results||[]})}),Q.post(`/api/workspace/products/:code/history`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`code`),r=await e.req.json().catch(()=>({})),i=r.type,a=String(r.content||``).trim();if(![`issue`,`resolution`,`caution`,`memo`,`stock`].includes(i))return e.json({success:!1,message:`잘못된 기록 유형입니다.`},400);if(!a)return e.json({success:!1,message:`내용을 입력해주세요.`},400);let o=await t.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(n).first();if(!o)return e.json({success:!1,message:`제품을 찾을 수 없습니다.`},404);let s=crypto.randomUUID();return await t.prepare(`INSERT INTO workspace_product_history (id, product_id, type, content) VALUES (?, ?, ?, ?)`).bind(s,o.id,i,a).run(),e.json({success:!0,id:s})}),Q.patch(`/api/workspace/history/:id`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=await e.req.json().catch(()=>({}));return r.resolved===void 0?e.json({success:!1,message:`변경할 값이 없습니다.`},400):(await t.prepare(`UPDATE workspace_product_history SET resolved = ? WHERE id = ?`).bind(+!!r.resolved,n).run(),e.json({success:!0}))});function DS(e){return{id:e.id,industry:e.industry,title:e.title,designNote:e.design_note,desiredQty:e.desired_qty,desiredPrice:e.desired_price,status:e.status,adminNote:e.admin_note,convertedOrderId:e.converted_order_id,clientName:e.client_name,clientEmail:e.client_email,createdAt:e.created_at,updatedAt:e.updated_at}}Q.get(`/api/workspace/inquiries`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`status`)||``,r=`SELECT i.*, u.name AS client_name, u.email AS client_email
              FROM workspace_inquiries i JOIN users u ON u.id = i.client_user_id`,i=[];n&&[`new`,`in_discussion`,`done`].includes(n)&&(r+=` WHERE i.status = ?`,i.push(n)),r+=` ORDER BY i.created_at DESC LIMIT 300`;let{results:a}=await t.prepare(r).bind(...i).all();return e.json({success:!0,inquiries:(a||[]).map(DS)})}),Q.patch(`/api/workspace/inquiries/:id`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=await e.req.json().catch(()=>({})),i=[],a=[];if(r.status!==void 0){if(![`new`,`in_discussion`,`done`].includes(r.status))return e.json({success:!1,message:`잘못된 상태입니다.`},400);i.push(`status = ?`),a.push(r.status)}return r.adminNote!==void 0&&(i.push(`admin_note = ?`),a.push(r.adminNote||null)),i.length?(i.push(`updated_at = datetime('now')`),a.push(n),await t.prepare(`UPDATE workspace_inquiries SET ${i.join(`, `)} WHERE id = ?`).bind(...a).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 값이 없습니다.`},400)}),Q.post(`/api/workspace/inquiries/:id/convert`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=await e.req.json().catch(()=>({})),i=await t.prepare(`SELECT * FROM workspace_inquiries WHERE id = ?`).bind(n).first();if(!i)return e.json({success:!1,message:`문의를 찾을 수 없습니다.`},404);if(i.status===`done`)return e.json({success:!1,message:`이미 발주로 전환된 문의입니다.`},400);let a=String(r.productCode||``).trim(),o=String(r.productName||i.title||``).trim();if(!a||!o)return e.json({success:!1,message:`제품코드와 제품명은 필수입니다.`},400);let s=Number(r.quantity)||i.desired_qty||0,l=String(r.factoryName||``).trim()||null,u=r.expectedCompleteAt||null,d=await t.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(a).first();if(d)d.client_user_id||await t.prepare(`UPDATE workspace_products SET client_user_id = ? WHERE id = ?`).bind(i.client_user_id,d.id).run();else{let e=crypto.randomUUID();await t.prepare(`INSERT INTO workspace_products (id, product_code, name, category, client_user_id) VALUES (?, ?, ?, ?, ?)`).bind(e,a,o,i.industry,i.client_user_id).run(),d={id:e,category:i.industry}}let f=(await t.prepare(`SELECT key FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC LIMIT 1`).bind(d.category||i.industry).first())?.key||`receipt`,p=crypto.randomUUID(),m=`WO-`+new Date().toISOString().slice(0,10).replace(/-/g,``)+`-`+p.slice(0,6);return await t.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at) VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(p,m,d.id,l,s,f,u).run(),await t.prepare(`UPDATE workspace_inquiries SET status = 'done', converted_order_id = ?, updated_at = datetime('now') WHERE id = ?`).bind(p,n).run(),e.json({success:!0,orderId:p,orderCode:m})});async function OS(e){let t=e.env.LOOKBOOK_DB;return await Lb(t,e.req.header(`X-Session-Token`)||e.req.query(`token`)||null)}Q.post(`/api/my/inquiries`,async e=>{let t=e.env.LOOKBOOK_DB,n=await OS(e);if(!n)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let r=await e.req.json().catch(()=>({})),i=String(r.title||``).trim();if(!i)return e.json({success:!1,message:`문의 제목을 입력해주세요.`},400);let a=SS.includes(r.industry)?r.industry:`clothing`,o=String(r.designNote||``).trim()||null,s=r.desiredQty?Number(r.desiredQty):null,l=r.desiredPrice?Number(r.desiredPrice):null,u=crypto.randomUUID();return await t.prepare(`INSERT INTO workspace_inquiries (id, client_user_id, industry, title, design_note, desired_qty, desired_price) VALUES (?, ?, ?, ?, ?, ?, ?)`).bind(u,n.id,a,i,o,s,l).run(),e.json({success:!0,id:u})}),Q.get(`/api/my/inquiries`,async e=>{let t=e.env.LOOKBOOK_DB,n=await OS(e);if(!n)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let{results:r}=await t.prepare(`SELECT * FROM workspace_inquiries WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100`).bind(n.id).all();return e.json({success:!0,inquiries:(r||[]).map(DS)})}),Q.get(`/api/my/orders`,async e=>{let t=e.env.LOOKBOOK_DB,n=await OS(e);if(!n)return e.json({success:!1,message:`로그인이 필요합니다.`},401);let{results:r}=await t.prepare(`
     SELECT o.*, p.product_code AS product_code, p.name AS product_name, COALESCE(p.category, 'clothing') AS industry,
            sd.label AS stage_label
@@ -8467,6 +8467,13 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     .ws-badge.done{background:#22c55e22;color:#22c55e;}
     .ws-inquiry-card .note{font-size:13px;color:#B7B7C2;margin:8px 0;white-space:pre-wrap;}
     .ws-inquiry-card .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+    .ws-opt-row{display:flex;gap:6px;margin-bottom:6px;}
+    .ws-opt-row input{flex:1;}
+    .ws-opt-row button{flex:0 0 32px;background:#3a3a60;color:#fff;border:none;border-radius:8px;cursor:pointer;}
+    .ws-order-row{display:flex;align-items:center;gap:10px;background:#1a1a2e;border:1px solid #2e2e50;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;font-size:13px;}
+    .ws-order-row:hover{border-color:#7C3AED;}
+    .ws-order-row .col{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ws-order-row .col.code{flex:1.3;font-weight:700;}
   </style>
 </head>
 <body>
@@ -8493,6 +8500,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       <button class="ws-nav-btn active" data-panel="home" onclick="wsSwitchPanel('home')">홈</button>
       <button class="ws-nav-btn" data-panel="inquiry" onclick="wsSwitchPanel('inquiry')">생산문의</button>
       <button class="ws-nav-btn" data-panel="board" onclick="wsSwitchPanel('board')">공정보드</button>
+      <button class="ws-nav-btn" data-panel="orders" onclick="wsSwitchPanel('orders')">발주관리</button>
       <button class="ws-nav-btn" data-panel="history" onclick="wsSwitchPanel('history')">생산이력</button>
       <button class="ws-nav-btn" data-panel="chat" onclick="wsSwitchPanel('chat')">AI 입력</button>
     </div>
@@ -8518,6 +8526,15 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           <button class="ws-btn" onclick="wsOpenNewOrderModal()">+ 발주 등록</button>
         </div>
         <div class="ws-board" id="wsBoard"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-orders">
+        <h1>발주관리</h1>
+        <div class="ws-toolbar">
+          <input class="ws-input" id="wsOrdersSearch" placeholder="발주코드·제품코드·고객사로 검색" onkeydown="if(event.key==='Enter')wsLoadOrdersList()"/>
+          <button class="ws-btn secondary" onclick="wsLoadOrdersList()">검색</button>
+        </div>
+        <div id="wsOrdersTable"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-history">
@@ -8573,12 +8590,29 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
 </div>
 
 <div class="ws-modal-overlay" id="wsOrderDetailOverlay">
-  <div class="ws-modal">
+  <div class="ws-modal" style="max-width:480px;max-height:85vh;overflow-y:auto;">
     <h3 id="wsDetailTitle">발주 상세</h3>
     <label>공정 단계</label>
     <select class="ws-input" id="wsDetailStage" style="width:100%"></select>
+    <label>수량</label>
+    <input class="ws-input" id="wsDetailQuantity" type="number" style="width:100%"/>
     <label>담당 팀</label>
     <input class="ws-input" id="wsDetailTeam" style="width:100%"/>
+    <label>옵션</label>
+    <div id="wsDetailOptions"></div>
+    <button class="ws-btn secondary" style="margin-bottom:10px" onclick="wsAddDetailOptionRow()">+ 옵션 추가</button>
+    <div style="display:flex;gap:8px;">
+      <div style="flex:1">
+        <label>단가(원)</label>
+        <input class="ws-input" id="wsDetailUnitPrice" type="number" style="width:100%" oninput="wsRecalcDetailTotal()"/>
+      </div>
+      <div style="flex:1">
+        <label>합계 금액(원)</label>
+        <input class="ws-input" id="wsDetailTotalAmount" type="number" style="width:100%"/>
+      </div>
+    </div>
+    <label>배송지</label>
+    <input class="ws-input" id="wsDetailShipping" style="width:100%"/>
     <label>메모</label>
     <input class="ws-input" id="wsDetailNote" style="width:100%"/>
     <div class="row">
@@ -8674,8 +8708,31 @@ function wsSwitchPanel(name) {
   if (name === 'home') wsLoadHome();
   if (name === 'inquiry') wsLoadInquiries();
   if (name === 'board') wsLoadBoard();
+  if (name === 'orders') wsLoadOrdersList();
   if (name === 'history') wsLoadProductList();
   if (name === 'chat') wsLoadChat();
+}
+
+async function wsLoadOrdersList() {
+  var q = document.getElementById('wsOrdersSearch').value.trim();
+  try {
+    var res = await fetch('/api/workspace/orders' + (q ? ('?q=' + encodeURIComponent(q)) : ''), { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    window._wsOrders = data.orders;
+    var table = document.getElementById('wsOrdersTable');
+    if (!data.orders.length) { table.innerHTML = '<div class="ws-empty">발주가 없습니다.</div>'; return; }
+    table.innerHTML = data.orders.map(function (o) {
+      return '<div class="ws-order-row" onclick="wsOpenDetailModal(\\'' + o.id + '\\')">' +
+        '<span class="col code">' + wsEsc(o.orderCode) + '</span>' +
+        '<span class="col">' + wsEsc(o.productCode) + ' ' + wsEsc(o.productName) + '</span>' +
+        '<span class="col">' + wsEsc(wsIndustryLabel[o.industry] || o.industry) + '</span>' +
+        '<span class="col">' + (o.quantity || 0) + '개</span>' +
+        '<span class="col">' + (o.totalAmount != null ? o.totalAmount.toLocaleString() + '원' : '-') + '</span>' +
+        '<span class="col">' + wsEsc(o.factoryName || '-') + '</span>' +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
 }
 
 var wsInquiryStatusTab = '';
@@ -8897,24 +8954,60 @@ function wsOpenDetailModal(orderId) {
     return '<option value="' + st.key + '">' + st.label + '</option>';
   }).join('');
   document.getElementById('wsDetailStage').value = order.stage;
+  document.getElementById('wsDetailQuantity').value = order.quantity || 0;
   document.getElementById('wsDetailTeam').value = order.assignedTeam || '';
+  wsRenderDetailOptions(order.options || []);
+  document.getElementById('wsDetailUnitPrice').value = order.unitPrice != null ? order.unitPrice : '';
+  document.getElementById('wsDetailTotalAmount').value = order.totalAmount != null ? order.totalAmount : '';
+  document.getElementById('wsDetailShipping').value = order.shippingAddress || '';
   document.getElementById('wsDetailNote').value = order.note || '';
   document.getElementById('wsOrderDetailOverlay').style.display = 'flex';
 }
 function wsCloseDetailModal() { document.getElementById('wsOrderDetailOverlay').style.display = 'none'; }
 
+function wsRenderDetailOptions(options) {
+  var el = document.getElementById('wsDetailOptions');
+  el.innerHTML = '';
+  if (!options.length) options = [{ label: '', value: '' }];
+  options.forEach(function (o) { wsAddDetailOptionRow(o.label, o.value); });
+}
+
+function wsAddDetailOptionRow(label, value) {
+  var el = document.getElementById('wsDetailOptions');
+  var row = document.createElement('div');
+  row.className = 'ws-opt-row';
+  row.innerHTML = '<input class="ws-input opt-label" placeholder="항목(예: 사이즈)" value="' + wsEsc(label || '') + '"/>' +
+    '<input class="ws-input opt-value" placeholder="값(예: L)" value="' + wsEsc(value || '') + '"/>' +
+    '<button type="button" onclick="this.parentElement.remove()">×</button>';
+  el.appendChild(row);
+}
+
+function wsRecalcDetailTotal() {
+  var qty = Number(document.getElementById('wsDetailQuantity').value) || 0;
+  var unitPrice = Number(document.getElementById('wsDetailUnitPrice').value) || 0;
+  document.getElementById('wsDetailTotalAmount').value = qty * unitPrice;
+}
+
 async function wsSubmitDetail() {
   if (!wsCurrentOrderId) return;
+  var options = Array.from(document.querySelectorAll('#wsDetailOptions .ws-opt-row')).map(function (row) {
+    return { label: row.querySelector('.opt-label').value.trim(), value: row.querySelector('.opt-value').value.trim() };
+  }).filter(function (o) { return o.label || o.value; });
   var body = {
     stage: document.getElementById('wsDetailStage').value,
+    quantity: document.getElementById('wsDetailQuantity').value,
     assignedTeam: document.getElementById('wsDetailTeam').value,
+    options: options,
+    unitPrice: document.getElementById('wsDetailUnitPrice').value,
+    totalAmount: document.getElementById('wsDetailTotalAmount').value,
+    shippingAddress: document.getElementById('wsDetailShipping').value,
     note: document.getElementById('wsDetailNote').value,
   };
   try {
     var res = await fetch('/api/workspace/orders/' + wsCurrentOrderId, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify(body) });
     var data = await res.json();
     if (!data.success) { alert(data.message || '저장 실패'); return; }
-    wsCloseDetailModal(); wsLoadBoard(); wsLoadHome();
+    wsCloseDetailModal(); wsLoadBoard(); wsLoadOrdersList(); wsLoadHome();
   } catch (e) { alert('서버 오류가 발생했습니다.'); }
 }
 
