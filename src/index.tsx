@@ -16585,35 +16585,67 @@ const WORKSPACE_INDUSTRIES = ['clothing', 'jewelry', 'bag', 'shoe']
 const WORKSPACE_INDUSTRY_LABEL: Record<string, string> = {
   clothing: '의류', jewelry: '주얼리', bag: '가방', shoe: '신발',
 }
-const WORKSPACE_STAGE_SETS: Record<string, { key: string; label: string }[]> = {
-  clothing: [
-    { key: 'receipt', label: '접수' }, { key: 'cutting', label: '재단' }, { key: 'sewing', label: '봉제' },
-    { key: 'inspection', label: '검단' }, { key: 'packing', label: '포장' }, { key: 'done', label: '완료' },
-  ],
-  jewelry: [
-    { key: 'receipt', label: '접수' }, { key: 'casting', label: '주물' }, { key: 'inbound', label: '입고' },
-    { key: 'plating', label: '도금' }, { key: 'shipping', label: '출고' }, { key: 'done', label: '완료' },
-  ],
-  bag: [
-    { key: 'receipt', label: '접수' }, { key: 'cutting', label: '재단' }, { key: 'sewing', label: '봉제' },
-    { key: 'hardware', label: '부속조립' }, { key: 'inspection', label: '검수' }, { key: 'done', label: '완료' },
-  ],
-  shoe: [
-    { key: 'receipt', label: '접수' }, { key: 'upper', label: '갑피재단' }, { key: 'stitching', label: '갑피봉제' },
-    { key: 'assembly', label: '조립' }, { key: 'inspection', label: '검수' }, { key: 'done', label: '완료' },
-  ],
+// 공정 단계 자체는 코드가 아니라 workspace_stage_defs 테이블에 있다 — 관리자가
+// 업종별로 단계를 직접 추가/삭제할 수 있게 하기 위함(마이그레이션 0043이 4개
+// 업종의 기본 단계를 심어둔다). sort_order로 보드 컬럼 순서를 정한다.
+async function wsGetStageSet(db: D1Database, industry: string): Promise<{ id: string; key: string; label: string }[]> {
+  const { results } = await db.prepare(`SELECT id, key, label FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC`).bind(industry).all()
+  return (results || []) as any[]
 }
-const WORKSPACE_STAGE_LABEL: Record<string, string> = {}
-const WORKSPACE_ALL_STAGE_KEYS: string[] = []
-for (const industry of WORKSPACE_INDUSTRIES) {
-  for (const s of WORKSPACE_STAGE_SETS[industry]) {
-    WORKSPACE_STAGE_LABEL[s.key] = s.label
-    if (!WORKSPACE_ALL_STAGE_KEYS.includes(s.key)) WORKSPACE_ALL_STAGE_KEYS.push(s.key)
+async function wsGetAllStageSets(db: D1Database): Promise<Record<string, { id: string; key: string; label: string }[]>> {
+  const { results } = await db.prepare(`SELECT industry, id, key, label FROM workspace_stage_defs ORDER BY industry ASC, sort_order ASC`).all()
+  const sets: Record<string, { id: string; key: string; label: string }[]> = {}
+  for (const ind of WORKSPACE_INDUSTRIES) sets[ind] = []
+  for (const r of (results || []) as any[]) {
+    if (!sets[r.industry]) sets[r.industry] = []
+    sets[r.industry].push({ id: r.id, key: r.key, label: r.label })
   }
+  return sets
 }
-function wsStageKeysFor(industry: string): string[] {
-  return (WORKSPACE_STAGE_SETS[industry] || WORKSPACE_STAGE_SETS.clothing).map((s) => s.key)
-}
+
+app.get('/api/workspace/stages', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const industry = c.req.query('industry') || ''
+  if (industry) {
+    if (!WORKSPACE_INDUSTRIES.includes(industry)) return c.json({ success: false, message: '잘못된 업종입니다.' }, 400)
+    return c.json({ success: true, stages: await wsGetStageSet(db, industry) })
+  }
+  return c.json({ success: true, stageSets: await wsGetAllStageSets(db) })
+})
+
+app.post('/api/workspace/stages', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const industry = body.industry
+  const label = String(body.label || '').trim()
+  if (!WORKSPACE_INDUSTRIES.includes(industry)) return c.json({ success: false, message: '잘못된 업종입니다.' }, 400)
+  if (!label) return c.json({ success: false, message: '단계 이름을 입력해주세요.' }, 400)
+  const key = 'custom_' + crypto.randomUUID().replace(/-/g, '').slice(0, 10)
+  const id = crypto.randomUUID()
+  // 새 단계는 맨 끝이 아니라 "마지막 단계(보통 완료) 바로 앞"에 끼워 넣는다 —
+  // 그래야 완료 컬럼이 계속 보드 맨 오른쪽에 남는다.
+  const last: any = await db.prepare(`SELECT key, sort_order FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order DESC LIMIT 1`).bind(industry).first()
+  if (last) {
+    await db.prepare(`UPDATE workspace_stage_defs SET sort_order = sort_order + 1 WHERE industry = ? AND key = ?`).bind(industry, last.key).run()
+    await db.prepare(`INSERT INTO workspace_stage_defs (id, industry, key, label, sort_order) VALUES (?, ?, ?, ?, ?)`).bind(id, industry, key, label, last.sort_order).run()
+  } else {
+    await db.prepare(`INSERT INTO workspace_stage_defs (id, industry, key, label, sort_order) VALUES (?, ?, ?, ?, 1)`).bind(id, industry, key, label).run()
+  }
+  return c.json({ success: true, id, key, label })
+})
+
+app.delete('/api/workspace/stages/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const id = c.req.param('id')
+  const stageDef: any = await db.prepare(`SELECT * FROM workspace_stage_defs WHERE id = ?`).bind(id).first()
+  if (!stageDef) return c.json({ success: false, message: '단계를 찾을 수 없습니다.' }, 404)
+  const countRow: any = await db.prepare(`SELECT COUNT(*) AS cnt FROM workspace_stage_defs WHERE industry = ?`).bind(stageDef.industry).first()
+  if ((countRow?.cnt || 0) <= 1) return c.json({ success: false, message: '최소 1개의 공정 단계는 있어야 합니다.' }, 400)
+  const inUse: any = await db.prepare(`SELECT COUNT(*) AS cnt FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE COALESCE(p.category, 'clothing') = ? AND o.stage = ?`).bind(stageDef.industry, stageDef.key).first()
+  if ((inUse?.cnt || 0) > 0) return c.json({ success: false, message: '이 단계에 있는 발주가 있어 삭제할 수 없습니다. 먼저 다른 단계로 옮겨주세요.' }, 400)
+  await db.prepare(`DELETE FROM workspace_stage_defs WHERE id = ?`).bind(id).run()
+  return c.json({ success: true })
+})
 
 function wsOrderRow(o: any) {
   return {
@@ -16644,7 +16676,7 @@ app.get('/api/workspace/orders', adminAuth, async (c) => {
   const conds: string[] = []
   const binds: any[] = []
   if (industry && WORKSPACE_INDUSTRIES.includes(industry)) { conds.push(`COALESCE(p.category, 'clothing') = ?`); binds.push(industry) }
-  if (stage && WORKSPACE_ALL_STAGE_KEYS.includes(stage)) { conds.push('o.stage = ?'); binds.push(stage) }
+  if (stage) { conds.push('o.stage = ?'); binds.push(stage) }
   if (q) { conds.push('(o.order_code LIKE ? OR p.product_code LIKE ? OR p.client_name LIKE ?)'); binds.push(`%${q}%`, `%${q}%`, `%${q}%`) }
   if (conds.length) sql += ' WHERE ' + conds.join(' AND ')
   sql += ' ORDER BY o.created_at DESC LIMIT 500'
@@ -16666,17 +16698,23 @@ app.post('/api/workspace/orders', adminAuth, async (c) => {
   const note = String(body.note || '').trim() || null
 
   let product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(productCode).first()
+  let orderIndustry = industry
   if (!product) {
     const pid = crypto.randomUUID()
     await db.prepare(`INSERT INTO workspace_products (id, product_code, name, client_name, category, is_sample) VALUES (?, ?, ?, ?, ?, ?)`)
       .bind(pid, productCode, productName, clientName, industry, body.isSample ? 1 : 0).run()
     product = { id: pid }
+  } else {
+    orderIndustry = product.category || industry
   }
+
+  const firstStage: any = await db.prepare(`SELECT key FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC LIMIT 1`).bind(orderIndustry).first()
+  const initialStage = firstStage?.key || 'receipt'
 
   const orderId = crypto.randomUUID()
   const orderCode = String(body.orderCode || '').trim() || ('WO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + orderId.slice(0, 6))
-  await db.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at, note) VALUES (?, ?, ?, ?, ?, 'receipt', ?, ?)`)
-    .bind(orderId, orderCode, product.id, factoryName, quantity, expectedCompleteAt, note).run()
+  await db.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(orderId, orderCode, product.id, factoryName, quantity, initialStage, expectedCompleteAt, note).run()
 
   return c.json({ success: true, orderId, orderCode })
 })
@@ -16690,7 +16728,8 @@ app.patch('/api/workspace/orders/:id', adminAuth, async (c) => {
   if (body.stage !== undefined) {
     const orderRow: any = await db.prepare(`SELECT COALESCE(p.category, 'clothing') AS industry FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE o.id = ?`).bind(id).first()
     if (!orderRow) return c.json({ success: false, message: '발주를 찾을 수 없습니다.' }, 404)
-    if (!wsStageKeysFor(orderRow.industry).includes(body.stage)) return c.json({ success: false, message: '잘못된 공정 단계입니다.' }, 400)
+    const validStages = await wsGetStageSet(db, orderRow.industry)
+    if (!validStages.some((s) => s.key === body.stage)) return c.json({ success: false, message: '잘못된 공정 단계입니다.' }, 400)
     sets.push('stage = ?'); vals.push(body.stage)
   }
   if (body.assignedTeam !== undefined) { sets.push('assigned_team = ?'); vals.push(body.assignedTeam || null) }
@@ -16800,7 +16839,11 @@ app.post('/api/workspace/chat', adminAuth, async (c) => {
     } else {
       const order: any = await db.prepare(`SELECT * FROM workspace_orders WHERE product_id = ? ORDER BY updated_at DESC LIMIT 1`).bind(product.id).first()
       const inbound: any = await db.prepare(`SELECT COALESCE(SUM(qty_in),0) AS qty_in, COALESCE(SUM(qty_defect),0) AS qty_defect FROM workspace_inbound_logs WHERE product_id = ?`).bind(product.id).first()
-      const stageLabel = order ? (WORKSPACE_STAGE_LABEL[order.stage] || order.stage) : '발주 없음'
+      let stageLabel = '발주 없음'
+      if (order) {
+        const sd: any = await db.prepare(`SELECT label FROM workspace_stage_defs WHERE industry = ? AND key = ?`).bind(product.category || 'clothing', order.stage).first()
+        stageLabel = sd?.label || order.stage
+      }
       reply = code + ' — 현재 단계: ' + stageLabel + (order?.factory_name ? ' (' + order.factory_name + ')' : '') + '. 누적 입고 ' + (inbound?.qty_in || 0) + '장, 불량 ' + (inbound?.qty_defect || 0) + '장.'
     }
     await db.prepare(`INSERT INTO workspace_chat_messages (id, role, content, status) VALUES (?, 'assistant', ?, 'answered')`).bind(assistantId, reply).run()
@@ -17059,11 +17102,25 @@ app.get('/workspace', (c) => {
   </div>
 </div>
 
+<div class="ws-modal-overlay" id="wsStageModalOverlay">
+  <div class="ws-modal">
+    <h3>공정 단계 추가</h3>
+    <label>업종</label>
+    <input class="ws-input" id="wsNewStageIndustryLabel" style="width:100%" disabled/>
+    <label>단계 이름 *</label>
+    <input class="ws-input" id="wsNewStageLabel" style="width:100%" placeholder="예: 다림질" onkeydown="if(event.key==='Enter')wsSubmitNewStage()"/>
+    <div class="row">
+      <button class="ws-btn secondary" onclick="wsCloseNewStageModal()">취소</button>
+      <button class="ws-btn" onclick="wsSubmitNewStage()">추가</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var wsAdminPassword = '';
 var wsIndustries = ${JSON.stringify(WORKSPACE_INDUSTRIES)};
 var wsIndustryLabel = ${JSON.stringify(WORKSPACE_INDUSTRY_LABEL)};
-var wsStageSets = ${JSON.stringify(WORKSPACE_STAGE_SETS)};
+var wsStageSets = {};
 var wsCurrentIndustry = 'clothing';
 var wsCurrentOrderId = null;
 var wsSelectedProductCode = null;
@@ -17114,20 +17171,59 @@ function wsSwitchPanel(name) {
   if (name === 'chat') wsLoadChat();
 }
 
-function wsInit() { wsRenderIndustryTabs(); wsLoadHome(); }
+function wsInit() { wsLoadStageSets().then(function () { wsRenderIndustryTabs(); wsLoadHome(); }); }
+
+async function wsLoadStageSets() {
+  try {
+    var res = await fetch('/api/workspace/stages', { headers: wsHeaders() });
+    var data = await res.json();
+    if (data.success) wsStageSets = data.stageSets;
+  } catch (e) { console.error(e); }
+}
 
 function wsRenderIndustryTabs() {
   var el = document.getElementById('wsIndustryTabs');
   if (!el) return;
   el.innerHTML = wsIndustries.map(function (ind) {
     return '<button class="ws-tab-btn' + (ind === wsCurrentIndustry ? ' active' : '') + '" onclick="wsSelectIndustry(\\'' + ind + '\\')">' + wsIndustryLabel[ind] + '</button>';
-  }).join('');
+  }).join('') + '<button class="ws-tab-btn" style="border-style:dashed" onclick="wsOpenNewStageModal()">+ 공정 추가</button>';
 }
 
 function wsSelectIndustry(ind) {
   wsCurrentIndustry = ind;
   wsRenderIndustryTabs();
   wsLoadBoard();
+}
+
+function wsOpenNewStageModal() {
+  document.getElementById('wsNewStageIndustryLabel').value = wsIndustryLabel[wsCurrentIndustry] || wsCurrentIndustry;
+  document.getElementById('wsNewStageLabel').value = '';
+  document.getElementById('wsStageModalOverlay').style.display = 'flex';
+}
+function wsCloseNewStageModal() { document.getElementById('wsStageModalOverlay').style.display = 'none'; }
+
+async function wsSubmitNewStage() {
+  var label = document.getElementById('wsNewStageLabel').value.trim();
+  if (!label) { alert('단계 이름을 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/stages', { method: 'POST', headers: wsHeaders(), body: JSON.stringify({ industry: wsCurrentIndustry, label: label }) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '추가 실패'); return; }
+    wsCloseNewStageModal();
+    await wsLoadStageSets();
+    wsLoadBoard();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsDeleteStage(id) {
+  if (!confirm('이 공정 단계를 삭제할까요? (발주가 있으면 삭제할 수 없어요)')) return;
+  try {
+    var res = await fetch('/api/workspace/stages/' + id, { method: 'DELETE', headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '삭제 실패'); return; }
+    await wsLoadStageSets();
+    wsLoadBoard();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
 }
 
 async function wsLoadHome() {
@@ -17157,7 +17253,7 @@ async function wsLoadBoard() {
       var items = data.orders.filter(function (o) { return o.stage === st.key; });
       var col = document.createElement('div');
       col.className = 'ws-col';
-      var head = '<div class="ws-col-head"><span>' + st.label + '</span><span>' + items.length + '</span></div>';
+      var head = '<div class="ws-col-head"><span>' + st.label + '</span><span>' + items.length + ' <span style="cursor:pointer;color:#ef4444;margin-left:4px" title="단계 삭제" onclick="wsDeleteStage(\\'' + st.id + '\\')">×</span></span></div>';
       var cards = items.map(function (o) {
         return '<div class="ws-order-card" onclick="wsOpenDetailModal(\\'' + o.id + '\\')">' +
           '<div class="code">' + wsEsc(o.productCode) + '</div>' +
