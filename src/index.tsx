@@ -16788,6 +16788,342 @@ app.patch('/api/workspace/history/:id', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// ────────────────────────────────────────────────────
+// 생산 문의 — 이지룩 ADMIN(상담 접수) ↔ 이지룩 USER(문의 작성) 연결 1단계.
+// 고객사 계정은 별도 체계 없이 기존 EZlook 로그인(users 테이블)을 그대로 쓴다.
+// ADMIN 쪽(/workspace의 "생산문의" 탭)은 adminAuth, USER 쪽(/api/my/*)은
+// 일반 로그인 세션(X-Session-Token)으로 보호한다.
+// ────────────────────────────────────────────────────
+function wsInquiryRow(r: any) {
+  return {
+    id: r.id, industry: r.industry, title: r.title, designNote: r.design_note,
+    desiredQty: r.desired_qty, desiredPrice: r.desired_price, status: r.status,
+    adminNote: r.admin_note, convertedOrderId: r.converted_order_id,
+    clientName: r.client_name, clientEmail: r.client_email,
+    createdAt: r.created_at, updatedAt: r.updated_at,
+  }
+}
+
+app.get('/api/workspace/inquiries', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const status = c.req.query('status') || ''
+  let sql = `SELECT i.*, u.name AS client_name, u.email AS client_email
+             FROM workspace_inquiries i JOIN users u ON u.id = i.client_user_id`
+  const binds: any[] = []
+  if (status && ['new', 'in_discussion', 'done'].includes(status)) { sql += ' WHERE i.status = ?'; binds.push(status) }
+  sql += ' ORDER BY i.created_at DESC LIMIT 300'
+  const { results } = await db.prepare(sql).bind(...binds).all()
+  return c.json({ success: true, inquiries: (results || []).map(wsInquiryRow) })
+})
+
+app.patch('/api/workspace/inquiries/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const id = c.req.param('id')
+  const body: any = await c.req.json().catch(() => ({}))
+  const sets: string[] = []
+  const vals: any[] = []
+  if (body.status !== undefined) {
+    if (!['new', 'in_discussion', 'done'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태입니다.' }, 400)
+    sets.push('status = ?'); vals.push(body.status)
+  }
+  if (body.adminNote !== undefined) { sets.push('admin_note = ?'); vals.push(body.adminNote || null) }
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  sets.push("updated_at = datetime('now')")
+  vals.push(id)
+  await db.prepare(`UPDATE workspace_inquiries SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
+  return c.json({ success: true })
+})
+
+// 문의를 실제 발주로 전환 — 제품(없으면 생성, client_user_id로 문의자와 연결)
+// + 발주를 만들고, 문의를 done으로 닫는다.
+app.post('/api/workspace/inquiries/:id/convert', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const id = c.req.param('id')
+  const body: any = await c.req.json().catch(() => ({}))
+  const inquiry: any = await db.prepare(`SELECT * FROM workspace_inquiries WHERE id = ?`).bind(id).first()
+  if (!inquiry) return c.json({ success: false, message: '문의를 찾을 수 없습니다.' }, 404)
+  if (inquiry.status === 'done') return c.json({ success: false, message: '이미 발주로 전환된 문의입니다.' }, 400)
+
+  const productCode = String(body.productCode || '').trim()
+  const productName = String(body.productName || inquiry.title || '').trim()
+  if (!productCode || !productName) return c.json({ success: false, message: '제품코드와 제품명은 필수입니다.' }, 400)
+  const quantity = Number(body.quantity) || inquiry.desired_qty || 0
+  const factoryName = String(body.factoryName || '').trim() || null
+  const expectedCompleteAt = body.expectedCompleteAt || null
+
+  let product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(productCode).first()
+  if (!product) {
+    const pid = crypto.randomUUID()
+    await db.prepare(`INSERT INTO workspace_products (id, product_code, name, category, client_user_id) VALUES (?, ?, ?, ?, ?)`)
+      .bind(pid, productCode, productName, inquiry.industry, inquiry.client_user_id).run()
+    product = { id: pid, category: inquiry.industry }
+  } else if (!product.client_user_id) {
+    await db.prepare(`UPDATE workspace_products SET client_user_id = ? WHERE id = ?`).bind(inquiry.client_user_id, product.id).run()
+  }
+
+  const firstStage: any = await db.prepare(`SELECT key FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC LIMIT 1`).bind(product.category || inquiry.industry).first()
+  const initialStage = firstStage?.key || 'receipt'
+
+  const orderId = crypto.randomUUID()
+  const orderCode = 'WO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + orderId.slice(0, 6)
+  await db.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .bind(orderId, orderCode, product.id, factoryName, quantity, initialStage, expectedCompleteAt).run()
+
+  await db.prepare(`UPDATE workspace_inquiries SET status = 'done', converted_order_id = ?, updated_at = datetime('now') WHERE id = ?`).bind(orderId, id).run()
+
+  return c.json({ success: true, orderId, orderCode })
+})
+
+// ── USER 포털 (/api/my/*) — 기존 로그인 세션(X-Session-Token)으로 보호. ──
+async function wsRequireUser(c: any) {
+  const db = c.env.LOOKBOOK_DB
+  const token = c.req.header('X-Session-Token') || c.req.query('token')
+  const user = await getUserFromToken(db, token || null)
+  return user
+}
+
+app.post('/api/my/inquiries', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const user = await wsRequireUser(c)
+  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  const body: any = await c.req.json().catch(() => ({}))
+  const title = String(body.title || '').trim()
+  if (!title) return c.json({ success: false, message: '문의 제목을 입력해주세요.' }, 400)
+  const industry = WORKSPACE_INDUSTRIES.includes(body.industry) ? body.industry : 'clothing'
+  const designNote = String(body.designNote || '').trim() || null
+  const desiredQty = body.desiredQty ? Number(body.desiredQty) : null
+  const desiredPrice = body.desiredPrice ? Number(body.desiredPrice) : null
+  const id = crypto.randomUUID()
+  await db.prepare(`INSERT INTO workspace_inquiries (id, client_user_id, industry, title, design_note, desired_qty, desired_price) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, user.id, industry, title, designNote, desiredQty, desiredPrice).run()
+  return c.json({ success: true, id })
+})
+
+app.get('/api/my/inquiries', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const user = await wsRequireUser(c)
+  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  const { results } = await db.prepare(`SELECT * FROM workspace_inquiries WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100`).bind(user.id).all()
+  return c.json({ success: true, inquiries: (results || []).map(wsInquiryRow) })
+})
+
+app.get('/api/my/orders', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const user = await wsRequireUser(c)
+  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  const { results } = await db.prepare(`
+    SELECT o.*, p.product_code AS product_code, p.name AS product_name, COALESCE(p.category, 'clothing') AS industry,
+           sd.label AS stage_label
+    FROM workspace_orders o
+    JOIN workspace_products p ON p.id = o.product_id
+    LEFT JOIN workspace_stage_defs sd ON sd.industry = COALESCE(p.category, 'clothing') AND sd.key = o.stage
+    WHERE p.client_user_id = ?
+    ORDER BY o.created_at DESC LIMIT 200
+  `).bind(user.id).all()
+  const orders = (results || []).map((o: any) => ({
+    id: o.id, orderCode: o.order_code, productCode: o.product_code, productName: o.product_name,
+    industry: o.industry, industryLabel: WORKSPACE_INDUSTRY_LABEL[o.industry] || o.industry,
+    quantity: o.quantity, stage: o.stage, stageLabel: o.stage_label || o.stage,
+    expectedCompleteAt: o.expected_complete_at, createdAt: o.created_at, updatedAt: o.updated_at,
+  }))
+  return c.json({ success: true, orders })
+})
+
+// GET /my-production — 이지룩 USER 포털 1단계. 기존 EZlook 로그인 계정을 그대로
+// 쓰는 고객용 화면으로, 생산 문의를 남기고 내 발주의 공정 현황을 조회한다.
+app.get('/my-production', (c) => {
+  return c.html(htmlShell('생산 문의·발주 현황', `
+  <div class="toast-container" id="toastContainer"></div>
+  <style>
+    body { background: #0A0A0D; }
+    .mp-wrap { min-height: 100vh; padding: 0 0 80px; background: #0A0A0D; }
+    .mp-inner { max-width: 560px; margin: 0 auto; padding: 0 16px; }
+    .mp-header { position: sticky; top: 0; z-index: 10; background: #0A0A0D; padding: 16px; }
+    .mp-back { width: 40px; height: 40px; border: none; background: #202127; border-radius: 50%; color: #B7B7C2; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; }
+    .mp-tabs { display: flex; gap: 6px; margin: 16px 0; }
+    .mp-tab-btn { padding: 9px 18px; border-radius: 999px; border: 1px solid #2C2D35; background: #17181D; color: #82828E; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .mp-tab-btn.active { background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; border-color: transparent; }
+    .mp-section { display: none; }
+    .mp-section.active { display: block; }
+    .mp-card { border: 1px solid #2C2D35; border-radius: 14px; background: #17181D; padding: 16px; margin-bottom: 12px; }
+    .mp-input, .mp-select, .mp-textarea { width: 100%; padding: 11px 14px; background: #202127; border: 1px solid #2C2D35; border-radius: 10px; color: #F2F2F5; font-size: 14px; outline: none; margin-bottom: 10px; font-family: inherit; }
+    .mp-textarea { min-height: 80px; resize: vertical; }
+    .mp-cta { display: block; width: 100%; padding: 14px 20px; background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; text-align: center; }
+    .mp-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+    .mp-badge.new, .mp-badge.receipt { background: #7C3AED22; color: #A78BFA; }
+    .mp-badge.in_discussion { background: #f59e0b22; color: #f59e0b; }
+    .mp-badge.done { background: #22c55e22; color: #22c55e; }
+    .mp-empty { color: #82828E; font-size: 14px; padding: 40px 0; text-align: center; }
+    .mp-title { font-size: 15px; font-weight: 700; color: #F2F2F5; }
+    .mp-meta { font-size: 12px; color: #82828E; margin-top: 4px; }
+  </style>
+
+  <div class="mp-wrap">
+    <div class="mp-header" style="display:flex;align-items:center;justify-content:space-between;max-width:560px;margin:0 auto;">
+      <a href="/" class="gapp-logo" style="display:flex;align-items:center;gap:8px;text-decoration:none;"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
+      <div style="display:flex;align-items:center;gap:8px;position:relative;">
+        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:14px;padding:6px 14px;background:#202127;border:1px solid #0579B3;border-radius:20px;color:#0DA8D6;cursor:pointer;font-weight:600;">로그인</button>
+        <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
+          <span id="navUserCredits" style="display:none;"></span>
+          <span id="navUserName" style="display:none;"></span>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#166534,#1E3A8A);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;cursor:pointer;user-select:none;">?</div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#17181D;border:1px solid #2C2D35;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.4);z-index:10001;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #2C2D35;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#F2F2F5;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:#82828E;margin-bottom:6px;"></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#0DA8D6;"></div>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:linear-gradient(135deg,#166534,#1E3A8A);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+              </div>
+            </a>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="/gov-support" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">지원사업 도우미</a>
+            <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:#2C2D35;margin:4px 0;"></div>
+            <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mp-inner">
+      <div style="display:flex;align-items:center;gap:12px;margin:12px 0 4px;">
+        <a href="/" class="mp-back">‹</a>
+        <h1 style="font-size:21px;font-weight:700;color:#F2F2F5;margin:0;">생산 문의·발주 현황</h1>
+      </div>
+
+      <div id="mpLoading" style="text-align:center;padding:60px 0;color:#82828E;font-size:15px;">불러오는 중...</div>
+
+      <div id="mpNeedLogin" style="display:none;text-align:center;padding:60px 20px;">
+        <p style="font-size:16px;color:#B7B7C2;margin-bottom:16px;">로그인 후 이용할 수 있어요.</p>
+        <a href="/" class="mp-cta" style="display:inline-block;width:auto;padding:10px 22px;border-radius:24px;">홈에서 로그인하기</a>
+      </div>
+
+      <div id="mpMain" style="display:none;">
+        <div class="mp-tabs">
+          <button class="mp-tab-btn active" data-tab="inquiry" onclick="mpSwitchTab('inquiry')">생산 문의</button>
+          <button class="mp-tab-btn" data-tab="orders" onclick="mpSwitchTab('orders')">내 발주 현황</button>
+        </div>
+
+        <div class="mp-section active" id="mpSection-inquiry">
+          <div class="mp-card">
+            <div style="font-size:14px;font-weight:700;color:#F2F2F5;margin-bottom:10px;">새 생산 문의 작성</div>
+            <select class="mp-select" id="mpIndustry">
+              ${WORKSPACE_INDUSTRIES.map((ind) => '<option value="' + ind + '">' + WORKSPACE_INDUSTRY_LABEL[ind] + '</option>').join('')}
+            </select>
+            <input class="mp-input" id="mpTitle" placeholder="제품명 / 디자인명 *"/>
+            <textarea class="mp-textarea" id="mpDesignNote" placeholder="재질, 색상, 참고 이미지 설명 등 자유롭게 적어주세요"></textarea>
+            <input class="mp-input" id="mpQty" type="number" placeholder="희망 수량"/>
+            <input class="mp-input" id="mpPrice" type="number" placeholder="희망 단가(원, 선택)"/>
+            <button class="mp-cta" onclick="mpSubmitInquiry()">문의 보내기</button>
+          </div>
+          <div id="mpInquiryList"></div>
+        </div>
+
+        <div class="mp-section" id="mpSection-orders">
+          <div id="mpOrderList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var MP_TOKEN = localStorage.getItem('lookbook_token') || '';
+    function mpHeaders() { return { 'Content-Type': 'application/json', 'X-Session-Token': MP_TOKEN }; }
+    function mpEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+
+    function mpSwitchTab(name) {
+      document.querySelectorAll('.mp-tab-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tab') === name); });
+      document.querySelectorAll('.mp-section').forEach(function (s) { s.classList.remove('active'); });
+      document.getElementById('mpSection-' + name).classList.add('active');
+      if (name === 'inquiry') mpLoadInquiries();
+      if (name === 'orders') mpLoadOrders();
+    }
+
+    async function mpInit() {
+      if (!MP_TOKEN) { document.getElementById('mpLoading').style.display = 'none'; document.getElementById('mpNeedLogin').style.display = 'block'; return; }
+      try {
+        var res = await fetch('/api/my/inquiries', { headers: mpHeaders() });
+        if (res.status === 401) { document.getElementById('mpLoading').style.display = 'none'; document.getElementById('mpNeedLogin').style.display = 'block'; return; }
+        document.getElementById('mpLoading').style.display = 'none';
+        document.getElementById('mpMain').style.display = 'block';
+        mpRenderInquiries(await res.json());
+      } catch (e) {
+        document.getElementById('mpLoading').style.display = 'none';
+        document.getElementById('mpNeedLogin').style.display = 'block';
+      }
+    }
+
+    async function mpSubmitInquiry() {
+      var title = document.getElementById('mpTitle').value.trim();
+      if (!title) { alert('제품명을 입력해주세요.'); return; }
+      var body = {
+        industry: document.getElementById('mpIndustry').value,
+        title: title,
+        designNote: document.getElementById('mpDesignNote').value.trim(),
+        desiredQty: document.getElementById('mpQty').value,
+        desiredPrice: document.getElementById('mpPrice').value,
+      };
+      try {
+        var res = await fetch('/api/my/inquiries', { method: 'POST', headers: mpHeaders(), body: JSON.stringify(body) });
+        var data = await res.json();
+        if (!data.success) { alert(data.message || '전송 실패'); return; }
+        document.getElementById('mpTitle').value = '';
+        document.getElementById('mpDesignNote').value = '';
+        document.getElementById('mpQty').value = '';
+        document.getElementById('mpPrice').value = '';
+        mpLoadInquiries();
+      } catch (e) { alert('서버 오류가 발생했습니다.'); }
+    }
+
+    async function mpLoadInquiries() {
+      try {
+        var res = await fetch('/api/my/inquiries', { headers: mpHeaders() });
+        mpRenderInquiries(await res.json());
+      } catch (e) { console.error(e); }
+    }
+
+    function mpRenderInquiries(data) {
+      if (!data.success) return;
+      var statusLabel = { new: '신규 접수', in_discussion: '상담중', done: '발주 완료' };
+      var list = document.getElementById('mpInquiryList');
+      if (!data.inquiries.length) { list.innerHTML = '<div class="mp-empty">아직 보낸 문의가 없어요.</div>'; return; }
+      list.innerHTML = data.inquiries.map(function (q) {
+        return '<div class="mp-card">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+          '<div><div class="mp-title">' + mpEsc(q.title) + '</div><div class="mp-meta">희망수량 ' + (q.desiredQty || '-') + ' · ' + q.createdAt + '</div></div>' +
+          '<span class="mp-badge ' + q.status + '">' + statusLabel[q.status] + '</span>' +
+          '</div>' +
+          (q.adminNote ? '<div class="mp-meta" style="margin-top:8px;color:#B7B7C2;">담당자 메모: ' + mpEsc(q.adminNote) + '</div>' : '') +
+          '</div>';
+      }).join('');
+    }
+
+    async function mpLoadOrders() {
+      try {
+        var res = await fetch('/api/my/orders', { headers: mpHeaders() });
+        var data = await res.json();
+        if (!data.success) return;
+        var list = document.getElementById('mpOrderList');
+        if (!data.orders.length) { list.innerHTML = '<div class="mp-empty">진행 중인 발주가 없어요.</div>'; return; }
+        list.innerHTML = data.orders.map(function (o) {
+          return '<div class="mp-card">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+            '<div><div class="mp-title">' + mpEsc(o.productName) + ' (' + mpEsc(o.productCode) + ')</div><div class="mp-meta">' + mpEsc(o.industryLabel) + ' · 수량 ' + (o.quantity || 0) + '개' + (o.expectedCompleteAt ? ' · 완료예정 ' + o.expectedCompleteAt : '') + '</div></div>' +
+            '<span class="mp-badge receipt">' + mpEsc(o.stageLabel) + '</span>' +
+            '</div></div>';
+        }).join('');
+      } catch (e) { console.error(e); }
+    }
+
+    mpInit();
+  </script>
+  `, '', 'EZlook 생산 문의와 내 발주의 공정 현황을 확인하세요.', c.env.GA4_MEASUREMENT_ID))
+})
+
 // AI 대화형 입력 — 자연어 문장을 gpt-4o-mini로 구조화한 뒤, 입고/불량 기록은
 // 반드시 사람이 "확인"을 눌러야 실제로 저장된다(실행 전 확인 + 되돌리기).
 const WORKSPACE_CHAT_SYSTEM_PROMPT = '너는 패션 제조업체 현장 워크스페이스의 기록 보조 AI다. 작업자가 입력한 한국어 문장을 보고 아래 JSON 스키마로만 답하라. 다른 설명은 절대 출력하지 마라.\n\n' +
@@ -16988,6 +17324,16 @@ app.get('/workspace', (c) => {
     .ws-modal label{display:block;font-size:12px;color:#8b8ba0;margin:10px 0 4px;}
     .ws-modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
     .ws-empty{color:#8b8ba0;font-size:13px;padding:30px;text-align:center;}
+    .ws-inquiry-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:12px;padding:16px;margin-bottom:12px;}
+    .ws-inquiry-card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+    .ws-inquiry-card .title{font-size:15px;font-weight:700;}
+    .ws-inquiry-card .meta{font-size:12px;color:#8b8ba0;margin-top:2px;}
+    .ws-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;}
+    .ws-badge.new{background:#7C3AED22;color:#A78BFA;}
+    .ws-badge.in_discussion{background:#f59e0b22;color:#f59e0b;}
+    .ws-badge.done{background:#22c55e22;color:#22c55e;}
+    .ws-inquiry-card .note{font-size:13px;color:#B7B7C2;margin:8px 0;white-space:pre-wrap;}
+    .ws-inquiry-card .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
   </style>
 </head>
 <body>
@@ -17012,6 +17358,7 @@ app.get('/workspace', (c) => {
   <div class="ws-body">
     <div class="ws-sidebar">
       <button class="ws-nav-btn active" data-panel="home" onclick="wsSwitchPanel('home')">홈</button>
+      <button class="ws-nav-btn" data-panel="inquiry" onclick="wsSwitchPanel('inquiry')">생산문의</button>
       <button class="ws-nav-btn" data-panel="board" onclick="wsSwitchPanel('board')">공정보드</button>
       <button class="ws-nav-btn" data-panel="history" onclick="wsSwitchPanel('history')">생산이력</button>
       <button class="ws-nav-btn" data-panel="chat" onclick="wsSwitchPanel('chat')">AI 입력</button>
@@ -17021,6 +17368,12 @@ app.get('/workspace', (c) => {
       <div class="ws-panel active" id="wsPanel-home">
         <h1>오늘의 공정 현황</h1>
         <div class="ws-cards" id="wsHomeCards"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-inquiry">
+        <h1>생산문의</h1>
+        <div class="ws-tabs" id="wsInquiryTabs"></div>
+        <div id="wsInquiryList"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-board">
@@ -17116,6 +17469,26 @@ app.get('/workspace', (c) => {
   </div>
 </div>
 
+<div class="ws-modal-overlay" id="wsConvertModalOverlay">
+  <div class="ws-modal">
+    <h3>발주로 전환</h3>
+    <label>제품코드 *</label>
+    <input class="ws-input" id="wsConvertProductCode" style="width:100%"/>
+    <label>제품명 *</label>
+    <input class="ws-input" id="wsConvertProductName" style="width:100%"/>
+    <label>공급 공장</label>
+    <input class="ws-input" id="wsConvertFactoryName" style="width:100%"/>
+    <label>수량</label>
+    <input class="ws-input" id="wsConvertQuantity" type="number" style="width:100%"/>
+    <label>예상 완료일</label>
+    <input class="ws-input" id="wsConvertDueDate" type="date" style="width:100%"/>
+    <div class="row">
+      <button class="ws-btn secondary" onclick="wsCloseConvertModal()">취소</button>
+      <button class="ws-btn" onclick="wsSubmitConvert()">발주 생성</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var wsAdminPassword = '';
 var wsIndustries = ${JSON.stringify(WORKSPACE_INDUSTRIES)};
@@ -17166,9 +17539,93 @@ function wsSwitchPanel(name) {
   document.querySelectorAll('.ws-panel').forEach(function (p) { p.classList.remove('active'); });
   document.getElementById('wsPanel-' + name).classList.add('active');
   if (name === 'home') wsLoadHome();
+  if (name === 'inquiry') wsLoadInquiries();
   if (name === 'board') wsLoadBoard();
   if (name === 'history') wsLoadProductList();
   if (name === 'chat') wsLoadChat();
+}
+
+var wsInquiryStatusTab = '';
+var wsConvertInquiryId = null;
+
+function wsRenderInquiryTabs() {
+  var el = document.getElementById('wsInquiryTabs');
+  if (!el) return;
+  var tabs = [['', '전체'], ['new', '신규'], ['in_discussion', '상담중'], ['done', '완료']];
+  el.innerHTML = tabs.map(function (t) {
+    return '<button class="ws-tab-btn' + (t[0] === wsInquiryStatusTab ? ' active' : '') + '" onclick="wsSelectInquiryTab(\\'' + t[0] + '\\')">' + t[1] + '</button>';
+  }).join('');
+}
+function wsSelectInquiryTab(status) {
+  wsInquiryStatusTab = status;
+  wsRenderInquiryTabs();
+  wsLoadInquiries();
+}
+
+async function wsLoadInquiries() {
+  wsRenderInquiryTabs();
+  try {
+    var res = await fetch('/api/workspace/inquiries' + (wsInquiryStatusTab ? ('?status=' + wsInquiryStatusTab) : ''), { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var statusLabel = { new: '신규', in_discussion: '상담중', done: '완료' };
+    var list = document.getElementById('wsInquiryList');
+    if (!data.inquiries.length) { list.innerHTML = '<div class="ws-empty">문의가 없습니다.</div>'; return; }
+    list.innerHTML = data.inquiries.map(function (q) {
+      var actions = '';
+      if (q.status !== 'done') {
+        actions = '<select class="ws-input" style="flex:0 0 110px" onchange="wsUpdateInquiryStatus(\\'' + q.id + '\\', this.value)">' +
+          '<option value="new"' + (q.status === 'new' ? ' selected' : '') + '>신규</option>' +
+          '<option value="in_discussion"' + (q.status === 'in_discussion' ? ' selected' : '') + '>상담중</option>' +
+          '</select>' +
+          '<button class="ws-btn" onclick="wsOpenConvertModal(\\'' + q.id + '\\', \\'' + wsEsc(q.title) + '\\', ' + (q.desiredQty || 0) + ')">발주로 전환</button>';
+      } else {
+        actions = '<span class="ws-badge done">발주 완료</span>';
+      }
+      return '<div class="ws-inquiry-card">' +
+        '<div class="top"><div><div class="title">' + wsEsc(q.title) + '</div><div class="meta">' + wsEsc(q.clientName || q.clientEmail) + ' · ' + wsEsc(wsIndustryLabel[q.industry] || q.industry) + ' · 희망수량 ' + (q.desiredQty || '-') + ' · ' + q.createdAt + '</div></div><span class="ws-badge ' + q.status + '">' + statusLabel[q.status] + '</span></div>' +
+        (q.designNote ? '<div class="note">' + wsEsc(q.designNote) + '</div>' : '') +
+        '<div class="actions">' + actions + '</div>' +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function wsUpdateInquiryStatus(id, status) {
+  try {
+    await fetch('/api/workspace/inquiries/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ status: status }) });
+    wsLoadInquiries();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+function wsOpenConvertModal(id, title, qty) {
+  wsConvertInquiryId = id;
+  document.getElementById('wsConvertProductCode').value = '';
+  document.getElementById('wsConvertProductName').value = title || '';
+  document.getElementById('wsConvertFactoryName').value = '';
+  document.getElementById('wsConvertQuantity').value = qty || '';
+  document.getElementById('wsConvertDueDate').value = '';
+  document.getElementById('wsConvertModalOverlay').style.display = 'flex';
+}
+function wsCloseConvertModal() { document.getElementById('wsConvertModalOverlay').style.display = 'none'; }
+
+async function wsSubmitConvert() {
+  if (!wsConvertInquiryId) return;
+  var body = {
+    productCode: document.getElementById('wsConvertProductCode').value.trim(),
+    productName: document.getElementById('wsConvertProductName').value.trim(),
+    factoryName: document.getElementById('wsConvertFactoryName').value.trim(),
+    quantity: document.getElementById('wsConvertQuantity').value,
+    expectedCompleteAt: document.getElementById('wsConvertDueDate').value,
+  };
+  if (!body.productCode || !body.productName) { alert('제품코드와 제품명을 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/inquiries/' + wsConvertInquiryId + '/convert', { method: 'POST', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '전환 실패'); return; }
+    wsCloseConvertModal();
+    wsLoadInquiries(); wsLoadHome();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
 }
 
 function wsInit() { wsLoadStageSets().then(function () { wsRenderIndustryTabs(); wsLoadHome(); }); }
