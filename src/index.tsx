@@ -16648,11 +16648,14 @@ app.delete('/api/workspace/stages/:id', adminAuth, async (c) => {
 })
 
 function wsOrderRow(o: any) {
+  let options: { label: string; value: string }[] = []
+  if (o.options_json) { try { options = JSON.parse(o.options_json) } catch { options = [] } }
   return {
     id: o.id, orderCode: o.order_code, productId: o.product_id, productCode: o.product_code,
     productName: o.product_name, clientName: o.client_name, factoryName: o.factory_name,
     quantity: o.quantity, stage: o.stage, industry: o.industry || 'clothing', assignedTeam: o.assigned_team,
     expectedCompleteAt: o.expected_complete_at, note: o.note, createdAt: o.created_at, updatedAt: o.updated_at,
+    options, unitPrice: o.unit_price ?? null, totalAmount: o.total_amount ?? null, shippingAddress: o.shipping_address ?? null,
   }
 }
 
@@ -16736,6 +16739,13 @@ app.patch('/api/workspace/orders/:id', adminAuth, async (c) => {
   if (body.expectedCompleteAt !== undefined) { sets.push('expected_complete_at = ?'); vals.push(body.expectedCompleteAt || null) }
   if (body.note !== undefined) { sets.push('note = ?'); vals.push(body.note || null) }
   if (body.quantity !== undefined) { sets.push('quantity = ?'); vals.push(Number(body.quantity) || 0) }
+  if (body.options !== undefined) {
+    const options = Array.isArray(body.options) ? body.options.filter((o: any) => o && (o.label || o.value)) : []
+    sets.push('options_json = ?'); vals.push(options.length ? JSON.stringify(options) : null)
+  }
+  if (body.unitPrice !== undefined) { sets.push('unit_price = ?'); vals.push(body.unitPrice === '' || body.unitPrice === null ? null : Number(body.unitPrice)) }
+  if (body.totalAmount !== undefined) { sets.push('total_amount = ?'); vals.push(body.totalAmount === '' || body.totalAmount === null ? null : Number(body.totalAmount)) }
+  if (body.shippingAddress !== undefined) { sets.push('shipping_address = ?'); vals.push(body.shippingAddress || null) }
   if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
   sets.push("updated_at = datetime('now')")
   vals.push(id)
@@ -17334,6 +17344,13 @@ app.get('/workspace', (c) => {
     .ws-badge.done{background:#22c55e22;color:#22c55e;}
     .ws-inquiry-card .note{font-size:13px;color:#B7B7C2;margin:8px 0;white-space:pre-wrap;}
     .ws-inquiry-card .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+    .ws-opt-row{display:flex;gap:6px;margin-bottom:6px;}
+    .ws-opt-row input{flex:1;}
+    .ws-opt-row button{flex:0 0 32px;background:#3a3a60;color:#fff;border:none;border-radius:8px;cursor:pointer;}
+    .ws-order-row{display:flex;align-items:center;gap:10px;background:#1a1a2e;border:1px solid #2e2e50;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;font-size:13px;}
+    .ws-order-row:hover{border-color:#7C3AED;}
+    .ws-order-row .col{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ws-order-row .col.code{flex:1.3;font-weight:700;}
   </style>
 </head>
 <body>
@@ -17360,6 +17377,7 @@ app.get('/workspace', (c) => {
       <button class="ws-nav-btn active" data-panel="home" onclick="wsSwitchPanel('home')">홈</button>
       <button class="ws-nav-btn" data-panel="inquiry" onclick="wsSwitchPanel('inquiry')">생산문의</button>
       <button class="ws-nav-btn" data-panel="board" onclick="wsSwitchPanel('board')">공정보드</button>
+      <button class="ws-nav-btn" data-panel="orders" onclick="wsSwitchPanel('orders')">발주관리</button>
       <button class="ws-nav-btn" data-panel="history" onclick="wsSwitchPanel('history')">생산이력</button>
       <button class="ws-nav-btn" data-panel="chat" onclick="wsSwitchPanel('chat')">AI 입력</button>
     </div>
@@ -17385,6 +17403,15 @@ app.get('/workspace', (c) => {
           <button class="ws-btn" onclick="wsOpenNewOrderModal()">+ 발주 등록</button>
         </div>
         <div class="ws-board" id="wsBoard"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-orders">
+        <h1>발주관리</h1>
+        <div class="ws-toolbar">
+          <input class="ws-input" id="wsOrdersSearch" placeholder="발주코드·제품코드·고객사로 검색" onkeydown="if(event.key==='Enter')wsLoadOrdersList()"/>
+          <button class="ws-btn secondary" onclick="wsLoadOrdersList()">검색</button>
+        </div>
+        <div id="wsOrdersTable"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-history">
@@ -17440,12 +17467,29 @@ app.get('/workspace', (c) => {
 </div>
 
 <div class="ws-modal-overlay" id="wsOrderDetailOverlay">
-  <div class="ws-modal">
+  <div class="ws-modal" style="max-width:480px;max-height:85vh;overflow-y:auto;">
     <h3 id="wsDetailTitle">발주 상세</h3>
     <label>공정 단계</label>
     <select class="ws-input" id="wsDetailStage" style="width:100%"></select>
+    <label>수량</label>
+    <input class="ws-input" id="wsDetailQuantity" type="number" style="width:100%"/>
     <label>담당 팀</label>
     <input class="ws-input" id="wsDetailTeam" style="width:100%"/>
+    <label>옵션</label>
+    <div id="wsDetailOptions"></div>
+    <button class="ws-btn secondary" style="margin-bottom:10px" onclick="wsAddDetailOptionRow()">+ 옵션 추가</button>
+    <div style="display:flex;gap:8px;">
+      <div style="flex:1">
+        <label>단가(원)</label>
+        <input class="ws-input" id="wsDetailUnitPrice" type="number" style="width:100%" oninput="wsRecalcDetailTotal()"/>
+      </div>
+      <div style="flex:1">
+        <label>합계 금액(원)</label>
+        <input class="ws-input" id="wsDetailTotalAmount" type="number" style="width:100%"/>
+      </div>
+    </div>
+    <label>배송지</label>
+    <input class="ws-input" id="wsDetailShipping" style="width:100%"/>
     <label>메모</label>
     <input class="ws-input" id="wsDetailNote" style="width:100%"/>
     <div class="row">
@@ -17541,8 +17585,31 @@ function wsSwitchPanel(name) {
   if (name === 'home') wsLoadHome();
   if (name === 'inquiry') wsLoadInquiries();
   if (name === 'board') wsLoadBoard();
+  if (name === 'orders') wsLoadOrdersList();
   if (name === 'history') wsLoadProductList();
   if (name === 'chat') wsLoadChat();
+}
+
+async function wsLoadOrdersList() {
+  var q = document.getElementById('wsOrdersSearch').value.trim();
+  try {
+    var res = await fetch('/api/workspace/orders' + (q ? ('?q=' + encodeURIComponent(q)) : ''), { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    window._wsOrders = data.orders;
+    var table = document.getElementById('wsOrdersTable');
+    if (!data.orders.length) { table.innerHTML = '<div class="ws-empty">발주가 없습니다.</div>'; return; }
+    table.innerHTML = data.orders.map(function (o) {
+      return '<div class="ws-order-row" onclick="wsOpenDetailModal(\\'' + o.id + '\\')">' +
+        '<span class="col code">' + wsEsc(o.orderCode) + '</span>' +
+        '<span class="col">' + wsEsc(o.productCode) + ' ' + wsEsc(o.productName) + '</span>' +
+        '<span class="col">' + wsEsc(wsIndustryLabel[o.industry] || o.industry) + '</span>' +
+        '<span class="col">' + (o.quantity || 0) + '개</span>' +
+        '<span class="col">' + (o.totalAmount != null ? o.totalAmount.toLocaleString() + '원' : '-') + '</span>' +
+        '<span class="col">' + wsEsc(o.factoryName || '-') + '</span>' +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
 }
 
 var wsInquiryStatusTab = '';
@@ -17764,24 +17831,60 @@ function wsOpenDetailModal(orderId) {
     return '<option value="' + st.key + '">' + st.label + '</option>';
   }).join('');
   document.getElementById('wsDetailStage').value = order.stage;
+  document.getElementById('wsDetailQuantity').value = order.quantity || 0;
   document.getElementById('wsDetailTeam').value = order.assignedTeam || '';
+  wsRenderDetailOptions(order.options || []);
+  document.getElementById('wsDetailUnitPrice').value = order.unitPrice != null ? order.unitPrice : '';
+  document.getElementById('wsDetailTotalAmount').value = order.totalAmount != null ? order.totalAmount : '';
+  document.getElementById('wsDetailShipping').value = order.shippingAddress || '';
   document.getElementById('wsDetailNote').value = order.note || '';
   document.getElementById('wsOrderDetailOverlay').style.display = 'flex';
 }
 function wsCloseDetailModal() { document.getElementById('wsOrderDetailOverlay').style.display = 'none'; }
 
+function wsRenderDetailOptions(options) {
+  var el = document.getElementById('wsDetailOptions');
+  el.innerHTML = '';
+  if (!options.length) options = [{ label: '', value: '' }];
+  options.forEach(function (o) { wsAddDetailOptionRow(o.label, o.value); });
+}
+
+function wsAddDetailOptionRow(label, value) {
+  var el = document.getElementById('wsDetailOptions');
+  var row = document.createElement('div');
+  row.className = 'ws-opt-row';
+  row.innerHTML = '<input class="ws-input opt-label" placeholder="항목(예: 사이즈)" value="' + wsEsc(label || '') + '"/>' +
+    '<input class="ws-input opt-value" placeholder="값(예: L)" value="' + wsEsc(value || '') + '"/>' +
+    '<button type="button" onclick="this.parentElement.remove()">×</button>';
+  el.appendChild(row);
+}
+
+function wsRecalcDetailTotal() {
+  var qty = Number(document.getElementById('wsDetailQuantity').value) || 0;
+  var unitPrice = Number(document.getElementById('wsDetailUnitPrice').value) || 0;
+  document.getElementById('wsDetailTotalAmount').value = qty * unitPrice;
+}
+
 async function wsSubmitDetail() {
   if (!wsCurrentOrderId) return;
+  var options = Array.from(document.querySelectorAll('#wsDetailOptions .ws-opt-row')).map(function (row) {
+    return { label: row.querySelector('.opt-label').value.trim(), value: row.querySelector('.opt-value').value.trim() };
+  }).filter(function (o) { return o.label || o.value; });
   var body = {
     stage: document.getElementById('wsDetailStage').value,
+    quantity: document.getElementById('wsDetailQuantity').value,
     assignedTeam: document.getElementById('wsDetailTeam').value,
+    options: options,
+    unitPrice: document.getElementById('wsDetailUnitPrice').value,
+    totalAmount: document.getElementById('wsDetailTotalAmount').value,
+    shippingAddress: document.getElementById('wsDetailShipping').value,
     note: document.getElementById('wsDetailNote').value,
   };
   try {
     var res = await fetch('/api/workspace/orders/' + wsCurrentOrderId, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify(body) });
     var data = await res.json();
     if (!data.success) { alert(data.message || '저장 실패'); return; }
-    wsCloseDetailModal(); wsLoadBoard(); wsLoadHome();
+    wsCloseDetailModal(); wsLoadBoard(); wsLoadOrdersList(); wsLoadHome();
   } catch (e) { alert('서버 오류가 발생했습니다.'); }
 }
 
