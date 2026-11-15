@@ -213,7 +213,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mwhvl2ol`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mwhwaxbj`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -10332,7 +10332,7 @@ function wsRestoreOperator() {
 // ── 메뉴별 도움말 — "왜 만들어졌는지" + "사용 방법". 각 패널 제목 옆 ? 버튼에서 호출.
 var WS_HELP = {
   home: { title: '홈 — 오늘의 공정 현황', reason: '매일 아침 전체 공정 현황과 출고 예정을 한눈에 보기 위한 대시보드입니다.', howto: '업종별 공정 단계마다 진행 중인 발주 건수를 카드로 보여줍니다. 아래 "출고 예정 일정"에서는 완료 예정일이 임박한 순서로 발주 목록을 확인할 수 있습니다.' },
-  notify: { title: '알림', reason: '유사 서비스를 벤치마킹한 결과 알림이 핵심 기능으로 확인되어 추가했습니다. 발주·문의·명세서 등 주요 이벤트가 생기면 자동으로 알림이 쌓입니다.', howto: '사이드바의 알림 뱃지로 안 읽은 알림 수를 확인하고, 목록에서 클릭하면 읽음 처리됩니다. "전체 읽음 처리" 버튼으로 한 번에 정리할 수 있습니다.' },
+  notify: { title: '알림', reason: '발주·문의·명세서 등 주요 이벤트가 생기면 자동으로 알림이 쌓여, 매번 각 메뉴를 직접 들어가 확인하지 않아도 되도록 만들었습니다.', howto: '사이드바의 알림 뱃지로 안 읽은 알림 수를 확인하고, 목록에서 클릭하면 읽음 처리됩니다. "전체 읽음 처리" 버튼으로 한 번에 정리할 수 있습니다.' },
   inquiry: { title: '생산문의', reason: '고객사(/my-production)가 보낸 생산 문의를 받아 발주로 전환하기 위한 메뉴입니다 — ADMIN과 USER를 잇는 첫 접점입니다.', howto: '상태 탭(대기/전환완료 등)에서 문의 내용을 확인하고, "발주로 전환" 버튼을 누르면 제조팀이 자동 배정되며 발주가 생성됩니다.' },
   board: { title: '공정보드', reason: '의류·주얼리·가방·신발은 제조 공정 단계가 서로 달라서, 업종별로 독립된 칸반보드로 진행 상황을 추적하기 위해 만들었습니다.', howto: '상단 업종 탭을 선택하면 해당 업종의 공정 단계가 열로 나타납니다. 발주 카드의 버튼으로 다음 단계로 이동시키고, 공정 단계 자체는 화면 하단에서 직접 추가·삭제할 수 있습니다.' },
   orders: { title: '발주관리', reason: '생산 문의를 발주로 전환한 뒤 품목별 옵션·단가·수량·배송지까지 상세하게 관리하기 위해 만들었습니다.', howto: '검색창에서 발주를 찾고 목록 행을 클릭하면 상세 모달이 열립니다. 옵션/단가/합계금액/배송지/담당팀/완료예정일을 확인하고 수정할 수 있습니다.' },
@@ -10341,7 +10341,7 @@ var WS_HELP = {
   invoice: { title: '거래명세서', reason: '발주가 끝난 뒤 고객사에 전달할 거래명세서를 발주 데이터 기반으로 자동 생성하기 위해 만들었습니다.', howto: '"명세서 생성" 버튼으로 발주를 선택해 명세서를 만들고, 목록에서 열어 품목별 내역을 확인·인쇄합니다. 상태(발행/결제완료 등)도 여기서 바꿉니다.' },
   clients: { title: '고객사·공장', reason: '고객사는 기존 회원 계정을 그대로 쓰되 사업자 정보를, 외주 공장은 연락처·카테고리를 한곳에서 관리하기 위해 만들었습니다.', howto: '고객사 탭에서 회사명·담당자·연락처를 저장하고, 공장 탭에서 공장을 추가·삭제합니다.' },
   stats: { title: '매출통계', reason: '발주 건수와 결제 금액을 기간별로 집계해 운영 현황을 빠르게 파악하기 위해 만들었습니다.', howto: '일간/주간/월간/분기별 단위를 선택하면 해당 기준으로 집계된 발주 건수·금액이 표시됩니다.' },
-  announce: { title: '공지사항', reason: '벤치마킹 결과를 반영해 고객사에 공지와 팝업으로 소식을 전달하기 위해 만들었습니다.', howto: '공지를 작성할 때 "팝업으로 노출"을 체크하면 /my-production 첫 화면에 팝업으로 뜹니다. 활성/비활성으로 노출 여부를 바로 바꿀 수 있습니다.' },
+  announce: { title: '공지사항', reason: '고객사에게 공지사항과 팝업으로 소식을 빠르게 전달하기 위해 만들었습니다.', howto: '공지를 작성할 때 "팝업으로 노출"을 체크하면 /my-production 첫 화면에 팝업으로 뜹니다. 활성/비활성으로 노출 여부를 바로 바꿀 수 있습니다.' },
   options: { title: '옵션 템플릿', reason: '발주를 만들 때마다 재질·색상 같은 옵션을 새로 입력하지 않도록, 자주 쓰는 옵션 묶음을 업종별 템플릿으로 저장하기 위해 만들었습니다.', howto: '업종을 고르고 옵션 라벨/값을 추가해 템플릿으로 저장합니다. 발주를 생성할 때 템플릿을 불러와 그대로 재사용할 수 있습니다.' },
   reconcile: { title: '공장별 발주·입고 대조', reason: '공장별 발주 수량과 실제 입고·불량 수량을 대조해서 공장의 품질·납기를 점검하기 위해 만들었습니다.', howto: '별도 입력 없이, 발주 데이터와 검수 메뉴에서 기록한 입고 로그를 공장별로 자동 집계해 표로 보여줍니다.' },
   workflow: { title: '워크플로우', reason: '캐드/원본, 부자재, 수리 등 부서 간 요청이 누락되지 않도록 티켓으로 남기기 위해 만들었습니다.', howto: '요청 유형·제목·제품코드·요청자를 입력해 등록하면, 상태를 접수→진행→완료 순으로 바꿔가며 처리합니다.' },
