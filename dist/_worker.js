@@ -213,7 +213,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mwhjtsu1`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mwhky465`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -8257,6 +8257,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div id="mpMain" style="display:none;">
+        <div id="mpAnnounceList" style="margin-bottom:14px;"></div>
         <div class="mp-tabs">
           <button class="mp-tab-btn active" data-tab="inquiry" onclick="mpSwitchTab('inquiry')">생산 문의</button>
           <button class="mp-tab-btn" data-tab="orders" onclick="mpSwitchTab('orders')">내 발주 현황</button>
@@ -8284,6 +8285,14 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     </div>
   </div>
 
+  <div id="mpPopupOverlay" style="display:none;position:fixed;inset:0;background:#000000aa;align-items:center;justify-content:center;z-index:9500;">
+    <div style="background:#17181D;border:1px solid #2C2D35;border-radius:16px;padding:24px;max-width:360px;width:90%;">
+      <div id="mpPopupTitle" style="font-size:16px;font-weight:700;color:#F2F2F5;margin-bottom:10px;"></div>
+      <div id="mpPopupContent" style="font-size:13px;color:#B7B7C2;line-height:1.6;margin-bottom:18px;white-space:pre-wrap;"></div>
+      <button class="mp-cta" onclick="document.getElementById('mpPopupOverlay').style.display='none';">확인</button>
+    </div>
+  </div>
+
   <script>
     var MP_TOKEN = localStorage.getItem('lookbook_token') || '';
     function mpHeaders() { return { 'Content-Type': 'application/json', 'X-Session-Token': MP_TOKEN }; }
@@ -8305,10 +8314,29 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         document.getElementById('mpLoading').style.display = 'none';
         document.getElementById('mpMain').style.display = 'block';
         mpRenderInquiries(await res.json());
+        mpLoadAnnouncements();
       } catch (e) {
         document.getElementById('mpLoading').style.display = 'none';
         document.getElementById('mpNeedLogin').style.display = 'block';
       }
+    }
+
+    async function mpLoadAnnouncements() {
+      try {
+        var res = await fetch('/api/announcements/active');
+        var data = await res.json();
+        if (!data.success) return;
+        var popup = data.announcements.find(function (a) { return a.is_popup; });
+        if (popup) {
+          document.getElementById('mpPopupTitle').textContent = popup.title;
+          document.getElementById('mpPopupContent').textContent = popup.content || '';
+          document.getElementById('mpPopupOverlay').style.display = 'flex';
+        }
+        var list = document.getElementById('mpAnnounceList');
+        list.innerHTML = data.announcements.slice(0, 3).map(function (a) {
+          return '<div class="mp-card" style="padding:10px 14px;"><div class="mp-title" style="font-size:13px;">' + mpEsc(a.title) + '</div></div>';
+        }).join('');
+      } catch (e) { console.error(e); }
     }
 
     async function mpSubmitInquiry() {
@@ -8391,7 +8419,11 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(user_id) DO UPDATE SET company_name = excluded.company_name, contact_name = excluded.contact_name,
       contact_phone = excluded.contact_phone, note = excluded.note, updated_at = datetime('now')
-  `).bind(n,i,a,o,s).run(),e.json({success:!0})}),Q.get(`/api/workspace/factories`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=(e.req.query(`q`)||``).trim(),r=`SELECT * FROM workspace_factories`,i=[];n&&(r+=` WHERE name LIKE ? OR category LIKE ?`,i.push(`%${n}%`,`%${n}%`)),r+=` ORDER BY created_at DESC LIMIT 200`;let{results:a}=await t.prepare(r).bind(...i).all();return e.json({success:!0,factories:a||[]})}),Q.post(`/api/workspace/factories`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=await e.req.json().catch(()=>({})),r=String(n.name||``).trim();if(!r)return e.json({success:!1,message:`공장명을 입력해주세요.`},400);let i=crypto.randomUUID();return await t.prepare(`INSERT INTO workspace_factories (id, name, category, contact_info, note) VALUES (?, ?, ?, ?, ?)`).bind(i,r,String(n.category||``).trim()||null,String(n.contactInfo||``).trim()||null,String(n.note||``).trim()||null).run(),e.json({success:!0,id:i})}),Q.delete(`/api/workspace/factories/:id`,$,async e=>(await e.env.LOOKBOOK_DB.prepare(`DELETE FROM workspace_factories WHERE id = ?`).bind(e.req.param(`id`)).run(),e.json({success:!0}))),Q.get(`/workspace`,e=>e.html(`<!DOCTYPE html>
+  `).bind(n,i,a,o,s).run(),e.json({success:!0})}),Q.get(`/api/workspace/factories`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=(e.req.query(`q`)||``).trim(),r=`SELECT * FROM workspace_factories`,i=[];n&&(r+=` WHERE name LIKE ? OR category LIKE ?`,i.push(`%${n}%`,`%${n}%`)),r+=` ORDER BY created_at DESC LIMIT 200`;let{results:a}=await t.prepare(r).bind(...i).all();return e.json({success:!0,factories:a||[]})}),Q.post(`/api/workspace/factories`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=await e.req.json().catch(()=>({})),r=String(n.name||``).trim();if(!r)return e.json({success:!1,message:`공장명을 입력해주세요.`},400);let i=crypto.randomUUID();return await t.prepare(`INSERT INTO workspace_factories (id, name, category, contact_info, note) VALUES (?, ?, ?, ?, ?)`).bind(i,r,String(n.category||``).trim()||null,String(n.contactInfo||``).trim()||null,String(n.note||``).trim()||null).run(),e.json({success:!0,id:i})}),Q.delete(`/api/workspace/factories/:id`,$,async e=>(await e.env.LOOKBOOK_DB.prepare(`DELETE FROM workspace_factories WHERE id = ?`).bind(e.req.param(`id`)).run(),e.json({success:!0})));var jS={daily:`strftime('%Y-%m-%d', o.created_at)`,weekly:`strftime('%Y-W%W', o.created_at)`,monthly:`strftime('%Y-%m', o.created_at)`,quarterly:`strftime('%Y', o.created_at) || '-Q' || ((CAST(strftime('%m', o.created_at) AS INTEGER) - 1) / 3 + 1)`};Q.get(`/api/workspace/stats`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`period`)||`monthly`,r=jS[n]||jS.monthly,{results:i}=await t.prepare(`
+    SELECT ${r} AS bucket, COUNT(*) AS order_count, COALESCE(SUM(o.total_amount), 0) AS total_amount
+    FROM workspace_orders o
+    GROUP BY bucket ORDER BY bucket DESC LIMIT 60
+  `).all();return e.json({success:!0,period:n,stats:(i||[]).reverse()})}),Q.get(`/api/workspace/announcements`,$,async e=>{let{results:t}=await e.env.LOOKBOOK_DB.prepare(`SELECT * FROM workspace_announcements ORDER BY created_at DESC LIMIT 100`).all();return e.json({success:!0,announcements:t||[]})}),Q.post(`/api/workspace/announcements`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=await e.req.json().catch(()=>({})),r=String(n.title||``).trim();if(!r)return e.json({success:!1,message:`제목을 입력해주세요.`},400);let i=crypto.randomUUID();return await t.prepare(`INSERT INTO workspace_announcements (id, title, content, is_popup) VALUES (?, ?, ?, ?)`).bind(i,r,String(n.content||``).trim()||null,+!!n.isPopup).run(),e.json({success:!0,id:i})}),Q.patch(`/api/workspace/announcements/:id`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.param(`id`),r=await e.req.json().catch(()=>({})),i=[],a=[];return r.isActive!==void 0&&(i.push(`is_active = ?`),a.push(+!!r.isActive)),r.isPopup!==void 0&&(i.push(`is_popup = ?`),a.push(+!!r.isPopup)),i.length?(i.push(`updated_at = datetime('now')`),a.push(n),await t.prepare(`UPDATE workspace_announcements SET ${i.join(`, `)} WHERE id = ?`).bind(...a).run(),e.json({success:!0})):e.json({success:!1,message:`변경할 값이 없습니다.`},400)}),Q.delete(`/api/workspace/announcements/:id`,$,async e=>(await e.env.LOOKBOOK_DB.prepare(`DELETE FROM workspace_announcements WHERE id = ?`).bind(e.req.param(`id`)).run(),e.json({success:!0}))),Q.get(`/api/announcements/active`,async e=>{let{results:t}=await e.env.LOOKBOOK_DB.prepare(`SELECT id, title, content, is_popup FROM workspace_announcements WHERE is_active = 1 ORDER BY created_at DESC LIMIT 20`).all();return e.json({success:!0,announcements:t||[]})}),Q.get(`/api/workspace/option-templates`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=e.req.query(`industry`)||``,r=`SELECT * FROM workspace_option_templates`,i=[];n&&SS.includes(n)&&(r+=` WHERE industry = ?`,i.push(n)),r+=` ORDER BY created_at DESC LIMIT 100`;let{results:a}=await t.prepare(r).bind(...i).all(),o=(a||[]).map(e=>{let t=[];try{t=JSON.parse(e.options_json)}catch{t=[]}return{id:e.id,industry:e.industry,label:e.label,options:t,createdAt:e.created_at}});return e.json({success:!0,templates:o})}),Q.post(`/api/workspace/option-templates`,$,async e=>{let t=e.env.LOOKBOOK_DB,n=await e.req.json().catch(()=>({})),r=String(n.label||``).trim(),i=Array.isArray(n.options)?n.options.filter(e=>e&&(e.label||e.value)):[];if(!r)return e.json({success:!1,message:`템플릿 이름을 입력해주세요.`},400);if(!i.length)return e.json({success:!1,message:`옵션을 1개 이상 입력해주세요.`},400);let a=SS.includes(n.industry)?n.industry:`clothing`,o=crypto.randomUUID();return await t.prepare(`INSERT INTO workspace_option_templates (id, industry, label, options_json) VALUES (?, ?, ?, ?)`).bind(o,a,r,JSON.stringify(i)).run(),e.json({success:!0,id:o})}),Q.delete(`/api/workspace/option-templates/:id`,$,async e=>(await e.env.LOOKBOOK_DB.prepare(`DELETE FROM workspace_option_templates WHERE id = ?`).bind(e.req.param(`id`)).run(),e.json({success:!0}))),Q.get(`/workspace`,e=>e.html(`<!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8"/>
@@ -8520,6 +8552,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       <button class="ws-nav-btn" data-panel="invoice" onclick="wsSwitchPanel('invoice')">거래명세서</button>
       <button class="ws-nav-btn" data-panel="history" onclick="wsSwitchPanel('history')">생산이력</button>
       <button class="ws-nav-btn" data-panel="clients" onclick="wsSwitchPanel('clients')">고객사·공장</button>
+      <button class="ws-nav-btn" data-panel="stats" onclick="wsSwitchPanel('stats')">매출통계</button>
+      <button class="ws-nav-btn" data-panel="announce" onclick="wsSwitchPanel('announce')">공지사항</button>
+      <button class="ws-nav-btn" data-panel="options" onclick="wsSwitchPanel('options')">옵션템플릿</button>
       <button class="ws-nav-btn" data-panel="chat" onclick="wsSwitchPanel('chat')">AI 입력</button>
     </div>
     <div class="ws-content">
@@ -8602,6 +8637,40 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <div id="wsClientsSection"></div>
       </div>
 
+      <div class="ws-panel" id="wsPanel-stats">
+        <h1>매출통계</h1>
+        <div class="ws-tabs" id="wsStatsTabs"></div>
+        <div class="ws-cards" id="wsStatsCards" style="margin-bottom:16px;"></div>
+        <div id="wsStatsTable"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-announce">
+        <h1>공지사항</h1>
+        <div class="ws-card" style="margin-bottom:16px;">
+          <input class="ws-input" id="wsNewAnnounceTitle" placeholder="제목 *" style="width:100%;margin-bottom:8px;"/>
+          <textarea class="ws-input" id="wsNewAnnounceContent" placeholder="내용" style="width:100%;min-height:70px;margin-bottom:8px;font-family:inherit;resize:vertical;"></textarea>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#B7B7C2;margin-bottom:8px;"><input type="checkbox" id="wsNewAnnouncePopup"/> 고객 포털에 팝업으로 표시</label>
+          <button class="ws-btn" onclick="wsSubmitAnnouncement()">등록</button>
+        </div>
+        <div id="wsAnnounceList"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-options">
+        <h1>옵션 템플릿</h1>
+        <div class="ws-card" style="margin-bottom:16px;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <select class="ws-input" id="wsNewTemplateIndustry" style="flex:0 0 110px;">
+              ${SS.map(e=>`<option value="`+e+`">`+CS[e]+`</option>`).join(``)}
+            </select>
+            <input class="ws-input" id="wsNewTemplateLabel" placeholder="템플릿 이름(예: 실버 체인 세트)" style="flex:1;"/>
+          </div>
+          <div id="wsNewTemplateOptions"></div>
+          <button class="ws-btn secondary" style="margin-bottom:8px" onclick="wsAddTemplateOptionRow()">+ 옵션 추가</button>
+          <button class="ws-btn" onclick="wsSubmitNewTemplate()">템플릿 저장</button>
+        </div>
+        <div id="wsTemplateList"></div>
+      </div>
+
       <div class="ws-panel" id="wsPanel-history">
         <h1>생산이력</h1>
         <div class="ws-two-col">
@@ -8665,7 +8734,11 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     <input class="ws-input" id="wsDetailTeam" style="width:100%"/>
     <label>옵션</label>
     <div id="wsDetailOptions"></div>
-    <button class="ws-btn secondary" style="margin-bottom:10px" onclick="wsAddDetailOptionRow()">+ 옵션 추가</button>
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <button class="ws-btn secondary" onclick="wsAddDetailOptionRow()">+ 옵션 추가</button>
+      <select class="ws-input" id="wsDetailTemplateSelect" style="flex:1;"><option value="">템플릿 불러오기…</option></select>
+      <button class="ws-btn secondary" onclick="wsApplyTemplateToDetail()">적용</button>
+    </div>
     <div style="display:flex;gap:8px;">
       <div style="flex:1">
         <label>단가(원)</label>
@@ -8821,6 +8894,9 @@ function wsSwitchPanel(name) {
   if (name === 'design') wsLoadDesignList();
   if (name === 'invoice') wsLoadInvoices();
   if (name === 'clients') { wsRenderClientsTabs(); wsLoadClientsList(); }
+  if (name === 'stats') wsLoadStats();
+  if (name === 'announce') wsLoadAnnouncements();
+  if (name === 'options') { wsRenderNewTemplateOptions(); wsLoadTemplateList(); }
 }
 
 async function wsLoadOrdersList() {
@@ -9053,7 +9129,7 @@ async function wsSubmitNewOrder() {
   } catch (e) { alert('서버 오류가 발생했습니다.'); }
 }
 
-function wsOpenDetailModal(orderId) {
+async function wsOpenDetailModal(orderId) {
   var order = (window._wsOrders || []).find(function (o) { return o.id === orderId; });
   if (!order) return;
   wsCurrentOrderId = orderId;
@@ -9071,6 +9147,15 @@ function wsOpenDetailModal(orderId) {
   document.getElementById('wsDetailTotalAmount').value = order.totalAmount != null ? order.totalAmount : '';
   document.getElementById('wsDetailShipping').value = order.shippingAddress || '';
   document.getElementById('wsDetailNote').value = order.note || '';
+  try {
+    var tplRes = await fetch('/api/workspace/option-templates?industry=' + industry, { headers: wsHeaders() });
+    var tplData = await tplRes.json();
+    if (tplData.success) {
+      window._wsTemplates = tplData.templates;
+      var sel = document.getElementById('wsDetailTemplateSelect');
+      sel.innerHTML = '<option value="">템플릿 불러오기…</option>' + tplData.templates.map(function (t) { return '<option value="' + t.id + '">' + wsEsc(t.label) + '</option>'; }).join('');
+    }
+  } catch (e) { console.error(e); }
   document.getElementById('wsOrderDetailOverlay').style.display = 'flex';
 }
 function wsCloseDetailModal() { document.getElementById('wsOrderDetailOverlay').style.display = 'none'; }
@@ -9520,6 +9605,163 @@ async function wsSubmitNewFactory() {
 async function wsDeleteFactory(id) {
   if (!confirm('이 공장을 삭제할까요?')) return;
   try { await fetch('/api/workspace/factories/' + id, { method: 'DELETE', headers: wsHeaders() }); wsLoadFactoriesList(); } catch (e) {}
+}
+
+// ── 매출통계 ──
+var wsStatsPeriod = 'monthly';
+function wsRenderStatsTabs() {
+  var el = document.getElementById('wsStatsTabs');
+  var tabs = [['daily', '일별'], ['weekly', '주별'], ['monthly', '월별'], ['quarterly', '분기별']];
+  el.innerHTML = tabs.map(function (t) {
+    return '<button class="ws-tab-btn' + (t[0] === wsStatsPeriod ? ' active' : '') + '" onclick="wsSelectStatsPeriod(\\'' + t[0] + '\\')">' + t[1] + '</button>';
+  }).join('');
+}
+function wsSelectStatsPeriod(p) { wsStatsPeriod = p; wsRenderStatsTabs(); wsLoadStats(); }
+
+async function wsLoadStats() {
+  wsRenderStatsTabs();
+  try {
+    var res = await fetch('/api/workspace/stats?period=' + wsStatsPeriod, { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var totalOrders = 0, totalAmount = 0;
+    data.stats.forEach(function (s) { totalOrders += s.order_count; totalAmount += s.total_amount; });
+    document.getElementById('wsStatsCards').innerHTML =
+      '<div class="ws-card"><div class="num">' + totalOrders + '</div><div class="label">전체 발주 건수</div></div>' +
+      '<div class="ws-card"><div class="num">' + totalAmount.toLocaleString() + '</div><div class="label">전체 결제금액(원)</div></div>';
+    var table = document.getElementById('wsStatsTable');
+    if (!data.stats.length) { table.innerHTML = '<div class="ws-empty">데이터가 없습니다.</div>'; return; }
+    table.innerHTML = data.stats.map(function (s) {
+      return '<div class="ws-order-row" style="cursor:default;">' +
+        '<span class="col code">' + wsEsc(s.bucket) + '</span>' +
+        '<span class="col">발주 ' + s.order_count + '건</span>' +
+        '<span class="col">' + s.total_amount.toLocaleString() + '원</span>' +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+// ── 공지사항 ──
+async function wsSubmitAnnouncement() {
+  var body = {
+    title: document.getElementById('wsNewAnnounceTitle').value.trim(),
+    content: document.getElementById('wsNewAnnounceContent').value.trim(),
+    isPopup: document.getElementById('wsNewAnnouncePopup').checked,
+  };
+  if (!body.title) { alert('제목을 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/announcements', { method: 'POST', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '등록 실패'); return; }
+    document.getElementById('wsNewAnnounceTitle').value = '';
+    document.getElementById('wsNewAnnounceContent').value = '';
+    document.getElementById('wsNewAnnouncePopup').checked = false;
+    wsLoadAnnouncements();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsLoadAnnouncements() {
+  try {
+    var res = await fetch('/api/workspace/announcements', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var list = document.getElementById('wsAnnounceList');
+    if (!data.announcements.length) { list.innerHTML = '<div class="ws-empty">공지사항이 없습니다.</div>'; return; }
+    list.innerHTML = data.announcements.map(function (a) {
+      return '<div class="ws-inquiry-card">' +
+        '<div class="top"><div><div class="title">' + wsEsc(a.title) + '</div><div class="meta">' + a.created_at + '</div></div></div>' +
+        (a.content ? '<div class="note">' + wsEsc(a.content) + '</div>' : '') +
+        '<div class="actions">' +
+        '<label style="font-size:12px;color:#B7B7C2;display:flex;align-items:center;gap:4px;"><input type="checkbox" ' + (a.is_active ? 'checked' : '') + ' onchange="wsToggleAnnounce(\\'' + a.id + '\\', \\'isActive\\', this.checked)"/> 게시중</label>' +
+        '<label style="font-size:12px;color:#B7B7C2;display:flex;align-items:center;gap:4px;"><input type="checkbox" ' + (a.is_popup ? 'checked' : '') + ' onchange="wsToggleAnnounce(\\'' + a.id + '\\', \\'isPopup\\', this.checked)"/> 팝업</label>' +
+        '<button class="ws-btn secondary" onclick="wsDeleteAnnouncement(\\'' + a.id + '\\')">삭제</button>' +
+        '</div></div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function wsToggleAnnounce(id, field, val) {
+  var body = {}; body[field] = val;
+  try { await fetch('/api/workspace/announcements/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify(body) }); } catch (e) {}
+}
+
+async function wsDeleteAnnouncement(id) {
+  if (!confirm('이 공지사항을 삭제할까요?')) return;
+  try { await fetch('/api/workspace/announcements/' + id, { method: 'DELETE', headers: wsHeaders() }); wsLoadAnnouncements(); } catch (e) {}
+}
+
+// ── 옵션 템플릿 ──
+function wsRenderNewTemplateOptions(options) {
+  var el = document.getElementById('wsNewTemplateOptions');
+  el.innerHTML = '';
+  (options && options.length ? options : [{ label: '', value: '' }]).forEach(function (o) { wsAddTemplateOptionRow(o.label, o.value); });
+}
+function wsAddTemplateOptionRow(label, value) {
+  var el = document.getElementById('wsNewTemplateOptions');
+  var row = document.createElement('div');
+  row.className = 'ws-opt-row';
+  row.innerHTML = '<input class="ws-input opt-label" placeholder="항목" value="' + wsEsc(label || '') + '"/>' +
+    '<input class="ws-input opt-value" placeholder="값" value="' + wsEsc(value || '') + '"/>' +
+    '<button type="button" onclick="this.parentElement.remove()">×</button>';
+  el.appendChild(row);
+}
+
+async function wsSubmitNewTemplate() {
+  var options = Array.from(document.querySelectorAll('#wsNewTemplateOptions .ws-opt-row')).map(function (row) {
+    return { label: row.querySelector('.opt-label').value.trim(), value: row.querySelector('.opt-value').value.trim() };
+  }).filter(function (o) { return o.label || o.value; });
+  var body = {
+    industry: document.getElementById('wsNewTemplateIndustry').value,
+    label: document.getElementById('wsNewTemplateLabel').value.trim(),
+    options: options,
+  };
+  if (!body.label) { alert('템플릿 이름을 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/option-templates', { method: 'POST', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '저장 실패'); return; }
+    document.getElementById('wsNewTemplateLabel').value = '';
+    wsRenderNewTemplateOptions();
+    wsLoadTemplateList();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsLoadTemplateList() {
+  try {
+    var res = await fetch('/api/workspace/option-templates', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    window._wsTemplates = data.templates;
+    var list = document.getElementById('wsTemplateList');
+    if (!data.templates.length) { list.innerHTML = '<div class="ws-empty">템플릿이 없습니다.</div>'; return; }
+    list.innerHTML = data.templates.map(function (t) {
+      var optStr = t.options.map(function (o) { return o.label + ': ' + o.value; }).join(', ');
+      return '<div class="ws-order-row" style="cursor:default;">' +
+        '<span class="col code">' + wsEsc(t.label) + '</span>' +
+        '<span class="col">' + wsEsc(wsIndustryLabel[t.industry] || t.industry) + '</span>' +
+        '<span class="col">' + wsEsc(optStr) + '</span>' +
+        '<span class="col" style="flex:0 0 40px;text-align:right;"><span style="cursor:pointer;color:#ef4444" onclick="wsDeleteTemplate(\\'' + t.id + '\\')">삭제</span></span>' +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function wsDeleteTemplate(id) {
+  if (!confirm('이 템플릿을 삭제할까요?')) return;
+  try { await fetch('/api/workspace/option-templates/' + id, { method: 'DELETE', headers: wsHeaders() }); wsLoadTemplateList(); } catch (e) {}
+}
+
+// 발주 상세 모달에서 템플릿 불러오기(옵션 템플릿 탭에서 미리 로드된 목록 재사용)
+async function wsApplyTemplateToDetail() {
+  var sel = document.getElementById('wsDetailTemplateSelect');
+  if (!sel || !sel.value) return;
+  if (!window._wsTemplates) {
+    var res = await fetch('/api/workspace/option-templates', { headers: wsHeaders() });
+    var data = await res.json();
+    if (data.success) window._wsTemplates = data.templates;
+  }
+  var tpl = (window._wsTemplates || []).find(function (t) { return t.id === sel.value; });
+  if (tpl) wsRenderDetailOptions(tpl.options);
 }
 <\/script>
 </body>
@@ -12879,4 +13121,4 @@ function gsOpenBuilder() {
     if (code) document.getElementById('errCode').textContent = '오류코드: ' + code
   <\/script>
 </body>
-</html>`));var jS=new De,MS=Object.assign({"/src/index.tsx":Q}),NS=!1;for(let[,e]of Object.entries(MS))e&&(jS.all(`*`,t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),jS.notFound(t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),NS=!0);if(!NS)throw Error(`Can't import modules from ['/src/index.ts','/src/index.tsx','/app/server.ts']`);export{jS as default};
+</html>`));var MS=new De,NS=Object.assign({"/src/index.tsx":Q}),PS=!1;for(let[,e]of Object.entries(NS))e&&(MS.all(`*`,t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),MS.notFound(t=>{let n;try{n=t.executionCtx}catch{}return e.fetch(t.req.raw,t.env,n)}),PS=!0);if(!PS)throw Error(`Can't import modules from ['/src/index.ts','/src/index.tsx','/app/server.ts']`);export{MS as default};
