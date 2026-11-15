@@ -16669,6 +16669,18 @@ app.get('/api/workspace/summary', adminAuth, async (c) => {
   return c.json({ success: true, counts, total })
 })
 
+// 홈 캘린더 — 완료 단계가 아닌 발주 중 출고(완료) 예정일이 잡힌 것만 날짜순으로.
+app.get('/api/workspace/upcoming', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const { results } = await db.prepare(`
+    SELECT o.id, o.order_code, o.expected_complete_at, o.stage, p.product_code, p.name AS product_name
+    FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id
+    WHERE o.expected_complete_at IS NOT NULL AND o.expected_complete_at >= date('now')
+    ORDER BY o.expected_complete_at ASC LIMIT 20
+  `).all()
+  return c.json({ success: true, upcoming: results || [] })
+})
+
 app.get('/api/workspace/orders', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const industry = c.req.query('industry') || ''
@@ -17039,6 +17051,15 @@ app.get('/api/my/orders', async (c) => {
   return c.json({ success: true, orders })
 })
 
+// 결제 및 거래명세서 — 고객이 자기 명세서만 조회(상태 변경은 ADMIN 전용).
+app.get('/api/my/invoices', async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const user = await wsRequireUser(c)
+  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  const { results } = await db.prepare(`SELECT * FROM workspace_invoices WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100`).bind(user.id).all()
+  return c.json({ success: true, invoices: (results || []).map(wsInvoiceRow) })
+})
+
 // GET /my-production — 이지룩 USER 포털 1단계. 기존 EZlook 로그인 계정을 그대로
 // 쓰는 고객용 화면으로, 생산 문의를 남기고 내 발주의 공정 현황을 조회한다.
 app.get('/my-production', (c) => {
@@ -17118,6 +17139,7 @@ app.get('/my-production', (c) => {
           <button class="mp-tab-btn active" data-tab="inquiry" onclick="mpSwitchTab('inquiry')">생산 문의</button>
           <button class="mp-tab-btn" data-tab="orders" onclick="mpSwitchTab('orders')">내 발주 현황</button>
           <button class="mp-tab-btn" data-tab="notify" onclick="mpSwitchTab('notify')">알림 <span id="mpNotifyBadge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:2px;"></span></button>
+          <button class="mp-tab-btn" data-tab="invoice" onclick="mpSwitchTab('invoice')">결제·거래명세서</button>
         </div>
 
         <div class="mp-section active" id="mpSection-inquiry">
@@ -17141,6 +17163,10 @@ app.get('/my-production', (c) => {
 
         <div class="mp-section" id="mpSection-notify">
           <div id="mpNotifyList"></div>
+        </div>
+
+        <div class="mp-section" id="mpSection-invoice">
+          <div id="mpInvoiceList"></div>
         </div>
       </div>
     </div>
@@ -17166,6 +17192,25 @@ app.get('/my-production', (c) => {
       if (name === 'inquiry') mpLoadInquiries();
       if (name === 'orders') mpLoadOrders();
       if (name === 'notify') mpLoadNotifications();
+      if (name === 'invoice') mpLoadInvoices();
+    }
+
+    async function mpLoadInvoices() {
+      try {
+        var res = await fetch('/api/my/invoices', { headers: mpHeaders() });
+        var data = await res.json();
+        if (!data.success) return;
+        var statusLabel = { pending: '승인대기', unpaid: '미결제', paid: '결제', tax_invoice_issued: '세금계산서 발행' };
+        var list = document.getElementById('mpInvoiceList');
+        if (!data.invoices.length) { list.innerHTML = '<div class="mp-empty">거래명세서가 없어요.</div>'; return; }
+        list.innerHTML = data.invoices.map(function (inv) {
+          return '<div class="mp-card">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
+            '<div><div class="mp-title">' + mpEsc(inv.invoiceCode) + '</div><div class="mp-meta">발주 ' + inv.orderIds.length + '건 · ' + (inv.totalAmount || 0).toLocaleString() + '원 · ' + inv.createdAt + '</div></div>' +
+            '<span class="mp-badge ' + (inv.status === 'paid' || inv.status === 'tax_invoice_issued' ? 'done' : 'new') + '">' + statusLabel[inv.status] + '</span>' +
+            '</div></div>';
+        }).join('');
+      } catch (e) { console.error(e); }
     }
 
     async function mpRefreshNotifyBadge() {
@@ -17993,6 +18038,8 @@ app.get('/workspace', (c) => {
       <div class="ws-panel active" id="wsPanel-home">
         <h1>오늘의 공정 현황</h1>
         <div class="ws-cards" id="wsHomeCards"></div>
+        <h2 style="font-size:15px;font-weight:700;margin:20px 0 10px;">출고 예정 일정</h2>
+        <div id="wsUpcomingList"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-notify">
@@ -18619,6 +18666,24 @@ async function wsLoadHome() {
       html += '<div class="ws-card"><div class="num">' + (data.counts[ind] || 0) + '</div><div class="label">' + wsIndustryLabel[ind] + '</div></div>';
     });
     document.getElementById('wsHomeCards').innerHTML = html;
+  } catch (e) { console.error(e); }
+  wsLoadUpcoming();
+}
+
+async function wsLoadUpcoming() {
+  try {
+    var res = await fetch('/api/workspace/upcoming', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var list = document.getElementById('wsUpcomingList');
+    if (!data.upcoming.length) { list.innerHTML = '<div class="ws-empty">출고 예정인 발주가 없습니다.</div>'; return; }
+    list.innerHTML = data.upcoming.map(function (o) {
+      return '<div class="ws-order-row" style="cursor:default;">' +
+        '<span class="col code">' + wsEsc(o.expected_complete_at) + '</span>' +
+        '<span class="col">' + wsEsc(o.order_code) + '</span>' +
+        '<span class="col">' + wsEsc(o.product_code) + ' ' + wsEsc(o.product_name) + '</span>' +
+        '</div>';
+    }).join('');
   } catch (e) { console.error(e); }
 }
 
