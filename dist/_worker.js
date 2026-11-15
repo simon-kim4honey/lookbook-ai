@@ -213,7 +213,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mwhv94dr`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=`mwhvl2ol`;function uy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var dy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -8207,6 +8207,9 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     .mp-back { width: 40px; height: 40px; border: none; background: #202127; border-radius: 50%; color: #B7B7C2; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; }
     .mp-tabs { display: flex; gap: 6px; margin: 16px 0; }
     .mp-tab-btn { padding: 9px 18px; border-radius: 999px; border: 1px solid #2C2D35; background: #17181D; color: #82828E; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .mp-help-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid #2C2D35; background: #17181D; color: #82828E; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+    .mp-help-btn:hover { border-color: #1E3A8A; color: #fff; }
+    .mp-help-body b { color: #F2F2F5; }
     .mp-tab-btn.active { background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; border-color: transparent; }
     .mp-section { display: none; }
     .mp-section.active { display: block; }
@@ -8274,6 +8277,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           <button class="mp-tab-btn" data-tab="orders" onclick="mpSwitchTab('orders')">내 발주 현황</button>
           <button class="mp-tab-btn" data-tab="notify" onclick="mpSwitchTab('notify')">알림 <span id="mpNotifyBadge" style="display:none;background:#ef4444;color:#fff;font-size:10px;font-weight:700;border-radius:10px;padding:1px 6px;margin-left:2px;"></span></button>
           <button class="mp-tab-btn" data-tab="invoice" onclick="mpSwitchTab('invoice')">결제·거래명세서</button>
+          <button class="mp-help-btn" onclick="mpShowHelp()">?</button>
         </div>
 
         <div class="mp-section active" id="mpSection-inquiry">
@@ -8314,10 +8318,35 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     </div>
   </div>
 
+  <div id="mpHelpOverlay" style="display:none;position:fixed;inset:0;background:#000000aa;align-items:center;justify-content:center;z-index:9500;">
+    <div style="background:#17181D;border:1px solid #2C2D35;border-radius:16px;padding:24px;max-width:380px;width:90%;max-height:80vh;overflow-y:auto;">
+      <div id="mpHelpTitle" style="font-size:16px;font-weight:700;color:#F2F2F5;margin-bottom:12px;"></div>
+      <div class="mp-help-body" id="mpHelpBody" style="font-size:13px;color:#B7B7C2;line-height:1.6;margin-bottom:18px;"></div>
+      <button class="mp-cta" onclick="document.getElementById('mpHelpOverlay').style.display='none';">확인</button>
+    </div>
+  </div>
+
   <script>
     var MP_TOKEN = localStorage.getItem('lookbook_token') || '';
     function mpHeaders() { return { 'Content-Type': 'application/json', 'X-Session-Token': MP_TOKEN }; }
     function mpEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+
+    // ── 탭별 도움말 — "왜 만들어졌는지" + "사용 방법"
+    var MP_HELP = {
+      inquiry: { title: '생산 문의', reason: '고객사가 직접 새 생산을 의뢰할 수 있도록 만들었습니다. 보내신 문의는 운영팀 워크스페이스의 "생산문의"에 들어가 발주로 전환됩니다.', howto: '업종·제품명·디자인 메모·희망 수량·희망 단가를 입력하고 "문의 보내기"를 누르면 됩니다.' },
+      orders: { title: '내 발주 현황', reason: '보내신 문의가 발주로 전환된 뒤 진행 상황을 직접 확인할 수 있도록 만들었습니다.', howto: '목록에서 현재 공정 단계와 예상 완료일을 확인할 수 있습니다.' },
+      notify: { title: '알림', reason: '발주 상태 변경 등 중요한 소식을 놓치지 않도록 만들었습니다.', howto: '새 알림이 있으면 탭에 빨간 숫자로 표시됩니다. 목록에서 클릭하면 읽음 처리됩니다.' },
+      invoice: { title: '결제·거래명세서', reason: '결제해야 할 거래명세서를 직접 조회할 수 있도록 만들었습니다.', howto: '내 명세서 목록과 상태(발행/결제완료 등)를 여기서 확인합니다.' },
+    };
+    function mpShowHelp() {
+      var activeBtn = document.querySelector('.mp-tab-btn.active');
+      var key = activeBtn ? activeBtn.getAttribute('data-tab') : 'inquiry';
+      var h = MP_HELP[key];
+      if (!h) return;
+      document.getElementById('mpHelpTitle').textContent = h.title;
+      document.getElementById('mpHelpBody').innerHTML = '<b>왜 만들어졌나요</b><div style="margin:4px 0 14px;">' + h.reason + '</div><b>사용 방법</b><div style="margin:4px 0 0;">' + h.howto + '</div>';
+      document.getElementById('mpHelpOverlay').style.display = 'flex';
+    }
 
     function mpSwitchTab(name) {
       document.querySelectorAll('.mp-tab-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-tab') === name); });
@@ -8557,6 +8586,10 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     .ws-input:focus{border-color:#7C3AED;}
     .ws-btn{padding:10px 16px;background:#7C3AED;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
     .ws-btn.secondary{background:#252540;color:#e0e0f0;}
+    .ws-panel h1{display:flex;align-items:center;gap:8px;}
+    .ws-help-btn{width:20px;height:20px;border-radius:50%;border:1px solid #3a3a60;background:#1a1a2e;color:#8b8ba0;font-size:12px;font-weight:700;cursor:pointer;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .ws-help-btn:hover{border-color:#7C3AED;color:#fff;}
+    .ws-help-body b{color:#F2F2F5;}
     .ws-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
     .ws-tab-btn{padding:8px 16px;border-radius:999px;border:1px solid #2e2e50;background:#1a1a2e;color:#8b8ba0;font-size:13px;font-weight:600;cursor:pointer;}
     .ws-tab-btn.active{background:#7C3AED;color:#fff;border-color:#7C3AED;}
@@ -8647,6 +8680,16 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
     </div>
   </div>
+
+  <div class="ws-modal-overlay" id="wsHelpOverlay">
+    <div class="ws-modal" style="max-width:460px;max-height:80vh;overflow-y:auto;">
+      <h3 id="wsHelpTitle" style="margin:0 0 14px;"></h3>
+      <div class="ws-help-body" id="wsHelpBody" style="font-size:13px;line-height:1.7;color:#d8d8e8;"></div>
+      <div class="row">
+        <button class="ws-btn" onclick="document.getElementById('wsHelpOverlay').style.display='none';">확인</button>
+      </div>
+    </div>
+  </div>
   <div class="ws-body">
     <div class="ws-sidebar">
       <button class="ws-nav-btn active" data-panel="home" onclick="wsSwitchPanel('home')">홈</button>
@@ -8672,14 +8715,14 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
     <div class="ws-content">
 
       <div class="ws-panel active" id="wsPanel-home">
-        <h1>오늘의 공정 현황</h1>
+        <h1>오늘의 공정 현황 <button class="ws-help-btn" onclick="wsShowHelp('home')">?</button></h1>
         <div class="ws-cards" id="wsHomeCards"></div>
         <h2 style="font-size:15px;font-weight:700;margin:20px 0 10px;">출고 예정 일정</h2>
         <div id="wsUpcomingList"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-notify">
-        <h1>알림</h1>
+        <h1>알림 <button class="ws-help-btn" onclick="wsShowHelp('notify')">?</button></h1>
         <div class="ws-tabs" id="wsNotifyTabs"></div>
         <div class="ws-toolbar">
           <button class="ws-btn secondary" onclick="wsMarkAllNotificationsRead()">전체 읽음 처리</button>
@@ -8688,13 +8731,13 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-inquiry">
-        <h1>생산문의</h1>
+        <h1>생산문의 <button class="ws-help-btn" onclick="wsShowHelp('inquiry')">?</button></h1>
         <div class="ws-tabs" id="wsInquiryTabs"></div>
         <div id="wsInquiryList"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-board">
-        <h1>공정보드</h1>
+        <h1>공정보드 <button class="ws-help-btn" onclick="wsShowHelp('board')">?</button></h1>
         <div class="ws-tabs" id="wsIndustryTabs"></div>
         <div class="ws-toolbar">
           <input class="ws-input" id="wsBoardSearch" placeholder="발주코드·제품코드·고객사로 검색" onkeydown="if(event.key==='Enter')wsLoadBoard()"/>
@@ -8705,7 +8748,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-orders">
-        <h1>발주관리</h1>
+        <h1>발주관리 <button class="ws-help-btn" onclick="wsShowHelp('orders')">?</button></h1>
         <div class="ws-toolbar">
           <input class="ws-input" id="wsOrdersSearch" placeholder="발주코드·제품코드·고객사로 검색" onkeydown="if(event.key==='Enter')wsLoadOrdersList()"/>
           <button class="ws-btn secondary" onclick="wsLoadOrdersList()">검색</button>
@@ -8714,7 +8757,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-inspection">
-        <h1>검수</h1>
+        <h1>검수 <button class="ws-help-btn" onclick="wsShowHelp('inspection')">?</button></h1>
         <div class="ws-card" style="margin-bottom:20px;">
           <div style="font-size:14px;font-weight:700;margin-bottom:10px;">입고/불량 기록</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
@@ -8734,7 +8777,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-design">
-        <h1>디자인 DB</h1>
+        <h1>디자인 DB <button class="ws-help-btn" onclick="wsShowHelp('design')">?</button></h1>
         <div class="ws-toolbar">
           <input class="ws-input" id="wsDesignSearch" placeholder="제품코드·제품명 검색" onkeyup="wsLoadDesignList()"/>
           <button class="ws-btn" onclick="wsOpenNewDesignModal()">+ 디자인 추가</button>
@@ -8746,7 +8789,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-invoice">
-        <h1>거래명세서</h1>
+        <h1>거래명세서 <button class="ws-help-btn" onclick="wsShowHelp('invoice')">?</button></h1>
         <div class="ws-tabs" id="wsInvoiceTabs"></div>
         <div class="ws-toolbar">
           <button class="ws-btn" onclick="wsOpenNewInvoiceModal()">+ 명세서 생성</button>
@@ -8755,20 +8798,20 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-clients">
-        <h1>고객사·공장</h1>
+        <h1>고객사·공장 <button class="ws-help-btn" onclick="wsShowHelp('clients')">?</button></h1>
         <div class="ws-tabs" id="wsClientsTabs"></div>
         <div id="wsClientsSection"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-stats">
-        <h1>매출통계</h1>
+        <h1>매출통계 <button class="ws-help-btn" onclick="wsShowHelp('stats')">?</button></h1>
         <div class="ws-tabs" id="wsStatsTabs"></div>
         <div class="ws-cards" id="wsStatsCards" style="margin-bottom:16px;"></div>
         <div id="wsStatsTable"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-announce">
-        <h1>공지사항</h1>
+        <h1>공지사항 <button class="ws-help-btn" onclick="wsShowHelp('announce')">?</button></h1>
         <div class="ws-card" style="margin-bottom:16px;">
           <input class="ws-input" id="wsNewAnnounceTitle" placeholder="제목 *" style="width:100%;margin-bottom:8px;"/>
           <textarea class="ws-input" id="wsNewAnnounceContent" placeholder="내용" style="width:100%;min-height:70px;margin-bottom:8px;font-family:inherit;resize:vertical;"></textarea>
@@ -8779,7 +8822,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-options">
-        <h1>옵션 템플릿</h1>
+        <h1>옵션 템플릿 <button class="ws-help-btn" onclick="wsShowHelp('options')">?</button></h1>
         <div class="ws-card" style="margin-bottom:16px;">
           <div style="display:flex;gap:8px;margin-bottom:8px;">
             <select class="ws-input" id="wsNewTemplateIndustry" style="flex:0 0 110px;">
@@ -8795,12 +8838,12 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-reconcile">
-        <h1>공장별 발주·입고 대조</h1>
+        <h1>공장별 발주·입고 대조 <button class="ws-help-btn" onclick="wsShowHelp('reconcile')">?</button></h1>
         <div id="wsReconcileTable"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-workflow">
-        <h1>워크플로우</h1>
+        <h1>워크플로우 <button class="ws-help-btn" onclick="wsShowHelp('workflow')">?</button></h1>
         <div class="ws-card" style="margin-bottom:16px;">
           <div style="display:flex;gap:8px;margin-bottom:8px;">
             <select class="ws-input" id="wsNewWfType" style="flex:0 0 120px;">
@@ -8821,7 +8864,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-teamchat">
-        <h1>사내톡</h1>
+        <h1>사내톡 <button class="ws-help-btn" onclick="wsShowHelp('teamchat')">?</button></h1>
         <div class="ws-chat-log" id="wsTeamChatLog"></div>
         <div class="ws-toolbar">
           <input class="ws-input" id="wsTeamChatName" placeholder="이름" style="flex:0 0 100px;"/>
@@ -8831,7 +8874,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-holiday">
-        <h1>근무/휴일관리</h1>
+        <h1>근무/휴일관리 <button class="ws-help-btn" onclick="wsShowHelp('holiday')">?</button></h1>
         <div class="ws-card" style="margin-bottom:16px;">
           <div style="display:flex;gap:8px;margin-bottom:8px;">
             <input class="ws-input" id="wsNewHolidayName" placeholder="이름 *" style="flex:1;"/>
@@ -8844,7 +8887,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-admins">
-        <h1>관리자 관리</h1>
+        <h1>관리자 관리 <button class="ws-help-btn" onclick="wsShowHelp('admins')">?</button></h1>
         <p style="font-size:12px;color:#B7B7C2;margin:-6px 0 16px;">공유 비밀번호와는 별개로, 운영팀 개개인의 로그인 계정입니다. 로그인하면 사내톡·워크플로우·근무관리 작성자가 자동으로 채워집니다.</p>
         <div class="ws-card" style="margin-bottom:16px;">
           <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
@@ -8862,7 +8905,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-history">
-        <h1>생산이력</h1>
+        <h1>생산이력 <button class="ws-help-btn" onclick="wsShowHelp('history')">?</button></h1>
         <div class="ws-two-col">
           <div class="ws-list-col">
             <input class="ws-input" id="wsHistSearch" placeholder="제품코드·제품명 검색" style="margin-bottom:10px;width:100%" onkeyup="wsLoadProductList()"/>
@@ -8875,7 +8918,7 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       </div>
 
       <div class="ws-panel" id="wsPanel-chat">
-        <h1>AI 대화형 입력</h1>
+        <h1>AI 대화형 입력 <button class="ws-help-btn" onclick="wsShowHelp('chat')">?</button></h1>
         <div class="ws-chat-log" id="wsChatLog"></div>
         <div class="ws-toolbar">
           <input class="ws-input" id="wsChatInput" placeholder="예: 서진봉제에서 TOP_002 150장 입고됐어, 불량 3장" onkeydown="if(event.key==='Enter')wsSendChat()"/>
@@ -10284,6 +10327,36 @@ function wsRestoreOperator() {
     wsAutofillOperatorName();
   }
   wsUpdateOperatorBar();
+}
+
+// ── 메뉴별 도움말 — "왜 만들어졌는지" + "사용 방법". 각 패널 제목 옆 ? 버튼에서 호출.
+var WS_HELP = {
+  home: { title: '홈 — 오늘의 공정 현황', reason: '매일 아침 전체 공정 현황과 출고 예정을 한눈에 보기 위한 대시보드입니다.', howto: '업종별 공정 단계마다 진행 중인 발주 건수를 카드로 보여줍니다. 아래 "출고 예정 일정"에서는 완료 예정일이 임박한 순서로 발주 목록을 확인할 수 있습니다.' },
+  notify: { title: '알림', reason: '유사 서비스를 벤치마킹한 결과 알림이 핵심 기능으로 확인되어 추가했습니다. 발주·문의·명세서 등 주요 이벤트가 생기면 자동으로 알림이 쌓입니다.', howto: '사이드바의 알림 뱃지로 안 읽은 알림 수를 확인하고, 목록에서 클릭하면 읽음 처리됩니다. "전체 읽음 처리" 버튼으로 한 번에 정리할 수 있습니다.' },
+  inquiry: { title: '생산문의', reason: '고객사(/my-production)가 보낸 생산 문의를 받아 발주로 전환하기 위한 메뉴입니다 — ADMIN과 USER를 잇는 첫 접점입니다.', howto: '상태 탭(대기/전환완료 등)에서 문의 내용을 확인하고, "발주로 전환" 버튼을 누르면 제조팀이 자동 배정되며 발주가 생성됩니다.' },
+  board: { title: '공정보드', reason: '의류·주얼리·가방·신발은 제조 공정 단계가 서로 달라서, 업종별로 독립된 칸반보드로 진행 상황을 추적하기 위해 만들었습니다.', howto: '상단 업종 탭을 선택하면 해당 업종의 공정 단계가 열로 나타납니다. 발주 카드의 버튼으로 다음 단계로 이동시키고, 공정 단계 자체는 화면 하단에서 직접 추가·삭제할 수 있습니다.' },
+  orders: { title: '발주관리', reason: '생산 문의를 발주로 전환한 뒤 품목별 옵션·단가·수량·배송지까지 상세하게 관리하기 위해 만들었습니다.', howto: '검색창에서 발주를 찾고 목록 행을 클릭하면 상세 모달이 열립니다. 옵션/단가/합계금액/배송지/담당팀/완료예정일을 확인하고 수정할 수 있습니다.' },
+  inspection: { title: '검수', reason: '공장에서 입고된 물량 중 양품·불량을 구분해 기록하기 위해 만들었습니다 — 공장대조 집계의 기초 데이터가 됩니다.', howto: '입고 수량과 불량 수량을 폼에 직접 입력하거나, "AI 입력" 메뉴에서 문장으로 말하면 자동으로 기록됩니다. 최근 입고 로그 목록에서 이력을 확인할 수 있습니다.' },
+  design: { title: '디자인 DB', reason: '제품(디자인)별 원가 정보와 공급 공장을 한곳에서 관리하기 위해 만들었습니다.', howto: '목록에서 제품을 선택한 뒤 원가 메모와 공급 공장을 입력해 저장합니다. 생산이력 메뉴에서도 같은 제품 정보가 연결되어 보입니다.' },
+  invoice: { title: '거래명세서', reason: '발주가 끝난 뒤 고객사에 전달할 거래명세서를 발주 데이터 기반으로 자동 생성하기 위해 만들었습니다.', howto: '"명세서 생성" 버튼으로 발주를 선택해 명세서를 만들고, 목록에서 열어 품목별 내역을 확인·인쇄합니다. 상태(발행/결제완료 등)도 여기서 바꿉니다.' },
+  clients: { title: '고객사·공장', reason: '고객사는 기존 회원 계정을 그대로 쓰되 사업자 정보를, 외주 공장은 연락처·카테고리를 한곳에서 관리하기 위해 만들었습니다.', howto: '고객사 탭에서 회사명·담당자·연락처를 저장하고, 공장 탭에서 공장을 추가·삭제합니다.' },
+  stats: { title: '매출통계', reason: '발주 건수와 결제 금액을 기간별로 집계해 운영 현황을 빠르게 파악하기 위해 만들었습니다.', howto: '일간/주간/월간/분기별 단위를 선택하면 해당 기준으로 집계된 발주 건수·금액이 표시됩니다.' },
+  announce: { title: '공지사항', reason: '벤치마킹 결과를 반영해 고객사에 공지와 팝업으로 소식을 전달하기 위해 만들었습니다.', howto: '공지를 작성할 때 "팝업으로 노출"을 체크하면 /my-production 첫 화면에 팝업으로 뜹니다. 활성/비활성으로 노출 여부를 바로 바꿀 수 있습니다.' },
+  options: { title: '옵션 템플릿', reason: '발주를 만들 때마다 재질·색상 같은 옵션을 새로 입력하지 않도록, 자주 쓰는 옵션 묶음을 업종별 템플릿으로 저장하기 위해 만들었습니다.', howto: '업종을 고르고 옵션 라벨/값을 추가해 템플릿으로 저장합니다. 발주를 생성할 때 템플릿을 불러와 그대로 재사용할 수 있습니다.' },
+  reconcile: { title: '공장별 발주·입고 대조', reason: '공장별 발주 수량과 실제 입고·불량 수량을 대조해서 공장의 품질·납기를 점검하기 위해 만들었습니다.', howto: '별도 입력 없이, 발주 데이터와 검수 메뉴에서 기록한 입고 로그를 공장별로 자동 집계해 표로 보여줍니다.' },
+  workflow: { title: '워크플로우', reason: '캐드/원본, 부자재, 수리 등 부서 간 요청이 누락되지 않도록 티켓으로 남기기 위해 만들었습니다.', howto: '요청 유형·제목·제품코드·요청자를 입력해 등록하면, 상태를 접수→진행→완료 순으로 바꿔가며 처리합니다.' },
+  teamchat: { title: '사내톡', reason: '운영팀이 AI가 아닌 사람끼리 빠르게 메모를 남기고 공유할 수 있는 간단한 공유 채팅방이 필요해 만들었습니다.', howto: '이름과 내용을 입력해 전송합니다. 헤더에서 "담당자 로그인"을 하면 이름이 자동으로 채워집니다.' },
+  holiday: { title: '근무/휴일관리', reason: '휴일 교환 신청을 받아 승인·반려를 처리하기 위해 만들었습니다.', howto: '이름·날짜·사유를 입력해 신청을 등록하고, 목록에서 상태를 대기→승인/반려로 바꿉니다.' },
+  admins: { title: '관리자 관리', reason: '공유 비밀번호 하나로만 운영팀 전체가 접속하던 방식을 보완해, 개개인의 로그인 계정을 두고 "누가 접속했는지" 식별하기 위해 만들었습니다. 사내톡·워크플로우·근무관리의 작성자 자동입력도 이 계정을 기반으로 동작합니다.', howto: '이메일·이름·초기 비밀번호로 계정을 추가하고, 권한(총괄/일반) 변경·활성화/비활성화·비밀번호 재설정·삭제를 할 수 있습니다. 헤더의 "담당자 로그인"으로 각자 개인 계정에 로그인합니다.' },
+  history: { title: '생산이력', reason: '제품별로 어떤 공정을 언제 거쳤는지 시간순으로 볼 수 있도록 만들었습니다.', howto: '왼쪽 목록에서 제품코드·제품명으로 검색해 선택하면, 오른쪽에 해당 제품의 공정 타임라인이 표시됩니다.' },
+  chat: { title: 'AI 대화형 입력', reason: '입고·불량 수량을 매번 폼에 입력하는 대신, 문장으로 말하면 AI(gpt-4o-mini)가 알아서 구조화해 기록하도록 만들었습니다.', howto: '예: "OO제품 50개 입고, 그중 3개 불량"처럼 자연어로 입력하면 검수 기록에 자동으로 반영됩니다.' },
+};
+function wsShowHelp(key) {
+  var h = WS_HELP[key];
+  if (!h) return;
+  document.getElementById('wsHelpTitle').textContent = h.title;
+  document.getElementById('wsHelpBody').innerHTML = '<b>왜 만들어졌나요</b><div style="margin:4px 0 14px;">' + h.reason + '</div><b>사용 방법</b><div style="margin:4px 0 0;">' + h.howto + '</div>';
+  document.getElementById('wsHelpOverlay').style.display = 'flex';
 }
 
 // ── 관리자 관리(CRUD) ──
