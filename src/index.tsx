@@ -16764,6 +16764,40 @@ app.get('/api/workspace/products', adminAuth, async (c) => {
   return c.json({ success: true, products: results || [] })
 })
 
+// 디자인 DB — 발주 없이도 제품(디자인)을 먼저 등록해 원가/공급공장을 기록할 수 있다.
+app.post('/api/workspace/products', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const productCode = String(body.productCode || '').trim()
+  const name = String(body.name || '').trim()
+  if (!productCode || !name) return c.json({ success: false, message: '제품코드와 제품명은 필수입니다.' }, 400)
+  const existing = await db.prepare(`SELECT id FROM workspace_products WHERE product_code = ?`).bind(productCode).first()
+  if (existing) return c.json({ success: false, message: '이미 존재하는 제품코드입니다.' }, 400)
+  const industry = WORKSPACE_INDUSTRIES.includes(body.industry) ? body.industry : 'clothing'
+  const id = crypto.randomUUID()
+  await db.prepare(`INSERT INTO workspace_products (id, product_code, name, client_name, category, cost_note, supply_factory) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, productCode, name, String(body.clientName || '').trim() || null, industry, String(body.costNote || '').trim() || null, String(body.supplyFactory || '').trim() || null).run()
+  return c.json({ success: true, id })
+})
+
+app.patch('/api/workspace/products/:code', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const code = c.req.param('code')
+  const body: any = await c.req.json().catch(() => ({}))
+  const product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(code).first()
+  if (!product) return c.json({ success: false, message: '제품을 찾을 수 없습니다.' }, 404)
+  const sets: string[] = []
+  const vals: any[] = []
+  if (body.costNote !== undefined) { sets.push('cost_note = ?'); vals.push(body.costNote || null) }
+  if (body.supplyFactory !== undefined) { sets.push('supply_factory = ?'); vals.push(body.supplyFactory || null) }
+  if (body.clientName !== undefined) { sets.push('client_name = ?'); vals.push(body.clientName || null) }
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  sets.push("updated_at = datetime('now')")
+  vals.push(product.id)
+  await db.prepare(`UPDATE workspace_products SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
+  return c.json({ success: true })
+})
+
 app.get('/api/workspace/products/:code/history', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const code = c.req.param('code')
@@ -17254,6 +17288,183 @@ app.post('/api/workspace/chat/:id/undo', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// ── 검수 — AI 대화형 입력과 같은 테이블(workspace_inbound_logs)을 쓰는 수동 입력
+// 경로. 말이 아니라 폼으로 바로 입고/불량 수량을 기록하고 싶을 때 사용한다.
+app.get('/api/workspace/inbound', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const q = (c.req.query('q') || '').trim()
+  let sql = `SELECT l.*, p.product_code AS product_code, p.name AS product_name
+             FROM workspace_inbound_logs l LEFT JOIN workspace_products p ON p.id = l.product_id`
+  const binds: any[] = []
+  if (q) { sql += ` WHERE p.product_code LIKE ? OR p.name LIKE ?`; binds.push(`%${q}%`, `%${q}%`) }
+  sql += ` ORDER BY l.created_at DESC LIMIT 100`
+  const { results } = await db.prepare(sql).bind(...binds).all()
+  const logs = (results || []).map((l: any) => ({
+    id: l.id, productCode: l.product_code, productName: l.product_name, factoryName: l.factory_name,
+    qtyIn: l.qty_in, qtyDefect: l.qty_defect, note: l.note, source: l.source, createdAt: l.created_at,
+  }))
+  return c.json({ success: true, logs })
+})
+
+app.post('/api/workspace/inbound', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const productCode = String(body.productCode || '').trim()
+  if (!productCode) return c.json({ success: false, message: '제품코드를 입력해주세요.' }, 400)
+  const factoryName = String(body.factoryName || '').trim() || null
+  const qtyIn = Number(body.qtyIn) || 0
+  const qtyDefect = Number(body.qtyDefect) || 0
+  const note = String(body.note || '').trim() || null
+
+  let product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(productCode).first()
+  if (!product) {
+    const pid = crypto.randomUUID()
+    await db.prepare(`INSERT INTO workspace_products (id, product_code, name, category) VALUES (?, ?, ?, 'clothing')`).bind(pid, productCode, productCode).run()
+    product = { id: pid }
+  }
+
+  const logId = crypto.randomUUID()
+  await db.prepare(`INSERT INTO workspace_inbound_logs (id, product_id, factory_name, qty_in, qty_defect, note, source) VALUES (?, ?, ?, ?, ?, ?, 'manual')`)
+    .bind(logId, product.id, factoryName, qtyIn, qtyDefect, note).run()
+
+  const histContent = '입고 ' + qtyIn + '장 / 불량 ' + qtyDefect + '장' + (factoryName ? ' (' + factoryName + ')' : '') + ' — 검수 기록'
+  await db.prepare(`INSERT INTO workspace_product_history (id, product_id, type, content) VALUES (?, ?, 'stock', ?)`).bind(crypto.randomUUID(), product.id, histContent).run()
+
+  return c.json({ success: true, id: logId })
+})
+
+// ── 거래명세서 — 발주(들)를 묶어서 명세서를 만들고 상태(승인대기/미결제/결제/
+// 세금계산서 발행완료)를 관리한다. 조인 테이블 대신 order_ids_json 배열로 저장.
+function wsInvoiceRow(r: any) {
+  let orderIds: string[] = []
+  try { orderIds = JSON.parse(r.order_ids_json) } catch { orderIds = [] }
+  return {
+    id: r.id, invoiceCode: r.invoice_code, clientUserId: r.client_user_id,
+    clientName: r.client_name, clientEmail: r.client_email,
+    orderIds, totalAmount: r.total_amount, status: r.status, note: r.note,
+    createdAt: r.created_at, updatedAt: r.updated_at,
+  }
+}
+
+app.get('/api/workspace/invoices', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const status = c.req.query('status') || ''
+  let sql = `SELECT i.*, u.name AS client_name, u.email AS client_email
+             FROM workspace_invoices i LEFT JOIN users u ON u.id = i.client_user_id`
+  const binds: any[] = []
+  if (status && ['pending', 'unpaid', 'paid', 'tax_invoice_issued'].includes(status)) { sql += ' WHERE i.status = ?'; binds.push(status) }
+  sql += ' ORDER BY i.created_at DESC LIMIT 200'
+  const { results } = await db.prepare(sql).bind(...binds).all()
+  return c.json({ success: true, invoices: (results || []).map(wsInvoiceRow) })
+})
+
+app.post('/api/workspace/invoices', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const clientUserId = String(body.clientUserId || '').trim()
+  const orderIds: string[] = Array.isArray(body.orderIds) ? body.orderIds.filter(Boolean) : []
+  if (!clientUserId) return c.json({ success: false, message: '고객사를 선택해주세요.' }, 400)
+  if (!orderIds.length) return c.json({ success: false, message: '발주를 1건 이상 선택해주세요.' }, 400)
+
+  const placeholders = orderIds.map(() => '?').join(',')
+  const { results } = await db.prepare(`SELECT id, quantity, unit_price, total_amount FROM workspace_orders WHERE id IN (${placeholders})`).bind(...orderIds).all()
+  let totalAmount = 0
+  for (const o of (results || []) as any[]) {
+    totalAmount += o.total_amount != null ? o.total_amount : (o.quantity || 0) * (o.unit_price || 0)
+  }
+
+  const id = crypto.randomUUID()
+  const invoiceCode = 'INV-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + id.slice(0, 6)
+  await db.prepare(`INSERT INTO workspace_invoices (id, invoice_code, client_user_id, order_ids_json, total_amount, note) VALUES (?, ?, ?, ?, ?, ?)`)
+    .bind(id, invoiceCode, clientUserId, JSON.stringify(orderIds), totalAmount, String(body.note || '').trim() || null).run()
+
+  return c.json({ success: true, id, invoiceCode, totalAmount })
+})
+
+app.patch('/api/workspace/invoices/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const id = c.req.param('id')
+  const body: any = await c.req.json().catch(() => ({}))
+  const sets: string[] = []
+  const vals: any[] = []
+  if (body.status !== undefined) {
+    if (!['pending', 'unpaid', 'paid', 'tax_invoice_issued'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태입니다.' }, 400)
+    sets.push('status = ?'); vals.push(body.status)
+  }
+  if (body.note !== undefined) { sets.push('note = ?'); vals.push(body.note || null) }
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  sets.push("updated_at = datetime('now')")
+  vals.push(id)
+  await db.prepare(`UPDATE workspace_invoices SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
+  return c.json({ success: true })
+})
+
+// ── 고객사·공장 관리 ──
+// 고객사 로그인은 기존 users 테이블 재사용(별도 계정 없음) — workspace_clients는
+// ADMIN이 덧붙이는 사업자 정보만 보관하고 users 테이블 자체는 건드리지 않는다.
+app.get('/api/workspace/clients', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const q = (c.req.query('q') || '').trim()
+  let sql = `SELECT u.id, u.name, u.email, wc.company_name, wc.contact_name, wc.contact_phone, wc.note
+             FROM users u LEFT JOIN workspace_clients wc ON wc.user_id = u.id
+             WHERE u.id IN (SELECT DISTINCT client_user_id FROM workspace_products WHERE client_user_id IS NOT NULL
+                             UNION SELECT DISTINCT client_user_id FROM workspace_inquiries)`
+  const binds: any[] = []
+  if (q) { sql += ` AND (u.name LIKE ? OR u.email LIKE ? OR wc.company_name LIKE ?)`; binds.push(`%${q}%`, `%${q}%`, `%${q}%`) }
+  sql += ` ORDER BY u.name LIMIT 200`
+  const { results } = await db.prepare(sql).bind(...binds).all()
+  const clients = (results || []).map((r: any) => ({
+    userId: r.id, name: r.name, email: r.email, companyName: r.company_name,
+    contactName: r.contact_name, contactPhone: r.contact_phone, note: r.note,
+  }))
+  return c.json({ success: true, clients })
+})
+
+app.patch('/api/workspace/clients/:userId', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const userId = c.req.param('userId')
+  const body: any = await c.req.json().catch(() => ({}))
+  const companyName = String(body.companyName || '').trim() || null
+  const contactName = String(body.contactName || '').trim() || null
+  const contactPhone = String(body.contactPhone || '').trim() || null
+  const note = String(body.note || '').trim() || null
+  await db.prepare(`
+    INSERT INTO workspace_clients (user_id, company_name, contact_name, contact_phone, note)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET company_name = excluded.company_name, contact_name = excluded.contact_name,
+      contact_phone = excluded.contact_phone, note = excluded.note, updated_at = datetime('now')
+  `).bind(userId, companyName, contactName, contactPhone, note).run()
+  return c.json({ success: true })
+})
+
+app.get('/api/workspace/factories', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const q = (c.req.query('q') || '').trim()
+  let sql = `SELECT * FROM workspace_factories`
+  const binds: any[] = []
+  if (q) { sql += ` WHERE name LIKE ? OR category LIKE ?`; binds.push(`%${q}%`, `%${q}%`) }
+  sql += ` ORDER BY created_at DESC LIMIT 200`
+  const { results } = await db.prepare(sql).bind(...binds).all()
+  return c.json({ success: true, factories: results || [] })
+})
+
+app.post('/api/workspace/factories', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const name = String(body.name || '').trim()
+  if (!name) return c.json({ success: false, message: '공장명을 입력해주세요.' }, 400)
+  const id = crypto.randomUUID()
+  await db.prepare(`INSERT INTO workspace_factories (id, name, category, contact_info, note) VALUES (?, ?, ?, ?, ?)`)
+    .bind(id, name, String(body.category || '').trim() || null, String(body.contactInfo || '').trim() || null, String(body.note || '').trim() || null).run()
+  return c.json({ success: true, id })
+})
+
+app.delete('/api/workspace/factories/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  await db.prepare(`DELETE FROM workspace_factories WHERE id = ?`).bind(c.req.param('id')).run()
+  return c.json({ success: true })
+})
+
 // GET /workspace — 이지룩 워크스페이스 메인 화면 (단일 페이지, /admin02와 동일한
 // 비밀번호 오버레이 방식). 페이지 자체는 누구나 열리지만, 데이터는 전부 adminAuth가
 // 걸린 API로만 오가므로 비밀번호 없이는 아무것도 보이지 않는다.
@@ -17304,7 +17515,11 @@ app.get('/workspace', (c) => {
     .ws-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
     .ws-tab-btn{padding:8px 16px;border-radius:999px;border:1px solid #2e2e50;background:#1a1a2e;color:#8b8ba0;font-size:13px;font-weight:600;cursor:pointer;}
     .ws-tab-btn.active{background:#7C3AED;color:#fff;border-color:#7C3AED;}
-    .ws-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;}
+    .ws-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:14px;scrollbar-width:thin;scrollbar-color:#7C3AED #1a1a2e;}
+    .ws-board::-webkit-scrollbar{height:10px;}
+    .ws-board::-webkit-scrollbar-track{background:#1a1a2e;border-radius:6px;}
+    .ws-board::-webkit-scrollbar-thumb{background:#7C3AED;border-radius:6px;}
+    .ws-board::-webkit-scrollbar-thumb:hover{background:#A78BFA;}
     .ws-col{flex:0 0 220px;background:#14142380;border:1px solid #2e2e50;border-radius:12px;padding:10px;max-height:70vh;overflow-y:auto;}
     .ws-col-head{font-size:13px;font-weight:700;color:#A78BFA;margin-bottom:10px;padding:0 4px;display:flex;justify-content:space-between;}
     .ws-order-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer;font-size:12px;}
@@ -17377,8 +17592,12 @@ app.get('/workspace', (c) => {
       <button class="ws-nav-btn active" data-panel="home" onclick="wsSwitchPanel('home')">홈</button>
       <button class="ws-nav-btn" data-panel="inquiry" onclick="wsSwitchPanel('inquiry')">생산문의</button>
       <button class="ws-nav-btn" data-panel="board" onclick="wsSwitchPanel('board')">공정보드</button>
+      <button class="ws-nav-btn" data-panel="inspection" onclick="wsSwitchPanel('inspection')">검수</button>
       <button class="ws-nav-btn" data-panel="orders" onclick="wsSwitchPanel('orders')">발주관리</button>
+      <button class="ws-nav-btn" data-panel="design" onclick="wsSwitchPanel('design')">디자인 DB</button>
+      <button class="ws-nav-btn" data-panel="invoice" onclick="wsSwitchPanel('invoice')">거래명세서</button>
       <button class="ws-nav-btn" data-panel="history" onclick="wsSwitchPanel('history')">생산이력</button>
+      <button class="ws-nav-btn" data-panel="clients" onclick="wsSwitchPanel('clients')">고객사·공장</button>
       <button class="ws-nav-btn" data-panel="chat" onclick="wsSwitchPanel('chat')">AI 입력</button>
     </div>
     <div class="ws-content">
@@ -17412,6 +17631,53 @@ app.get('/workspace', (c) => {
           <button class="ws-btn secondary" onclick="wsLoadOrdersList()">검색</button>
         </div>
         <div id="wsOrdersTable"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-inspection">
+        <h1>검수</h1>
+        <div class="ws-card" style="margin-bottom:20px;">
+          <div style="font-size:14px;font-weight:700;margin-bottom:10px;">입고/불량 기록</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+            <input class="ws-input" id="wsInspProductCode" placeholder="제품코드 *" style="flex:1;min-width:120px;"/>
+            <input class="ws-input" id="wsInspFactory" placeholder="공급처" style="flex:1;min-width:120px;"/>
+            <input class="ws-input" id="wsInspQtyIn" type="number" placeholder="입고 수량" style="flex:0 0 110px;"/>
+            <input class="ws-input" id="wsInspQtyDefect" type="number" placeholder="불량 수량" style="flex:0 0 110px;"/>
+          </div>
+          <input class="ws-input" id="wsInspNote" placeholder="메모" style="width:100%;margin-bottom:8px;"/>
+          <button class="ws-btn" onclick="wsSubmitInspection()">기록</button>
+        </div>
+        <div class="ws-toolbar">
+          <input class="ws-input" id="wsInspSearch" placeholder="제품코드·제품명 검색" onkeydown="if(event.key==='Enter')wsLoadInspectionLog()"/>
+          <button class="ws-btn secondary" onclick="wsLoadInspectionLog()">검색</button>
+        </div>
+        <div id="wsInspectionList"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-design">
+        <h1>디자인 DB</h1>
+        <div class="ws-toolbar">
+          <input class="ws-input" id="wsDesignSearch" placeholder="제품코드·제품명 검색" onkeyup="wsLoadDesignList()"/>
+          <button class="ws-btn" onclick="wsOpenNewDesignModal()">+ 디자인 추가</button>
+        </div>
+        <div class="ws-two-col">
+          <div class="ws-list-col" id="wsDesignList"></div>
+          <div class="ws-detail-col" id="wsDesignDetail"><div class="ws-empty">왼쪽에서 디자인을 선택하세요.</div></div>
+        </div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-invoice">
+        <h1>거래명세서</h1>
+        <div class="ws-tabs" id="wsInvoiceTabs"></div>
+        <div class="ws-toolbar">
+          <button class="ws-btn" onclick="wsOpenNewInvoiceModal()">+ 명세서 생성</button>
+        </div>
+        <div id="wsInvoiceList"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-clients">
+        <h1>고객사·공장</h1>
+        <div class="ws-tabs" id="wsClientsTabs"></div>
+        <div id="wsClientsSection"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-history">
@@ -17533,6 +17799,47 @@ app.get('/workspace', (c) => {
   </div>
 </div>
 
+<div class="ws-modal-overlay" id="wsNewDesignModalOverlay">
+  <div class="ws-modal">
+    <h3>새 디자인 등록</h3>
+    <label>업종</label>
+    <select class="ws-input" id="wsNewDesignIndustry" style="width:100%">
+      ${WORKSPACE_INDUSTRIES.map((ind) => '<option value="' + ind + '">' + WORKSPACE_INDUSTRY_LABEL[ind] + '</option>').join('')}
+    </select>
+    <label>제품코드 *</label>
+    <input class="ws-input" id="wsNewDesignCode" style="width:100%"/>
+    <label>제품명 *</label>
+    <input class="ws-input" id="wsNewDesignName" style="width:100%"/>
+    <label>고객사명</label>
+    <input class="ws-input" id="wsNewDesignClient" style="width:100%"/>
+    <label>공급 공장</label>
+    <input class="ws-input" id="wsNewDesignSupplyFactory" style="width:100%"/>
+    <label>원가 정보</label>
+    <input class="ws-input" id="wsNewDesignCostNote" style="width:100%"/>
+    <div class="row">
+      <button class="ws-btn secondary" onclick="wsCloseNewDesignModal()">취소</button>
+      <button class="ws-btn" onclick="wsSubmitNewDesign()">등록</button>
+    </div>
+  </div>
+</div>
+
+<div class="ws-modal-overlay" id="wsNewInvoiceModalOverlay">
+  <div class="ws-modal" style="max-width:480px;max-height:85vh;overflow-y:auto;">
+    <h3>거래명세서 생성</h3>
+    <label>고객 이메일로 검색</label>
+    <div class="ws-toolbar" style="margin-bottom:8px;">
+      <input class="ws-input" id="wsInvoiceClientSearch" placeholder="이메일 또는 이름"/>
+      <button class="ws-btn secondary" onclick="wsSearchInvoiceClient()">검색</button>
+    </div>
+    <div id="wsInvoiceClientResult"></div>
+    <div id="wsInvoiceOrderPicker" style="margin-top:10px;"></div>
+    <div class="row">
+      <button class="ws-btn secondary" onclick="wsCloseNewInvoiceModal()">취소</button>
+      <button class="ws-btn" onclick="wsSubmitNewInvoice()">명세서 생성</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var wsAdminPassword = '';
 var wsIndustries = ${JSON.stringify(WORKSPACE_INDUSTRIES)};
@@ -17588,6 +17895,10 @@ function wsSwitchPanel(name) {
   if (name === 'orders') wsLoadOrdersList();
   if (name === 'history') wsLoadProductList();
   if (name === 'chat') wsLoadChat();
+  if (name === 'inspection') wsLoadInspectionLog();
+  if (name === 'design') wsLoadDesignList();
+  if (name === 'invoice') wsLoadInvoices();
+  if (name === 'clients') { wsRenderClientsTabs(); wsLoadClientsList(); }
 }
 
 async function wsLoadOrdersList() {
@@ -17992,6 +18303,301 @@ async function wsUndoChat(id) {
     if (!data.success) { alert(data.message || '처리 실패'); return; }
     wsLoadChat();
   } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+// ── 검수 ──
+async function wsSubmitInspection() {
+  var body = {
+    productCode: document.getElementById('wsInspProductCode').value.trim(),
+    factoryName: document.getElementById('wsInspFactory').value.trim(),
+    qtyIn: document.getElementById('wsInspQtyIn').value,
+    qtyDefect: document.getElementById('wsInspQtyDefect').value,
+    note: document.getElementById('wsInspNote').value.trim(),
+  };
+  if (!body.productCode) { alert('제품코드를 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/inbound', { method: 'POST', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '기록 실패'); return; }
+    ['wsInspProductCode', 'wsInspFactory', 'wsInspQtyIn', 'wsInspQtyDefect', 'wsInspNote'].forEach(function (id) { document.getElementById(id).value = ''; });
+    wsLoadInspectionLog();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsLoadInspectionLog() {
+  var q = document.getElementById('wsInspSearch').value.trim();
+  try {
+    var res = await fetch('/api/workspace/inbound' + (q ? ('?q=' + encodeURIComponent(q)) : ''), { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var list = document.getElementById('wsInspectionList');
+    if (!data.logs.length) { list.innerHTML = '<div class="ws-empty">기록이 없습니다.</div>'; return; }
+    list.innerHTML = data.logs.map(function (l) {
+      return '<div class="ws-order-row" style="cursor:default;">' +
+        '<span class="col code">' + wsEsc(l.productCode || '-') + ' ' + wsEsc(l.productName || '') + '</span>' +
+        '<span class="col">' + wsEsc(l.factoryName || '-') + '</span>' +
+        '<span class="col">입고 ' + (l.qtyIn || 0) + '</span>' +
+        '<span class="col">불량 ' + (l.qtyDefect || 0) + '</span>' +
+        '<span class="col">' + (l.source === 'ai_chat' ? 'AI' : '수동') + '</span>' +
+        '<span class="col">' + l.createdAt + '</span>' +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+// ── 디자인 DB ──
+var wsSelectedDesignCode = null;
+
+async function wsLoadDesignList() {
+  var q = document.getElementById('wsDesignSearch').value.trim();
+  try {
+    var res = await fetch('/api/workspace/products' + (q ? ('?q=' + encodeURIComponent(q)) : ''), { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var list = document.getElementById('wsDesignList');
+    if (!data.products.length) { list.innerHTML = '<div class="ws-empty">디자인이 없습니다.</div>'; return; }
+    list.innerHTML = data.products.map(function (p) {
+      return '<div class="ws-product-item" onclick="wsSelectDesign(\\'' + p.product_code + '\\')"><div class="code">' + wsEsc(p.product_code) + '</div><div class="name">' + wsEsc(p.name) + '</div></div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+function wsOpenNewDesignModal() { document.getElementById('wsNewDesignModalOverlay').style.display = 'flex'; }
+function wsCloseNewDesignModal() { document.getElementById('wsNewDesignModalOverlay').style.display = 'none'; }
+
+async function wsSubmitNewDesign() {
+  var body = {
+    industry: document.getElementById('wsNewDesignIndustry').value,
+    productCode: document.getElementById('wsNewDesignCode').value.trim(),
+    name: document.getElementById('wsNewDesignName').value.trim(),
+    clientName: document.getElementById('wsNewDesignClient').value.trim(),
+    supplyFactory: document.getElementById('wsNewDesignSupplyFactory').value.trim(),
+    costNote: document.getElementById('wsNewDesignCostNote').value.trim(),
+  };
+  if (!body.productCode || !body.name) { alert('제품코드와 제품명을 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/products', { method: 'POST', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '등록 실패'); return; }
+    wsCloseNewDesignModal();
+    ['wsNewDesignCode', 'wsNewDesignName', 'wsNewDesignClient', 'wsNewDesignSupplyFactory', 'wsNewDesignCostNote'].forEach(function (id) { document.getElementById(id).value = ''; });
+    wsLoadDesignList();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsSelectDesign(code) {
+  wsSelectedDesignCode = code;
+  try {
+    var res = await fetch('/api/workspace/products/' + encodeURIComponent(code) + '/history', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '조회 실패'); return; }
+    var p = data.product;
+    document.getElementById('wsDesignDetail').innerHTML =
+      '<h3 style="margin-bottom:12px">' + wsEsc(p.name) + ' (' + wsEsc(p.product_code) + ')</h3>' +
+      '<label style="display:block;font-size:12px;color:#8b8ba0;margin:10px 0 4px;">고객사명</label>' +
+      '<input class="ws-input" id="wsDesignClientInput" style="width:100%" value="' + wsEsc(p.client_name || '') + '"/>' +
+      '<label style="display:block;font-size:12px;color:#8b8ba0;margin:10px 0 4px;">공급 공장</label>' +
+      '<input class="ws-input" id="wsDesignSupplyInput" style="width:100%" value="' + wsEsc(p.supply_factory || '') + '"/>' +
+      '<label style="display:block;font-size:12px;color:#8b8ba0;margin:10px 0 4px;">원가 정보</label>' +
+      '<input class="ws-input" id="wsDesignCostInput" style="width:100%" value="' + wsEsc(p.cost_note || '') + '"/>' +
+      '<button class="ws-btn" style="margin-top:10px" onclick="wsSaveDesignDetail()">저장</button>';
+  } catch (e) { console.error(e); }
+}
+
+async function wsSaveDesignDetail() {
+  if (!wsSelectedDesignCode) return;
+  var body = {
+    clientName: document.getElementById('wsDesignClientInput').value.trim(),
+    supplyFactory: document.getElementById('wsDesignSupplyInput').value.trim(),
+    costNote: document.getElementById('wsDesignCostInput').value.trim(),
+  };
+  try {
+    var res = await fetch('/api/workspace/products/' + encodeURIComponent(wsSelectedDesignCode) + '', { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '저장 실패'); return; }
+    alert('저장했습니다.');
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+// ── 거래명세서 ──
+var wsInvoiceStatusTab = '';
+var wsInvoiceClientUserId = null;
+
+function wsRenderInvoiceTabs() {
+  var el = document.getElementById('wsInvoiceTabs');
+  var tabs = [['', '전체'], ['pending', '승인대기'], ['unpaid', '미결제'], ['paid', '결제'], ['tax_invoice_issued', '세금계산서 발행']];
+  el.innerHTML = tabs.map(function (t) {
+    return '<button class="ws-tab-btn' + (t[0] === wsInvoiceStatusTab ? ' active' : '') + '" onclick="wsSelectInvoiceTab(\\'' + t[0] + '\\')">' + t[1] + '</button>';
+  }).join('');
+}
+function wsSelectInvoiceTab(status) { wsInvoiceStatusTab = status; wsRenderInvoiceTabs(); wsLoadInvoices(); }
+
+async function wsLoadInvoices() {
+  wsRenderInvoiceTabs();
+  try {
+    var res = await fetch('/api/workspace/invoices' + (wsInvoiceStatusTab ? ('?status=' + wsInvoiceStatusTab) : ''), { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var statusLabel = { pending: '승인대기', unpaid: '미결제', paid: '결제', tax_invoice_issued: '세금계산서 발행' };
+    var list = document.getElementById('wsInvoiceList');
+    if (!data.invoices.length) { list.innerHTML = '<div class="ws-empty">거래명세서가 없습니다.</div>'; return; }
+    list.innerHTML = data.invoices.map(function (inv) {
+      return '<div class="ws-inquiry-card">' +
+        '<div class="top"><div><div class="title">' + wsEsc(inv.invoiceCode) + '</div><div class="meta">' + wsEsc(inv.clientName || inv.clientEmail || '-') + ' · 발주 ' + inv.orderIds.length + '건 · ' + (inv.totalAmount || 0).toLocaleString() + '원 · ' + inv.createdAt + '</div></div>' +
+        '<select class="ws-input" style="flex:0 0 150px" onchange="wsUpdateInvoiceStatus(\\'' + inv.id + '\\', this.value)">' +
+        Object.keys(statusLabel).map(function (s) { return '<option value="' + s + '"' + (s === inv.status ? ' selected' : '') + '>' + statusLabel[s] + '</option>'; }).join('') +
+        '</select></div>' +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function wsUpdateInvoiceStatus(id, status) {
+  try { await fetch('/api/workspace/invoices/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ status: status }) }); wsLoadInvoices(); } catch (e) {}
+}
+
+function wsOpenNewInvoiceModal() {
+  wsInvoiceClientUserId = null;
+  document.getElementById('wsInvoiceClientSearch').value = '';
+  document.getElementById('wsInvoiceClientResult').innerHTML = '';
+  document.getElementById('wsInvoiceOrderPicker').innerHTML = '';
+  document.getElementById('wsNewInvoiceModalOverlay').style.display = 'flex';
+}
+function wsCloseNewInvoiceModal() { document.getElementById('wsNewInvoiceModalOverlay').style.display = 'none'; }
+
+async function wsSearchInvoiceClient() {
+  var q = document.getElementById('wsInvoiceClientSearch').value.trim();
+  if (!q) return;
+  try {
+    var res = await fetch('/api/workspace/clients?q=' + encodeURIComponent(q), { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    document.getElementById('wsInvoiceClientResult').innerHTML = data.clients.map(function (cl) {
+      return '<div class="ws-product-item" onclick="wsPickInvoiceClient(\\'' + cl.userId + '\\', \\'' + wsEsc(cl.name || cl.email) + '\\')"><div class="code">' + wsEsc(cl.name) + '</div><div class="name">' + wsEsc(cl.email) + '</div></div>';
+    }).join('') || '<div class="ws-empty">검색 결과가 없습니다.</div>';
+  } catch (e) { console.error(e); }
+}
+
+async function wsPickInvoiceClient(userId, label) {
+  wsInvoiceClientUserId = userId;
+  document.getElementById('wsInvoiceClientResult').innerHTML = '<div class="mp-meta" style="color:#A78BFA">선택됨: ' + wsEsc(label) + '</div>';
+  try {
+    var res = await fetch('/api/workspace/orders', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var picker = document.getElementById('wsInvoiceOrderPicker');
+    picker.innerHTML = '<div style="font-size:12px;color:#8b8ba0;margin-bottom:6px;">명세서에 포함할 발주 선택</div>' +
+      data.orders.map(function (o) {
+        return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;"><input type="checkbox" class="inv-order-check" value="' + o.id + '"/>' + wsEsc(o.orderCode) + ' · ' + wsEsc(o.productCode) + ' · ' + (o.totalAmount != null ? o.totalAmount.toLocaleString() + '원' : '금액 미입력') + '</label>';
+      }).join('') || '<div class="ws-empty">발주가 없습니다.</div>';
+  } catch (e) { console.error(e); }
+}
+
+async function wsSubmitNewInvoice() {
+  if (!wsInvoiceClientUserId) { alert('고객사를 먼저 선택해주세요.'); return; }
+  var orderIds = Array.from(document.querySelectorAll('.inv-order-check:checked')).map(function (el) { return el.value; });
+  if (!orderIds.length) { alert('발주를 1건 이상 선택해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/invoices', { method: 'POST', headers: wsHeaders(), body: JSON.stringify({ clientUserId: wsInvoiceClientUserId, orderIds: orderIds }) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '생성 실패'); return; }
+    wsCloseNewInvoiceModal();
+    wsLoadInvoices();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+// ── 고객사·공장 ──
+var wsClientsSubTab = 'clients';
+
+function wsRenderClientsTabs() {
+  var el = document.getElementById('wsClientsTabs');
+  var tabs = [['clients', '고객사'], ['factories', '공장']];
+  el.innerHTML = tabs.map(function (t) {
+    return '<button class="ws-tab-btn' + (t[0] === wsClientsSubTab ? ' active' : '') + '" onclick="wsSelectClientsTab(\\'' + t[0] + '\\')">' + t[1] + '</button>';
+  }).join('');
+}
+function wsSelectClientsTab(tab) {
+  wsClientsSubTab = tab;
+  wsRenderClientsTabs();
+  if (tab === 'clients') wsLoadClientsList(); else wsLoadFactoriesList();
+}
+
+async function wsLoadClientsList() {
+  try {
+    var res = await fetch('/api/workspace/clients', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var sec = document.getElementById('wsClientsSection');
+    if (!data.clients.length) { sec.innerHTML = '<div class="ws-empty">고객사가 없습니다(문의·발주가 있어야 표시됩니다).</div>'; return; }
+    sec.innerHTML = data.clients.map(function (cl) {
+      return '<div class="ws-card" style="margin-bottom:10px;">' +
+        '<div style="font-weight:700;margin-bottom:6px;">' + wsEsc(cl.name) + ' · ' + wsEsc(cl.email) + '</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+        '<input class="ws-input" style="flex:1;min-width:140px;" placeholder="회사명" id="cl_company_' + cl.userId + '" value="' + wsEsc(cl.companyName || '') + '"/>' +
+        '<input class="ws-input" style="flex:1;min-width:140px;" placeholder="담당자" id="cl_contact_' + cl.userId + '" value="' + wsEsc(cl.contactName || '') + '"/>' +
+        '<input class="ws-input" style="flex:1;min-width:140px;" placeholder="연락처" id="cl_phone_' + cl.userId + '" value="' + wsEsc(cl.contactPhone || '') + '"/>' +
+        '<button class="ws-btn secondary" onclick="wsSaveClientInfo(\\'' + cl.userId + '\\')">저장</button>' +
+        '</div></div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function wsSaveClientInfo(userId) {
+  var body = {
+    companyName: document.getElementById('cl_company_' + userId).value.trim(),
+    contactName: document.getElementById('cl_contact_' + userId).value.trim(),
+    contactPhone: document.getElementById('cl_phone_' + userId).value.trim(),
+  };
+  try {
+    var res = await fetch('/api/workspace/clients/' + userId, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '저장 실패'); return; }
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsLoadFactoriesList() {
+  try {
+    var res = await fetch('/api/workspace/factories', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var sec = document.getElementById('wsClientsSection');
+    var formHtml = '<div class="ws-card" style="margin-bottom:16px;">' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;">' +
+      '<input class="ws-input" id="wsNewFactoryName" placeholder="공장명 *" style="flex:1;min-width:120px;"/>' +
+      '<input class="ws-input" id="wsNewFactoryCategory" placeholder="종류(예: 봉제, 도금)" style="flex:1;min-width:120px;"/>' +
+      '<input class="ws-input" id="wsNewFactoryContact" placeholder="연락처" style="flex:1;min-width:120px;"/>' +
+      '<button class="ws-btn" onclick="wsSubmitNewFactory()">추가</button>' +
+      '</div></div>';
+    var listHtml = data.factories.map(function (f) {
+      return '<div class="ws-order-row" style="cursor:default;">' +
+        '<span class="col code">' + wsEsc(f.name) + '</span>' +
+        '<span class="col">' + wsEsc(f.category || '-') + '</span>' +
+        '<span class="col">' + wsEsc(f.contact_info || '-') + '</span>' +
+        '<span class="col" style="flex:0 0 40px;text-align:right;"><span style="cursor:pointer;color:#ef4444" onclick="wsDeleteFactory(\\'' + f.id + '\\')">삭제</span></span>' +
+        '</div>';
+    }).join('') || '<div class="ws-empty">등록된 공장이 없습니다.</div>';
+    sec.innerHTML = formHtml + listHtml;
+  } catch (e) { console.error(e); }
+}
+
+async function wsSubmitNewFactory() {
+  var body = {
+    name: document.getElementById('wsNewFactoryName').value.trim(),
+    category: document.getElementById('wsNewFactoryCategory').value.trim(),
+    contactInfo: document.getElementById('wsNewFactoryContact').value.trim(),
+  };
+  if (!body.name) { alert('공장명을 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/factories', { method: 'POST', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '추가 실패'); return; }
+    wsLoadFactoriesList();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsDeleteFactory(id) {
+  if (!confirm('이 공장을 삭제할까요?')) return;
+  try { await fetch('/api/workspace/factories/' + id, { method: 'DELETE', headers: wsHeaders() }); wsLoadFactoriesList(); } catch (e) {}
 }
 </script>
 </body>
