@@ -3574,6 +3574,32 @@ async function createSession(db: D1Database, userId: string): Promise<string> {
   return token
 }
 
+// ── 헬퍼: 워크스페이스 개별 관리자 세션 (30일) — 공유 ADMIN_PASSWORD 게이트 안쪽에서
+// "누가 로그인했는지" 식별하는 별도 레이어. 세션 무효화 시 user_sessions와 동일하게
+// 계정당 최대 5개만 유지.
+async function createWsAdminSession(db: D1Database, adminId: string): Promise<string> {
+  const token = genToken()
+  const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+  await db.prepare(`DELETE FROM workspace_admin_sessions WHERE admin_id = ? AND token NOT IN (
+    SELECT token FROM workspace_admin_sessions WHERE admin_id = ? ORDER BY created_at DESC LIMIT 4
+  )`).bind(adminId, adminId).run()
+  await db.prepare(
+    `INSERT INTO workspace_admin_sessions (token, admin_id, expires_at) VALUES (?, ?, ?)`
+  ).bind(token, adminId, expires).run()
+  return token
+}
+
+async function getWsAdminFromToken(db: D1Database, token: string | null) {
+  if (!token) return null
+  const now = new Date().toISOString()
+  const row = await db.prepare(`
+    SELECT a.id, a.email, a.name, a.role
+    FROM workspace_admin_sessions s JOIN workspace_admins a ON a.id = s.admin_id
+    WHERE s.token = ? AND s.expires_at > ? AND a.is_active = 1
+  `).bind(token, now).first()
+  return row || null
+}
+
 // 모바일 사파리의 ITP(스크립트가 쓰는 storage를 7일 뒤 비우는 정책) 때문에
 // localStorage에 저장한 세션 토큰이 카톡 등 다른 앱에서 들어온 방문에서는
 // 일주일 만에 날아가 재로그인을 유발한다. 서버가 응답 헤더로 내려주는 쿠키는
@@ -17607,6 +17633,95 @@ app.patch('/api/workspace/invoices/:id', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// ── 관리자 관리(개별 계정) ── API 자체는 여전히 공유 ADMIN_PASSWORD(adminAuth)가
+// 1차 게이트. 이 CRUD는 그 안쪽에서 운영팀 개개인의 로그인 계정을 관리하고,
+// admin-login으로 발급한 세션 토큰(X-Ws-Admin-Token)은 "누가 썼는지" 식별용으로만
+// 쓰인다(사내톡/워크플로우/휴일신청 작성자 자동입력) — API 권한을 세분화하지는 않는다.
+app.get('/api/workspace/admins', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const { results } = await db.prepare(
+    `SELECT id, email, name, role, is_active, last_login_at, created_at FROM workspace_admins ORDER BY created_at ASC`
+  ).all()
+  return c.json({ success: true, admins: results || [] })
+})
+
+app.post('/api/workspace/admins', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const email = String(body.email || '').trim().toLowerCase()
+  const name = String(body.name || '').trim()
+  const password = String(body.password || '')
+  if (!email || !name || password.length < 4) {
+    return c.json({ success: false, message: '이메일, 이름, 4자 이상의 비밀번호를 입력해주세요.' }, 400)
+  }
+  const role = body.role === 'super' ? 'super' : 'staff'
+  const dup = await db.prepare(`SELECT id FROM workspace_admins WHERE email = ?`).bind(email).first()
+  if (dup) return c.json({ success: false, message: '이미 등록된 이메일입니다.' }, 409)
+  const id = crypto.randomUUID()
+  const passwordHash = await hashPassword(password)
+  await db.prepare(
+    `INSERT INTO workspace_admins (id, email, name, password_hash, role) VALUES (?, ?, ?, ?, ?)`
+  ).bind(id, email, name, passwordHash, role).run()
+  return c.json({ success: true, id })
+})
+
+app.patch('/api/workspace/admins/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const id = c.req.param('id')
+  const body: any = await c.req.json().catch(() => ({}))
+  const sets: string[] = []
+  const vals: any[] = []
+  if (body.role !== undefined) {
+    if (!['super', 'staff'].includes(body.role)) return c.json({ success: false, message: '잘못된 권한입니다.' }, 400)
+    sets.push('role = ?'); vals.push(body.role)
+  }
+  if (body.isActive !== undefined) { sets.push('is_active = ?'); vals.push(body.isActive ? 1 : 0) }
+  if (body.setPassword) {
+    if (String(body.setPassword).length < 4) return c.json({ success: false, message: '비밀번호는 4자 이상이어야 합니다.' }, 400)
+    sets.push('password_hash = ?'); vals.push(await hashPassword(String(body.setPassword)))
+  }
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  sets.push("updated_at = datetime('now')")
+  vals.push(id)
+  await db.prepare(`UPDATE workspace_admins SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
+  return c.json({ success: true })
+})
+
+app.delete('/api/workspace/admins/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  await db.prepare(`DELETE FROM workspace_admins WHERE id = ?`).bind(c.req.param('id')).run()
+  return c.json({ success: true })
+})
+
+app.post('/api/workspace/admin-login', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const email = String(body.email || '').trim().toLowerCase()
+  const password = String(body.password || '')
+  const admin: any = await db.prepare(
+    `SELECT id, name, email, role, password_hash FROM workspace_admins WHERE email = ? AND is_active = 1`
+  ).bind(email).first()
+  if (!admin) return c.json({ success: false, message: '등록되지 않은 계정입니다.' }, 401)
+  const ok = await verifyPassword(password, admin.password_hash)
+  if (!ok) return c.json({ success: false, message: '비밀번호가 올바르지 않습니다.' }, 401)
+  const token = await createWsAdminSession(db, admin.id)
+  await db.prepare(`UPDATE workspace_admins SET last_login_at = datetime('now') WHERE id = ?`).bind(admin.id).run()
+  return c.json({ success: true, token, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } })
+})
+
+app.post('/api/workspace/admin-logout', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const token = c.req.header('X-Ws-Admin-Token')
+  if (token) await db.prepare(`DELETE FROM workspace_admin_sessions WHERE token = ?`).bind(token).run()
+  return c.json({ success: true })
+})
+
+app.get('/api/workspace/admin-me', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const admin = await getWsAdminFromToken(db, c.req.header('X-Ws-Admin-Token') || null)
+  return c.json({ success: true, admin: admin || null })
+})
+
 // ── 고객사·공장 관리 ──
 // 고객사 로그인은 기존 users 테이블 재사용(별도 계정 없음) — workspace_clients는
 // ADMIN이 덧붙이는 사업자 정보만 보관하고 users 테이블 자체는 건드리지 않는다.
@@ -18010,7 +18125,22 @@ app.get('/workspace', (c) => {
   <div class="ws-header">
     <span class="logo">이지룩 WORKS</span>
     <span class="badge">제조 워크스페이스</span>
+    <span id="wsOperatorBar" style="margin-left:auto;margin-right:12px;font-size:12px;color:#B7B7C2;"></span>
     <button class="logout" onclick="wsLogout()">로그아웃</button>
+  </div>
+
+  <div class="ws-modal-overlay" id="wsOperatorLoginOverlay">
+    <div class="ws-modal" style="max-width:360px;">
+      <h3 style="margin:0 0 12px;">담당자 로그인</h3>
+      <p style="font-size:12px;color:#B7B7C2;margin:0 0 12px;">사내톡·워크플로우·근무관리에 이름이 자동으로 들어갑니다.</p>
+      <input class="ws-input" id="wsOpEmailInput" placeholder="이메일" style="width:100%;margin-bottom:8px;" onkeydown="if(event.key==='Enter')wsOperatorLogin()"/>
+      <input class="ws-input" type="password" id="wsOpPwInput" placeholder="비밀번호" style="width:100%;margin-bottom:8px;" onkeydown="if(event.key==='Enter')wsOperatorLogin()"/>
+      <div class="err" id="wsOperatorLoginErr" style="color:#ef4444;font-size:12px;margin-bottom:8px;"></div>
+      <div class="row">
+        <button class="ws-btn secondary" onclick="document.getElementById('wsOperatorLoginOverlay').style.display='none';">취소</button>
+        <button class="ws-btn" onclick="wsOperatorLogin()">로그인</button>
+      </div>
+    </div>
   </div>
   <div class="ws-body">
     <div class="ws-sidebar">
@@ -18031,6 +18161,7 @@ app.get('/workspace', (c) => {
       <button class="ws-nav-btn" data-panel="workflow" onclick="wsSwitchPanel('workflow')">워크플로우</button>
       <button class="ws-nav-btn" data-panel="teamchat" onclick="wsSwitchPanel('teamchat')">사내톡</button>
       <button class="ws-nav-btn" data-panel="holiday" onclick="wsSwitchPanel('holiday')">근무관리</button>
+      <button class="ws-nav-btn" data-panel="admins" onclick="wsSwitchPanel('admins')">관리자관리</button>
       <button class="ws-nav-btn" data-panel="chat" onclick="wsSwitchPanel('chat')">AI 입력</button>
     </div>
     <div class="ws-content">
@@ -18205,6 +18336,24 @@ app.get('/workspace', (c) => {
           <button class="ws-btn" onclick="wsSubmitHoliday()">신청</button>
         </div>
         <div id="wsHolidayList"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-admins">
+        <h1>관리자 관리</h1>
+        <p style="font-size:12px;color:#B7B7C2;margin:-6px 0 16px;">공유 비밀번호와는 별개로, 운영팀 개개인의 로그인 계정입니다. 로그인하면 사내톡·워크플로우·근무관리 작성자가 자동으로 채워집니다.</p>
+        <div class="ws-card" style="margin-bottom:16px;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+            <input class="ws-input" id="wsNewAdminEmail" placeholder="이메일" style="flex:1;min-width:140px;"/>
+            <input class="ws-input" id="wsNewAdminName" placeholder="이름" style="flex:1;min-width:100px;"/>
+            <input class="ws-input" type="password" id="wsNewAdminPw" placeholder="초기 비밀번호(4자 이상)" style="flex:1;min-width:140px;"/>
+            <select class="ws-input" id="wsNewAdminRole" style="flex:0 0 110px;">
+              <option value="staff">일반관리자</option>
+              <option value="super">총괄관리자</option>
+            </select>
+          </div>
+          <button class="ws-btn" onclick="wsAddAdmin()">관리자 추가</button>
+        </div>
+        <div id="wsAdminsTable"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-history">
@@ -18448,6 +18597,7 @@ function wsSwitchPanel(name) {
   if (name === 'workflow') wsLoadWorkflow();
   if (name === 'teamchat') wsLoadTeamChat();
   if (name === 'holiday') wsLoadHolidays();
+  if (name === 'admins') wsLoadAdmins();
 }
 
 async function wsLoadOrdersList() {
@@ -18555,7 +18705,7 @@ async function wsSubmitConvert() {
   } catch (e) { alert('서버 오류가 발생했습니다.'); }
 }
 
-function wsInit() { wsLoadStageSets().then(function () { wsRenderIndustryTabs(); wsLoadHome(); }); wsRefreshNotifyBadge(); }
+function wsInit() { wsLoadStageSets().then(function () { wsRenderIndustryTabs(); wsLoadHome(); }); wsRefreshNotifyBadge(); wsRestoreOperator(); }
 
 async function wsRefreshNotifyBadge() {
   try {
@@ -19553,6 +19703,148 @@ async function wsLoadHolidays() {
 
 async function wsUpdateHolidayStatus(id, status) {
   try { await fetch('/api/workspace/holidays/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ status: status }) }); wsLoadHolidays(); } catch (e) {}
+}
+
+// ── 담당자(개별 관리자) 로그인 — 공유 ADMIN_PASSWORD와는 별개 레이어. 로그인하면
+// 사내톡/워크플로우/근무관리 작성자란에 이름이 자동으로 채워진다.
+var wsOperatorToken = '';
+var wsOperatorName = '';
+var wsOperatorRole = '';
+
+function wsUpdateOperatorBar() {
+  var bar = document.getElementById('wsOperatorBar');
+  if (!bar) return;
+  if (wsOperatorToken) {
+    bar.innerHTML = '접속자: <b style="color:#fff;">' + wsEsc(wsOperatorName) + '</b>' + (wsOperatorRole === 'super' ? ' <span style="color:#7C3AED;">(총괄)</span>' : '') +
+      ' <button class="ws-btn secondary" style="padding:2px 10px;font-size:12px;margin-left:6px;" onclick="wsOperatorLogout()">전환</button>';
+  } else {
+    bar.innerHTML = '<button class="ws-btn secondary" style="padding:2px 10px;font-size:12px;" onclick="wsOpenOperatorLogin()">담당자 로그인</button>';
+  }
+}
+
+function wsOpenOperatorLogin() {
+  document.getElementById('wsOperatorLoginErr').textContent = '';
+  document.getElementById('wsOperatorLoginOverlay').style.display = 'flex';
+}
+
+async function wsOperatorLogin() {
+  var email = document.getElementById('wsOpEmailInput').value.trim();
+  var pw = document.getElementById('wsOpPwInput').value;
+  var err = document.getElementById('wsOperatorLoginErr');
+  err.textContent = '';
+  try {
+    var res = await fetch('/api/workspace/admin-login', { method: 'POST', headers: wsHeaders(), body: JSON.stringify({ email: email, password: pw }) });
+    var data = await res.json();
+    if (!data.success) { err.textContent = data.message || '로그인 실패'; return; }
+    wsOperatorToken = data.token; wsOperatorName = data.admin.name; wsOperatorRole = data.admin.role;
+    try {
+      sessionStorage.setItem('wsOperatorToken', wsOperatorToken);
+      sessionStorage.setItem('wsOperatorName', wsOperatorName);
+      sessionStorage.setItem('wsOperatorRole', wsOperatorRole);
+    } catch (e) {}
+    document.getElementById('wsOperatorLoginOverlay').style.display = 'none';
+    document.getElementById('wsOpEmailInput').value = '';
+    document.getElementById('wsOpPwInput').value = '';
+    wsUpdateOperatorBar();
+    wsAutofillOperatorName();
+  } catch (e) { err.textContent = '서버 오류가 발생했습니다.'; }
+}
+
+async function wsOperatorLogout() {
+  try {
+    await fetch('/api/workspace/admin-logout', { method: 'POST', headers: Object.assign({ 'X-Ws-Admin-Token': wsOperatorToken }, wsHeaders()) });
+  } catch (e) {}
+  wsOperatorToken = ''; wsOperatorName = ''; wsOperatorRole = '';
+  try { sessionStorage.removeItem('wsOperatorToken'); sessionStorage.removeItem('wsOperatorName'); sessionStorage.removeItem('wsOperatorRole'); } catch (e) {}
+  wsUpdateOperatorBar();
+}
+
+function wsAutofillOperatorName() {
+  if (!wsOperatorName) return;
+  ['wsNewWfRequester', 'wsTeamChatName', 'wsNewHolidayName'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el && !el.value) el.value = wsOperatorName;
+  });
+}
+
+function wsRestoreOperator() {
+  var token = null, name = null, role = null;
+  try {
+    token = sessionStorage.getItem('wsOperatorToken');
+    name = sessionStorage.getItem('wsOperatorName');
+    role = sessionStorage.getItem('wsOperatorRole');
+  } catch (e) {}
+  if (token && name) {
+    wsOperatorToken = token; wsOperatorName = name; wsOperatorRole = role || '';
+    wsAutofillOperatorName();
+  }
+  wsUpdateOperatorBar();
+}
+
+// ── 관리자 관리(CRUD) ──
+async function wsLoadAdmins() {
+  try {
+    var res = await fetch('/api/workspace/admins', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var table = document.getElementById('wsAdminsTable');
+    if (!data.admins.length) { table.innerHTML = '<div class="ws-empty">등록된 관리자 계정이 없습니다.</div>'; return; }
+    var roleLabel = { super: '총괄관리자', staff: '일반관리자' };
+    table.innerHTML = data.admins.map(function (a) {
+      var lastLogin = a.last_login_at ? a.last_login_at.slice(0, 16).replace('T', ' ') : '로그인 기록 없음';
+      return '<div class="ws-inquiry-card">' +
+        '<div class="top"><div><div class="title">' + wsEsc(a.name) + ' <span style="color:#8b8ba0;font-weight:400;">(' + wsEsc(a.email) + ')</span></div>' +
+        '<div class="meta">' + roleLabel[a.role] + ' · ' + (a.is_active ? '활성' : '비활성') + ' · 마지막 로그인: ' + lastLogin + '</div></div></div>' +
+        '<div class="actions">' +
+        '<button class="ws-btn secondary" onclick="wsSetAdminRole(\\'' + a.id + '\\', \\'' + (a.role === 'super' ? 'staff' : 'super') + '\\')">' + (a.role === 'super' ? '일반관리자로 변경' : '총괄관리자로 변경') + '</button>' +
+        '<button class="ws-btn secondary" onclick="wsToggleAdminActive(\\'' + a.id + '\\', ' + (a.is_active ? 'false' : 'true') + ')">' + (a.is_active ? '비활성화' : '활성화') + '</button>' +
+        '<button class="ws-btn secondary" onclick="wsResetAdminPassword(\\'' + a.id + '\\')">비밀번호 재설정</button>' +
+        '<button class="ws-btn secondary" style="color:#ef4444;" onclick="wsDeleteAdmin(\\'' + a.id + '\\', \\'' + wsEsc(a.name) + '\\')">삭제</button>' +
+        '</div></div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function wsAddAdmin() {
+  var body = {
+    email: document.getElementById('wsNewAdminEmail').value.trim(),
+    name: document.getElementById('wsNewAdminName').value.trim(),
+    password: document.getElementById('wsNewAdminPw').value,
+    role: document.getElementById('wsNewAdminRole').value,
+  };
+  if (!body.email || !body.name || body.password.length < 4) { alert('이메일, 이름, 4자 이상의 비밀번호를 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/admins', { method: 'POST', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '추가 실패'); return; }
+    ['wsNewAdminEmail', 'wsNewAdminName', 'wsNewAdminPw'].forEach(function (id) { document.getElementById(id).value = ''; });
+    wsLoadAdmins();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsSetAdminRole(id, role) {
+  try { await fetch('/api/workspace/admins/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ role: role }) }); wsLoadAdmins(); } catch (e) {}
+}
+
+async function wsToggleAdminActive(id, isActive) {
+  try { await fetch('/api/workspace/admins/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ isActive: isActive }) }); wsLoadAdmins(); } catch (e) {}
+}
+
+async function wsResetAdminPassword(id) {
+  var pw = prompt('새 비밀번호를 입력해주세요 (4자 이상)');
+  if (!pw) return;
+  if (pw.length < 4) { alert('4자 이상 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/admins/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ setPassword: pw }) });
+    var data = await res.json();
+    if (!data.success) alert(data.message || '변경 실패');
+    else alert('비밀번호가 변경되었습니다.');
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsDeleteAdmin(id, name) {
+  if (!confirm(name + ' 계정을 삭제하시겠습니까?')) return;
+  try { await fetch('/api/workspace/admins/' + id, { method: 'DELETE', headers: wsHeaders() }); wsLoadAdmins(); } catch (e) {}
 }
 </script>
 </body>
