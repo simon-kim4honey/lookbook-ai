@@ -17489,6 +17489,34 @@ app.get('/api/workspace/invoices', adminAuth, async (c) => {
   return c.json({ success: true, invoices: (results || []).map(wsInvoiceRow) })
 })
 
+// 거래명세서 상세 — 품목별 내역(발주마다 제품/옵션/수량/단가/금액)까지 펼쳐서 보여준다.
+app.get('/api/workspace/invoices/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const row: any = await db.prepare(`
+    SELECT i.*, u.name AS client_name, u.email AS client_email
+    FROM workspace_invoices i LEFT JOIN users u ON u.id = i.client_user_id
+    WHERE i.id = ?
+  `).bind(c.req.param('id')).first()
+  if (!row) return c.json({ success: false, message: '명세서를 찾을 수 없습니다.' }, 404)
+  const invoice = wsInvoiceRow(row)
+  const client: any = await db.prepare(`SELECT * FROM workspace_clients WHERE user_id = ?`).bind(invoice.clientUserId).first()
+  let orders: any[] = []
+  if (invoice.orderIds.length) {
+    const placeholders = invoice.orderIds.map(() => '?').join(',')
+    const { results } = await db.prepare(`
+      SELECT o.*, p.product_code AS product_code, p.name AS product_name
+      FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id
+      WHERE o.id IN (${placeholders})
+    `).bind(...invoice.orderIds).all()
+    orders = (results || []).map(wsOrderRow)
+  }
+  return c.json({
+    success: true, invoice,
+    client: client ? { companyName: client.company_name, contactName: client.contact_name, contactPhone: client.contact_phone } : null,
+    orders,
+  })
+})
+
 app.post('/api/workspace/invoices', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const body: any = await c.req.json().catch(() => ({}))
@@ -18123,6 +18151,16 @@ app.get('/workspace', (c) => {
     <div class="row">
       <button class="ws-btn secondary" onclick="wsCloseNewInvoiceModal()">취소</button>
       <button class="ws-btn" onclick="wsSubmitNewInvoice()">명세서 생성</button>
+    </div>
+  </div>
+</div>
+
+<div class="ws-modal-overlay" id="wsInvoiceDetailOverlay">
+  <div class="ws-modal" style="max-width:560px;max-height:85vh;overflow-y:auto;">
+    <div id="wsInvoiceDetailBody"></div>
+    <div class="row">
+      <button class="ws-btn secondary" onclick="document.getElementById('wsInvoiceDetailOverlay').style.display='none';">닫기</button>
+      <button class="ws-btn" onclick="window.print()">인쇄</button>
     </div>
   </div>
 </div>
@@ -18793,6 +18831,7 @@ async function wsLoadInvoices() {
         '<select class="ws-input" style="flex:0 0 150px" onchange="wsUpdateInvoiceStatus(\\'' + inv.id + '\\', this.value)">' +
         Object.keys(statusLabel).map(function (s) { return '<option value="' + s + '"' + (s === inv.status ? ' selected' : '') + '>' + statusLabel[s] + '</option>'; }).join('') +
         '</select></div>' +
+        '<div class="actions"><button class="ws-btn secondary" onclick="wsOpenInvoiceDetail(\\'' + inv.id + '\\')">상세보기</button></div>' +
         '</div>';
     }).join('');
   } catch (e) { console.error(e); }
@@ -18800,6 +18839,39 @@ async function wsLoadInvoices() {
 
 async function wsUpdateInvoiceStatus(id, status) {
   try { await fetch('/api/workspace/invoices/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ status: status }) }); wsLoadInvoices(); } catch (e) {}
+}
+
+async function wsOpenInvoiceDetail(id) {
+  try {
+    var res = await fetch('/api/workspace/invoices/' + id, { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '조회 실패'); return; }
+    var statusLabel = { pending: '승인대기', unpaid: '미결제', paid: '결제', tax_invoice_issued: '세금계산서 발행' };
+    var inv = data.invoice, cl = data.client;
+    var rows = data.orders.map(function (o) {
+      var optStr = (o.options || []).map(function (x) { return x.label + ':' + x.value; }).join(', ');
+      var amount = o.totalAmount != null ? o.totalAmount : (o.quantity || 0) * (o.unitPrice || 0);
+      return '<tr><td style="padding:6px 8px;border-bottom:1px solid #2e2e50;">' + wsEsc(o.productCode) + ' ' + wsEsc(o.productName) + '</td>' +
+        '<td style="padding:6px 8px;border-bottom:1px solid #2e2e50;">' + wsEsc(optStr || '-') + '</td>' +
+        '<td style="padding:6px 8px;border-bottom:1px solid #2e2e50;text-align:right;">' + (o.quantity || 0) + '</td>' +
+        '<td style="padding:6px 8px;border-bottom:1px solid #2e2e50;text-align:right;">' + (o.unitPrice != null ? o.unitPrice.toLocaleString() : '-') + '</td>' +
+        '<td style="padding:6px 8px;border-bottom:1px solid #2e2e50;text-align:right;">' + amount.toLocaleString() + '원</td></tr>';
+    }).join('');
+    document.getElementById('wsInvoiceDetailBody').innerHTML =
+      '<h3 style="margin-bottom:4px">' + wsEsc(inv.invoiceCode) + '</h3>' +
+      '<div style="font-size:13px;color:#8b8ba0;margin-bottom:14px;">' + statusLabel[inv.status] + ' · ' + inv.createdAt + '</div>' +
+      '<div style="font-size:13px;margin-bottom:14px;">' +
+      '<b>' + wsEsc(cl && cl.companyName ? cl.companyName : (inv.clientName || inv.clientEmail || '고객사 미지정')) + '</b>' +
+      (cl && cl.contactName ? ' · 담당자 ' + wsEsc(cl.contactName) : '') + (cl && cl.contactPhone ? ' · ' + wsEsc(cl.contactPhone) : '') +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">' +
+      '<thead><tr style="color:#8b8ba0;text-align:left;"><th style="padding:6px 8px;">품목</th><th style="padding:6px 8px;">옵션</th><th style="padding:6px 8px;text-align:right;">수량</th><th style="padding:6px 8px;text-align:right;">단가</th><th style="padding:6px 8px;text-align:right;">금액</th></tr></thead>' +
+      '<tbody>' + (rows || '<tr><td colspan="5" style="padding:10px;color:#8b8ba0;">품목 정보가 없습니다.</td></tr>') + '</tbody>' +
+      '</table>' +
+      '<div style="text-align:right;font-size:15px;font-weight:700;margin-bottom:10px;">합계 ' + (inv.totalAmount || 0).toLocaleString() + '원</div>' +
+      (inv.note ? '<div style="font-size:12px;color:#8b8ba0;">메모: ' + wsEsc(inv.note) + '</div>' : '');
+    document.getElementById('wsInvoiceDetailOverlay').style.display = 'flex';
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
 }
 
 function wsOpenNewInvoiceModal() {
