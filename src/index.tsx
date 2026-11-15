@@ -16716,8 +16716,8 @@ app.patch('/api/workspace/history/:id', adminAuth, async (c) => {
 // 반드시 사람이 "확인"을 눌러야 실제로 저장된다(실행 전 확인 + 되돌리기).
 const WORKSPACE_CHAT_SYSTEM_PROMPT = '너는 패션 제조업체 현장 워크스페이스의 기록 보조 AI다. 작업자가 입력한 한국어 문장을 보고 아래 JSON 스키마로만 답하라. 다른 설명은 절대 출력하지 마라.\n\n' +
   '{"intent": "inbound" | "query" | "unknown", "productCode": string|null, "factoryName": string|null, "qtyIn": number|null, "qtyDefect": number|null, "note": string|null, "reply": string}\n\n' +
-  '- intent=inbound: 특정 제품의 입고·불량 수량을 보고하는 문장(예: "신광에서 HAUS_001 도금 200개 들어왔어", "ACOL_004 2개 중 불량 1개"). productCode는 문장에서 가장 그럴듯한 제품/작업 코드를 대문자+언더스코어로 정규화해 추출. qtyIn/qtyDefect는 숫자만(모르면 null, 불량 언급 없으면 0). reply에는 "OOO — 입고 N개, 불량 N개로 기록할까요?" 같은 확인 문구를 담아라.\n' +
-  '- intent=query: 특정 제품의 위치/상태를 묻는 질문(예: "HAUS_002 어디 있어?"). productCode만 추출하고 reply는 빈 문자열로 둬라(서버가 실제 데이터로 채운다).\n' +
+  '- intent=inbound: 특정 제품의 입고·불량 수량을 보고하는 문장(예: "서진봉제에서 TOP_002 150장 입고됐어, 불량 3장", "PANTS_003 80장 중 불량 2장"). productCode는 문장에서 가장 그럴듯한 제품/작업 코드를 대문자+언더스코어로 정규화해 추출. qtyIn/qtyDefect는 숫자만(모르면 null, 불량 언급 없으면 0). reply에는 "OOO — 입고 N장, 불량 N장으로 기록할까요?" 같은 확인 문구를 담아라.\n' +
+  '- intent=query: 특정 제품의 위치/상태를 묻는 질문(예: "TOP_002 어디 있어?"). productCode만 추출하고 reply는 빈 문자열로 둬라(서버가 실제 데이터로 채운다).\n' +
   '- intent=unknown: 위 두 경우로 분류할 수 없으면. reply에 무엇을 더 알려주면 되는지 짧게 되물어라.'
 
 app.post('/api/workspace/chat', adminAuth, async (c) => {
@@ -16748,7 +16748,7 @@ app.post('/api/workspace/chat', adminAuth, async (c) => {
       note: parsed.note || null,
       rawInput: message,
     }
-    const reply = parsed.reply || (action.productCode + ' — 입고 ' + action.qtyIn + '개, 불량 ' + action.qtyDefect + '개로 기록할까요?')
+    const reply = parsed.reply || (action.productCode + ' — 입고 ' + action.qtyIn + '장, 불량 ' + action.qtyDefect + '장으로 기록할까요?')
     await db.prepare(`INSERT INTO workspace_chat_messages (id, role, content, action_json, status) VALUES (?, 'assistant', ?, ?, 'pending')`)
       .bind(assistantId, reply, JSON.stringify(action)).run()
     return c.json({ success: true, id: assistantId, intent: 'inbound', reply, action })
@@ -16764,7 +16764,7 @@ app.post('/api/workspace/chat', adminAuth, async (c) => {
       const order: any = await db.prepare(`SELECT * FROM workspace_orders WHERE product_id = ? ORDER BY updated_at DESC LIMIT 1`).bind(product.id).first()
       const inbound: any = await db.prepare(`SELECT COALESCE(SUM(qty_in),0) AS qty_in, COALESCE(SUM(qty_defect),0) AS qty_defect FROM workspace_inbound_logs WHERE product_id = ?`).bind(product.id).first()
       const stageLabel = order ? (WORKSPACE_STAGE_LABEL[order.stage] || order.stage) : '발주 없음'
-      reply = code + ' — 현재 단계: ' + stageLabel + (order?.factory_name ? ' (' + order.factory_name + ')' : '') + '. 누적 입고 ' + (inbound?.qty_in || 0) + '개, 불량 ' + (inbound?.qty_defect || 0) + '개.'
+      reply = code + ' — 현재 단계: ' + stageLabel + (order?.factory_name ? ' (' + order.factory_name + ')' : '') + '. 누적 입고 ' + (inbound?.qty_in || 0) + '장, 불량 ' + (inbound?.qty_defect || 0) + '장.'
     }
     await db.prepare(`INSERT INTO workspace_chat_messages (id, role, content, status) VALUES (?, 'assistant', ?, 'answered')`).bind(assistantId, reply).run()
     return c.json({ success: true, id: assistantId, intent: 'query', reply })
@@ -16800,7 +16800,7 @@ app.post('/api/workspace/chat/:id/confirm', adminAuth, async (c) => {
     .bind(logId, product.id, action.factoryName, action.qtyIn, action.qtyDefect, action.note, action.rawInput).run()
 
   const histId = crypto.randomUUID()
-  const histContent = '입고 ' + action.qtyIn + '개 / 불량 ' + action.qtyDefect + '개' + (action.factoryName ? ' (' + action.factoryName + ')' : '') + ' — AI 대화 기록'
+  const histContent = '입고 ' + action.qtyIn + '장 / 불량 ' + action.qtyDefect + '장' + (action.factoryName ? ' (' + action.factoryName + ')' : '') + ' — AI 대화 기록'
   await db.prepare(`INSERT INTO workspace_product_history (id, product_id, type, content) VALUES (?, ?, 'stock', ?)`).bind(histId, product.id, histContent).run()
 
   const newAction = Object.assign({}, action, { logId, historyId: histId })
@@ -16951,7 +16951,7 @@ app.get('/workspace', (c) => {
       </div>
 
       <div class="ws-panel" id="wsPanel-history">
-        <h1>생산이력 (카르테)</h1>
+        <h1>생산이력</h1>
         <div class="ws-two-col">
           <div class="ws-list-col">
             <input class="ws-input" id="wsHistSearch" placeholder="제품코드·제품명 검색" style="margin-bottom:10px;width:100%" onkeyup="wsLoadProductList()"/>
@@ -16967,7 +16967,7 @@ app.get('/workspace', (c) => {
         <h1>AI 대화형 입력</h1>
         <div class="ws-chat-log" id="wsChatLog"></div>
         <div class="ws-toolbar">
-          <input class="ws-input" id="wsChatInput" placeholder="예: 신광에서 HAUS_001 도금 200개 들어왔어" onkeydown="if(event.key==='Enter')wsSendChat()"/>
+          <input class="ws-input" id="wsChatInput" placeholder="예: 서진봉제에서 TOP_002 150장 입고됐어, 불량 3장" onkeydown="if(event.key==='Enter')wsSendChat()"/>
           <button class="ws-btn" onclick="wsSendChat()">전송</button>
         </div>
       </div>
