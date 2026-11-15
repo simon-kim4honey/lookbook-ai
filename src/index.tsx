@@ -16578,39 +16578,105 @@ app.get('/techpack', (c) => {
 // 같은 방식(kim4honey@gmail.com 계정 전용)으로만 주입되지만, 실제 접근 제어는
 // 여기 adminAuth가 담당한다 — 링크가 안 보여도 URL을 직접 알면 비밀번호 없이는 못 들어간다.
 // ────────────────────────────────────────────────────
-const WORKSPACE_STAGES = ['receipt', 'casting', 'inbound', 'plating', 'shipping', 'done']
-const WORKSPACE_STAGE_LABEL: Record<string, string> = {
-  receipt: '접수', casting: '주물', inbound: '입고', plating: '도금', shipping: '출고', done: '완료',
+// 업종별로 공정 단계가 다르다(실제 이지룩 WORKS도 "사용기업 업종 선택(의류/주얼리/신발/가방)하여
+// 각 업종에 맞게 공정 변경" 필요하다고 안내함). 제품(workspace_products.category)이 업종을 가지고,
+// 발주(workspace_orders.stage)는 그 제품 업종의 단계 집합 안에서만 움직인다.
+const WORKSPACE_INDUSTRIES = ['clothing', 'jewelry', 'bag', 'shoe']
+const WORKSPACE_INDUSTRY_LABEL: Record<string, string> = {
+  clothing: '의류', jewelry: '주얼리', bag: '가방', shoe: '신발',
 }
+// 공정 단계 자체는 코드가 아니라 workspace_stage_defs 테이블에 있다 — 관리자가
+// 업종별로 단계를 직접 추가/삭제할 수 있게 하기 위함(마이그레이션 0043이 4개
+// 업종의 기본 단계를 심어둔다). sort_order로 보드 컬럼 순서를 정한다.
+async function wsGetStageSet(db: D1Database, industry: string): Promise<{ id: string; key: string; label: string }[]> {
+  const { results } = await db.prepare(`SELECT id, key, label FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC`).bind(industry).all()
+  return (results || []) as any[]
+}
+async function wsGetAllStageSets(db: D1Database): Promise<Record<string, { id: string; key: string; label: string }[]>> {
+  const { results } = await db.prepare(`SELECT industry, id, key, label FROM workspace_stage_defs ORDER BY industry ASC, sort_order ASC`).all()
+  const sets: Record<string, { id: string; key: string; label: string }[]> = {}
+  for (const ind of WORKSPACE_INDUSTRIES) sets[ind] = []
+  for (const r of (results || []) as any[]) {
+    if (!sets[r.industry]) sets[r.industry] = []
+    sets[r.industry].push({ id: r.id, key: r.key, label: r.label })
+  }
+  return sets
+}
+
+app.get('/api/workspace/stages', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const industry = c.req.query('industry') || ''
+  if (industry) {
+    if (!WORKSPACE_INDUSTRIES.includes(industry)) return c.json({ success: false, message: '잘못된 업종입니다.' }, 400)
+    return c.json({ success: true, stages: await wsGetStageSet(db, industry) })
+  }
+  return c.json({ success: true, stageSets: await wsGetAllStageSets(db) })
+})
+
+app.post('/api/workspace/stages', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const industry = body.industry
+  const label = String(body.label || '').trim()
+  if (!WORKSPACE_INDUSTRIES.includes(industry)) return c.json({ success: false, message: '잘못된 업종입니다.' }, 400)
+  if (!label) return c.json({ success: false, message: '단계 이름을 입력해주세요.' }, 400)
+  const key = 'custom_' + crypto.randomUUID().replace(/-/g, '').slice(0, 10)
+  const id = crypto.randomUUID()
+  // 새 단계는 맨 끝이 아니라 "마지막 단계(보통 완료) 바로 앞"에 끼워 넣는다 —
+  // 그래야 완료 컬럼이 계속 보드 맨 오른쪽에 남는다.
+  const last: any = await db.prepare(`SELECT key, sort_order FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order DESC LIMIT 1`).bind(industry).first()
+  if (last) {
+    await db.prepare(`UPDATE workspace_stage_defs SET sort_order = sort_order + 1 WHERE industry = ? AND key = ?`).bind(industry, last.key).run()
+    await db.prepare(`INSERT INTO workspace_stage_defs (id, industry, key, label, sort_order) VALUES (?, ?, ?, ?, ?)`).bind(id, industry, key, label, last.sort_order).run()
+  } else {
+    await db.prepare(`INSERT INTO workspace_stage_defs (id, industry, key, label, sort_order) VALUES (?, ?, ?, ?, 1)`).bind(id, industry, key, label).run()
+  }
+  return c.json({ success: true, id, key, label })
+})
+
+app.delete('/api/workspace/stages/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const id = c.req.param('id')
+  const stageDef: any = await db.prepare(`SELECT * FROM workspace_stage_defs WHERE id = ?`).bind(id).first()
+  if (!stageDef) return c.json({ success: false, message: '단계를 찾을 수 없습니다.' }, 404)
+  const countRow: any = await db.prepare(`SELECT COUNT(*) AS cnt FROM workspace_stage_defs WHERE industry = ?`).bind(stageDef.industry).first()
+  if ((countRow?.cnt || 0) <= 1) return c.json({ success: false, message: '최소 1개의 공정 단계는 있어야 합니다.' }, 400)
+  const inUse: any = await db.prepare(`SELECT COUNT(*) AS cnt FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE COALESCE(p.category, 'clothing') = ? AND o.stage = ?`).bind(stageDef.industry, stageDef.key).first()
+  if ((inUse?.cnt || 0) > 0) return c.json({ success: false, message: '이 단계에 있는 발주가 있어 삭제할 수 없습니다. 먼저 다른 단계로 옮겨주세요.' }, 400)
+  await db.prepare(`DELETE FROM workspace_stage_defs WHERE id = ?`).bind(id).run()
+  return c.json({ success: true })
+})
 
 function wsOrderRow(o: any) {
   return {
     id: o.id, orderCode: o.order_code, productId: o.product_id, productCode: o.product_code,
     productName: o.product_name, clientName: o.client_name, factoryName: o.factory_name,
-    quantity: o.quantity, stage: o.stage, assignedTeam: o.assigned_team,
+    quantity: o.quantity, stage: o.stage, industry: o.industry || 'clothing', assignedTeam: o.assigned_team,
     expectedCompleteAt: o.expected_complete_at, note: o.note, createdAt: o.created_at, updatedAt: o.updated_at,
   }
 }
 
 app.get('/api/workspace/summary', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
-  const { results } = await db.prepare(`SELECT stage, COUNT(*) AS cnt FROM workspace_orders GROUP BY stage`).all()
+  const { results } = await db.prepare(`SELECT COALESCE(p.category, 'clothing') AS industry, COUNT(*) AS cnt FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id GROUP BY COALESCE(p.category, 'clothing')`).all()
   const counts: Record<string, number> = {}
-  for (const s of WORKSPACE_STAGES) counts[s] = 0
-  for (const r of (results || []) as any[]) counts[r.stage as string] = r.cnt as number
+  for (const ind of WORKSPACE_INDUSTRIES) counts[ind] = 0
+  for (const r of (results || []) as any[]) counts[r.industry as string] = r.cnt as number
   const total = Object.values(counts).reduce((a, b) => a + b, 0)
   return c.json({ success: true, counts, total })
 })
 
 app.get('/api/workspace/orders', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
+  const industry = c.req.query('industry') || ''
   const stage = c.req.query('stage') || ''
   const q = (c.req.query('q') || '').trim()
-  let sql = `SELECT o.*, p.product_code AS product_code, p.name AS product_name, p.client_name AS client_name
+  let sql = `SELECT o.*, p.product_code AS product_code, p.name AS product_name, p.client_name AS client_name, COALESCE(p.category, 'clothing') AS industry
              FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id`
   const conds: string[] = []
   const binds: any[] = []
-  if (stage && WORKSPACE_STAGES.includes(stage)) { conds.push('o.stage = ?'); binds.push(stage) }
+  if (industry && WORKSPACE_INDUSTRIES.includes(industry)) { conds.push(`COALESCE(p.category, 'clothing') = ?`); binds.push(industry) }
+  if (stage) { conds.push('o.stage = ?'); binds.push(stage) }
   if (q) { conds.push('(o.order_code LIKE ? OR p.product_code LIKE ? OR p.client_name LIKE ?)'); binds.push(`%${q}%`, `%${q}%`, `%${q}%`) }
   if (conds.length) sql += ' WHERE ' + conds.join(' AND ')
   sql += ' ORDER BY o.created_at DESC LIMIT 500'
@@ -16624,6 +16690,7 @@ app.post('/api/workspace/orders', adminAuth, async (c) => {
   const productCode = String(body.productCode || '').trim()
   const productName = String(body.productName || '').trim()
   if (!productCode || !productName) return c.json({ success: false, message: '제품코드와 제품명은 필수입니다.' }, 400)
+  const industry = WORKSPACE_INDUSTRIES.includes(body.industry) ? body.industry : 'clothing'
   const quantity = Number(body.quantity) || 0
   const clientName = String(body.clientName || '').trim() || null
   const factoryName = String(body.factoryName || '').trim() || null
@@ -16631,17 +16698,23 @@ app.post('/api/workspace/orders', adminAuth, async (c) => {
   const note = String(body.note || '').trim() || null
 
   let product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(productCode).first()
+  let orderIndustry = industry
   if (!product) {
     const pid = crypto.randomUUID()
-    await db.prepare(`INSERT INTO workspace_products (id, product_code, name, client_name, is_sample) VALUES (?, ?, ?, ?, ?)`)
-      .bind(pid, productCode, productName, clientName, body.isSample ? 1 : 0).run()
+    await db.prepare(`INSERT INTO workspace_products (id, product_code, name, client_name, category, is_sample) VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(pid, productCode, productName, clientName, industry, body.isSample ? 1 : 0).run()
     product = { id: pid }
+  } else {
+    orderIndustry = product.category || industry
   }
+
+  const firstStage: any = await db.prepare(`SELECT key FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC LIMIT 1`).bind(orderIndustry).first()
+  const initialStage = firstStage?.key || 'receipt'
 
   const orderId = crypto.randomUUID()
   const orderCode = String(body.orderCode || '').trim() || ('WO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + orderId.slice(0, 6))
-  await db.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at, note) VALUES (?, ?, ?, ?, ?, 'receipt', ?, ?)`)
-    .bind(orderId, orderCode, product.id, factoryName, quantity, expectedCompleteAt, note).run()
+  await db.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(orderId, orderCode, product.id, factoryName, quantity, initialStage, expectedCompleteAt, note).run()
 
   return c.json({ success: true, orderId, orderCode })
 })
@@ -16653,7 +16726,10 @@ app.patch('/api/workspace/orders/:id', adminAuth, async (c) => {
   const sets: string[] = []
   const vals: any[] = []
   if (body.stage !== undefined) {
-    if (!WORKSPACE_STAGES.includes(body.stage)) return c.json({ success: false, message: '잘못된 공정 단계입니다.' }, 400)
+    const orderRow: any = await db.prepare(`SELECT COALESCE(p.category, 'clothing') AS industry FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE o.id = ?`).bind(id).first()
+    if (!orderRow) return c.json({ success: false, message: '발주를 찾을 수 없습니다.' }, 404)
+    const validStages = await wsGetStageSet(db, orderRow.industry)
+    if (!validStages.some((s) => s.key === body.stage)) return c.json({ success: false, message: '잘못된 공정 단계입니다.' }, 400)
     sets.push('stage = ?'); vals.push(body.stage)
   }
   if (body.assignedTeam !== undefined) { sets.push('assigned_team = ?'); vals.push(body.assignedTeam || null) }
@@ -16716,8 +16792,8 @@ app.patch('/api/workspace/history/:id', adminAuth, async (c) => {
 // 반드시 사람이 "확인"을 눌러야 실제로 저장된다(실행 전 확인 + 되돌리기).
 const WORKSPACE_CHAT_SYSTEM_PROMPT = '너는 패션 제조업체 현장 워크스페이스의 기록 보조 AI다. 작업자가 입력한 한국어 문장을 보고 아래 JSON 스키마로만 답하라. 다른 설명은 절대 출력하지 마라.\n\n' +
   '{"intent": "inbound" | "query" | "unknown", "productCode": string|null, "factoryName": string|null, "qtyIn": number|null, "qtyDefect": number|null, "note": string|null, "reply": string}\n\n' +
-  '- intent=inbound: 특정 제품의 입고·불량 수량을 보고하는 문장(예: "신광에서 HAUS_001 도금 200개 들어왔어", "ACOL_004 2개 중 불량 1개"). productCode는 문장에서 가장 그럴듯한 제품/작업 코드를 대문자+언더스코어로 정규화해 추출. qtyIn/qtyDefect는 숫자만(모르면 null, 불량 언급 없으면 0). reply에는 "OOO — 입고 N개, 불량 N개로 기록할까요?" 같은 확인 문구를 담아라.\n' +
-  '- intent=query: 특정 제품의 위치/상태를 묻는 질문(예: "HAUS_002 어디 있어?"). productCode만 추출하고 reply는 빈 문자열로 둬라(서버가 실제 데이터로 채운다).\n' +
+  '- intent=inbound: 특정 제품의 입고·불량 수량을 보고하는 문장(예: "서진봉제에서 TOP_002 150장 입고됐어, 불량 3장", "PANTS_003 80장 중 불량 2장"). productCode는 문장에서 가장 그럴듯한 제품/작업 코드를 대문자+언더스코어로 정규화해 추출. qtyIn/qtyDefect는 숫자만(모르면 null, 불량 언급 없으면 0). reply에는 "OOO — 입고 N장, 불량 N장으로 기록할까요?" 같은 확인 문구를 담아라.\n' +
+  '- intent=query: 특정 제품의 위치/상태를 묻는 질문(예: "TOP_002 어디 있어?"). productCode만 추출하고 reply는 빈 문자열로 둬라(서버가 실제 데이터로 채운다).\n' +
   '- intent=unknown: 위 두 경우로 분류할 수 없으면. reply에 무엇을 더 알려주면 되는지 짧게 되물어라.'
 
 app.post('/api/workspace/chat', adminAuth, async (c) => {
@@ -16748,7 +16824,7 @@ app.post('/api/workspace/chat', adminAuth, async (c) => {
       note: parsed.note || null,
       rawInput: message,
     }
-    const reply = parsed.reply || (action.productCode + ' — 입고 ' + action.qtyIn + '개, 불량 ' + action.qtyDefect + '개로 기록할까요?')
+    const reply = parsed.reply || (action.productCode + ' — 입고 ' + action.qtyIn + '장, 불량 ' + action.qtyDefect + '장으로 기록할까요?')
     await db.prepare(`INSERT INTO workspace_chat_messages (id, role, content, action_json, status) VALUES (?, 'assistant', ?, ?, 'pending')`)
       .bind(assistantId, reply, JSON.stringify(action)).run()
     return c.json({ success: true, id: assistantId, intent: 'inbound', reply, action })
@@ -16763,8 +16839,12 @@ app.post('/api/workspace/chat', adminAuth, async (c) => {
     } else {
       const order: any = await db.prepare(`SELECT * FROM workspace_orders WHERE product_id = ? ORDER BY updated_at DESC LIMIT 1`).bind(product.id).first()
       const inbound: any = await db.prepare(`SELECT COALESCE(SUM(qty_in),0) AS qty_in, COALESCE(SUM(qty_defect),0) AS qty_defect FROM workspace_inbound_logs WHERE product_id = ?`).bind(product.id).first()
-      const stageLabel = order ? (WORKSPACE_STAGE_LABEL[order.stage] || order.stage) : '발주 없음'
-      reply = code + ' — 현재 단계: ' + stageLabel + (order?.factory_name ? ' (' + order.factory_name + ')' : '') + '. 누적 입고 ' + (inbound?.qty_in || 0) + '개, 불량 ' + (inbound?.qty_defect || 0) + '개.'
+      let stageLabel = '발주 없음'
+      if (order) {
+        const sd: any = await db.prepare(`SELECT label FROM workspace_stage_defs WHERE industry = ? AND key = ?`).bind(product.category || 'clothing', order.stage).first()
+        stageLabel = sd?.label || order.stage
+      }
+      reply = code + ' — 현재 단계: ' + stageLabel + (order?.factory_name ? ' (' + order.factory_name + ')' : '') + '. 누적 입고 ' + (inbound?.qty_in || 0) + '장, 불량 ' + (inbound?.qty_defect || 0) + '장.'
     }
     await db.prepare(`INSERT INTO workspace_chat_messages (id, role, content, status) VALUES (?, 'assistant', ?, 'answered')`).bind(assistantId, reply).run()
     return c.json({ success: true, id: assistantId, intent: 'query', reply })
@@ -16791,7 +16871,7 @@ app.post('/api/workspace/chat/:id/confirm', adminAuth, async (c) => {
   let product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(action.productCode).first()
   if (!product) {
     const pid = crypto.randomUUID()
-    await db.prepare(`INSERT INTO workspace_products (id, product_code, name) VALUES (?, ?, ?)`).bind(pid, action.productCode, action.productCode).run()
+    await db.prepare(`INSERT INTO workspace_products (id, product_code, name, category) VALUES (?, ?, ?, 'clothing')`).bind(pid, action.productCode, action.productCode).run()
     product = { id: pid }
   }
 
@@ -16800,7 +16880,7 @@ app.post('/api/workspace/chat/:id/confirm', adminAuth, async (c) => {
     .bind(logId, product.id, action.factoryName, action.qtyIn, action.qtyDefect, action.note, action.rawInput).run()
 
   const histId = crypto.randomUUID()
-  const histContent = '입고 ' + action.qtyIn + '개 / 불량 ' + action.qtyDefect + '개' + (action.factoryName ? ' (' + action.factoryName + ')' : '') + ' — AI 대화 기록'
+  const histContent = '입고 ' + action.qtyIn + '장 / 불량 ' + action.qtyDefect + '장' + (action.factoryName ? ' (' + action.factoryName + ')' : '') + ' — AI 대화 기록'
   await db.prepare(`INSERT INTO workspace_product_history (id, product_id, type, content) VALUES (?, ?, 'stock', ?)`).bind(histId, product.id, histContent).run()
 
   const newAction = Object.assign({}, action, { logId, historyId: histId })
@@ -16875,6 +16955,9 @@ app.get('/workspace', (c) => {
     .ws-input:focus{border-color:#7C3AED;}
     .ws-btn{padding:10px 16px;background:#7C3AED;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
     .ws-btn.secondary{background:#252540;color:#e0e0f0;}
+    .ws-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
+    .ws-tab-btn{padding:8px 16px;border-radius:999px;border:1px solid #2e2e50;background:#1a1a2e;color:#8b8ba0;font-size:13px;font-weight:600;cursor:pointer;}
+    .ws-tab-btn.active{background:#7C3AED;color:#fff;border-color:#7C3AED;}
     .ws-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;}
     .ws-col{flex:0 0 220px;background:#14142380;border:1px solid #2e2e50;border-radius:12px;padding:10px;max-height:70vh;overflow-y:auto;}
     .ws-col-head{font-size:13px;font-weight:700;color:#A78BFA;margin-bottom:10px;padding:0 4px;display:flex;justify-content:space-between;}
@@ -16942,6 +17025,7 @@ app.get('/workspace', (c) => {
 
       <div class="ws-panel" id="wsPanel-board">
         <h1>공정보드</h1>
+        <div class="ws-tabs" id="wsIndustryTabs"></div>
         <div class="ws-toolbar">
           <input class="ws-input" id="wsBoardSearch" placeholder="발주코드·제품코드·고객사로 검색" onkeydown="if(event.key==='Enter')wsLoadBoard()"/>
           <button class="ws-btn secondary" onclick="wsLoadBoard()">검색</button>
@@ -16951,7 +17035,7 @@ app.get('/workspace', (c) => {
       </div>
 
       <div class="ws-panel" id="wsPanel-history">
-        <h1>생산이력 (카르테)</h1>
+        <h1>생산이력</h1>
         <div class="ws-two-col">
           <div class="ws-list-col">
             <input class="ws-input" id="wsHistSearch" placeholder="제품코드·제품명 검색" style="margin-bottom:10px;width:100%" onkeyup="wsLoadProductList()"/>
@@ -16967,7 +17051,7 @@ app.get('/workspace', (c) => {
         <h1>AI 대화형 입력</h1>
         <div class="ws-chat-log" id="wsChatLog"></div>
         <div class="ws-toolbar">
-          <input class="ws-input" id="wsChatInput" placeholder="예: 신광에서 HAUS_001 도금 200개 들어왔어" onkeydown="if(event.key==='Enter')wsSendChat()"/>
+          <input class="ws-input" id="wsChatInput" placeholder="예: 서진봉제에서 TOP_002 150장 입고됐어, 불량 3장" onkeydown="if(event.key==='Enter')wsSendChat()"/>
           <button class="ws-btn" onclick="wsSendChat()">전송</button>
         </div>
       </div>
@@ -16979,6 +17063,10 @@ app.get('/workspace', (c) => {
 <div class="ws-modal-overlay" id="wsOrderModalOverlay">
   <div class="ws-modal">
     <h3>새 발주 등록</h3>
+    <label>업종 *</label>
+    <select class="ws-input" id="wsNewIndustry" style="width:100%">
+      ${WORKSPACE_INDUSTRIES.map((ind) => '<option value="' + ind + '">' + WORKSPACE_INDUSTRY_LABEL[ind] + '</option>').join('')}
+    </select>
     <label>제품코드 *</label>
     <input class="ws-input" id="wsNewProductCode" style="width:100%"/>
     <label>제품명 *</label>
@@ -17002,9 +17090,7 @@ app.get('/workspace', (c) => {
   <div class="ws-modal">
     <h3 id="wsDetailTitle">발주 상세</h3>
     <label>공정 단계</label>
-    <select class="ws-input" id="wsDetailStage" style="width:100%">
-      ${WORKSPACE_STAGES.map((s) => '<option value="' + s + '">' + WORKSPACE_STAGE_LABEL[s] + '</option>').join('')}
-    </select>
+    <select class="ws-input" id="wsDetailStage" style="width:100%"></select>
     <label>담당 팀</label>
     <input class="ws-input" id="wsDetailTeam" style="width:100%"/>
     <label>메모</label>
@@ -17016,10 +17102,26 @@ app.get('/workspace', (c) => {
   </div>
 </div>
 
+<div class="ws-modal-overlay" id="wsStageModalOverlay">
+  <div class="ws-modal">
+    <h3>공정 단계 추가</h3>
+    <label>업종</label>
+    <input class="ws-input" id="wsNewStageIndustryLabel" style="width:100%" disabled/>
+    <label>단계 이름 *</label>
+    <input class="ws-input" id="wsNewStageLabel" style="width:100%" placeholder="예: 다림질" onkeydown="if(event.key==='Enter')wsSubmitNewStage()"/>
+    <div class="row">
+      <button class="ws-btn secondary" onclick="wsCloseNewStageModal()">취소</button>
+      <button class="ws-btn" onclick="wsSubmitNewStage()">추가</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var wsAdminPassword = '';
-var wsStageLabel = ${JSON.stringify(WORKSPACE_STAGE_LABEL)};
-var wsStages = ${JSON.stringify(WORKSPACE_STAGES)};
+var wsIndustries = ${JSON.stringify(WORKSPACE_INDUSTRIES)};
+var wsIndustryLabel = ${JSON.stringify(WORKSPACE_INDUSTRY_LABEL)};
+var wsStageSets = {};
+var wsCurrentIndustry = 'clothing';
 var wsCurrentOrderId = null;
 var wsSelectedProductCode = null;
 
@@ -17069,7 +17171,60 @@ function wsSwitchPanel(name) {
   if (name === 'chat') wsLoadChat();
 }
 
-function wsInit() { wsLoadHome(); }
+function wsInit() { wsLoadStageSets().then(function () { wsRenderIndustryTabs(); wsLoadHome(); }); }
+
+async function wsLoadStageSets() {
+  try {
+    var res = await fetch('/api/workspace/stages', { headers: wsHeaders() });
+    var data = await res.json();
+    if (data.success) wsStageSets = data.stageSets;
+  } catch (e) { console.error(e); }
+}
+
+function wsRenderIndustryTabs() {
+  var el = document.getElementById('wsIndustryTabs');
+  if (!el) return;
+  el.innerHTML = wsIndustries.map(function (ind) {
+    return '<button class="ws-tab-btn' + (ind === wsCurrentIndustry ? ' active' : '') + '" onclick="wsSelectIndustry(\\'' + ind + '\\')">' + wsIndustryLabel[ind] + '</button>';
+  }).join('') + '<button class="ws-tab-btn" style="border-style:dashed" onclick="wsOpenNewStageModal()">+ 공정 추가</button>';
+}
+
+function wsSelectIndustry(ind) {
+  wsCurrentIndustry = ind;
+  wsRenderIndustryTabs();
+  wsLoadBoard();
+}
+
+function wsOpenNewStageModal() {
+  document.getElementById('wsNewStageIndustryLabel').value = wsIndustryLabel[wsCurrentIndustry] || wsCurrentIndustry;
+  document.getElementById('wsNewStageLabel').value = '';
+  document.getElementById('wsStageModalOverlay').style.display = 'flex';
+}
+function wsCloseNewStageModal() { document.getElementById('wsStageModalOverlay').style.display = 'none'; }
+
+async function wsSubmitNewStage() {
+  var label = document.getElementById('wsNewStageLabel').value.trim();
+  if (!label) { alert('단계 이름을 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/stages', { method: 'POST', headers: wsHeaders(), body: JSON.stringify({ industry: wsCurrentIndustry, label: label }) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '추가 실패'); return; }
+    wsCloseNewStageModal();
+    await wsLoadStageSets();
+    wsLoadBoard();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsDeleteStage(id) {
+  if (!confirm('이 공정 단계를 삭제할까요? (발주가 있으면 삭제할 수 없어요)')) return;
+  try {
+    var res = await fetch('/api/workspace/stages/' + id, { method: 'DELETE', headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '삭제 실패'); return; }
+    await wsLoadStageSets();
+    wsLoadBoard();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
 
 async function wsLoadHome() {
   try {
@@ -17077,8 +17232,8 @@ async function wsLoadHome() {
     var data = await res.json();
     if (!data.success) return;
     var html = '<div class="ws-card"><div class="num">' + data.total + '</div><div class="label">전체 발주</div></div>';
-    wsStages.forEach(function (s) {
-      html += '<div class="ws-card"><div class="num">' + (data.counts[s] || 0) + '</div><div class="label">' + wsStageLabel[s] + '</div></div>';
+    wsIndustries.forEach(function (ind) {
+      html += '<div class="ws-card"><div class="num">' + (data.counts[ind] || 0) + '</div><div class="label">' + wsIndustryLabel[ind] + '</div></div>';
     });
     document.getElementById('wsHomeCards').innerHTML = html;
   } catch (e) { console.error(e); }
@@ -17087,16 +17242,18 @@ async function wsLoadHome() {
 async function wsLoadBoard() {
   var q = document.getElementById('wsBoardSearch').value.trim();
   try {
-    var res = await fetch('/api/workspace/orders' + (q ? ('?q=' + encodeURIComponent(q)) : ''), { headers: wsHeaders() });
+    var url = '/api/workspace/orders?industry=' + encodeURIComponent(wsCurrentIndustry) + (q ? ('&q=' + encodeURIComponent(q)) : '');
+    var res = await fetch(url, { headers: wsHeaders() });
     var data = await res.json();
     if (!data.success) return;
+    var stageSet = wsStageSets[wsCurrentIndustry] || wsStageSets.clothing;
     var board = document.getElementById('wsBoard');
     board.innerHTML = '';
-    wsStages.forEach(function (stage) {
-      var items = data.orders.filter(function (o) { return o.stage === stage; });
+    stageSet.forEach(function (st) {
+      var items = data.orders.filter(function (o) { return o.stage === st.key; });
       var col = document.createElement('div');
       col.className = 'ws-col';
-      var head = '<div class="ws-col-head"><span>' + wsStageLabel[stage] + '</span><span>' + items.length + '</span></div>';
+      var head = '<div class="ws-col-head"><span>' + st.label + '</span><span>' + items.length + ' <span style="cursor:pointer;color:#ef4444;margin-left:4px" title="단계 삭제" onclick="wsDeleteStage(\\'' + st.id + '\\')">×</span></span></div>';
       var cards = items.map(function (o) {
         return '<div class="ws-order-card" onclick="wsOpenDetailModal(\\'' + o.id + '\\')">' +
           '<div class="code">' + wsEsc(o.productCode) + '</div>' +
@@ -17112,11 +17269,15 @@ async function wsLoadBoard() {
 
 function wsEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
 
-function wsOpenNewOrderModal() { document.getElementById('wsOrderModalOverlay').style.display = 'flex'; }
+function wsOpenNewOrderModal() {
+  document.getElementById('wsNewIndustry').value = wsCurrentIndustry;
+  document.getElementById('wsOrderModalOverlay').style.display = 'flex';
+}
 function wsCloseNewOrderModal() { document.getElementById('wsOrderModalOverlay').style.display = 'none'; }
 
 async function wsSubmitNewOrder() {
   var body = {
+    industry: document.getElementById('wsNewIndustry').value,
     productCode: document.getElementById('wsNewProductCode').value.trim(),
     productName: document.getElementById('wsNewProductName').value.trim(),
     clientName: document.getElementById('wsNewClientName').value.trim(),
@@ -17139,7 +17300,12 @@ function wsOpenDetailModal(orderId) {
   var order = (window._wsOrders || []).find(function (o) { return o.id === orderId; });
   if (!order) return;
   wsCurrentOrderId = orderId;
-  document.getElementById('wsDetailTitle').textContent = order.orderCode + ' · ' + order.productCode;
+  var industry = order.industry || 'clothing';
+  document.getElementById('wsDetailTitle').textContent = order.orderCode + ' · ' + order.productCode + ' (' + (wsIndustryLabel[industry] || industry) + ')';
+  var stageSet = wsStageSets[industry] || wsStageSets.clothing;
+  document.getElementById('wsDetailStage').innerHTML = stageSet.map(function (st) {
+    return '<option value="' + st.key + '">' + st.label + '</option>';
+  }).join('');
   document.getElementById('wsDetailStage').value = order.stage;
   document.getElementById('wsDetailTeam').value = order.assignedTeam || '';
   document.getElementById('wsDetailNote').value = order.note || '';
