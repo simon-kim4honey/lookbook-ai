@@ -35,3 +35,6 @@ lerna-debug.log*
 
 # misc
 .DS_Store
+
+# Claude Code tooling (agent worktrees, local settings)
+.claude/
