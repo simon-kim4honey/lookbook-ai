@@ -16633,7 +16633,7 @@ app.get('/api/workspace/stages', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const industry = c.req.query('industry') || ''
   if (industry) {
-    if (!WORKSPACE_INDUSTRIES.includes(industry)) return c.json({ success: false, message: '잘못된 업종입니다.' }, 400)
+    if (!WORKSPACE_INDUSTRIES.includes(industry)) return c.json({ success: false, message: '잘못된 업종이에요.' }, 400)
     return c.json({ success: true, stages: await wsGetStageSet(db, industry) })
   }
   return c.json({ success: true, stageSets: await wsGetAllStageSets(db) })
@@ -16644,7 +16644,7 @@ app.post('/api/workspace/stages', adminAuth, async (c) => {
   const body: any = await c.req.json().catch(() => ({}))
   const industry = body.industry
   const label = String(body.label || '').trim()
-  if (!WORKSPACE_INDUSTRIES.includes(industry)) return c.json({ success: false, message: '잘못된 업종입니다.' }, 400)
+  if (!WORKSPACE_INDUSTRIES.includes(industry)) return c.json({ success: false, message: '잘못된 업종이에요.' }, 400)
   if (!label) return c.json({ success: false, message: '단계 이름을 입력해주세요.' }, 400)
   const key = 'custom_' + crypto.randomUUID().replace(/-/g, '').slice(0, 10)
   const id = crypto.randomUUID()
@@ -16664,11 +16664,11 @@ app.delete('/api/workspace/stages/:id', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const id = c.req.param('id')
   const stageDef: any = await db.prepare(`SELECT * FROM workspace_stage_defs WHERE id = ?`).bind(id).first()
-  if (!stageDef) return c.json({ success: false, message: '단계를 찾을 수 없습니다.' }, 404)
+  if (!stageDef) return c.json({ success: false, message: '단계를 찾을 수 없어요.' }, 404)
   const countRow: any = await db.prepare(`SELECT COUNT(*) AS cnt FROM workspace_stage_defs WHERE industry = ?`).bind(stageDef.industry).first()
-  if ((countRow?.cnt || 0) <= 1) return c.json({ success: false, message: '최소 1개의 공정 단계는 있어야 합니다.' }, 400)
+  if ((countRow?.cnt || 0) <= 1) return c.json({ success: false, message: '최소 1개의 공정 단계는 있어야 해요.' }, 400)
   const inUse: any = await db.prepare(`SELECT COUNT(*) AS cnt FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE COALESCE(p.category, 'clothing') = ? AND o.stage = ?`).bind(stageDef.industry, stageDef.key).first()
-  if ((inUse?.cnt || 0) > 0) return c.json({ success: false, message: '이 단계에 있는 발주가 있어 삭제할 수 없습니다. 먼저 다른 단계로 옮겨주세요.' }, 400)
+  if ((inUse?.cnt || 0) > 0) return c.json({ success: false, message: '이 단계에 있는 발주가 있어서 삭제할 수 없어요. 먼저 다른 단계로 옮겨 주세요.' }, 400)
   await db.prepare(`DELETE FROM workspace_stage_defs WHERE id = ?`).bind(id).run()
   return c.json({ success: true })
 })
@@ -16730,7 +16730,7 @@ app.post('/api/workspace/orders', adminAuth, async (c) => {
   const body: any = await c.req.json().catch(() => ({}))
   const productCode = String(body.productCode || '').trim()
   const productName = String(body.productName || '').trim()
-  if (!productCode || !productName) return c.json({ success: false, message: '제품코드와 제품명은 필수입니다.' }, 400)
+  if (!productCode || !productName) return c.json({ success: false, message: '제품코드와 제품명은 필수예요.' }, 400)
   const industry = WORKSPACE_INDUSTRIES.includes(body.industry) ? body.industry : 'clothing'
   const quantity = Number(body.quantity) || 0
   const clientName = String(body.clientName || '').trim() || null
@@ -16769,9 +16769,9 @@ app.patch('/api/workspace/orders/:id', adminAuth, async (c) => {
   const vals: any[] = []
   if (body.stage !== undefined) {
     const orderRow: any = await db.prepare(`SELECT COALESCE(p.category, 'clothing') AS industry FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id WHERE o.id = ?`).bind(id).first()
-    if (!orderRow) return c.json({ success: false, message: '발주를 찾을 수 없습니다.' }, 404)
+    if (!orderRow) return c.json({ success: false, message: '발주를 찾을 수 없어요.' }, 404)
     const validStages = await wsGetStageSet(db, orderRow.industry)
-    if (!validStages.some((s) => s.key === body.stage)) return c.json({ success: false, message: '잘못된 공정 단계입니다.' }, 400)
+    if (!validStages.some((s) => s.key === body.stage)) return c.json({ success: false, message: '잘못된 공정 단계예요.' }, 400)
     sets.push('stage = ?'); vals.push(body.stage)
   }
   if (body.assignedTeam !== undefined) { sets.push('assigned_team = ?'); vals.push(body.assignedTeam || null) }
@@ -16785,7 +16785,7 @@ app.patch('/api/workspace/orders/:id', adminAuth, async (c) => {
   if (body.unitPrice !== undefined) { sets.push('unit_price = ?'); vals.push(body.unitPrice === '' || body.unitPrice === null ? null : Number(body.unitPrice)) }
   if (body.totalAmount !== undefined) { sets.push('total_amount = ?'); vals.push(body.totalAmount === '' || body.totalAmount === null ? null : Number(body.totalAmount)) }
   if (body.shippingAddress !== undefined) { sets.push('shipping_address = ?'); vals.push(body.shippingAddress || null) }
-  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없어요.' }, 400)
   sets.push("updated_at = datetime('now')")
   vals.push(id)
   await db.prepare(`UPDATE workspace_orders SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
@@ -16809,9 +16809,9 @@ app.post('/api/workspace/products', adminAuth, async (c) => {
   const body: any = await c.req.json().catch(() => ({}))
   const productCode = String(body.productCode || '').trim()
   const name = String(body.name || '').trim()
-  if (!productCode || !name) return c.json({ success: false, message: '제품코드와 제품명은 필수입니다.' }, 400)
+  if (!productCode || !name) return c.json({ success: false, message: '제품코드와 제품명은 필수예요.' }, 400)
   const existing = await db.prepare(`SELECT id FROM workspace_products WHERE product_code = ?`).bind(productCode).first()
-  if (existing) return c.json({ success: false, message: '이미 존재하는 제품코드입니다.' }, 400)
+  if (existing) return c.json({ success: false, message: '이미 존재하는 제품코드예요.' }, 400)
   const industry = WORKSPACE_INDUSTRIES.includes(body.industry) ? body.industry : 'clothing'
   const id = crypto.randomUUID()
   await db.prepare(`INSERT INTO workspace_products (id, product_code, name, client_name, category, cost_note, supply_factory) VALUES (?, ?, ?, ?, ?, ?, ?)`)
@@ -16824,13 +16824,13 @@ app.patch('/api/workspace/products/:code', adminAuth, async (c) => {
   const code = c.req.param('code')
   const body: any = await c.req.json().catch(() => ({}))
   const product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(code).first()
-  if (!product) return c.json({ success: false, message: '제품을 찾을 수 없습니다.' }, 404)
+  if (!product) return c.json({ success: false, message: '제품을 찾을 수 없어요.' }, 404)
   const sets: string[] = []
   const vals: any[] = []
   if (body.costNote !== undefined) { sets.push('cost_note = ?'); vals.push(body.costNote || null) }
   if (body.supplyFactory !== undefined) { sets.push('supply_factory = ?'); vals.push(body.supplyFactory || null) }
   if (body.clientName !== undefined) { sets.push('client_name = ?'); vals.push(body.clientName || null) }
-  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없어요.' }, 400)
   sets.push("updated_at = datetime('now')")
   vals.push(product.id)
   await db.prepare(`UPDATE workspace_products SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
@@ -16841,7 +16841,7 @@ app.get('/api/workspace/products/:code/history', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const code = c.req.param('code')
   const product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(code).first()
-  if (!product) return c.json({ success: false, message: '제품을 찾을 수 없습니다.' }, 404)
+  if (!product) return c.json({ success: false, message: '제품을 찾을 수 없어요.' }, 404)
   const history = await db.prepare(`SELECT * FROM workspace_product_history WHERE product_id = ? ORDER BY created_at DESC LIMIT 200`).bind(product.id).all()
   const orders = await db.prepare(`SELECT * FROM workspace_orders WHERE product_id = ? ORDER BY created_at DESC LIMIT 50`).bind(product.id).all()
   return c.json({ success: true, product, history: history.results || [], orders: orders.results || [] })
@@ -16853,10 +16853,10 @@ app.post('/api/workspace/products/:code/history', adminAuth, async (c) => {
   const body: any = await c.req.json().catch(() => ({}))
   const type = body.type
   const content = String(body.content || '').trim()
-  if (!['issue', 'resolution', 'caution', 'memo', 'stock'].includes(type)) return c.json({ success: false, message: '잘못된 기록 유형입니다.' }, 400)
+  if (!['issue', 'resolution', 'caution', 'memo', 'stock'].includes(type)) return c.json({ success: false, message: '잘못된 기록 유형이에요.' }, 400)
   if (!content) return c.json({ success: false, message: '내용을 입력해주세요.' }, 400)
   const product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(code).first()
-  if (!product) return c.json({ success: false, message: '제품을 찾을 수 없습니다.' }, 404)
+  if (!product) return c.json({ success: false, message: '제품을 찾을 수 없어요.' }, 404)
   const id = crypto.randomUUID()
   await db.prepare(`INSERT INTO workspace_product_history (id, product_id, type, content) VALUES (?, ?, ?, ?)`).bind(id, product.id, type, content).run()
   return c.json({ success: true, id })
@@ -16866,7 +16866,7 @@ app.patch('/api/workspace/history/:id', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const id = c.req.param('id')
   const body: any = await c.req.json().catch(() => ({}))
-  if (body.resolved === undefined) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  if (body.resolved === undefined) return c.json({ success: false, message: '변경할 값이 없어요.' }, 400)
   await db.prepare(`UPDATE workspace_product_history SET resolved = ? WHERE id = ?`).bind(body.resolved ? 1 : 0, id).run()
   return c.json({ success: true })
 })
@@ -16903,7 +16903,7 @@ app.post('/api/workspace/notifications/read-all', adminAuth, async (c) => {
 app.get('/api/my/notifications', async (c) => {
   const db = c.env.LOOKBOOK_DB
   const user = await wsRequireUser(c)
-  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  if (!user) return c.json({ success: false, message: '로그인이 필요해요.' }, 401)
   const status = c.req.query('status') || ''
   let sql = `SELECT * FROM workspace_notifications WHERE audience = 'client' AND client_user_id = ?`
   const binds: any[] = [user.id]
@@ -16917,7 +16917,7 @@ app.get('/api/my/notifications', async (c) => {
 app.post('/api/my/notifications/:id/read', async (c) => {
   const db = c.env.LOOKBOOK_DB
   const user = await wsRequireUser(c)
-  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  if (!user) return c.json({ success: false, message: '로그인이 필요해요.' }, 401)
   await db.prepare(`UPDATE workspace_notifications SET is_read = 1 WHERE id = ? AND client_user_id = ?`).bind(c.req.param('id'), user.id).run()
   return c.json({ success: true })
 })
@@ -16925,7 +16925,7 @@ app.post('/api/my/notifications/:id/read', async (c) => {
 app.post('/api/my/notifications/read-all', async (c) => {
   const db = c.env.LOOKBOOK_DB
   const user = await wsRequireUser(c)
-  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  if (!user) return c.json({ success: false, message: '로그인이 필요해요.' }, 401)
   await db.prepare(`UPDATE workspace_notifications SET is_read = 1 WHERE audience = 'client' AND client_user_id = ? AND is_read = 0`).bind(user.id).run()
   return c.json({ success: true })
 })
@@ -16965,11 +16965,11 @@ app.patch('/api/workspace/inquiries/:id', adminAuth, async (c) => {
   const sets: string[] = []
   const vals: any[] = []
   if (body.status !== undefined) {
-    if (!['new', 'in_discussion', 'done'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태입니다.' }, 400)
+    if (!['new', 'in_discussion', 'done'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태예요.' }, 400)
     sets.push('status = ?'); vals.push(body.status)
   }
   if (body.adminNote !== undefined) { sets.push('admin_note = ?'); vals.push(body.adminNote || null) }
-  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없어요.' }, 400)
   sets.push("updated_at = datetime('now')")
   vals.push(id)
   await db.prepare(`UPDATE workspace_inquiries SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
@@ -16983,12 +16983,12 @@ app.post('/api/workspace/inquiries/:id/convert', adminAuth, async (c) => {
   const id = c.req.param('id')
   const body: any = await c.req.json().catch(() => ({}))
   const inquiry: any = await db.prepare(`SELECT * FROM workspace_inquiries WHERE id = ?`).bind(id).first()
-  if (!inquiry) return c.json({ success: false, message: '문의를 찾을 수 없습니다.' }, 404)
-  if (inquiry.status === 'done') return c.json({ success: false, message: '이미 발주로 전환된 문의입니다.' }, 400)
+  if (!inquiry) return c.json({ success: false, message: '문의를 찾을 수 없어요.' }, 404)
+  if (inquiry.status === 'done') return c.json({ success: false, message: '이미 발주로 전환된 문의예요.' }, 400)
 
   const productCode = String(body.productCode || '').trim()
   const productName = String(body.productName || inquiry.title || '').trim()
-  if (!productCode || !productName) return c.json({ success: false, message: '제품코드와 제품명은 필수입니다.' }, 400)
+  if (!productCode || !productName) return c.json({ success: false, message: '제품코드와 제품명은 필수예요.' }, 400)
   const quantity = Number(body.quantity) || inquiry.desired_qty || 0
   const factoryName = String(body.factoryName || '').trim() || null
   const expectedCompleteAt = body.expectedCompleteAt || null
@@ -17015,7 +17015,7 @@ app.post('/api/workspace/inquiries/:id/convert', adminAuth, async (c) => {
   await db.prepare(`UPDATE workspace_inquiries SET status = 'done', converted_order_id = ?, updated_at = datetime('now') WHERE id = ?`).bind(orderId, id).run()
 
   if (inquiry.client_user_id) {
-    await wsNotify(db, 'client', '발주서 ' + orderCode + '_' + productCode + '가 접수되어 생산이 시작되었습니다.', inquiry.client_user_id)
+    await wsNotify(db, 'client', '발주서 ' + orderCode + '_' + productCode + '가 접수되어 생산이 시작됐어요.', inquiry.client_user_id)
   }
 
   return c.json({ success: true, orderId, orderCode })
@@ -17032,7 +17032,7 @@ async function wsRequireUser(c: any) {
 app.post('/api/my/inquiries', async (c) => {
   const db = c.env.LOOKBOOK_DB
   const user = await wsRequireUser(c)
-  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  if (!user) return c.json({ success: false, message: '로그인이 필요해요.' }, 401)
   const body: any = await c.req.json().catch(() => ({}))
   const title = String(body.title || '').trim()
   if (!title) return c.json({ success: false, message: '문의 제목을 입력해주세요.' }, 400)
@@ -17043,14 +17043,14 @@ app.post('/api/my/inquiries', async (c) => {
   const id = crypto.randomUUID()
   await db.prepare(`INSERT INTO workspace_inquiries (id, client_user_id, industry, title, design_note, desired_qty, desired_price) VALUES (?, ?, ?, ?, ?, ?, ?)`)
     .bind(id, user.id, industry, title, designNote, desiredQty, desiredPrice).run()
-  await wsNotify(db, 'admin', (user.name || user.email) + '님의 새 생산 문의가 접수되었습니다: ' + title)
+  await wsNotify(db, 'admin', (user.name || user.email) + '님의 새 생산 문의가 접수됐어요: ' + title)
   return c.json({ success: true, id })
 })
 
 app.get('/api/my/inquiries', async (c) => {
   const db = c.env.LOOKBOOK_DB
   const user = await wsRequireUser(c)
-  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  if (!user) return c.json({ success: false, message: '로그인이 필요해요.' }, 401)
   const { results } = await db.prepare(`SELECT * FROM workspace_inquiries WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100`).bind(user.id).all()
   return c.json({ success: true, inquiries: (results || []).map(wsInquiryRow) })
 })
@@ -17058,7 +17058,7 @@ app.get('/api/my/inquiries', async (c) => {
 app.get('/api/my/orders', async (c) => {
   const db = c.env.LOOKBOOK_DB
   const user = await wsRequireUser(c)
-  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  if (!user) return c.json({ success: false, message: '로그인이 필요해요.' }, 401)
   const { results } = await db.prepare(`
     SELECT o.*, p.product_code AS product_code, p.name AS product_name, COALESCE(p.category, 'clothing') AS industry,
            sd.label AS stage_label
@@ -17081,7 +17081,7 @@ app.get('/api/my/orders', async (c) => {
 app.get('/api/my/invoices', async (c) => {
   const db = c.env.LOOKBOOK_DB
   const user = await wsRequireUser(c)
-  if (!user) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
+  if (!user) return c.json({ success: false, message: '로그인이 필요해요.' }, 401)
   const { results } = await db.prepare(`SELECT * FROM workspace_invoices WHERE client_user_id = ? ORDER BY created_at DESC LIMIT 100`).bind(user.id).all()
   return c.json({ success: true, invoices: (results || []).map(wsInvoiceRow) })
 })
@@ -17092,57 +17092,57 @@ app.get('/my-production', (c) => {
   return c.html(htmlShell('생산 문의·발주 현황', `
   <div class="toast-container" id="toastContainer"></div>
   <style>
-    body { background: #0A0A0D; }
-    .mp-wrap { min-height: 100vh; padding: 0 0 80px; background: #0A0A0D; }
+    body { background: #F2F4F6; }
+    .mp-wrap { min-height: 100vh; padding: 0 0 80px; background: #F2F4F6; }
     .mp-inner { max-width: 560px; margin: 0 auto; padding: 0 16px; }
-    .mp-header { position: sticky; top: 0; z-index: 10; background: #0A0A0D; padding: 16px; }
-    .mp-back { width: 40px; height: 40px; border: none; background: #202127; border-radius: 50%; color: #B7B7C2; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; }
+    .mp-header { position: sticky; top: 0; z-index: 10; background: #F2F4F6; padding: 16px; }
+    .mp-back { width: 40px; height: 40px; border: none; background: #FFFFFF; border-radius: 50%; color: #8B95A1; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-decoration: none; }
     .mp-tabs { display: flex; gap: 6px; margin: 16px 0; }
-    .mp-tab-btn { padding: 9px 18px; border-radius: 999px; border: 1px solid #2C2D35; background: #17181D; color: #82828E; font-size: 13px; font-weight: 700; cursor: pointer; }
-    .mp-help-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid #2C2D35; background: #17181D; color: #82828E; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
-    .mp-help-btn:hover { border-color: #1E3A8A; color: #fff; }
-    .mp-help-body b { color: #F2F2F5; }
-    .mp-tab-btn.active { background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; border-color: transparent; }
+    .mp-tab-btn { padding: 9px 18px; border-radius: 999px; border: 1px solid #E5E8EB; background: #FFFFFF; color: #8B95A1; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .mp-help-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid #E5E8EB; background: #FFFFFF; color: #8B95A1; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+    .mp-help-btn:hover { border-color: #3182F6; color: #3182F6; }
+    .mp-help-body b { color: #191F28; }
+    .mp-tab-btn.active { background: #3182F6; color: #fff; border-color: transparent; }
     .mp-section { display: none; }
     .mp-section.active { display: block; }
-    .mp-card { border: 1px solid #2C2D35; border-radius: 14px; background: #17181D; padding: 16px; margin-bottom: 12px; }
-    .mp-input, .mp-select, .mp-textarea { width: 100%; padding: 11px 14px; background: #202127; border: 1px solid #2C2D35; border-radius: 10px; color: #F2F2F5; font-size: 14px; outline: none; margin-bottom: 10px; font-family: inherit; }
+    .mp-card { border: 1px solid #E5E8EB; border-radius: 14px; background: #FFFFFF; padding: 16px; margin-bottom: 12px; box-shadow: 0 2px 10px rgba(15,23,42,0.05); }
+    .mp-input, .mp-select, .mp-textarea { width: 100%; padding: 11px 14px; background: #FFFFFF; border: 1px solid #E5E8EB; border-radius: 10px; color: #191F28; font-size: 14px; outline: none; margin-bottom: 10px; font-family: inherit; }
     .mp-textarea { min-height: 80px; resize: vertical; }
-    .mp-cta { display: block; width: 100%; padding: 14px 20px; background: linear-gradient(135deg, #166534 0%, #1E3A8A 100%); color: #fff; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; text-align: center; }
+    .mp-cta { display: block; width: 100%; padding: 14px 20px; background: #3182F6; color: #fff; border: none; border-radius: 14px; font-size: 15px; font-weight: 700; cursor: pointer; text-align: center; }
     .mp-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
-    .mp-badge.new, .mp-badge.receipt { background: #7C3AED22; color: #A78BFA; }
+    .mp-badge.new, .mp-badge.receipt { background: #EAF2FF; color: #3182F6; }
     .mp-badge.in_discussion { background: #f59e0b22; color: #f59e0b; }
     .mp-badge.done { background: #22c55e22; color: #22c55e; }
-    .mp-empty { color: #82828E; font-size: 14px; padding: 40px 0; text-align: center; }
-    .mp-title { font-size: 15px; font-weight: 700; color: #F2F2F5; }
-    .mp-meta { font-size: 12px; color: #82828E; margin-top: 4px; }
+    .mp-empty { color: #8B95A1; font-size: 14px; padding: 40px 0; text-align: center; }
+    .mp-title { font-size: 15px; font-weight: 700; color: #191F28; }
+    .mp-meta { font-size: 12px; color: #8B95A1; margin-top: 4px; }
   </style>
 
   <div class="mp-wrap">
     <div class="mp-header" style="display:flex;align-items:center;justify-content:space-between;max-width:560px;margin:0 auto;">
       <a href="/" class="gapp-logo" style="display:flex;align-items:center;gap:8px;text-decoration:none;"><span class="gapp-logo-ez">EZ</span><span class="gapp-logo-look">look</span></a>
       <div style="display:flex;align-items:center;gap:8px;position:relative;">
-        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:14px;padding:6px 14px;background:#202127;border:1px solid #0579B3;border-radius:20px;color:#0DA8D6;cursor:pointer;font-weight:600;">로그인</button>
+        <button id="navLoginBtn" onclick="openModal('loginModal')" style="font-size:14px;padding:6px 14px;background:#FFFFFF;border:1px solid #3182F6;border-radius:20px;color:#3182F6;cursor:pointer;font-weight:600;">로그인</button>
         <div id="navUserArea" style="display:none;align-items:center;gap:0;position:relative;">
           <span id="navUserCredits" style="display:none;"></span>
           <span id="navUserName" style="display:none;"></span>
-          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#166534,#1E3A8A);display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;cursor:pointer;user-select:none;">?</div>
-          <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#17181D;border:1px solid #2C2D35;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.4);z-index:10001;">
-            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #2C2D35;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">
-              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#F2F2F5;margin-bottom:2px;"></div>
-              <div id="ddUserEmail" style="font-size:11px;color:#82828E;margin-bottom:6px;"></div>
+          <div id="navUserAvatar" onclick="toggleUserMenu()" style="width:32px;height:32px;border-radius:50%;background:#3182F6;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;font-weight:700;cursor:pointer;user-select:none;">?</div>
+          <div id="userDropdownMenu" style="display:none;position:absolute;top:40px;right:0;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:6px;min-width:210px;box-shadow:0 12px 32px rgba(0,0,0,0.4);z-index:10001;">
+            <a href="/dashboard" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:12px 14px 10px;border-bottom:1px solid #E5E8EB;margin-bottom:4px;text-decoration:none;cursor:pointer;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">
+              <div id="ddUserName" style="font-size:13px;font-weight:700;color:#191F28;margin-bottom:2px;"></div>
+              <div id="ddUserEmail" style="font-size:11px;color:#8B95A1;margin-bottom:6px;"></div>
               <div style="display:flex;align-items:center;justify-content:space-between;">
-                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#0DA8D6;"></div>
-                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:linear-gradient(135deg,#166534,#1E3A8A);color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
+                <div id="ddUserCredits" style="font-size:12px;font-weight:600;color:#3182F6;"></div>
+                <button onclick="event.preventDefault();event.stopPropagation();openChargePanel();toggleUserMenu();" style="font-size:14.85px;padding:3px 10px;background:#3182F6;color:white;border:none;border-radius:20px;cursor:pointer;font-weight:600;">충전</button>
               </div>
             </a>
-            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">모델컷 만들기</a>
-            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">누끼컷 만들기</a>
-            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">생성 내역</a>
-            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">카톡 문의</a>
-            <a href="/gov-support" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">지원사업 도우미</a>
-            <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#B7B7C2;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#202127'" onmouseout="this.style.background=''">서비스소개</a>
-            <div style="height:1px;background:#2C2D35;margin:4px 0;"></div>
+            <a href="/" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#8B95A1;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">모델컷 만들기</a>
+            <a href="/ghostcut" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#8B95A1;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">누끼컷 만들기</a>
+            <a href="/dashboard#history" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#8B95A1;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">생성 내역</a>
+            <a href="http://pf.kakao.com/_wFyCX/chat" target="_blank" onclick="gaEvent('kakao_channel_add_click', Object.assign({source:'user_menu'}, getStoredUtm())); document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#8B95A1;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">카톡 문의</a>
+            <a href="/gov-support" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#8B95A1;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">지원사업 도우미</a>
+            <a href="https://www.aifashion.co.kr/about" onclick="document.getElementById('userDropdownMenu').style.display='none';" style="display:block;padding:9px 12px;font-size:13px;color:#8B95A1;text-decoration:none;border-radius:10px;" onmouseover="this.style.background='#F2F4F6'" onmouseout="this.style.background=''">서비스소개</a>
+            <div style="height:1px;background:#E5E8EB;margin:4px 0;"></div>
             <button onclick="handleLogout()" style="display:block;width:100%;text-align:left;padding:9px 12px;font-size:13px;color:#ef4444;background:none;border:none;cursor:pointer;border-radius:10px;" onmouseover="this.style.background='#ef444411'" onmouseout="this.style.background=''">로그아웃</button>
           </div>
         </div>
@@ -17152,13 +17152,13 @@ app.get('/my-production', (c) => {
     <div class="mp-inner">
       <div style="display:flex;align-items:center;gap:12px;margin:12px 0 4px;">
         <a href="/" class="mp-back">‹</a>
-        <h1 style="font-size:21px;font-weight:700;color:#F2F2F5;margin:0;">생산 문의·발주 현황</h1>
+        <h1 style="font-size:21px;font-weight:700;color:#191F28;margin:0;">생산 문의·발주 현황</h1>
       </div>
 
-      <div id="mpLoading" style="text-align:center;padding:60px 0;color:#82828E;font-size:15px;">불러오는 중...</div>
+      <div id="mpLoading" style="text-align:center;padding:60px 0;color:#8B95A1;font-size:15px;">불러오는 중...</div>
 
       <div id="mpNeedLogin" style="display:none;text-align:center;padding:60px 20px;">
-        <p style="font-size:16px;color:#B7B7C2;margin-bottom:16px;">로그인 후 이용할 수 있어요.</p>
+        <p style="font-size:16px;color:#8B95A1;margin-bottom:16px;">로그인 후 이용할 수 있어요.</p>
         <a href="/" class="mp-cta" style="display:inline-block;width:auto;padding:10px 22px;border-radius:24px;">홈에서 로그인하기</a>
       </div>
 
@@ -17174,7 +17174,7 @@ app.get('/my-production', (c) => {
 
         <div class="mp-section active" id="mpSection-inquiry">
           <div class="mp-card">
-            <div style="font-size:14px;font-weight:700;color:#F2F2F5;margin-bottom:10px;">새 생산 문의 작성</div>
+            <div style="font-size:14px;font-weight:700;color:#191F28;margin-bottom:10px;">새 생산 문의 작성</div>
             <select class="mp-select" id="mpIndustry">
               ${WORKSPACE_INDUSTRIES.map((ind) => '<option value="' + ind + '">' + WORKSPACE_INDUSTRY_LABEL[ind] + '</option>').join('')}
             </select>
@@ -17203,17 +17203,17 @@ app.get('/my-production', (c) => {
   </div>
 
   <div id="mpPopupOverlay" style="display:none;position:fixed;inset:0;background:#000000aa;align-items:center;justify-content:center;z-index:9500;">
-    <div style="background:#17181D;border:1px solid #2C2D35;border-radius:16px;padding:24px;max-width:360px;width:90%;">
-      <div id="mpPopupTitle" style="font-size:16px;font-weight:700;color:#F2F2F5;margin-bottom:10px;"></div>
-      <div id="mpPopupContent" style="font-size:13px;color:#B7B7C2;line-height:1.6;margin-bottom:18px;white-space:pre-wrap;"></div>
+    <div style="background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:24px;max-width:360px;width:90%;">
+      <div id="mpPopupTitle" style="font-size:16px;font-weight:700;color:#191F28;margin-bottom:10px;"></div>
+      <div id="mpPopupContent" style="font-size:13px;color:#8B95A1;line-height:1.6;margin-bottom:18px;white-space:pre-wrap;"></div>
       <button class="mp-cta" onclick="document.getElementById('mpPopupOverlay').style.display='none';">확인</button>
     </div>
   </div>
 
   <div id="mpHelpOverlay" style="display:none;position:fixed;inset:0;background:#000000aa;align-items:center;justify-content:center;z-index:9500;">
-    <div style="background:#17181D;border:1px solid #2C2D35;border-radius:16px;padding:24px;max-width:380px;width:90%;max-height:80vh;overflow-y:auto;">
-      <div id="mpHelpTitle" style="font-size:16px;font-weight:700;color:#F2F2F5;margin-bottom:12px;"></div>
-      <div class="mp-help-body" id="mpHelpBody" style="font-size:13px;color:#B7B7C2;line-height:1.6;margin-bottom:18px;"></div>
+    <div style="background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:24px;max-width:380px;width:90%;max-height:80vh;overflow-y:auto;">
+      <div id="mpHelpTitle" style="font-size:16px;font-weight:700;color:#191F28;margin-bottom:12px;"></div>
+      <div class="mp-help-body" id="mpHelpBody" style="font-size:13px;color:#8B95A1;line-height:1.6;margin-bottom:18px;"></div>
       <button class="mp-cta" onclick="document.getElementById('mpHelpOverlay').style.display='none';">확인</button>
     </div>
   </div>
@@ -17225,10 +17225,10 @@ app.get('/my-production', (c) => {
 
     // ── 탭별 도움말 — "왜 만들어졌는지" + "사용 방법"
     var MP_HELP = {
-      inquiry: { title: '생산 문의', reason: '고객사가 직접 새 생산을 의뢰할 수 있도록 만들었습니다. 보내신 문의는 운영팀 워크스페이스의 "생산문의"에 들어가 발주로 전환됩니다.', howto: '업종·제품명·디자인 메모·희망 수량·희망 단가를 입력하고 "문의 보내기"를 누르면 됩니다.' },
-      orders: { title: '내 발주 현황', reason: '보내신 문의가 발주로 전환된 뒤 진행 상황을 직접 확인할 수 있도록 만들었습니다.', howto: '목록에서 현재 공정 단계와 예상 완료일을 확인할 수 있습니다.' },
-      notify: { title: '알림', reason: '발주 상태 변경 등 중요한 소식을 놓치지 않도록 만들었습니다.', howto: '새 알림이 있으면 탭에 빨간 숫자로 표시됩니다. 목록에서 클릭하면 읽음 처리됩니다.' },
-      invoice: { title: '결제·거래명세서', reason: '결제해야 할 거래명세서를 직접 조회할 수 있도록 만들었습니다.', howto: '내 명세서 목록과 상태(발행/결제완료 등)를 여기서 확인합니다.' },
+      inquiry: { title: '생산 문의', reason: '고객사가 직접 새 생산을 의뢰할 수 있도록 만들었어요. 보내신 문의는 운영팀 워크스페이스의 "생산문의"에 들어가 발주로 전환돼요.', howto: '업종·제품명·디자인 메모·희망 수량·희망 단가를 입력하고 "문의 보내기"를 누르면 돼요.' },
+      orders: { title: '내 발주 현황', reason: '보내신 문의가 발주로 전환된 뒤 진행 상황을 직접 확인할 수 있도록 만들었어요.', howto: '목록에서 현재 공정 단계와 예상 완료일을 확인할 수 있어요.' },
+      notify: { title: '알림', reason: '발주 상태 변경 등 중요한 소식을 놓치지 않도록 만들었어요.', howto: '새 알림이 있으면 탭에 빨간 숫자로 표시돼요. 목록에서 클릭하면 읽음 처리돼요.' },
+      invoice: { title: '결제·거래명세서', reason: '결제해야 할 거래명세서를 직접 조회할 수 있도록 만들었어요.', howto: '내 명세서 목록과 상태(발행/결제완료 등)를 여기서 확인해요.' },
     };
     function mpShowHelp() {
       var activeBtn = document.querySelector('.mp-tab-btn.active');
@@ -17288,7 +17288,7 @@ app.get('/my-production', (c) => {
         if (!data.notifications.length) { list.innerHTML = '<div class="mp-empty">알림이 없어요.</div>'; return; }
         list.innerHTML = data.notifications.map(function (n) {
           return '<div class="mp-card">' +
-            '<div style="font-size:13px;color:#F2F2F5;font-weight:' + (n.is_read ? '400' : '700') + ';">' + mpEsc(n.message) + '</div>' +
+            '<div style="font-size:13px;color:#191F28;font-weight:' + (n.is_read ? '400' : '700') + ';">' + mpEsc(n.message) + '</div>' +
             '<div class="mp-meta">' + n.created_at + '</div>' +
             (n.is_read ? '' : '<button class="mp-cta" style="width:auto;padding:4px 12px;margin-top:6px;font-size:12px;" onclick="mpMarkNotificationRead(\\'' + n.id + '\\')">읽음</button>') +
             '</div>';
@@ -17316,16 +17316,30 @@ app.get('/my-production', (c) => {
       }
     }
 
+    // 팝업 공지를 매번 화면에 뜨자마자 다시 띄우면 진입 즉시 뜨는 바텀시트와
+    // 같은 경험이 돼요. 한 번 본 공지 id는 localStorage에 남겨 같은 공지는 다시
+    // 띄우지 않고, 새 공지가 올라왔을 때만 보여줘요.
+    function mpSeenPopupIds() {
+      try { return JSON.parse(localStorage.getItem('mp_seen_popups') || '[]'); } catch (e) { return []; }
+    }
+    function mpMarkPopupSeen(id) {
+      try {
+        var seen = mpSeenPopupIds();
+        if (seen.indexOf(id) === -1) { seen.push(id); localStorage.setItem('mp_seen_popups', JSON.stringify(seen.slice(-50))); }
+      } catch (e) {}
+    }
     async function mpLoadAnnouncements() {
       try {
         var res = await fetch('/api/announcements/active');
         var data = await res.json();
         if (!data.success) return;
-        var popup = data.announcements.find(function (a) { return a.is_popup; });
+        var seen = mpSeenPopupIds();
+        var popup = data.announcements.find(function (a) { return a.is_popup && seen.indexOf(a.id) === -1; });
         if (popup) {
           document.getElementById('mpPopupTitle').textContent = popup.title;
           document.getElementById('mpPopupContent').textContent = popup.content || '';
           document.getElementById('mpPopupOverlay').style.display = 'flex';
+          mpMarkPopupSeen(popup.id);
         }
         var list = document.getElementById('mpAnnounceList');
         list.innerHTML = data.announcements.slice(0, 3).map(function (a) {
@@ -17353,7 +17367,7 @@ app.get('/my-production', (c) => {
         document.getElementById('mpQty').value = '';
         document.getElementById('mpPrice').value = '';
         mpLoadInquiries();
-      } catch (e) { alert('서버 오류가 발생했습니다.'); }
+      } catch (e) { alert('서버 오류가 발생했어요.'); }
     }
 
     async function mpLoadInquiries() {
@@ -17374,7 +17388,7 @@ app.get('/my-production', (c) => {
           '<div><div class="mp-title">' + mpEsc(q.title) + '</div><div class="mp-meta">희망수량 ' + (q.desiredQty || '-') + ' · ' + q.createdAt + '</div></div>' +
           '<span class="mp-badge ' + q.status + '">' + statusLabel[q.status] + '</span>' +
           '</div>' +
-          (q.adminNote ? '<div class="mp-meta" style="margin-top:8px;color:#B7B7C2;">담당자 메모: ' + mpEsc(q.adminNote) + '</div>' : '') +
+          (q.adminNote ? '<div class="mp-meta" style="margin-top:8px;color:#8B95A1;">담당자 메모: ' + mpEsc(q.adminNote) + '</div>' : '') +
           '</div>';
       }).join('');
     }
@@ -17478,7 +17492,7 @@ app.post('/api/workspace/chat/:id/confirm', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const id = c.req.param('id')
   const msg: any = await db.prepare(`SELECT * FROM workspace_chat_messages WHERE id = ?`).bind(id).first()
-  if (!msg || msg.status !== 'pending' || !msg.action_json) return c.json({ success: false, message: '확인할 수 없는 요청입니다.' }, 400)
+  if (!msg || msg.status !== 'pending' || !msg.action_json) return c.json({ success: false, message: '확인할 수 없는 요청이에요.' }, 400)
   const action = JSON.parse(msg.action_json)
 
   let product: any = await db.prepare(`SELECT * FROM workspace_products WHERE product_code = ?`).bind(action.productCode).first()
@@ -17499,7 +17513,7 @@ app.post('/api/workspace/chat/:id/confirm', adminAuth, async (c) => {
   const newAction = Object.assign({}, action, { logId, historyId: histId })
   await db.prepare(`UPDATE workspace_chat_messages SET status = 'confirmed', action_json = ? WHERE id = ?`).bind(JSON.stringify(newAction), id).run()
 
-  return c.json({ success: true, message: '기록했습니다.' })
+  return c.json({ success: true, message: '기록했어요.' })
 })
 
 app.post('/api/workspace/chat/:id/cancel', adminAuth, async (c) => {
@@ -17513,7 +17527,7 @@ app.post('/api/workspace/chat/:id/undo', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const id = c.req.param('id')
   const msg: any = await db.prepare(`SELECT * FROM workspace_chat_messages WHERE id = ?`).bind(id).first()
-  if (!msg || msg.status !== 'confirmed' || !msg.action_json) return c.json({ success: false, message: '되돌릴 수 없는 요청입니다.' }, 400)
+  if (!msg || msg.status !== 'confirmed' || !msg.action_json) return c.json({ success: false, message: '되돌릴 수 없는 요청이에요.' }, 400)
   const action = JSON.parse(msg.action_json)
   if (action.logId) await db.prepare(`DELETE FROM workspace_inbound_logs WHERE id = ?`).bind(action.logId).run()
   if (action.historyId) await db.prepare(`DELETE FROM workspace_product_history WHERE id = ?`).bind(action.historyId).run()
@@ -17599,7 +17613,7 @@ app.get('/api/workspace/invoices/:id', adminAuth, async (c) => {
     FROM workspace_invoices i LEFT JOIN users u ON u.id = i.client_user_id
     WHERE i.id = ?
   `).bind(c.req.param('id')).first()
-  if (!row) return c.json({ success: false, message: '명세서를 찾을 수 없습니다.' }, 404)
+  if (!row) return c.json({ success: false, message: '명세서를 찾을 수 없어요.' }, 404)
   const invoice = wsInvoiceRow(row)
   const client: any = await db.prepare(`SELECT * FROM workspace_clients WHERE user_id = ?`).bind(invoice.clientUserId).first()
   let orders: any[] = []
@@ -17639,7 +17653,7 @@ app.post('/api/workspace/invoices', adminAuth, async (c) => {
   await db.prepare(`INSERT INTO workspace_invoices (id, invoice_code, client_user_id, order_ids_json, total_amount, note) VALUES (?, ?, ?, ?, ?, ?)`)
     .bind(id, invoiceCode, clientUserId, JSON.stringify(orderIds), totalAmount, String(body.note || '').trim() || null).run()
 
-  await wsNotify(db, 'client', '제품이 출고되어 거래명세서(' + invoiceCode + ')가 생성되었습니다. 확인해주세요.', clientUserId)
+  await wsNotify(db, 'client', '제품이 출고되어 거래명세서(' + invoiceCode + ')가 생성됐어요. 확인해 주세요.', clientUserId)
 
   return c.json({ success: true, id, invoiceCode, totalAmount })
 })
@@ -17651,11 +17665,11 @@ app.patch('/api/workspace/invoices/:id', adminAuth, async (c) => {
   const sets: string[] = []
   const vals: any[] = []
   if (body.status !== undefined) {
-    if (!['pending', 'unpaid', 'paid', 'tax_invoice_issued'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태입니다.' }, 400)
+    if (!['pending', 'unpaid', 'paid', 'tax_invoice_issued'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태예요.' }, 400)
     sets.push('status = ?'); vals.push(body.status)
   }
   if (body.note !== undefined) { sets.push('note = ?'); vals.push(body.note || null) }
-  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없어요.' }, 400)
   sets.push("updated_at = datetime('now')")
   vals.push(id)
   await db.prepare(`UPDATE workspace_invoices SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
@@ -17685,7 +17699,7 @@ app.post('/api/workspace/admins', adminAuth, async (c) => {
   }
   const role = body.role === 'super' ? 'super' : 'staff'
   const dup = await db.prepare(`SELECT id FROM workspace_admins WHERE email = ?`).bind(email).first()
-  if (dup) return c.json({ success: false, message: '이미 등록된 이메일입니다.' }, 409)
+  if (dup) return c.json({ success: false, message: '이미 등록된 이메일이에요.' }, 409)
   const id = crypto.randomUUID()
   const passwordHash = await hashPassword(password)
   await db.prepare(
@@ -17701,15 +17715,15 @@ app.patch('/api/workspace/admins/:id', adminAuth, async (c) => {
   const sets: string[] = []
   const vals: any[] = []
   if (body.role !== undefined) {
-    if (!['super', 'staff'].includes(body.role)) return c.json({ success: false, message: '잘못된 권한입니다.' }, 400)
+    if (!['super', 'staff'].includes(body.role)) return c.json({ success: false, message: '잘못된 권한이에요.' }, 400)
     sets.push('role = ?'); vals.push(body.role)
   }
   if (body.isActive !== undefined) { sets.push('is_active = ?'); vals.push(body.isActive ? 1 : 0) }
   if (body.setPassword) {
-    if (String(body.setPassword).length < 4) return c.json({ success: false, message: '비밀번호는 4자 이상이어야 합니다.' }, 400)
+    if (String(body.setPassword).length < 4) return c.json({ success: false, message: '비밀번호는 4자 이상이어야 해요.' }, 400)
     sets.push('password_hash = ?'); vals.push(await hashPassword(String(body.setPassword)))
   }
-  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없어요.' }, 400)
   sets.push("updated_at = datetime('now')")
   vals.push(id)
   await db.prepare(`UPDATE workspace_admins SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
@@ -17730,9 +17744,9 @@ app.post('/api/workspace/admin-login', adminAuth, async (c) => {
   const admin: any = await db.prepare(
     `SELECT id, name, email, role, password_hash FROM workspace_admins WHERE email = ? AND is_active = 1`
   ).bind(email).first()
-  if (!admin) return c.json({ success: false, message: '등록되지 않은 계정입니다.' }, 401)
+  if (!admin) return c.json({ success: false, message: '등록되지 않은 계정이에요.' }, 401)
   const ok = await verifyPassword(password, admin.password_hash)
-  if (!ok) return c.json({ success: false, message: '비밀번호가 올바르지 않습니다.' }, 401)
+  if (!ok) return c.json({ success: false, message: '비밀번호가 올바르지 않아요.' }, 401)
   const token = await createWsAdminSession(db, admin.id)
   await db.prepare(`UPDATE workspace_admins SET last_login_at = datetime('now') WHERE id = ?`).bind(admin.id).run()
   return c.json({ success: true, token, admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role } })
@@ -17882,7 +17896,7 @@ app.post('/api/workspace/workflow', adminAuth, async (c) => {
 app.patch('/api/workspace/workflow/:id', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const body: any = await c.req.json().catch(() => ({}))
-  if (!['open', 'in_progress', 'done'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태입니다.' }, 400)
+  if (!['open', 'in_progress', 'done'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태예요.' }, 400)
   await db.prepare(`UPDATE workspace_workflow_requests SET status = ?, updated_at = datetime('now') WHERE id = ?`).bind(body.status, c.req.param('id')).run()
   return c.json({ success: true })
 })
@@ -17926,7 +17940,7 @@ app.post('/api/workspace/holidays', adminAuth, async (c) => {
 app.patch('/api/workspace/holidays/:id', adminAuth, async (c) => {
   const db = c.env.LOOKBOOK_DB
   const body: any = await c.req.json().catch(() => ({}))
-  if (!['pending', 'approved', 'rejected'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태입니다.' }, 400)
+  if (!['pending', 'approved', 'rejected'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태예요.' }, 400)
   await db.prepare(`UPDATE workspace_holiday_requests SET status = ? WHERE id = ?`).bind(body.status, c.req.param('id')).run()
   return c.json({ success: true })
 })
@@ -17977,7 +17991,7 @@ app.patch('/api/workspace/announcements/:id', adminAuth, async (c) => {
   const vals: any[] = []
   if (body.isActive !== undefined) { sets.push('is_active = ?'); vals.push(body.isActive ? 1 : 0) }
   if (body.isPopup !== undefined) { sets.push('is_popup = ?'); vals.push(body.isPopup ? 1 : 0) }
-  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없습니다.' }, 400)
+  if (!sets.length) return c.json({ success: false, message: '변경할 값이 없어요.' }, 400)
   sets.push("updated_at = datetime('now')")
   vals.push(id)
   await db.prepare(`UPDATE workspace_announcements SET ${sets.join(', ')} WHERE id = ?`).bind(...vals).run()
@@ -18047,96 +18061,109 @@ app.get('/workspace', (c) => {
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{font-family:'Pretendard',-apple-system,sans-serif;background:#0f0f1a;color:#e0e0f0;min-height:100vh;}
-    #loginOverlay{position:fixed;inset:0;background:#0f0f1a;display:flex;align-items:center;justify-content:center;z-index:100;}
-    .login-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center;}
+    body{font-family:'Pretendard',-apple-system,sans-serif;background:#F2F4F6;color:#191F28;min-height:100vh;}
+    #loginOverlay{position:fixed;inset:0;background:#F2F4F6;display:flex;align-items:center;justify-content:center;z-index:100;}
+    .login-card{background:#FFFFFF;border:1px solid #E5E8EB;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center;box-shadow:0 2px 16px rgba(15,23,42,0.08);}
     .login-card .logo{font-size:32px;margin-bottom:8px;}
     .login-card h2{font-size:20px;font-weight:700;margin-bottom:4px;}
-    .login-card p{font-size:13px;color:#8b8ba0;margin-bottom:28px;}
-    .login-card input{width:100%;padding:12px 16px;background:#252540;border:1px solid #3a3a60;border-radius:10px;color:#e0e0f0;font-size:15px;outline:none;margin-bottom:12px;}
-    .login-card input:focus{border-color:#7C3AED;}
+    .login-card p{font-size:13px;color:#8B95A1;margin-bottom:28px;}
+    .login-card input{width:100%;padding:12px 16px;background:#F2F4F6;border:1px solid #E5E8EB;border-radius:10px;color:#191F28;font-size:15px;outline:none;margin-bottom:12px;}
+    .login-card input:focus{border-color:#3182F6;}
     .login-card .err{font-size:13px;color:#ef4444;margin-bottom:10px;min-height:18px;}
-    .btn-save{background:#7C3AED;color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;}
+    .btn-save{background:#3182F6;color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:600;cursor:pointer;}
     #wsMain{display:none;}
-    .ws-header{background:#1a1a2e;border-bottom:1px solid #2e2e50;padding:14px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50;}
-    .ws-header .logo{font-size:18px;font-weight:700;color:#A78BFA;}
-    .ws-header .badge{font-size:11px;background:#7C3AED22;color:#A78BFA;padding:3px 10px;border-radius:20px;border:1px solid #7C3AED44;}
-    .ws-header .logout{margin-left:auto;font-size:13px;cursor:pointer;padding:6px 14px;border:1px solid #3a3a60;border-radius:8px;background:none;color:#e0e0f0;}
-    .ws-header .logout:hover{border-color:#7C3AED;color:#A78BFA;}
+    .ws-header{background:#FFFFFF;border-bottom:1px solid #E5E8EB;padding:14px 24px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:50;}
+    .ws-header .logo{font-size:18px;font-weight:700;color:#3182F6;}
+    .ws-header .badge{font-size:11px;background:#EAF2FF;color:#3182F6;padding:3px 10px;border-radius:20px;border:1px solid #3182F6;}
+    .ws-header .logout{margin-left:auto;font-size:13px;cursor:pointer;padding:6px 14px;border:1px solid #E5E8EB;border-radius:8px;background:none;color:#191F28;}
+    .ws-header .logout:hover{border-color:#3182F6;color:#3182F6;}
     .ws-body{display:flex;min-height:calc(100vh - 54px);}
-    .ws-sidebar{width:180px;flex-shrink:0;background:#14142380;border-right:1px solid #2e2e50;padding:16px 10px;}
-    .ws-nav-btn{display:block;width:100%;text-align:left;padding:10px 14px;margin-bottom:4px;border:none;border-radius:10px;background:none;color:#8b8ba0;font-size:14px;font-weight:500;cursor:pointer;}
-    .ws-nav-btn:hover{background:#252540;color:#e0e0f0;}
-    .ws-nav-btn.active{background:#7C3AED22;color:#A78BFA;}
+    .ws-sidebar{width:180px;flex-shrink:0;background:#FFFFFF;border-right:1px solid #E5E8EB;padding:16px 10px;}
+    .ws-nav-btn{display:block;width:100%;text-align:left;padding:10px 14px;margin-bottom:4px;border:none;border-radius:10px;background:none;color:#8B95A1;font-size:14px;font-weight:500;cursor:pointer;}
+    .ws-nav-btn:hover{background:#F2F4F6;color:#191F28;}
+    .ws-nav-btn.active{background:#EAF2FF;color:#3182F6;}
     .ws-content{flex:1;padding:24px;max-width:1100px;}
     .ws-panel{display:none;}
     .ws-panel.active{display:block;}
     .ws-panel h1{font-size:20px;font-weight:700;margin-bottom:18px;}
     .ws-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:24px;}
-    .ws-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:12px;padding:16px;}
-    .ws-card .num{font-size:24px;font-weight:800;color:#A78BFA;}
-    .ws-card .label{font-size:12px;color:#8b8ba0;margin-top:4px;}
+    .ws-card{background:#FFFFFF;border:1px solid #E5E8EB;border-radius:12px;padding:16px;box-shadow:0 2px 10px rgba(15,23,42,0.05);}
+    .ws-card .num{font-size:24px;font-weight:800;color:#3182F6;}
+    .ws-card .label{font-size:12px;color:#8B95A1;margin-top:4px;}
     .ws-toolbar{display:flex;gap:8px;margin-bottom:16px;}
-    .ws-input{flex:1;padding:10px 14px;background:#1a1a2e;border:1px solid #2e2e50;border-radius:10px;color:#e0e0f0;font-size:13px;outline:none;}
-    .ws-input:focus{border-color:#7C3AED;}
-    .ws-btn{padding:10px 16px;background:#7C3AED;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
-    .ws-btn.secondary{background:#252540;color:#e0e0f0;}
+    .ws-input{flex:1;padding:10px 14px;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:10px;color:#191F28;font-size:13px;outline:none;}
+    .ws-input:focus{border-color:#3182F6;}
+    .ws-btn{padding:10px 16px;background:#3182F6;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;}
+    .ws-btn.secondary{background:#F2F4F6;color:#191F28;}
     .ws-panel h1{display:flex;align-items:center;gap:8px;}
-    .ws-help-btn{width:20px;height:20px;border-radius:50%;border:1px solid #3a3a60;background:#1a1a2e;color:#8b8ba0;font-size:12px;font-weight:700;cursor:pointer;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
-    .ws-help-btn:hover{border-color:#7C3AED;color:#fff;}
-    .ws-help-body b{color:#F2F2F5;}
+    .ws-help-btn{width:20px;height:20px;border-radius:50%;border:1px solid #E5E8EB;background:#FFFFFF;color:#8B95A1;font-size:12px;font-weight:700;cursor:pointer;line-height:1;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}
+    .ws-help-btn:hover{border-color:#3182F6;color:#3182F6;}
+    .ws-help-body b{color:#191F28;}
     .ws-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;}
-    .ws-tab-btn{padding:8px 16px;border-radius:999px;border:1px solid #2e2e50;background:#1a1a2e;color:#8b8ba0;font-size:13px;font-weight:600;cursor:pointer;}
-    .ws-tab-btn.active{background:#7C3AED;color:#fff;border-color:#7C3AED;}
-    .ws-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:14px;scrollbar-width:thin;scrollbar-color:#7C3AED #1a1a2e;}
+    .ws-tab-btn{padding:8px 16px;border-radius:999px;border:1px solid #E5E8EB;background:#FFFFFF;color:#8B95A1;font-size:13px;font-weight:600;cursor:pointer;}
+    .ws-tab-btn.active{background:#3182F6;color:#fff;border-color:#3182F6;}
+    .ws-board{display:flex;gap:12px;overflow-x:auto;padding-bottom:14px;scrollbar-width:thin;scrollbar-color:#3182F6 #FFFFFF;}
     .ws-board::-webkit-scrollbar{height:10px;}
-    .ws-board::-webkit-scrollbar-track{background:#1a1a2e;border-radius:6px;}
-    .ws-board::-webkit-scrollbar-thumb{background:#7C3AED;border-radius:6px;}
-    .ws-board::-webkit-scrollbar-thumb:hover{background:#A78BFA;}
-    .ws-col{flex:0 0 220px;background:#14142380;border:1px solid #2e2e50;border-radius:12px;padding:10px;max-height:70vh;overflow-y:auto;}
-    .ws-col-head{font-size:13px;font-weight:700;color:#A78BFA;margin-bottom:10px;padding:0 4px;display:flex;justify-content:space-between;}
-    .ws-order-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer;font-size:12px;}
-    .ws-order-card:hover{border-color:#7C3AED;}
-    .ws-order-card .code{font-weight:700;color:#e0e0f0;margin-bottom:4px;}
-    .ws-order-card .meta{color:#8b8ba0;}
+    .ws-board::-webkit-scrollbar-track{background:#FFFFFF;border-radius:6px;}
+    .ws-board::-webkit-scrollbar-thumb{background:#3182F6;border-radius:6px;}
+    .ws-board::-webkit-scrollbar-thumb:hover{background:#3182F6;}
+    /* macOS 등 "스크롤할 때만 보이는" 오버레이 스크롤바 설정에서는 위 네이티브
+       스크롤바 스타일이 아예 적용되지 않아(OS 레벨 설정이라 CSS로 못 바꿈) 가로
+       스크롤이 가능하다는 것 자체를 알아채기 어렵다. 그래서 항상 보이는 트랙+막대를
+       직접 그려서 스크롤 가능 여부와 위치를 분명하게 보여준다.
+    */
+    .ws-board-scrollbar{height:5px;background:#E5E8EB;border-radius:999px;margin-bottom:16px;position:relative;overflow:hidden;display:none;}
+    .ws-board-scrollbar.visible{display:block;}
+    .ws-board-scrollbar-thumb{position:absolute;top:0;left:0;height:100%;background:#3182F6;border-radius:999px;min-width:24px;}
+    .ws-col{flex:0 0 220px;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:12px;padding:10px;max-height:70vh;overflow-y:auto;position:relative;}
+    .ws-col::after{content:'';display:block;position:sticky;bottom:0;left:0;right:0;height:22px;margin-top:-22px;background:linear-gradient(to bottom,rgba(25,31,40,0),rgba(25,31,40,0.1));pointer-events:none;}
+    .ws-col:has(.ws-empty)::after{display:none;}
+    .ws-col-head{font-size:13px;font-weight:700;color:#3182F6;margin-bottom:10px;padding:0 4px;display:flex;justify-content:space-between;}
+    .ws-order-card{background:#FFFFFF;border:1px solid #E5E8EB;border-radius:10px;padding:10px;margin-bottom:8px;cursor:pointer;font-size:12px;}
+    .ws-order-card:hover{border-color:#3182F6;}
+    .ws-order-card .code{font-weight:700;color:#191F28;margin-bottom:4px;}
+    .ws-order-card .meta{color:#8B95A1;}
     .ws-two-col{display:flex;gap:16px;}
-    .ws-list-col{flex:0 0 260px;max-height:70vh;overflow-y:auto;}
+    .ws-list-col{flex:0 0 260px;max-height:70vh;overflow-y:auto;position:relative;}
+    .ws-list-col::after{content:'';display:block;position:sticky;bottom:0;left:0;right:0;height:22px;margin-top:-22px;background:linear-gradient(to bottom,rgba(25,31,40,0),rgba(25,31,40,0.1));pointer-events:none;}
+    .ws-list-col:has(.ws-empty)::after{display:none;}
     .ws-detail-col{flex:1;}
     .ws-product-item{padding:10px 12px;border-radius:10px;cursor:pointer;margin-bottom:4px;font-size:13px;}
-    .ws-product-item:hover,.ws-product-item.active{background:#252540;}
+    .ws-product-item:hover,.ws-product-item.active{background:#F2F4F6;}
     .ws-product-item .code{font-weight:700;}
-    .ws-product-item .name{color:#8b8ba0;font-size:12px;}
-    .ws-hist-item{background:#1a1a2e;border:1px solid #2e2e50;border-left:3px solid #7C3AED;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;}
-    .ws-hist-item .type{display:inline-block;font-size:11px;font-weight:700;color:#A78BFA;margin-bottom:4px;}
+    .ws-product-item .name{color:#8B95A1;font-size:12px;}
+    .ws-hist-item{background:#FFFFFF;border:1px solid #E5E8EB;border-left:3px solid #3182F6;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;}
+    .ws-hist-item .type{display:inline-block;font-size:11px;font-weight:700;color:#3182F6;margin-bottom:4px;}
     .ws-hist-item.issue{border-left-color:#ef4444;}
     .ws-hist-item.resolution{border-left-color:#22c55e;}
-    .ws-chat-log{height:55vh;overflow-y:auto;background:#14142380;border:1px solid #2e2e50;border-radius:12px;padding:16px;margin-bottom:12px;}
+    .ws-chat-log{height:55vh;overflow-y:auto;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:12px;padding:16px;margin-bottom:12px;position:relative;}
+    .ws-chat-log::after{content:'';display:block;position:sticky;bottom:0;left:0;right:0;height:22px;margin-top:-22px;background:linear-gradient(to bottom,rgba(25,31,40,0),rgba(25,31,40,0.1));pointer-events:none;}
     .ws-bubble{max-width:70%;padding:10px 14px;border-radius:14px;margin-bottom:10px;font-size:13px;line-height:1.5;}
-    .ws-bubble.user{background:#7C3AED;color:#fff;margin-left:auto;border-bottom-right-radius:4px;}
-    .ws-bubble.assistant{background:#1a1a2e;border:1px solid #2e2e50;margin-right:auto;border-bottom-left-radius:4px;}
+    .ws-bubble.user{background:#3182F6;color:#fff;margin-left:auto;border-bottom-right-radius:4px;}
+    .ws-bubble.assistant{background:#FFFFFF;border:1px solid #E5E8EB;margin-right:auto;border-bottom-left-radius:4px;}
     .ws-bubble .actions{margin-top:8px;display:flex;gap:6px;}
     .ws-bubble .actions button{padding:5px 12px;font-size:12px;border-radius:8px;border:none;cursor:pointer;}
     .ws-modal-overlay{position:fixed;inset:0;background:#000000aa;display:none;align-items:center;justify-content:center;z-index:90;}
-    .ws-modal{background:#1a1a2e;border:1px solid #2e2e50;border-radius:14px;padding:24px;width:100%;max-width:420px;}
+    .ws-modal{background:#FFFFFF;border:1px solid #E5E8EB;border-radius:14px;padding:24px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(15,23,42,0.12);}
     .ws-modal h3{margin-bottom:14px;font-size:16px;}
-    .ws-modal label{display:block;font-size:12px;color:#8b8ba0;margin:10px 0 4px;}
+    .ws-modal label{display:block;font-size:12px;color:#8B95A1;margin:10px 0 4px;}
     .ws-modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
-    .ws-empty{color:#8b8ba0;font-size:13px;padding:30px;text-align:center;}
-    .ws-inquiry-card{background:#1a1a2e;border:1px solid #2e2e50;border-radius:12px;padding:16px;margin-bottom:12px;}
+    .ws-empty{color:#8B95A1;font-size:13px;padding:30px;text-align:center;}
+    .ws-inquiry-card{background:#FFFFFF;border:1px solid #E5E8EB;border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 10px rgba(15,23,42,0.05);}
     .ws-inquiry-card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
     .ws-inquiry-card .title{font-size:15px;font-weight:700;}
-    .ws-inquiry-card .meta{font-size:12px;color:#8b8ba0;margin-top:2px;}
+    .ws-inquiry-card .meta{font-size:12px;color:#8B95A1;margin-top:2px;}
     .ws-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;}
-    .ws-badge.new{background:#7C3AED22;color:#A78BFA;}
+    .ws-badge.new{background:#EAF2FF;color:#3182F6;}
     .ws-badge.in_discussion{background:#f59e0b22;color:#f59e0b;}
     .ws-badge.done{background:#22c55e22;color:#22c55e;}
-    .ws-inquiry-card .note{font-size:13px;color:#B7B7C2;margin:8px 0;white-space:pre-wrap;}
+    .ws-inquiry-card .note{font-size:13px;color:#8B95A1;margin:8px 0;white-space:pre-wrap;}
     .ws-inquiry-card .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
     .ws-opt-row{display:flex;gap:6px;margin-bottom:6px;}
     .ws-opt-row input{flex:1;}
-    .ws-opt-row button{flex:0 0 32px;background:#3a3a60;color:#fff;border:none;border-radius:8px;cursor:pointer;}
-    .ws-order-row{display:flex;align-items:center;gap:10px;background:#1a1a2e;border:1px solid #2e2e50;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;font-size:13px;}
-    .ws-order-row:hover{border-color:#7C3AED;}
+    .ws-opt-row button{flex:0 0 32px;background:#F2F4F6;color:#4E5968;border:none;border-radius:8px;cursor:pointer;}
+    .ws-order-row{display:flex;align-items:center;gap:10px;background:#FFFFFF;border:1px solid #E5E8EB;border-radius:10px;padding:12px 14px;margin-bottom:8px;cursor:pointer;font-size:13px;}
+    .ws-order-row:hover{border-color:#3182F6;}
     .ws-order-row .col{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     .ws-order-row .col.code{flex:1.3;font-weight:700;}
   </style>
@@ -18158,14 +18185,14 @@ app.get('/workspace', (c) => {
   <div class="ws-header">
     <span class="logo">이지룩 WORKS</span>
     <span class="badge">제조 워크스페이스</span>
-    <span id="wsOperatorBar" style="margin-left:auto;margin-right:12px;font-size:12px;color:#B7B7C2;"></span>
+    <span id="wsOperatorBar" style="margin-left:auto;margin-right:12px;font-size:12px;color:#8B95A1;"></span>
     <button class="logout" onclick="wsLogout()">로그아웃</button>
   </div>
 
   <div class="ws-modal-overlay" id="wsOperatorLoginOverlay">
     <div class="ws-modal" style="max-width:360px;">
       <h3 style="margin:0 0 12px;">담당자 로그인</h3>
-      <p style="font-size:12px;color:#B7B7C2;margin:0 0 12px;">사내톡·워크플로우·근무관리에 이름이 자동으로 들어갑니다.</p>
+      <p style="font-size:12px;color:#8B95A1;margin:0 0 12px;">사내톡·워크플로우·근무관리에 이름이 자동으로 들어가요.</p>
       <input class="ws-input" id="wsOpEmailInput" placeholder="이메일" style="width:100%;margin-bottom:8px;" onkeydown="if(event.key==='Enter')wsOperatorLogin()"/>
       <input class="ws-input" type="password" id="wsOpPwInput" placeholder="비밀번호" style="width:100%;margin-bottom:8px;" onkeydown="if(event.key==='Enter')wsOperatorLogin()"/>
       <div class="err" id="wsOperatorLoginErr" style="color:#ef4444;font-size:12px;margin-bottom:8px;"></div>
@@ -18179,7 +18206,7 @@ app.get('/workspace', (c) => {
   <div class="ws-modal-overlay" id="wsHelpOverlay">
     <div class="ws-modal" style="max-width:460px;max-height:80vh;overflow-y:auto;">
       <h3 id="wsHelpTitle" style="margin:0 0 14px;"></h3>
-      <div class="ws-help-body" id="wsHelpBody" style="font-size:13px;line-height:1.7;color:#d8d8e8;"></div>
+      <div class="ws-help-body" id="wsHelpBody" style="font-size:13px;line-height:1.7;color:#4E5968;"></div>
       <div class="row">
         <button class="ws-btn" onclick="document.getElementById('wsHelpOverlay').style.display='none';">확인</button>
       </div>
@@ -18240,6 +18267,7 @@ app.get('/workspace', (c) => {
           <button class="ws-btn" onclick="wsOpenNewOrderModal()">+ 발주 등록</button>
         </div>
         <div class="ws-board" id="wsBoard"></div>
+        <div class="ws-board-scrollbar" id="wsBoardScrollbar"><div class="ws-board-scrollbar-thumb" id="wsBoardScrollbarThumb"></div></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-orders">
@@ -18310,7 +18338,7 @@ app.get('/workspace', (c) => {
         <div class="ws-card" style="margin-bottom:16px;">
           <input class="ws-input" id="wsNewAnnounceTitle" placeholder="제목 *" style="width:100%;margin-bottom:8px;"/>
           <textarea class="ws-input" id="wsNewAnnounceContent" placeholder="내용" style="width:100%;min-height:70px;margin-bottom:8px;font-family:inherit;resize:vertical;"></textarea>
-          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#B7B7C2;margin-bottom:8px;"><input type="checkbox" id="wsNewAnnouncePopup"/> 고객 포털에 팝업으로 표시</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#8B95A1;margin-bottom:8px;"><input type="checkbox" id="wsNewAnnouncePopup"/> 고객 포털에 팝업으로 표시</label>
           <button class="ws-btn" onclick="wsSubmitAnnouncement()">등록</button>
         </div>
         <div id="wsAnnounceList"></div>
@@ -18383,7 +18411,7 @@ app.get('/workspace', (c) => {
 
       <div class="ws-panel" id="wsPanel-admins">
         <h1>관리자 관리 <button class="ws-help-btn" onclick="wsShowHelp('admins')">?</button></h1>
-        <p style="font-size:12px;color:#B7B7C2;margin:-6px 0 16px;">공유 비밀번호와는 별개로, 운영팀 개개인의 로그인 계정입니다. 로그인하면 사내톡·워크플로우·근무관리 작성자가 자동으로 채워집니다.</p>
+        <p style="font-size:12px;color:#8B95A1;margin:-6px 0 16px;">공유 비밀번호와는 별개로, 운영팀 개개인의 로그인 계정이에요. 로그인하면 사내톡·워크플로우·근무관리 작성자가 자동으로 채워져요.</p>
         <div class="ws-card" style="margin-bottom:16px;">
           <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
             <input class="ws-input" id="wsNewAdminEmail" placeholder="이메일" style="flex:1;min-width:140px;"/>
@@ -18597,8 +18625,8 @@ async function wsLogin() {
       document.getElementById('loginOverlay').style.display = 'none';
       document.getElementById('wsMain').style.display = 'block';
       wsInit();
-    } else { err.textContent = '비밀번호가 올바르지 않습니다.'; }
-  } catch (e) { err.textContent = '서버 오류가 발생했습니다.'; }
+    } else { err.textContent = '비밀번호가 올바르지 않아요.'; }
+  } catch (e) { err.textContent = '서버 오류가 발생했어요.'; }
 }
 function wsLogout() {
   wsAdminPassword = '';
@@ -18651,7 +18679,7 @@ async function wsLoadOrdersList() {
     if (!data.success) return;
     window._wsOrders = data.orders;
     var table = document.getElementById('wsOrdersTable');
-    if (!data.orders.length) { table.innerHTML = '<div class="ws-empty">발주가 없습니다.</div>'; return; }
+    if (!data.orders.length) { table.innerHTML = '<div class="ws-empty">발주가 없어요.</div>'; return; }
     table.innerHTML = data.orders.map(function (o) {
       return '<div class="ws-order-row" onclick="wsOpenDetailModal(\\'' + o.id + '\\')">' +
         '<span class="col code">' + wsEsc(o.orderCode) + '</span>' +
@@ -18690,7 +18718,7 @@ async function wsLoadInquiries() {
     if (!data.success) return;
     var statusLabel = { new: '신규', in_discussion: '상담중', done: '완료' };
     var list = document.getElementById('wsInquiryList');
-    if (!data.inquiries.length) { list.innerHTML = '<div class="ws-empty">문의가 없습니다.</div>'; return; }
+    if (!data.inquiries.length) { list.innerHTML = '<div class="ws-empty">문의가 없어요.</div>'; return; }
     list.innerHTML = data.inquiries.map(function (q) {
       var actions = '';
       if (q.status !== 'done') {
@@ -18715,7 +18743,7 @@ async function wsUpdateInquiryStatus(id, status) {
   try {
     await fetch('/api/workspace/inquiries/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ status: status }) });
     wsLoadInquiries();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 function wsOpenConvertModal(id, title, qty) {
@@ -18745,7 +18773,7 @@ async function wsSubmitConvert() {
     if (!data.success) { alert(data.message || '전환 실패'); return; }
     wsCloseConvertModal();
     wsLoadInquiries(); wsLoadHome();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 function wsInit() { wsLoadStageSets().then(function () { wsRenderIndustryTabs(); wsLoadHome(); }); wsRefreshNotifyBadge(); wsRestoreOperator(); }
@@ -18778,7 +18806,7 @@ async function wsLoadNotifications() {
     var data = await res.json();
     if (!data.success) return;
     var list = document.getElementById('wsNotifyList');
-    if (!data.notifications.length) { list.innerHTML = '<div class="ws-empty">알림이 없습니다.</div>'; return; }
+    if (!data.notifications.length) { list.innerHTML = '<div class="ws-empty">알림이 없어요.</div>'; return; }
     list.innerHTML = data.notifications.map(function (n) {
       return '<div class="ws-inquiry-card">' +
         '<div class="top"><div><div class="title" style="font-size:13px;font-weight:' + (n.is_read ? '400' : '700') + '">' + wsEsc(n.message) + '</div><div class="meta">' + n.created_at + '</div></div>' +
@@ -18835,7 +18863,7 @@ async function wsSubmitNewStage() {
     wsCloseNewStageModal();
     await wsLoadStageSets();
     wsLoadBoard();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsDeleteStage(id) {
@@ -18846,7 +18874,7 @@ async function wsDeleteStage(id) {
     if (!data.success) { alert(data.message || '삭제 실패'); return; }
     await wsLoadStageSets();
     wsLoadBoard();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsLoadHome() {
@@ -18869,7 +18897,7 @@ async function wsLoadUpcoming() {
     var data = await res.json();
     if (!data.success) return;
     var list = document.getElementById('wsUpcomingList');
-    if (!data.upcoming.length) { list.innerHTML = '<div class="ws-empty">출고 예정인 발주가 없습니다.</div>'; return; }
+    if (!data.upcoming.length) { list.innerHTML = '<div class="ws-empty">출고 예정인 발주가 없어요.</div>'; return; }
     list.innerHTML = data.upcoming.map(function (o) {
       return '<div class="ws-order-row" style="cursor:default;">' +
         '<span class="col code">' + wsEsc(o.expected_complete_at) + '</span>' +
@@ -18901,12 +18929,37 @@ async function wsLoadBoard() {
           '<div class="meta">' + wsEsc(o.orderCode) + '<br/>' + (o.factoryName ? wsEsc(o.factoryName) + ' · ' : '') + (o.quantity || 0) + '개</div>' +
           '</div>';
       }).join('');
-      col.innerHTML = head + (cards || '<div class="ws-empty">없음</div>');
+      col.innerHTML = head + (cards || '<div class="ws-empty">비어 있어요</div>');
       board.appendChild(col);
     });
     window._wsOrders = data.orders;
+    wsUpdateBoardScrollbar();
   } catch (e) { console.error(e); }
 }
+
+// macOS 오버레이 스크롤바처럼 스크롤 중에만 보이는 환경에서도 가로 스크롤이
+// 가능하다는 걸 알 수 있도록, 항상 보이는 트랙+막대를 실제 스크롤 위치에 맞춰 그린다.
+function wsUpdateBoardScrollbar() {
+  var board = document.getElementById('wsBoard');
+  var track = document.getElementById('wsBoardScrollbar');
+  var thumb = document.getElementById('wsBoardScrollbarThumb');
+  if (!board || !track || !thumb) return;
+  var scrollWidth = board.scrollWidth;
+  var clientWidth = board.clientWidth;
+  if (scrollWidth <= clientWidth + 1) { track.classList.remove('visible'); return; }
+  track.classList.add('visible');
+  var thumbPct = Math.max((clientWidth / scrollWidth) * 100, 4);
+  var maxLeftPct = 100 - thumbPct;
+  var leftPct = (board.scrollLeft / (scrollWidth - clientWidth)) * maxLeftPct;
+  thumb.style.width = thumbPct + '%';
+  thumb.style.left = leftPct + '%';
+}
+(function wsInitBoardScrollbar() {
+  var board = document.getElementById('wsBoard');
+  if (!board) return;
+  board.addEventListener('scroll', wsUpdateBoardScrollbar);
+  window.addEventListener('resize', wsUpdateBoardScrollbar);
+})();
 
 function wsEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
 
@@ -18934,7 +18987,7 @@ async function wsSubmitNewOrder() {
     wsCloseNewOrderModal();
     ['wsNewProductCode', 'wsNewProductName', 'wsNewClientName', 'wsNewFactoryName', 'wsNewQuantity', 'wsNewDueDate'].forEach(function (id) { document.getElementById(id).value = ''; });
     wsLoadBoard(); wsLoadHome();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsOpenDetailModal(orderId) {
@@ -19011,7 +19064,7 @@ async function wsSubmitDetail() {
     var data = await res.json();
     if (!data.success) { alert(data.message || '저장 실패'); return; }
     wsCloseDetailModal(); wsLoadBoard(); wsLoadOrdersList(); wsLoadHome();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsLoadProductList() {
@@ -19021,7 +19074,7 @@ async function wsLoadProductList() {
     var data = await res.json();
     if (!data.success) return;
     var list = document.getElementById('wsProductList');
-    if (!data.products.length) { list.innerHTML = '<div class="ws-empty">제품이 없습니다.</div>'; return; }
+    if (!data.products.length) { list.innerHTML = '<div class="ws-empty">제품이 없어요.</div>'; return; }
     list.innerHTML = data.products.map(function (p) {
       return '<div class="ws-product-item" onclick="wsSelectProduct(\\'' + p.product_code + '\\')"><div class="code">' + wsEsc(p.product_code) + '</div><div class="name">' + wsEsc(p.name) + '</div></div>';
     }).join('');
@@ -19037,7 +19090,7 @@ async function wsSelectProduct(code) {
     var typeLabel = { issue: '문제', resolution: '해결', caution: '주의', memo: '메모', stock: '재고' };
     var histHtml = data.history.map(function (h) {
       return '<div class="ws-hist-item ' + h.type + '"><span class="type">' + (typeLabel[h.type] || h.type) + '</span> · ' + h.created_at + '<br/>' + wsEsc(h.content) + '</div>';
-    }).join('') || '<div class="ws-empty">이력이 없습니다.</div>';
+    }).join('') || '<div class="ws-empty">이력이 없어요.</div>';
     document.getElementById('wsProductDetail').innerHTML =
       '<h3 style="margin-bottom:12px">' + wsEsc(data.product.name) + ' (' + wsEsc(data.product.product_code) + ')</h3>' +
       '<div class="ws-toolbar">' +
@@ -19058,7 +19111,7 @@ async function wsAddHistory() {
     var data = await res.json();
     if (!data.success) { alert(data.message || '기록 실패'); return; }
     wsSelectProduct(wsSelectedProductCode);
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsLoadChat() {
@@ -19075,9 +19128,9 @@ async function wsLoadChat() {
 function wsRenderBubble(m) {
   var html = '<div class="ws-bubble ' + m.role + '">' + wsEsc(m.content);
   if (m.role === 'assistant' && m.status === 'pending') {
-    html += '<div class="actions"><button style="background:#22c55e;color:#fff" onclick="wsConfirmChat(\\'' + m.id + '\\')">확인</button><button style="background:#3a3a60;color:#fff" onclick="wsCancelChat(\\'' + m.id + '\\')">취소</button></div>';
+    html += '<div class="actions"><button style="background:#22c55e;color:#fff" onclick="wsConfirmChat(\\'' + m.id + '\\')">확인</button><button style="background:#F2F4F6;color:#4E5968" onclick="wsCancelChat(\\'' + m.id + '\\')">취소</button></div>';
   } else if (m.role === 'assistant' && m.status === 'confirmed') {
-    html += '<div class="actions"><button style="background:#3a3a60;color:#fff" onclick="wsUndoChat(\\'' + m.id + '\\')">되돌리기</button></div>';
+    html += '<div class="actions"><button style="background:#F2F4F6;color:#4E5968" onclick="wsUndoChat(\\'' + m.id + '\\')">되돌리기</button></div>';
   }
   html += '</div>';
   return html;
@@ -19094,10 +19147,10 @@ async function wsSendChat() {
   try {
     var res = await fetch('/api/workspace/chat', { method: 'POST', headers: wsHeaders(), body: JSON.stringify({ message: message }) });
     var data = await res.json();
-    if (!data.success) { log.innerHTML += '<div class="ws-bubble assistant">' + wsEsc(data.message || '오류가 발생했습니다.') + '</div>'; return; }
+    if (!data.success) { log.innerHTML += '<div class="ws-bubble assistant">' + wsEsc(data.message || '오류가 발생했어요.') + '</div>'; return; }
     log.innerHTML += wsRenderBubble({ id: data.id, role: 'assistant', content: data.reply, status: data.intent === 'inbound' ? 'pending' : null });
     log.scrollTop = log.scrollHeight;
-  } catch (e) { log.innerHTML += '<div class="ws-bubble assistant">서버 오류가 발생했습니다.</div>'; }
+  } catch (e) { log.innerHTML += '<div class="ws-bubble assistant">서버 오류가 발생했어요.</div>'; }
 }
 
 async function wsConfirmChat(id) {
@@ -19106,7 +19159,7 @@ async function wsConfirmChat(id) {
     var data = await res.json();
     if (!data.success) { alert(data.message || '처리 실패'); return; }
     wsLoadChat();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 async function wsCancelChat(id) {
   try { await fetch('/api/workspace/chat/' + id + '/cancel', { method: 'POST', headers: wsHeaders() }); wsLoadChat(); } catch (e) {}
@@ -19117,7 +19170,7 @@ async function wsUndoChat(id) {
     var data = await res.json();
     if (!data.success) { alert(data.message || '처리 실패'); return; }
     wsLoadChat();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 // ── 검수 ──
@@ -19136,7 +19189,7 @@ async function wsSubmitInspection() {
     if (!data.success) { alert(data.message || '기록 실패'); return; }
     ['wsInspProductCode', 'wsInspFactory', 'wsInspQtyIn', 'wsInspQtyDefect', 'wsInspNote'].forEach(function (id) { document.getElementById(id).value = ''; });
     wsLoadInspectionLog();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsLoadInspectionLog() {
@@ -19146,7 +19199,7 @@ async function wsLoadInspectionLog() {
     var data = await res.json();
     if (!data.success) return;
     var list = document.getElementById('wsInspectionList');
-    if (!data.logs.length) { list.innerHTML = '<div class="ws-empty">기록이 없습니다.</div>'; return; }
+    if (!data.logs.length) { list.innerHTML = '<div class="ws-empty">기록이 없어요.</div>'; return; }
     list.innerHTML = data.logs.map(function (l) {
       return '<div class="ws-order-row" style="cursor:default;">' +
         '<span class="col code">' + wsEsc(l.productCode || '-') + ' ' + wsEsc(l.productName || '') + '</span>' +
@@ -19170,7 +19223,7 @@ async function wsLoadDesignList() {
     var data = await res.json();
     if (!data.success) return;
     var list = document.getElementById('wsDesignList');
-    if (!data.products.length) { list.innerHTML = '<div class="ws-empty">디자인이 없습니다.</div>'; return; }
+    if (!data.products.length) { list.innerHTML = '<div class="ws-empty">디자인이 없어요.</div>'; return; }
     list.innerHTML = data.products.map(function (p) {
       return '<div class="ws-product-item" onclick="wsSelectDesign(\\'' + p.product_code + '\\')"><div class="code">' + wsEsc(p.product_code) + '</div><div class="name">' + wsEsc(p.name) + '</div></div>';
     }).join('');
@@ -19197,7 +19250,7 @@ async function wsSubmitNewDesign() {
     wsCloseNewDesignModal();
     ['wsNewDesignCode', 'wsNewDesignName', 'wsNewDesignClient', 'wsNewDesignSupplyFactory', 'wsNewDesignCostNote'].forEach(function (id) { document.getElementById(id).value = ''; });
     wsLoadDesignList();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsSelectDesign(code) {
@@ -19209,11 +19262,11 @@ async function wsSelectDesign(code) {
     var p = data.product;
     document.getElementById('wsDesignDetail').innerHTML =
       '<h3 style="margin-bottom:12px">' + wsEsc(p.name) + ' (' + wsEsc(p.product_code) + ')</h3>' +
-      '<label style="display:block;font-size:12px;color:#8b8ba0;margin:10px 0 4px;">고객사명</label>' +
+      '<label style="display:block;font-size:12px;color:#8B95A1;margin:10px 0 4px;">고객사명</label>' +
       '<input class="ws-input" id="wsDesignClientInput" style="width:100%" value="' + wsEsc(p.client_name || '') + '"/>' +
-      '<label style="display:block;font-size:12px;color:#8b8ba0;margin:10px 0 4px;">공급 공장</label>' +
+      '<label style="display:block;font-size:12px;color:#8B95A1;margin:10px 0 4px;">공급 공장</label>' +
       '<input class="ws-input" id="wsDesignSupplyInput" style="width:100%" value="' + wsEsc(p.supply_factory || '') + '"/>' +
-      '<label style="display:block;font-size:12px;color:#8b8ba0;margin:10px 0 4px;">원가 정보</label>' +
+      '<label style="display:block;font-size:12px;color:#8B95A1;margin:10px 0 4px;">원가 정보</label>' +
       '<input class="ws-input" id="wsDesignCostInput" style="width:100%" value="' + wsEsc(p.cost_note || '') + '"/>' +
       '<button class="ws-btn" style="margin-top:10px" onclick="wsSaveDesignDetail()">저장</button>';
   } catch (e) { console.error(e); }
@@ -19230,8 +19283,8 @@ async function wsSaveDesignDetail() {
     var res = await fetch('/api/workspace/products/' + encodeURIComponent(wsSelectedDesignCode) + '', { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify(body) });
     var data = await res.json();
     if (!data.success) { alert(data.message || '저장 실패'); return; }
-    alert('저장했습니다.');
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+    alert('저장했어요.');
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 // ── 거래명세서 ──
@@ -19255,7 +19308,7 @@ async function wsLoadInvoices() {
     if (!data.success) return;
     var statusLabel = { pending: '승인대기', unpaid: '미결제', paid: '결제', tax_invoice_issued: '세금계산서 발행' };
     var list = document.getElementById('wsInvoiceList');
-    if (!data.invoices.length) { list.innerHTML = '<div class="ws-empty">거래명세서가 없습니다.</div>'; return; }
+    if (!data.invoices.length) { list.innerHTML = '<div class="ws-empty">거래명세서가 없어요.</div>'; return; }
     list.innerHTML = data.invoices.map(function (inv) {
       return '<div class="ws-inquiry-card">' +
         '<div class="top"><div><div class="title">' + wsEsc(inv.invoiceCode) + '</div><div class="meta">' + wsEsc(inv.clientName || inv.clientEmail || '-') + ' · 발주 ' + inv.orderIds.length + '건 · ' + (inv.totalAmount || 0).toLocaleString() + '원 · ' + inv.createdAt + '</div></div>' +
@@ -19282,27 +19335,27 @@ async function wsOpenInvoiceDetail(id) {
     var rows = data.orders.map(function (o) {
       var optStr = (o.options || []).map(function (x) { return x.label + ':' + x.value; }).join(', ');
       var amount = o.totalAmount != null ? o.totalAmount : (o.quantity || 0) * (o.unitPrice || 0);
-      return '<tr><td style="padding:6px 8px;border-bottom:1px solid #2e2e50;">' + wsEsc(o.productCode) + ' ' + wsEsc(o.productName) + '</td>' +
-        '<td style="padding:6px 8px;border-bottom:1px solid #2e2e50;">' + wsEsc(optStr || '-') + '</td>' +
-        '<td style="padding:6px 8px;border-bottom:1px solid #2e2e50;text-align:right;">' + (o.quantity || 0) + '</td>' +
-        '<td style="padding:6px 8px;border-bottom:1px solid #2e2e50;text-align:right;">' + (o.unitPrice != null ? o.unitPrice.toLocaleString() : '-') + '</td>' +
-        '<td style="padding:6px 8px;border-bottom:1px solid #2e2e50;text-align:right;">' + amount.toLocaleString() + '원</td></tr>';
+      return '<tr><td style="padding:6px 8px;border-bottom:1px solid #E5E8EB;">' + wsEsc(o.productCode) + ' ' + wsEsc(o.productName) + '</td>' +
+        '<td style="padding:6px 8px;border-bottom:1px solid #E5E8EB;">' + wsEsc(optStr || '-') + '</td>' +
+        '<td style="padding:6px 8px;border-bottom:1px solid #E5E8EB;text-align:right;">' + (o.quantity || 0) + '</td>' +
+        '<td style="padding:6px 8px;border-bottom:1px solid #E5E8EB;text-align:right;">' + (o.unitPrice != null ? o.unitPrice.toLocaleString() : '-') + '</td>' +
+        '<td style="padding:6px 8px;border-bottom:1px solid #E5E8EB;text-align:right;">' + amount.toLocaleString() + '원</td></tr>';
     }).join('');
     document.getElementById('wsInvoiceDetailBody').innerHTML =
       '<h3 style="margin-bottom:4px">' + wsEsc(inv.invoiceCode) + '</h3>' +
-      '<div style="font-size:13px;color:#8b8ba0;margin-bottom:14px;">' + statusLabel[inv.status] + ' · ' + inv.createdAt + '</div>' +
+      '<div style="font-size:13px;color:#8B95A1;margin-bottom:14px;">' + statusLabel[inv.status] + ' · ' + inv.createdAt + '</div>' +
       '<div style="font-size:13px;margin-bottom:14px;">' +
       '<b>' + wsEsc(cl && cl.companyName ? cl.companyName : (inv.clientName || inv.clientEmail || '고객사 미지정')) + '</b>' +
       (cl && cl.contactName ? ' · 담당자 ' + wsEsc(cl.contactName) : '') + (cl && cl.contactPhone ? ' · ' + wsEsc(cl.contactPhone) : '') +
       '</div>' +
       '<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px;">' +
-      '<thead><tr style="color:#8b8ba0;text-align:left;"><th style="padding:6px 8px;">품목</th><th style="padding:6px 8px;">옵션</th><th style="padding:6px 8px;text-align:right;">수량</th><th style="padding:6px 8px;text-align:right;">단가</th><th style="padding:6px 8px;text-align:right;">금액</th></tr></thead>' +
-      '<tbody>' + (rows || '<tr><td colspan="5" style="padding:10px;color:#8b8ba0;">품목 정보가 없습니다.</td></tr>') + '</tbody>' +
+      '<thead><tr style="color:#8B95A1;text-align:left;"><th style="padding:6px 8px;">품목</th><th style="padding:6px 8px;">옵션</th><th style="padding:6px 8px;text-align:right;">수량</th><th style="padding:6px 8px;text-align:right;">단가</th><th style="padding:6px 8px;text-align:right;">금액</th></tr></thead>' +
+      '<tbody>' + (rows || '<tr><td colspan="5" style="padding:10px;color:#8B95A1;">품목 정보가 없어요.</td></tr>') + '</tbody>' +
       '</table>' +
       '<div style="text-align:right;font-size:15px;font-weight:700;margin-bottom:10px;">합계 ' + (inv.totalAmount || 0).toLocaleString() + '원</div>' +
-      (inv.note ? '<div style="font-size:12px;color:#8b8ba0;">메모: ' + wsEsc(inv.note) + '</div>' : '');
+      (inv.note ? '<div style="font-size:12px;color:#8B95A1;">메모: ' + wsEsc(inv.note) + '</div>' : '');
     document.getElementById('wsInvoiceDetailOverlay').style.display = 'flex';
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 function wsOpenNewInvoiceModal() {
@@ -19323,22 +19376,22 @@ async function wsSearchInvoiceClient() {
     if (!data.success) return;
     document.getElementById('wsInvoiceClientResult').innerHTML = data.clients.map(function (cl) {
       return '<div class="ws-product-item" onclick="wsPickInvoiceClient(\\'' + cl.userId + '\\', \\'' + wsEsc(cl.name || cl.email) + '\\')"><div class="code">' + wsEsc(cl.name) + '</div><div class="name">' + wsEsc(cl.email) + '</div></div>';
-    }).join('') || '<div class="ws-empty">검색 결과가 없습니다.</div>';
+    }).join('') || '<div class="ws-empty">검색 결과가 없어요.</div>';
   } catch (e) { console.error(e); }
 }
 
 async function wsPickInvoiceClient(userId, label) {
   wsInvoiceClientUserId = userId;
-  document.getElementById('wsInvoiceClientResult').innerHTML = '<div class="mp-meta" style="color:#A78BFA">선택됨: ' + wsEsc(label) + '</div>';
+  document.getElementById('wsInvoiceClientResult').innerHTML = '<div class="mp-meta" style="color:#3182F6">선택됨: ' + wsEsc(label) + '</div>';
   try {
     var res = await fetch('/api/workspace/orders', { headers: wsHeaders() });
     var data = await res.json();
     if (!data.success) return;
     var picker = document.getElementById('wsInvoiceOrderPicker');
-    picker.innerHTML = '<div style="font-size:12px;color:#8b8ba0;margin-bottom:6px;">명세서에 포함할 발주 선택</div>' +
+    picker.innerHTML = '<div style="font-size:12px;color:#8B95A1;margin-bottom:6px;">명세서에 포함할 발주 선택</div>' +
       data.orders.map(function (o) {
         return '<label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;"><input type="checkbox" class="inv-order-check" value="' + o.id + '"/>' + wsEsc(o.orderCode) + ' · ' + wsEsc(o.productCode) + ' · ' + (o.totalAmount != null ? o.totalAmount.toLocaleString() + '원' : '금액 미입력') + '</label>';
-      }).join('') || '<div class="ws-empty">발주가 없습니다.</div>';
+      }).join('') || '<div class="ws-empty">발주가 없어요.</div>';
   } catch (e) { console.error(e); }
 }
 
@@ -19352,7 +19405,7 @@ async function wsSubmitNewInvoice() {
     if (!data.success) { alert(data.message || '생성 실패'); return; }
     wsCloseNewInvoiceModal();
     wsLoadInvoices();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 // ── 고객사·공장 ──
@@ -19377,7 +19430,7 @@ async function wsLoadClientsList() {
     var data = await res.json();
     if (!data.success) return;
     var sec = document.getElementById('wsClientsSection');
-    if (!data.clients.length) { sec.innerHTML = '<div class="ws-empty">고객사가 없습니다(문의·발주가 있어야 표시됩니다).</div>'; return; }
+    if (!data.clients.length) { sec.innerHTML = '<div class="ws-empty">고객사가 없어요(문의·발주가 있어야 표시돼요).</div>'; return; }
     sec.innerHTML = data.clients.map(function (cl) {
       return '<div class="ws-card" style="margin-bottom:10px;">' +
         '<div style="font-weight:700;margin-bottom:6px;">' + wsEsc(cl.name) + ' · ' + wsEsc(cl.email) + '</div>' +
@@ -19401,7 +19454,7 @@ async function wsSaveClientInfo(userId) {
     var res = await fetch('/api/workspace/clients/' + userId, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify(body) });
     var data = await res.json();
     if (!data.success) { alert(data.message || '저장 실패'); return; }
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsLoadFactoriesList() {
@@ -19424,7 +19477,7 @@ async function wsLoadFactoriesList() {
         '<span class="col">' + wsEsc(f.contact_info || '-') + '</span>' +
         '<span class="col" style="flex:0 0 40px;text-align:right;"><span style="cursor:pointer;color:#ef4444" onclick="wsDeleteFactory(\\'' + f.id + '\\')">삭제</span></span>' +
         '</div>';
-    }).join('') || '<div class="ws-empty">등록된 공장이 없습니다.</div>';
+    }).join('') || '<div class="ws-empty">등록된 공장이 없어요.</div>';
     sec.innerHTML = formHtml + listHtml;
   } catch (e) { console.error(e); }
 }
@@ -19441,7 +19494,7 @@ async function wsSubmitNewFactory() {
     var data = await res.json();
     if (!data.success) { alert(data.message || '추가 실패'); return; }
     wsLoadFactoriesList();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsDeleteFactory(id) {
@@ -19472,7 +19525,7 @@ async function wsLoadStats() {
       '<div class="ws-card"><div class="num">' + totalOrders + '</div><div class="label">전체 발주 건수</div></div>' +
       '<div class="ws-card"><div class="num">' + totalAmount.toLocaleString() + '</div><div class="label">전체 결제금액(원)</div></div>';
     var table = document.getElementById('wsStatsTable');
-    if (!data.stats.length) { table.innerHTML = '<div class="ws-empty">데이터가 없습니다.</div>'; return; }
+    if (!data.stats.length) { table.innerHTML = '<div class="ws-empty">데이터가 없어요.</div>'; return; }
     table.innerHTML = data.stats.map(function (s) {
       return '<div class="ws-order-row" style="cursor:default;">' +
         '<span class="col code">' + wsEsc(s.bucket) + '</span>' +
@@ -19499,7 +19552,7 @@ async function wsSubmitAnnouncement() {
     document.getElementById('wsNewAnnounceContent').value = '';
     document.getElementById('wsNewAnnouncePopup').checked = false;
     wsLoadAnnouncements();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsLoadAnnouncements() {
@@ -19508,14 +19561,14 @@ async function wsLoadAnnouncements() {
     var data = await res.json();
     if (!data.success) return;
     var list = document.getElementById('wsAnnounceList');
-    if (!data.announcements.length) { list.innerHTML = '<div class="ws-empty">공지사항이 없습니다.</div>'; return; }
+    if (!data.announcements.length) { list.innerHTML = '<div class="ws-empty">공지사항이 없어요.</div>'; return; }
     list.innerHTML = data.announcements.map(function (a) {
       return '<div class="ws-inquiry-card">' +
         '<div class="top"><div><div class="title">' + wsEsc(a.title) + '</div><div class="meta">' + a.created_at + '</div></div></div>' +
         (a.content ? '<div class="note">' + wsEsc(a.content) + '</div>' : '') +
         '<div class="actions">' +
-        '<label style="font-size:12px;color:#B7B7C2;display:flex;align-items:center;gap:4px;"><input type="checkbox" ' + (a.is_active ? 'checked' : '') + ' onchange="wsToggleAnnounce(\\'' + a.id + '\\', \\'isActive\\', this.checked)"/> 게시중</label>' +
-        '<label style="font-size:12px;color:#B7B7C2;display:flex;align-items:center;gap:4px;"><input type="checkbox" ' + (a.is_popup ? 'checked' : '') + ' onchange="wsToggleAnnounce(\\'' + a.id + '\\', \\'isPopup\\', this.checked)"/> 팝업</label>' +
+        '<label style="font-size:12px;color:#8B95A1;display:flex;align-items:center;gap:4px;"><input type="checkbox" ' + (a.is_active ? 'checked' : '') + ' onchange="wsToggleAnnounce(\\'' + a.id + '\\', \\'isActive\\', this.checked)"/> 게시중</label>' +
+        '<label style="font-size:12px;color:#8B95A1;display:flex;align-items:center;gap:4px;"><input type="checkbox" ' + (a.is_popup ? 'checked' : '') + ' onchange="wsToggleAnnounce(\\'' + a.id + '\\', \\'isPopup\\', this.checked)"/> 팝업</label>' +
         '<button class="ws-btn secondary" onclick="wsDeleteAnnouncement(\\'' + a.id + '\\')">삭제</button>' +
         '</div></div>';
     }).join('');
@@ -19565,7 +19618,7 @@ async function wsSubmitNewTemplate() {
     document.getElementById('wsNewTemplateLabel').value = '';
     wsRenderNewTemplateOptions();
     wsLoadTemplateList();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsLoadTemplateList() {
@@ -19575,7 +19628,7 @@ async function wsLoadTemplateList() {
     if (!data.success) return;
     window._wsTemplates = data.templates;
     var list = document.getElementById('wsTemplateList');
-    if (!data.templates.length) { list.innerHTML = '<div class="ws-empty">템플릿이 없습니다.</div>'; return; }
+    if (!data.templates.length) { list.innerHTML = '<div class="ws-empty">템플릿이 없어요.</div>'; return; }
     list.innerHTML = data.templates.map(function (t) {
       var optStr = t.options.map(function (o) { return o.label + ': ' + o.value; }).join(', ');
       return '<div class="ws-order-row" style="cursor:default;">' +
@@ -19613,7 +19666,7 @@ async function wsLoadReconciliation() {
     var data = await res.json();
     if (!data.success) return;
     var table = document.getElementById('wsReconcileTable');
-    if (!data.factories.length) { table.innerHTML = '<div class="ws-empty">데이터가 없습니다.</div>'; return; }
+    if (!data.factories.length) { table.innerHTML = '<div class="ws-empty">데이터가 없어요.</div>'; return; }
     table.innerHTML = data.factories.map(function (f) {
       return '<div class="ws-order-row" style="cursor:default;">' +
         '<span class="col code">' + wsEsc(f.factoryName) + '</span>' +
@@ -19651,7 +19704,7 @@ async function wsSubmitWorkflow() {
     if (!data.success) { alert(data.message || '등록 실패'); return; }
     ['wsNewWfTitle', 'wsNewWfProductCode', 'wsNewWfRequester', 'wsNewWfContent'].forEach(function (id) { document.getElementById(id).value = ''; });
     wsLoadWorkflow();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsLoadWorkflow() {
@@ -19663,7 +19716,7 @@ async function wsLoadWorkflow() {
     var typeLabel = { cad: '캐드/원본', material: '부자재', repair: '수리', other: '기타' };
     var statusLabel = { open: '접수', in_progress: '진행', done: '완료' };
     var list = document.getElementById('wsWfList');
-    if (!data.requests.length) { list.innerHTML = '<div class="ws-empty">요청이 없습니다.</div>'; return; }
+    if (!data.requests.length) { list.innerHTML = '<div class="ws-empty">요청이 없어요.</div>'; return; }
     list.innerHTML = data.requests.map(function (r) {
       return '<div class="ws-inquiry-card">' +
         '<div class="top"><div><div class="title">[' + typeLabel[r.type] + '] ' + wsEsc(r.title) + '</div><div class="meta">' + wsEsc(r.requester_name || '-') + (r.product_code ? ' · ' + wsEsc(r.product_code) : '') + ' · ' + r.created_at + '</div></div>' +
@@ -19688,7 +19741,7 @@ async function wsLoadTeamChat() {
     if (!data.success) return;
     var log = document.getElementById('wsTeamChatLog');
     log.innerHTML = data.messages.map(function (m) {
-      return '<div class="ws-bubble assistant" style="max-width:85%;"><b>' + wsEsc(m.author_name) + '</b><br/>' + wsEsc(m.content) + '<div style="font-size:11px;color:#8b8ba0;margin-top:4px;">' + m.created_at + '</div></div>';
+      return '<div class="ws-bubble assistant" style="max-width:85%;"><b>' + wsEsc(m.author_name) + '</b><br/>' + wsEsc(m.content) + '<div style="font-size:11px;color:#8B95A1;margin-top:4px;">' + m.created_at + '</div></div>';
     }).join('');
     log.scrollTop = log.scrollHeight;
   } catch (e) { console.error(e); }
@@ -19705,7 +19758,7 @@ async function wsSendTeamChat() {
     if (!data.success) { alert(data.message || '전송 실패'); return; }
     document.getElementById('wsTeamChatInput').value = '';
     wsLoadTeamChat();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 // ── 근무/휴일관리 ──
@@ -19722,7 +19775,7 @@ async function wsSubmitHoliday() {
     if (!data.success) { alert(data.message || '신청 실패'); return; }
     ['wsNewHolidayName', 'wsNewHolidayDate', 'wsNewHolidayReason'].forEach(function (id) { document.getElementById(id).value = ''; });
     wsLoadHolidays();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsLoadHolidays() {
@@ -19732,7 +19785,7 @@ async function wsLoadHolidays() {
     if (!data.success) return;
     var statusLabel = { pending: '대기', approved: '승인', rejected: '반려' };
     var list = document.getElementById('wsHolidayList');
-    if (!data.requests.length) { list.innerHTML = '<div class="ws-empty">신청 내역이 없습니다.</div>'; return; }
+    if (!data.requests.length) { list.innerHTML = '<div class="ws-empty">신청 내역이 없어요.</div>'; return; }
     list.innerHTML = data.requests.map(function (h) {
       return '<div class="ws-inquiry-card">' +
         '<div class="top"><div><div class="title">' + wsEsc(h.requester_name) + ' · ' + wsEsc(h.requested_date) + '</div><div class="meta">' + wsEsc(h.reason || '-') + '</div></div>' +
@@ -19758,7 +19811,7 @@ function wsUpdateOperatorBar() {
   var bar = document.getElementById('wsOperatorBar');
   if (!bar) return;
   if (wsOperatorToken) {
-    bar.innerHTML = '접속자: <b style="color:#fff;">' + wsEsc(wsOperatorName) + '</b>' + (wsOperatorRole === 'super' ? ' <span style="color:#7C3AED;">(총괄)</span>' : '') +
+    bar.innerHTML = '접속자: <b style="color:#fff;">' + wsEsc(wsOperatorName) + '</b>' + (wsOperatorRole === 'super' ? ' <span style="color:#3182F6;">(총괄)</span>' : '') +
       ' <button class="ws-btn secondary" style="padding:2px 10px;font-size:12px;margin-left:6px;" onclick="wsOperatorLogout()">전환</button>';
   } else {
     bar.innerHTML = '<button class="ws-btn secondary" style="padding:2px 10px;font-size:12px;" onclick="wsOpenOperatorLogin()">담당자 로그인</button>';
@@ -19790,7 +19843,7 @@ async function wsOperatorLogin() {
     document.getElementById('wsOpPwInput').value = '';
     wsUpdateOperatorBar();
     wsAutofillOperatorName();
-  } catch (e) { err.textContent = '서버 오류가 발생했습니다.'; }
+  } catch (e) { err.textContent = '서버 오류가 발생했어요.'; }
 }
 
 async function wsOperatorLogout() {
@@ -19826,25 +19879,25 @@ function wsRestoreOperator() {
 
 // ── 메뉴별 도움말 — "왜 만들어졌는지" + "사용 방법". 각 패널 제목 옆 ? 버튼에서 호출.
 var WS_HELP = {
-  home: { title: '홈 — 오늘의 공정 현황', reason: '매일 아침 전체 공정 현황과 출고 예정을 한눈에 보기 위한 대시보드입니다.', howto: '업종별 공정 단계마다 진행 중인 발주 건수를 카드로 보여줍니다. 아래 "출고 예정 일정"에서는 완료 예정일이 임박한 순서로 발주 목록을 확인할 수 있습니다.' },
-  notify: { title: '알림', reason: '발주·문의·명세서 등 주요 이벤트가 생기면 자동으로 알림이 쌓여, 매번 각 메뉴를 직접 들어가 확인하지 않아도 되도록 만들었습니다.', howto: '사이드바의 알림 뱃지로 안 읽은 알림 수를 확인하고, 목록에서 클릭하면 읽음 처리됩니다. "전체 읽음 처리" 버튼으로 한 번에 정리할 수 있습니다.' },
-  inquiry: { title: '생산문의', reason: '고객사(/my-production)가 보낸 생산 문의를 받아 발주로 전환하기 위한 메뉴입니다 — ADMIN과 USER를 잇는 첫 접점입니다.', howto: '상태 탭(대기/전환완료 등)에서 문의 내용을 확인하고, "발주로 전환" 버튼을 누르면 제조팀이 자동 배정되며 발주가 생성됩니다.' },
-  board: { title: '공정보드', reason: '의류·주얼리·가방·신발은 제조 공정 단계가 서로 달라서, 업종별로 독립된 칸반보드로 진행 상황을 추적하기 위해 만들었습니다.', howto: '상단 업종 탭을 선택하면 해당 업종의 공정 단계가 열로 나타납니다. 발주 카드의 버튼으로 다음 단계로 이동시키고, 공정 단계 자체는 화면 하단에서 직접 추가·삭제할 수 있습니다.' },
-  orders: { title: '발주관리', reason: '생산 문의를 발주로 전환한 뒤 품목별 옵션·단가·수량·배송지까지 상세하게 관리하기 위해 만들었습니다.', howto: '검색창에서 발주를 찾고 목록 행을 클릭하면 상세 모달이 열립니다. 옵션/단가/합계금액/배송지/담당팀/완료예정일을 확인하고 수정할 수 있습니다.' },
-  inspection: { title: '검수', reason: '공장에서 입고된 물량 중 양품·불량을 구분해 기록하기 위해 만들었습니다 — 공장대조 집계의 기초 데이터가 됩니다.', howto: '입고 수량과 불량 수량을 폼에 직접 입력하거나, "AI 입력" 메뉴에서 문장으로 말하면 자동으로 기록됩니다. 최근 입고 로그 목록에서 이력을 확인할 수 있습니다.' },
-  design: { title: '디자인 DB', reason: '제품(디자인)별 원가 정보와 공급 공장을 한곳에서 관리하기 위해 만들었습니다.', howto: '목록에서 제품을 선택한 뒤 원가 메모와 공급 공장을 입력해 저장합니다. 생산이력 메뉴에서도 같은 제품 정보가 연결되어 보입니다.' },
-  invoice: { title: '거래명세서', reason: '발주가 끝난 뒤 고객사에 전달할 거래명세서를 발주 데이터 기반으로 자동 생성하기 위해 만들었습니다.', howto: '"명세서 생성" 버튼으로 발주를 선택해 명세서를 만들고, 목록에서 열어 품목별 내역을 확인·인쇄합니다. 상태(발행/결제완료 등)도 여기서 바꿉니다.' },
-  clients: { title: '고객사·공장', reason: '고객사는 기존 회원 계정을 그대로 쓰되 사업자 정보를, 외주 공장은 연락처·카테고리를 한곳에서 관리하기 위해 만들었습니다.', howto: '고객사 탭에서 회사명·담당자·연락처를 저장하고, 공장 탭에서 공장을 추가·삭제합니다.' },
-  stats: { title: '매출통계', reason: '발주 건수와 결제 금액을 기간별로 집계해 운영 현황을 빠르게 파악하기 위해 만들었습니다.', howto: '일간/주간/월간/분기별 단위를 선택하면 해당 기준으로 집계된 발주 건수·금액이 표시됩니다.' },
-  announce: { title: '공지사항', reason: '고객사에게 공지사항과 팝업으로 소식을 빠르게 전달하기 위해 만들었습니다.', howto: '공지를 작성할 때 "팝업으로 노출"을 체크하면 /my-production 첫 화면에 팝업으로 뜹니다. 활성/비활성으로 노출 여부를 바로 바꿀 수 있습니다.' },
-  options: { title: '옵션 템플릿', reason: '발주를 만들 때마다 재질·색상 같은 옵션을 새로 입력하지 않도록, 자주 쓰는 옵션 묶음을 업종별 템플릿으로 저장하기 위해 만들었습니다.', howto: '업종을 고르고 옵션 라벨/값을 추가해 템플릿으로 저장합니다. 발주를 생성할 때 템플릿을 불러와 그대로 재사용할 수 있습니다.' },
-  reconcile: { title: '공장별 발주·입고 대조', reason: '공장별 발주 수량과 실제 입고·불량 수량을 대조해서 공장의 품질·납기를 점검하기 위해 만들었습니다.', howto: '별도 입력 없이, 발주 데이터와 검수 메뉴에서 기록한 입고 로그를 공장별로 자동 집계해 표로 보여줍니다.' },
-  workflow: { title: '워크플로우', reason: '캐드/원본, 부자재, 수리 등 부서 간 요청이 누락되지 않도록 티켓으로 남기기 위해 만들었습니다.', howto: '요청 유형·제목·제품코드·요청자를 입력해 등록하면, 상태를 접수→진행→완료 순으로 바꿔가며 처리합니다.' },
-  teamchat: { title: '사내톡', reason: '운영팀이 AI가 아닌 사람끼리 빠르게 메모를 남기고 공유할 수 있는 간단한 공유 채팅방이 필요해 만들었습니다.', howto: '이름과 내용을 입력해 전송합니다. 헤더에서 "담당자 로그인"을 하면 이름이 자동으로 채워집니다.' },
-  holiday: { title: '근무/휴일관리', reason: '휴일 교환 신청을 받아 승인·반려를 처리하기 위해 만들었습니다.', howto: '이름·날짜·사유를 입력해 신청을 등록하고, 목록에서 상태를 대기→승인/반려로 바꿉니다.' },
-  admins: { title: '관리자 관리', reason: '공유 비밀번호 하나로만 운영팀 전체가 접속하던 방식을 보완해, 개개인의 로그인 계정을 두고 "누가 접속했는지" 식별하기 위해 만들었습니다. 사내톡·워크플로우·근무관리의 작성자 자동입력도 이 계정을 기반으로 동작합니다.', howto: '이메일·이름·초기 비밀번호로 계정을 추가하고, 권한(총괄/일반) 변경·활성화/비활성화·비밀번호 재설정·삭제를 할 수 있습니다. 헤더의 "담당자 로그인"으로 각자 개인 계정에 로그인합니다.' },
-  history: { title: '생산이력', reason: '제품별로 어떤 공정을 언제 거쳤는지 시간순으로 볼 수 있도록 만들었습니다.', howto: '왼쪽 목록에서 제품코드·제품명으로 검색해 선택하면, 오른쪽에 해당 제품의 공정 타임라인이 표시됩니다.' },
-  chat: { title: 'AI 대화형 입력', reason: '입고·불량 수량을 매번 폼에 입력하는 대신, 문장으로 말하면 AI(gpt-4o-mini)가 알아서 구조화해 기록하도록 만들었습니다.', howto: '예: "OO제품 50개 입고, 그중 3개 불량"처럼 자연어로 입력하면 검수 기록에 자동으로 반영됩니다.' },
+  home: { title: '홈 — 오늘의 공정 현황', reason: '매일 아침 전체 공정 현황과 출고 예정을 한눈에 보기 위한 대시보드예요.', howto: '업종별 공정 단계마다 진행 중인 발주 건수를 카드로 보여줘요. 아래 "출고 예정 일정"에서는 완료 예정일이 임박한 순서로 발주 목록을 확인할 수 있어요.' },
+  notify: { title: '알림', reason: '발주·문의·명세서 등 주요 이벤트가 생기면 자동으로 알림이 쌓여서, 매번 각 메뉴를 직접 들어가 확인하지 않아도 돼요.', howto: '사이드바의 알림 뱃지로 안 읽은 알림 수를 확인하고, 목록에서 클릭하면 읽음 처리돼요. "전체 읽음 처리" 버튼으로 한 번에 정리할 수 있어요.' },
+  inquiry: { title: '생산문의', reason: '고객사(/my-production)가 보낸 생산 문의를 받아 발주로 전환하는 메뉴예요 — ADMIN과 USER를 잇는 첫 접점이에요.', howto: '상태 탭(대기/전환완료 등)에서 문의 내용을 확인하고, "발주로 전환" 버튼을 누르면 제조팀이 자동 배정되면서 발주가 생성돼요.' },
+  board: { title: '공정보드', reason: '의류·주얼리·가방·신발은 제조 공정 단계가 서로 달라서, 업종별로 독립된 칸반보드로 진행 상황을 추적할 수 있도록 만들었어요.', howto: '상단 업종 탭을 선택하면 해당 업종의 공정 단계가 열로 나타나요. 발주 카드의 버튼으로 다음 단계로 이동시키고, 공정 단계 자체는 화면 하단에서 직접 추가·삭제할 수 있어요.' },
+  orders: { title: '발주관리', reason: '생산 문의를 발주로 전환한 뒤 품목별 옵션·단가·수량·배송지까지 상세하게 관리할 수 있도록 만들었어요.', howto: '검색창에서 발주를 찾고 목록 행을 클릭하면 상세 모달이 열려요. 옵션/단가/합계금액/배송지/담당팀/완료예정일을 확인하고 수정할 수 있어요.' },
+  inspection: { title: '검수', reason: '공장에서 입고된 물량 중 양품·불량을 구분해서 기록할 수 있도록 만들었어요 — 공장대조 집계의 기초 데이터가 돼요.', howto: '입고 수량과 불량 수량을 폼에 직접 입력하거나, "AI 입력" 메뉴에서 문장으로 말하면 자동으로 기록돼요. 최근 입고 로그 목록에서 이력을 확인할 수 있어요.' },
+  design: { title: '디자인 DB', reason: '제품(디자인)별 원가 정보와 공급 공장을 한곳에서 관리할 수 있도록 만들었어요.', howto: '목록에서 제품을 선택한 뒤 원가 메모와 공급 공장을 입력해서 저장해요. 생산이력 메뉴에서도 같은 제품 정보가 연결되어 보여요.' },
+  invoice: { title: '거래명세서', reason: '발주가 끝난 뒤 고객사에 전달할 거래명세서를 발주 데이터 기반으로 자동 생성할 수 있도록 만들었어요.', howto: '"명세서 생성" 버튼으로 발주를 선택해 명세서를 만들고, 목록에서 열어 품목별 내역을 확인·인쇄해요. 상태(발행/결제완료 등)도 여기서 바꿀 수 있어요.' },
+  clients: { title: '고객사·공장', reason: '고객사는 기존 회원 계정을 그대로 쓰되 사업자 정보를, 외주 공장은 연락처·카테고리를 한곳에서 관리할 수 있도록 만들었어요.', howto: '고객사 탭에서 회사명·담당자·연락처를 저장하고, 공장 탭에서 공장을 추가·삭제할 수 있어요.' },
+  stats: { title: '매출통계', reason: '발주 건수와 결제 금액을 기간별로 집계해서 운영 현황을 빠르게 파악할 수 있도록 만들었어요.', howto: '일간/주간/월간/분기별 단위를 선택하면 해당 기준으로 집계된 발주 건수·금액이 표시돼요.' },
+  announce: { title: '공지사항', reason: '고객사에게 공지사항과 팝업으로 소식을 빠르게 전달할 수 있도록 만들었어요.', howto: '공지를 작성할 때 "팝업으로 노출"을 체크하면 /my-production 첫 화면에 팝업으로 떠요. 활성/비활성으로 노출 여부를 바로 바꿀 수 있어요.' },
+  options: { title: '옵션 템플릿', reason: '발주를 만들 때마다 재질·색상 같은 옵션을 새로 입력하지 않도록, 자주 쓰는 옵션 묶음을 업종별 템플릿으로 저장할 수 있게 만들었어요.', howto: '업종을 고르고 옵션 라벨/값을 추가해서 템플릿으로 저장해요. 발주를 생성할 때 템플릿을 불러와 그대로 재사용할 수 있어요.' },
+  reconcile: { title: '공장별 발주·입고 대조', reason: '공장별 발주 수량과 실제 입고·불량 수량을 대조해서 공장의 품질·납기를 점검할 수 있도록 만들었어요.', howto: '별도 입력 없이, 발주 데이터와 검수 메뉴에서 기록한 입고 로그를 공장별로 자동 집계해서 표로 보여줘요.' },
+  workflow: { title: '워크플로우', reason: '캐드/원본, 부자재, 수리 등 부서 간 요청이 누락되지 않도록 티켓으로 남길 수 있게 만들었어요.', howto: '요청 유형·제목·제품코드·요청자를 입력해서 등록하면, 상태를 접수→진행→완료 순으로 바꿔가며 처리해요.' },
+  teamchat: { title: '사내톡', reason: '운영팀이 AI가 아닌 사람끼리 빠르게 메모를 남기고 공유할 수 있는 간단한 공유 채팅방이 필요해서 만들었어요.', howto: '이름과 내용을 입력해서 전송해요. 헤더에서 "담당자 로그인"을 하면 이름이 자동으로 채워져요.' },
+  holiday: { title: '근무/휴일관리', reason: '휴일 교환 신청을 받아서 승인·반려를 처리할 수 있도록 만들었어요.', howto: '이름·날짜·사유를 입력해서 신청을 등록하고, 목록에서 상태를 대기→승인/반려로 바꿀 수 있어요.' },
+  admins: { title: '관리자 관리', reason: '공유 비밀번호 하나로만 운영팀 전체가 접속하던 방식을 보완해서, 개개인의 로그인 계정을 두고 "누가 접속했는지" 식별할 수 있도록 만들었어요. 사내톡·워크플로우·근무관리의 작성자 자동입력도 이 계정을 기반으로 동작해요.', howto: '이메일·이름·초기 비밀번호로 계정을 추가하고, 권한(총괄/일반) 변경·활성화/비활성화·비밀번호 재설정·삭제를 할 수 있어요. 헤더의 "담당자 로그인"으로 각자 개인 계정에 로그인해요.' },
+  history: { title: '생산이력', reason: '제품별로 어떤 공정을 언제 거쳤는지 시간순으로 볼 수 있도록 만들었어요.', howto: '왼쪽 목록에서 제품코드·제품명으로 검색해서 선택하면, 오른쪽에 해당 제품의 공정 타임라인이 표시돼요.' },
+  chat: { title: 'AI 대화형 입력', reason: '입고·불량 수량을 매번 폼에 입력하는 대신, 문장으로 말하면 AI(gpt-4o-mini)가 알아서 구조화해서 기록하도록 만들었어요.', howto: '예: "OO제품 50개 입고, 그중 3개 불량"처럼 자연어로 입력하면 검수 기록에 자동으로 반영돼요.' },
 };
 function wsShowHelp(key) {
   var h = WS_HELP[key];
@@ -19861,12 +19914,12 @@ async function wsLoadAdmins() {
     var data = await res.json();
     if (!data.success) return;
     var table = document.getElementById('wsAdminsTable');
-    if (!data.admins.length) { table.innerHTML = '<div class="ws-empty">등록된 관리자 계정이 없습니다.</div>'; return; }
+    if (!data.admins.length) { table.innerHTML = '<div class="ws-empty">등록된 관리자 계정이 없어요.</div>'; return; }
     var roleLabel = { super: '총괄관리자', staff: '일반관리자' };
     table.innerHTML = data.admins.map(function (a) {
       var lastLogin = a.last_login_at ? a.last_login_at.slice(0, 16).replace('T', ' ') : '로그인 기록 없음';
       return '<div class="ws-inquiry-card">' +
-        '<div class="top"><div><div class="title">' + wsEsc(a.name) + ' <span style="color:#8b8ba0;font-weight:400;">(' + wsEsc(a.email) + ')</span></div>' +
+        '<div class="top"><div><div class="title">' + wsEsc(a.name) + ' <span style="color:#8B95A1;font-weight:400;">(' + wsEsc(a.email) + ')</span></div>' +
         '<div class="meta">' + roleLabel[a.role] + ' · ' + (a.is_active ? '활성' : '비활성') + ' · 마지막 로그인: ' + lastLogin + '</div></div></div>' +
         '<div class="actions">' +
         '<button class="ws-btn secondary" onclick="wsSetAdminRole(\\'' + a.id + '\\', \\'' + (a.role === 'super' ? 'staff' : 'super') + '\\')">' + (a.role === 'super' ? '일반관리자로 변경' : '총괄관리자로 변경') + '</button>' +
@@ -19892,7 +19945,7 @@ async function wsAddAdmin() {
     if (!data.success) { alert(data.message || '추가 실패'); return; }
     ['wsNewAdminEmail', 'wsNewAdminName', 'wsNewAdminPw'].forEach(function (id) { document.getElementById(id).value = ''; });
     wsLoadAdmins();
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsSetAdminRole(id, role) {
@@ -19911,12 +19964,12 @@ async function wsResetAdminPassword(id) {
     var res = await fetch('/api/workspace/admins/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ setPassword: pw }) });
     var data = await res.json();
     if (!data.success) alert(data.message || '변경 실패');
-    else alert('비밀번호가 변경되었습니다.');
-  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+    else alert('비밀번호가 변경됐어요.');
+  } catch (e) { alert('서버 오류가 발생했어요.'); }
 }
 
 async function wsDeleteAdmin(id, name) {
-  if (!confirm(name + ' 계정을 삭제하시겠습니까?')) return;
+  if (!confirm(name + ' 계정을 삭제하시겠어요?')) return;
   try { await fetch('/api/workspace/admins/' + id, { method: 'DELETE', headers: wsHeaders() }); wsLoadAdmins(); } catch (e) {}
 }
 </script>
