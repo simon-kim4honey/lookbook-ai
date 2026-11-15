@@ -1866,6 +1866,22 @@ function updateUserUI(partial) {
     } else if (existingWorkspaceLink) {
       existingWorkspaceLink.remove();
     }
+
+    // 전체 로그인 사용자 대상: 드롭다운에 "생산 문의·발주 현황"(/my-production,
+    // 이지룩 USER 포털) 바로가기 추가 — 위 두 개와 달리 특정 계정 전용이 아니라
+    // 로그인한 모든 사용자에게 보인다.
+    const existingProductionLink = document.getElementById('ddProductionLink');
+    if (dropdownMenu && !existingProductionLink) {
+      const links = dropdownMenu.querySelectorAll('a');
+      const lastLink = links[links.length - 1];
+      if (lastLink) {
+        const productionLink = lastLink.cloneNode(true);
+        productionLink.id = 'ddProductionLink';
+        productionLink.href = '/my-production';
+        productionLink.textContent = '생산 문의·발주 현황';
+        lastLink.insertAdjacentElement('afterend', productionLink);
+      }
+    }
   } else {
     if (loginBtn)  loginBtn.style.display  = '';
     if (signupBtn) signupBtn.style.display = '';
@@ -1873,6 +1889,10 @@ function updateUserUI(partial) {
 
     const existingAdminLink = document.getElementById('ddAdminLink');
     if (existingAdminLink) existingAdminLink.remove();
+    const existingWorkspaceLinkOut = document.getElementById('ddWorkspaceLink');
+    if (existingWorkspaceLinkOut) existingWorkspaceLinkOut.remove();
+    const existingProductionLinkOut = document.getElementById('ddProductionLink');
+    if (existingProductionLinkOut) existingProductionLinkOut.remove();
   }
 }
 
