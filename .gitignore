@@ -36,3 +36,6 @@ lerna-debug.log*
 # misc
 .DS_Store
 __pycache__/
+
+# Claude Code tooling (agent worktrees, local settings)
+.claude/
