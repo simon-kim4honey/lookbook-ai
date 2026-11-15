@@ -16713,13 +16713,14 @@ app.post('/api/workspace/orders', adminAuth, async (c) => {
 
   const firstStage: any = await db.prepare(`SELECT key FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC LIMIT 1`).bind(orderIndustry).first()
   const initialStage = firstStage?.key || 'receipt'
+  const assignedTeam = String(body.assignedTeam || '').trim() || await wsAutoAssignTeam(db, orderIndustry)
 
   const orderId = crypto.randomUUID()
   const orderCode = String(body.orderCode || '').trim() || ('WO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + orderId.slice(0, 6))
-  await db.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .bind(orderId, orderCode, product.id, factoryName, quantity, initialStage, expectedCompleteAt, note).run()
+  await db.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, assigned_team, expected_complete_at, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(orderId, orderCode, product.id, factoryName, quantity, initialStage, assignedTeam, expectedCompleteAt, note).run()
 
-  return c.json({ success: true, orderId, orderCode })
+  return c.json({ success: true, orderId, orderCode, assignedTeam })
 })
 
 app.patch('/api/workspace/orders/:id', adminAuth, async (c) => {
@@ -16966,11 +16967,12 @@ app.post('/api/workspace/inquiries/:id/convert', adminAuth, async (c) => {
 
   const firstStage: any = await db.prepare(`SELECT key FROM workspace_stage_defs WHERE industry = ? ORDER BY sort_order ASC LIMIT 1`).bind(product.category || inquiry.industry).first()
   const initialStage = firstStage?.key || 'receipt'
+  const assignedTeam = await wsAutoAssignTeam(db, product.category || inquiry.industry)
 
   const orderId = crypto.randomUUID()
   const orderCode = 'WO-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + orderId.slice(0, 6)
-  await db.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, expected_complete_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
-    .bind(orderId, orderCode, product.id, factoryName, quantity, initialStage, expectedCompleteAt).run()
+  await db.prepare(`INSERT INTO workspace_orders (id, order_code, product_id, factory_name, quantity, stage, assigned_team, expected_complete_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(orderId, orderCode, product.id, factoryName, quantity, initialStage, assignedTeam, expectedCompleteAt).run()
 
   await db.prepare(`UPDATE workspace_inquiries SET status = 'done', converted_order_id = ?, updated_at = datetime('now') WHERE id = ?`).bind(orderId, id).run()
 
@@ -17626,6 +17628,120 @@ app.delete('/api/workspace/factories/:id', adminAuth, async (c) => {
   return c.json({ success: true })
 })
 
+// ── 공장별 발주·입고 대조 — 발주 수량 대비 입고/불량 수량을 공장별로 집계.
+app.get('/api/workspace/factory-reconciliation', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const { results: orderRows } = await db.prepare(`
+    SELECT COALESCE(factory_name, '미지정') AS factory_name, COUNT(*) AS order_count, COALESCE(SUM(quantity), 0) AS ordered_qty
+    FROM workspace_orders GROUP BY COALESCE(factory_name, '미지정')
+  `).all()
+  const { results: inboundRows } = await db.prepare(`
+    SELECT COALESCE(factory_name, '미지정') AS factory_name, COALESCE(SUM(qty_in), 0) AS inbound_qty, COALESCE(SUM(qty_defect), 0) AS defect_qty
+    FROM workspace_inbound_logs GROUP BY COALESCE(factory_name, '미지정')
+  `).all()
+  const map: Record<string, any> = {}
+  for (const r of (orderRows || []) as any[]) map[r.factory_name] = { factoryName: r.factory_name, orderCount: r.order_count, orderedQty: r.ordered_qty, inboundQty: 0, defectQty: 0 }
+  for (const r of (inboundRows || []) as any[]) {
+    if (!map[r.factory_name]) map[r.factory_name] = { factoryName: r.factory_name, orderCount: 0, orderedQty: 0, inboundQty: 0, defectQty: 0 }
+    map[r.factory_name].inboundQty = r.inbound_qty
+    map[r.factory_name].defectQty = r.defect_qty
+  }
+  return c.json({ success: true, factories: Object.values(map) })
+})
+
+// ── AI 제조팀 자동분배 — 두 제조팀 중 "진행 중"(완료 단계가 아닌) 발주가 적은
+// 쪽으로 자동 배정한다. 발주 생성/문의 전환 시 담당팀을 비워두면 자동 호출된다.
+const WORKSPACE_TEAMS = ['제조1팀', '제조2팀']
+async function wsAutoAssignTeam(db: D1Database, industry: string): Promise<string> {
+  const stages = await wsGetStageSet(db, industry)
+  const lastKey = stages.length ? stages[stages.length - 1].key : 'done'
+  const counts: number[] = []
+  for (const team of WORKSPACE_TEAMS) {
+    const row: any = await db.prepare(`
+      SELECT COUNT(*) AS cnt FROM workspace_orders o JOIN workspace_products p ON p.id = o.product_id
+      WHERE o.assigned_team = ? AND o.stage != ? AND COALESCE(p.category, 'clothing') = ?
+    `).bind(team, lastKey, industry).first()
+    counts.push(row?.cnt || 0)
+  }
+  return counts[0] <= counts[1] ? WORKSPACE_TEAMS[0] : WORKSPACE_TEAMS[1]
+}
+
+// ── 워크플로우(요청) — 캐드/원본, 부자재, 수리 등 부서 간 요청 티켓.
+app.get('/api/workspace/workflow', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const status = c.req.query('status') || ''
+  let sql = `SELECT * FROM workspace_workflow_requests`
+  const binds: any[] = []
+  if (status && ['open', 'in_progress', 'done'].includes(status)) { sql += ' WHERE status = ?'; binds.push(status) }
+  sql += ' ORDER BY created_at DESC LIMIT 100'
+  const { results } = await db.prepare(sql).bind(...binds).all()
+  return c.json({ success: true, requests: results || [] })
+})
+
+app.post('/api/workspace/workflow', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const title = String(body.title || '').trim()
+  if (!title) return c.json({ success: false, message: '제목을 입력해주세요.' }, 400)
+  const type = ['cad', 'material', 'repair', 'other'].includes(body.type) ? body.type : 'other'
+  const id = crypto.randomUUID()
+  await db.prepare(`INSERT INTO workspace_workflow_requests (id, type, title, content, product_code, requester_name) VALUES (?, ?, ?, ?, ?, ?)`)
+    .bind(id, type, title, String(body.content || '').trim() || null, String(body.productCode || '').trim() || null, String(body.requesterName || '').trim() || null).run()
+  return c.json({ success: true, id })
+})
+
+app.patch('/api/workspace/workflow/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  if (!['open', 'in_progress', 'done'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태입니다.' }, 400)
+  await db.prepare(`UPDATE workspace_workflow_requests SET status = ?, updated_at = datetime('now') WHERE id = ?`).bind(body.status, c.req.param('id')).run()
+  return c.json({ success: true })
+})
+
+// ── 사내톡 — 운영팀 전체가 보는 공유 채팅방(AI 아님).
+app.get('/api/workspace/team-chat', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const { results } = await db.prepare(`SELECT * FROM workspace_team_chat ORDER BY created_at DESC LIMIT 100`).all()
+  return c.json({ success: true, messages: (results || []).reverse() })
+})
+
+app.post('/api/workspace/team-chat', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const authorName = String(body.authorName || '').trim()
+  const content = String(body.content || '').trim()
+  if (!authorName || !content) return c.json({ success: false, message: '이름과 내용을 입력해주세요.' }, 400)
+  await db.prepare(`INSERT INTO workspace_team_chat (id, author_name, content) VALUES (?, ?, ?)`).bind(crypto.randomUUID(), authorName, content).run()
+  return c.json({ success: true })
+})
+
+// ── 근무/휴일관리 — 휴일 교환 신청.
+app.get('/api/workspace/holidays', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const { results } = await db.prepare(`SELECT * FROM workspace_holiday_requests ORDER BY requested_date DESC LIMIT 100`).all()
+  return c.json({ success: true, requests: results || [] })
+})
+
+app.post('/api/workspace/holidays', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  const requesterName = String(body.requesterName || '').trim()
+  const requestedDate = String(body.requestedDate || '').trim()
+  if (!requesterName || !requestedDate) return c.json({ success: false, message: '이름과 날짜를 입력해주세요.' }, 400)
+  const id = crypto.randomUUID()
+  await db.prepare(`INSERT INTO workspace_holiday_requests (id, requester_name, requested_date, reason) VALUES (?, ?, ?, ?)`)
+    .bind(id, requesterName, requestedDate, String(body.reason || '').trim() || null).run()
+  return c.json({ success: true, id })
+})
+
+app.patch('/api/workspace/holidays/:id', adminAuth, async (c) => {
+  const db = c.env.LOOKBOOK_DB
+  const body: any = await c.req.json().catch(() => ({}))
+  if (!['pending', 'approved', 'rejected'].includes(body.status)) return c.json({ success: false, message: '잘못된 상태입니다.' }, 400)
+  await db.prepare(`UPDATE workspace_holiday_requests SET status = ? WHERE id = ?`).bind(body.status, c.req.param('id')).run()
+  return c.json({ success: true })
+})
+
 // ── 매출통계 — 발주 건수·결제금액을 기간별로 집계. 원가 정보가 자유 텍스트라
 // (cost_note) 마진율까지는 계산하지 않는다(숫자로 구조화된 원가 필드가 없음).
 const WORKSPACE_STATS_GROUP: Record<string, string> = {
@@ -17863,9 +17979,13 @@ app.get('/workspace', (c) => {
       <button class="ws-nav-btn" data-panel="invoice" onclick="wsSwitchPanel('invoice')">거래명세서</button>
       <button class="ws-nav-btn" data-panel="history" onclick="wsSwitchPanel('history')">생산이력</button>
       <button class="ws-nav-btn" data-panel="clients" onclick="wsSwitchPanel('clients')">고객사·공장</button>
+      <button class="ws-nav-btn" data-panel="reconcile" onclick="wsSwitchPanel('reconcile')">공장대조</button>
       <button class="ws-nav-btn" data-panel="stats" onclick="wsSwitchPanel('stats')">매출통계</button>
       <button class="ws-nav-btn" data-panel="announce" onclick="wsSwitchPanel('announce')">공지사항</button>
       <button class="ws-nav-btn" data-panel="options" onclick="wsSwitchPanel('options')">옵션템플릿</button>
+      <button class="ws-nav-btn" data-panel="workflow" onclick="wsSwitchPanel('workflow')">워크플로우</button>
+      <button class="ws-nav-btn" data-panel="teamchat" onclick="wsSwitchPanel('teamchat')">사내톡</button>
+      <button class="ws-nav-btn" data-panel="holiday" onclick="wsSwitchPanel('holiday')">근무관리</button>
       <button class="ws-nav-btn" data-panel="chat" onclick="wsSwitchPanel('chat')">AI 입력</button>
     </div>
     <div class="ws-content">
@@ -17989,6 +18109,55 @@ app.get('/workspace', (c) => {
           <button class="ws-btn" onclick="wsSubmitNewTemplate()">템플릿 저장</button>
         </div>
         <div id="wsTemplateList"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-reconcile">
+        <h1>공장별 발주·입고 대조</h1>
+        <div id="wsReconcileTable"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-workflow">
+        <h1>워크플로우</h1>
+        <div class="ws-card" style="margin-bottom:16px;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <select class="ws-input" id="wsNewWfType" style="flex:0 0 120px;">
+              <option value="cad">캐드/원본</option>
+              <option value="material">부자재</option>
+              <option value="repair">수리</option>
+              <option value="other">기타</option>
+            </select>
+            <input class="ws-input" id="wsNewWfTitle" placeholder="제목 *" style="flex:1;"/>
+            <input class="ws-input" id="wsNewWfProductCode" placeholder="관련 제품코드" style="flex:0 0 140px;"/>
+          </div>
+          <input class="ws-input" id="wsNewWfRequester" placeholder="요청자 이름" style="width:100%;margin-bottom:8px;"/>
+          <textarea class="ws-input" id="wsNewWfContent" placeholder="요청 내용" style="width:100%;min-height:60px;margin-bottom:8px;font-family:inherit;resize:vertical;"></textarea>
+          <button class="ws-btn" onclick="wsSubmitWorkflow()">요청 등록</button>
+        </div>
+        <div class="ws-tabs" id="wsWfTabs"></div>
+        <div id="wsWfList"></div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-teamchat">
+        <h1>사내톡</h1>
+        <div class="ws-chat-log" id="wsTeamChatLog"></div>
+        <div class="ws-toolbar">
+          <input class="ws-input" id="wsTeamChatName" placeholder="이름" style="flex:0 0 100px;"/>
+          <input class="ws-input" id="wsTeamChatInput" placeholder="메시지 입력" onkeydown="if(event.key==='Enter')wsSendTeamChat()"/>
+          <button class="ws-btn" onclick="wsSendTeamChat()">전송</button>
+        </div>
+      </div>
+
+      <div class="ws-panel" id="wsPanel-holiday">
+        <h1>근무/휴일관리</h1>
+        <div class="ws-card" style="margin-bottom:16px;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
+            <input class="ws-input" id="wsNewHolidayName" placeholder="이름 *" style="flex:1;"/>
+            <input class="ws-input" id="wsNewHolidayDate" type="date" style="flex:1;"/>
+          </div>
+          <input class="ws-input" id="wsNewHolidayReason" placeholder="사유" style="width:100%;margin-bottom:8px;"/>
+          <button class="ws-btn" onclick="wsSubmitHoliday()">신청</button>
+        </div>
+        <div id="wsHolidayList"></div>
       </div>
 
       <div class="ws-panel" id="wsPanel-history">
@@ -18228,6 +18397,10 @@ function wsSwitchPanel(name) {
   if (name === 'announce') wsLoadAnnouncements();
   if (name === 'options') { wsRenderNewTemplateOptions(); wsLoadTemplateList(); }
   if (name === 'notify') wsLoadNotifications();
+  if (name === 'reconcile') wsLoadReconciliation();
+  if (name === 'workflow') wsLoadWorkflow();
+  if (name === 'teamchat') wsLoadTeamChat();
+  if (name === 'holiday') wsLoadHolidays();
 }
 
 async function wsLoadOrdersList() {
@@ -19173,6 +19346,148 @@ async function wsApplyTemplateToDetail() {
   }
   var tpl = (window._wsTemplates || []).find(function (t) { return t.id === sel.value; });
   if (tpl) wsRenderDetailOptions(tpl.options);
+}
+
+// ── 공장별 발주·입고 대조 ──
+async function wsLoadReconciliation() {
+  try {
+    var res = await fetch('/api/workspace/factory-reconciliation', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var table = document.getElementById('wsReconcileTable');
+    if (!data.factories.length) { table.innerHTML = '<div class="ws-empty">데이터가 없습니다.</div>'; return; }
+    table.innerHTML = data.factories.map(function (f) {
+      return '<div class="ws-order-row" style="cursor:default;">' +
+        '<span class="col code">' + wsEsc(f.factoryName) + '</span>' +
+        '<span class="col">발주 ' + f.orderCount + '건 · ' + f.orderedQty + '개</span>' +
+        '<span class="col">입고 ' + f.inboundQty + '개</span>' +
+        '<span class="col">불량 ' + f.defectQty + '개</span>' +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+// ── 워크플로우 ──
+var wsWfStatusTab = '';
+function wsRenderWfTabs() {
+  var el = document.getElementById('wsWfTabs');
+  var tabs = [['', '전체'], ['open', '접수'], ['in_progress', '진행'], ['done', '완료']];
+  el.innerHTML = tabs.map(function (t) {
+    return '<button class="ws-tab-btn' + (t[0] === wsWfStatusTab ? ' active' : '') + '" onclick="wsSelectWfTab(\\'' + t[0] + '\\')">' + t[1] + '</button>';
+  }).join('');
+}
+function wsSelectWfTab(status) { wsWfStatusTab = status; wsRenderWfTabs(); wsLoadWorkflow(); }
+
+async function wsSubmitWorkflow() {
+  var body = {
+    type: document.getElementById('wsNewWfType').value,
+    title: document.getElementById('wsNewWfTitle').value.trim(),
+    productCode: document.getElementById('wsNewWfProductCode').value.trim(),
+    requesterName: document.getElementById('wsNewWfRequester').value.trim(),
+    content: document.getElementById('wsNewWfContent').value.trim(),
+  };
+  if (!body.title) { alert('제목을 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/workflow', { method: 'POST', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '등록 실패'); return; }
+    ['wsNewWfTitle', 'wsNewWfProductCode', 'wsNewWfRequester', 'wsNewWfContent'].forEach(function (id) { document.getElementById(id).value = ''; });
+    wsLoadWorkflow();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsLoadWorkflow() {
+  wsRenderWfTabs();
+  try {
+    var res = await fetch('/api/workspace/workflow' + (wsWfStatusTab ? ('?status=' + wsWfStatusTab) : ''), { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var typeLabel = { cad: '캐드/원본', material: '부자재', repair: '수리', other: '기타' };
+    var statusLabel = { open: '접수', in_progress: '진행', done: '완료' };
+    var list = document.getElementById('wsWfList');
+    if (!data.requests.length) { list.innerHTML = '<div class="ws-empty">요청이 없습니다.</div>'; return; }
+    list.innerHTML = data.requests.map(function (r) {
+      return '<div class="ws-inquiry-card">' +
+        '<div class="top"><div><div class="title">[' + typeLabel[r.type] + '] ' + wsEsc(r.title) + '</div><div class="meta">' + wsEsc(r.requester_name || '-') + (r.product_code ? ' · ' + wsEsc(r.product_code) : '') + ' · ' + r.created_at + '</div></div>' +
+        '<select class="ws-input" style="flex:0 0 110px" onchange="wsUpdateWorkflowStatus(\\'' + r.id + '\\', this.value)">' +
+        Object.keys(statusLabel).map(function (s) { return '<option value="' + s + '"' + (s === r.status ? ' selected' : '') + '>' + statusLabel[s] + '</option>'; }).join('') +
+        '</select></div>' +
+        (r.content ? '<div class="note">' + wsEsc(r.content) + '</div>' : '') +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function wsUpdateWorkflowStatus(id, status) {
+  try { await fetch('/api/workspace/workflow/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ status: status }) }); wsLoadWorkflow(); } catch (e) {}
+}
+
+// ── 사내톡 ──
+async function wsLoadTeamChat() {
+  try {
+    var res = await fetch('/api/workspace/team-chat', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var log = document.getElementById('wsTeamChatLog');
+    log.innerHTML = data.messages.map(function (m) {
+      return '<div class="ws-bubble assistant" style="max-width:85%;"><b>' + wsEsc(m.author_name) + '</b><br/>' + wsEsc(m.content) + '<div style="font-size:11px;color:#8b8ba0;margin-top:4px;">' + m.created_at + '</div></div>';
+    }).join('');
+    log.scrollTop = log.scrollHeight;
+  } catch (e) { console.error(e); }
+}
+
+async function wsSendTeamChat() {
+  var authorName = document.getElementById('wsTeamChatName').value.trim();
+  var content = document.getElementById('wsTeamChatInput').value.trim();
+  if (!authorName) { alert('이름을 입력해주세요.'); return; }
+  if (!content) return;
+  try {
+    var res = await fetch('/api/workspace/team-chat', { method: 'POST', headers: wsHeaders(), body: JSON.stringify({ authorName: authorName, content: content }) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '전송 실패'); return; }
+    document.getElementById('wsTeamChatInput').value = '';
+    wsLoadTeamChat();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+// ── 근무/휴일관리 ──
+async function wsSubmitHoliday() {
+  var body = {
+    requesterName: document.getElementById('wsNewHolidayName').value.trim(),
+    requestedDate: document.getElementById('wsNewHolidayDate').value,
+    reason: document.getElementById('wsNewHolidayReason').value.trim(),
+  };
+  if (!body.requesterName || !body.requestedDate) { alert('이름과 날짜를 입력해주세요.'); return; }
+  try {
+    var res = await fetch('/api/workspace/holidays', { method: 'POST', headers: wsHeaders(), body: JSON.stringify(body) });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '신청 실패'); return; }
+    ['wsNewHolidayName', 'wsNewHolidayDate', 'wsNewHolidayReason'].forEach(function (id) { document.getElementById(id).value = ''; });
+    wsLoadHolidays();
+  } catch (e) { alert('서버 오류가 발생했습니다.'); }
+}
+
+async function wsLoadHolidays() {
+  try {
+    var res = await fetch('/api/workspace/holidays', { headers: wsHeaders() });
+    var data = await res.json();
+    if (!data.success) return;
+    var statusLabel = { pending: '대기', approved: '승인', rejected: '반려' };
+    var list = document.getElementById('wsHolidayList');
+    if (!data.requests.length) { list.innerHTML = '<div class="ws-empty">신청 내역이 없습니다.</div>'; return; }
+    list.innerHTML = data.requests.map(function (h) {
+      return '<div class="ws-inquiry-card">' +
+        '<div class="top"><div><div class="title">' + wsEsc(h.requester_name) + ' · ' + wsEsc(h.requested_date) + '</div><div class="meta">' + wsEsc(h.reason || '-') + '</div></div>' +
+        '<select class="ws-input" style="flex:0 0 100px" onchange="wsUpdateHolidayStatus(\\'' + h.id + '\\', this.value)">' +
+        Object.keys(statusLabel).map(function (s) { return '<option value="' + s + '"' + (s === h.status ? ' selected' : '') + '>' + statusLabel[s] + '</option>'; }).join('') +
+        '</select></div>' +
+        '</div>';
+    }).join('');
+  } catch (e) { console.error(e); }
+}
+
+async function wsUpdateHolidayStatus(id, status) {
+  try { await fetch('/api/workspace/holidays/' + id, { method: 'PATCH', headers: wsHeaders(), body: JSON.stringify({ status: status }) }); wsLoadHolidays(); } catch (e) {}
 }
 </script>
 </body>
