@@ -150,7 +150,7 @@ const PLAN_SLOTS = [
   {label:"아이템 (한 문장)", keys:["p2_s3"]},
   {label:"비즈니스 모델", keys:["p1_s1"]},
   {label:"주요 경쟁력", keys:["p1_s2"]},
-  {label:"차별화", keys:["p3_s3","p1_s3"], pickFirst:true},
+  {label:"차별화", keys:["p3_s3","p4_s3"], join:true, fallbackKeys:["p1_s3"]},
   {label:"홍보 방안 (숫자)", keys:["p5_s2"]},
   {label:"기대 효과", keys:["p6_s3"]},
   {label:"ESG 한 줄", keys:["p7_s3"]},
@@ -158,7 +158,12 @@ const PLAN_SLOTS = [
 ];
 
 function slotValue(slot, answers){
-  if (slot.join) return slot.keys.map(k=>(answers[k]||'').trim()).filter(Boolean).join('\n');
+  if (slot.join){
+    const parts = slot.keys.map(k=>(answers[k]||'').trim()).filter(Boolean);
+    if (parts.length) return parts.join('\n');
+    if (slot.fallbackKeys){ for (const k of slot.fallbackKeys){ if ((answers[k]||'').trim()) return answers[k].trim(); } }
+    return '';
+  }
   if (slot.pickFirst){ for (const k of slot.keys){ if ((answers[k]||'').trim()) return answers[k].trim(); } return ''; }
   return (answers[slot.keys[0]]||'').trim();
 }
