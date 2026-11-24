@@ -218,7 +218,7 @@ ${t.statText?`[수치] ${t.statText}`:``}
        ON CONFLICT(id) DO UPDATE SET
          brand_alias = excluded.brand_alias,
          answers_json = excluded.answers_json,
-         updated_at = datetime('now')`).bind(n,r,a).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.get(`/submissions`,fy,async e=>{try{let t=((await e.env.LOOKBOOK_DB.prepare(`SELECT id, brand_alias, answers_json, submitted_at, updated_at FROM study_submissions ORDER BY updated_at DESC`).all()).results||[]).map(e=>({id:e.id,brandAlias:e.brand_alias,answers:JSON.parse(e.answers_json||`{}`),submittedAt:e.submitted_at,updatedAt:e.updated_at}));return e.json({success:!0,count:t.length,submissions:t})}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.post(`/reset`,fy,async e=>{try{return await e.env.LOOKBOOK_DB.prepare(`DELETE FROM study_submissions`).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}});var py=`<!DOCTYPE html>
+         updated_at = datetime('now')`).bind(n,r,a).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.get(`/restore`,async e=>{try{let t=String(e.req.query(`brandAlias`)||``).trim().slice(0,60);if(!t)return e.json({success:!1,message:`브랜드명을 입력해주세요.`},400);let n=e.req.header(`cf-connecting-ip`)||e.req.header(`x-forwarded-for`)||`unknown`;if(!await dy(e.env.LOOKBOOK_KV,`study_restore_rl_${n}`,20,60))return e.json({success:!1,message:`요청이 너무 많아요. 잠시 후 다시 시도해주세요.`},429);let r=await e.env.LOOKBOOK_DB.prepare(`SELECT id, answers_json, updated_at FROM study_submissions WHERE brand_alias = ? ORDER BY updated_at DESC LIMIT 1`).bind(t).first();return r?e.json({success:!0,id:r.id,answers:JSON.parse(r.answers_json||`{}`),updatedAt:r.updated_at}):e.json({success:!1,message:`이 브랜드명으로 업로드된 답안을 찾지 못했어요.`},404)}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.get(`/submissions`,fy,async e=>{try{let t=((await e.env.LOOKBOOK_DB.prepare(`SELECT id, brand_alias, answers_json, submitted_at, updated_at FROM study_submissions ORDER BY updated_at DESC`).all()).results||[]).map(e=>({id:e.id,brandAlias:e.brand_alias,answers:JSON.parse(e.answers_json||`{}`),submittedAt:e.submitted_at,updatedAt:e.updated_at}));return e.json({success:!0,count:t.length,submissions:t})}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.post(`/reset`,fy,async e=>{try{return await e.env.LOOKBOOK_DB.prepare(`DELETE FROM study_submissions`).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}});var py=`<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -383,6 +383,13 @@ h3.block-label{
   padding:8px 12px;min-width:160px;background:#fff;color:var(--title);flex:1;
 }
 .profile-row input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
+.btn-restore{
+  cursor:pointer;font-weight:600;font-size:12.5px;white-space:nowrap;
+  background:#fff;color:var(--main);border:1px solid var(--main);border-radius:999px;
+  padding:7px 14px;transition:.15s;
+}
+.btn-restore:hover{background:var(--main);color:#fff}
+.restore-hint{font-size:12.5px;color:var(--ph);margin:-12px 0 20px}
 .plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px}
 .plan-title{font-weight:700;font-size:19px;color:var(--title)}
 .plan-progress-wrap{display:flex;align-items:center;gap:10px;min-width:180px}
@@ -454,7 +461,9 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
       <div class="profile-row">
         <label for="brandInput">브랜드명</label>
         <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
+        <button class="btn-restore" id="restoreBtn" type="button">📂 이 브랜드명으로 불러오기</button>
       </div>
+      <p class="restore-hint">다른 컴퓨터로 접속했나요? 지난번에 쓴 브랜드명을 입력하고 눌러주세요.</p>
       <div class="plan-top">
         <div class="plan-title">내 미니 사업계획서</div>
         <div class="plan-progress-wrap">
@@ -857,7 +866,8 @@ function flushAllVisible(){
   });
 }
 window.addEventListener('beforeunload', flushAllVisible);
-document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState==='hidden') flushAllVisible(); });
+function flushOnHide(){ if (document.visibilityState==='hidden') flushAllVisible(); }
+document.addEventListener('visibilitychange', flushOnHide);
 
 /* 내 답안 지우기 — 두 번 눌러야 실행 */
 function handleClear(p){
@@ -918,6 +928,41 @@ function renderPlan(){
 const brandInput = document.getElementById('brandInput');
 brandInput.value = lsGetProfile().brand || '';
 brandInput.addEventListener('input', ()=> lsSetProfile({brand: brandInput.value}));
+
+/* 다른 기기에서 이어서 작성하기 — 브랜드명으로 서버에 올린 가장 최근 답안을 불러온다 */
+let restoreArmed = false;
+document.getElementById('restoreBtn').onclick = async ()=>{
+  const statusEl = document.getElementById('uploadStatus');
+  const brandAlias = (brandInput.value||'').trim();
+  if (!brandAlias){ statusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; statusEl.className='upload-status err'; brandInput.focus(); return; }
+  const btn = document.getElementById('restoreBtn');
+  if (!restoreArmed){
+    restoreArmed = true;
+    btn.textContent = '정말 불러올까요? 지금 답은 덮어써져요';
+    setTimeout(()=>{ restoreArmed=false; btn.textContent='📂 이 브랜드명으로 불러오기'; }, 3000);
+    return;
+  }
+  restoreArmed = false; btn.textContent = '📂 이 브랜드명으로 불러오기';
+  statusEl.textContent = '불러오는 중…'; statusEl.className = 'upload-status';
+  try{
+    const res = await fetch('/api/study/restore?brandAlias='+encodeURIComponent(brandAlias));
+    const data = await res.json().catch(()=>null);
+    if (!data || !data.success){
+      statusEl.textContent = '⚠ '+(data && data.message ? data.message : '불러오지 못했어요');
+      statusEl.className = 'upload-status err';
+      return;
+    }
+    Object.keys(data.answers||{}).forEach(key=> lsSetInput(key, data.answers[key]));
+    try{ localStorage.setItem(LS_PREFIX+'submission_id', data.id); }catch{}
+    // reload 직전 beforeunload/visibilitychange가 화면에 떠있는(아직 비어있는) textarea 값을
+    // 그대로 다시 저장해 방금 복원한 값을 덮어쓰지 않도록, 리로드 전에 flush 리스너를 해제한다.
+    window.removeEventListener('beforeunload', flushAllVisible);
+    document.removeEventListener('visibilitychange', flushOnHide);
+    location.reload();
+  }catch(e){
+    statusEl.textContent = '⚠ 네트워크 문제로 불러오지 못했어요'; statusEl.className = 'upload-status err';
+  }
+};
 
 /* ── F3. 업로드 ───────────────────────── */
 function collectAllAnswers(){
@@ -1265,7 +1310,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,hy=`mwuoglhj`;function gy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var _y=e=>e?`
+`,hy=`mwvby9vs`;function gy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var _y=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
