@@ -260,15 +260,13 @@ header{
 .eyebrow{font-size:13px;font-weight:600;color:var(--main);margin-bottom:8px}
 h1{font-weight:700;font-size:clamp(24px,3.2vw,34px);line-height:1.3;letter-spacing:-.01em;color:var(--title)}
 h1 em{font-style:normal;color:var(--main);position:relative;white-space:nowrap}
-h1 em svg{display:none}
 .head-note{max-width:420px;color:var(--sub);font-size:14.5px;padding-bottom:4px}
 .head-note strong{color:var(--body1)}
 
-/* ── 실습 메뉴 (7개) ─────────────────────── */
+/* ── 실습 메뉴 ─────────────────────── */
 section.menu{padding:28px 0 6px}
 .menu-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .menu-head h2{font-size:18px;font-weight:700;color:var(--title)}
-.menu-head span{font-size:12.5px;color:var(--sub)}
 .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
 .chip{
   position:relative;text-align:left;cursor:pointer;
@@ -318,15 +316,13 @@ section.menu{padding:28px 0 6px}
 .btn-clear:hover{background:var(--danger);color:#fff}
 .btn-clear.armed{background:var(--danger);color:#fff}
 
-.sheet-body{display:grid;grid-template-columns:1.6fr 1fr;gap:0}
-.col-main{padding:24px 28px;border-right:1px solid var(--border)}
-.col-side{padding:24px 28px}
+.sheet-body{padding:24px 28px}
 
 h3.block-label{
   font-size:12.5px;font-weight:700;
   color:var(--sub);margin:0 0 12px;
 }
-.col-main h3.block-label:not(:first-child){margin-top:26px}
+.sheet-body h3.block-label:not(:first-child){margin-top:26px}
 
 /* 진행 단계 체크리스트 */
 .steps{display:flex;flex-direction:column;gap:10px}
@@ -374,34 +370,22 @@ h3.block-label{
 }
 .example p+p{margin-top:8px}
 
-.side-item{margin-bottom:24px}
-.side-item .kv{font-size:14.5px}
-.side-item .kv b{display:block;font-size:12.5px;color:var(--sub);font-weight:700;margin-bottom:6px}
-.side-item .kv ul{list-style:none}
-.side-item .kv li{padding-left:16px;position:relative;margin-bottom:3px;color:var(--body1)}
-.side-item .kv li::before{content:"—";position:absolute;left:0;color:var(--main)}
-
 /* ── F2. 내 미니 사업계획서 모아보기 ───────── */
 .plan-section{margin-top:32px}
 .plan-card-outer{
   background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 30px;
 }
-.plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px}
-.plan-title{font-weight:700;font-size:19px;color:var(--title)}
-.plan-progress-wrap{display:flex;align-items:center;gap:10px;min-width:180px}
-.plan-progress-num{font-size:12.5px;font-weight:600;color:var(--sub);white-space:nowrap}
-.profile-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.profile-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
 .profile-row label{font-size:13px;color:var(--sub)}
 .profile-row input{
   font-family:var(--font);font-size:14.5px;border:1px solid var(--border);border-radius:10px;
   padding:8px 12px;min-width:160px;background:#fff;color:var(--title);flex:1;
 }
 .profile-row input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
-.present-toggle{
-  cursor:pointer;font-weight:700;font-size:12.5px;
-  background:#fff;color:var(--body1);border:1px solid var(--border);border-radius:999px;padding:8px 14px;
-}
-.present-toggle:hover{border-color:var(--main);color:var(--main)}
+.plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.plan-title{font-weight:700;font-size:19px;color:var(--title)}
+.plan-progress-wrap{display:flex;align-items:center;gap:10px;min-width:180px}
+.plan-progress-num{font-size:12.5px;font-weight:600;color:var(--sub);white-space:nowrap}
 .plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
 .plan-cell{
   border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:#fff;cursor:pointer;transition:.15s;
@@ -412,23 +396,6 @@ h3.block-label{
 .plan-cell-val{font-size:14.5px;white-space:pre-line;color:var(--body1)}
 .plan-cell.empty .plan-cell-val{color:var(--ph)}
 .plan-cell-goto{font-size:12px;color:var(--main);margin-top:6px;display:inline-block;font-weight:600}
-
-/* 발표 모드 */
-.present-overlay{
-  position:fixed;inset:0;background:rgba(25,31,40,.6);z-index:500;display:none;
-  align-items:center;justify-content:center;padding:20px;
-}
-.present-overlay.on{display:flex}
-.present-card{
-  background:var(--card);border-radius:16px;max-width:480px;width:100%;max-height:88vh;overflow:auto;
-  padding:32px 24px;position:relative;
-}
-.present-close{
-  position:absolute;top:14px;right:14px;cursor:pointer;background:none;border:none;
-  font-size:20px;color:var(--ph);
-}
-.present-card .plan-grid{grid-template-columns:1fr}
-.present-card .plan-cell-val{font-size:16px}
 
 /* ── F3. 업로드 ───────── */
 .action-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
@@ -446,19 +413,17 @@ h3.block-label{
 button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
-/* 좁은 화면(휴대폰)에서는 1단으로 */
+/* 좁은 화면(휴대폰)에서는 여백만 줄임 */
 @media (max-width:760px){
   .wrap{padding:0 16px 60px}
   header{align-items:stretch}
-  .sheet-body{grid-template-columns:1fr}
-  .col-main{border-right:0;border-bottom:1px solid var(--border)}
   .btn-pill{width:100%}
 }
 
 @media print{
   .sheet{box-shadow:none;page-break-inside:avoid}
   .chip{display:none}
-  .action-row,.present-toggle{display:none!important}
+  .action-row{display:none!important}
 }
 </style>
 </head>
@@ -473,9 +438,9 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
     <p class="head-note"><strong>패션·뷰티 소상공인 강의 현장용.</strong> 강의 중 이 페이지를 열고 실습을 하나씩 여세요. 단계별 체크로 참여자가 진행 상황을 그대로 따라갈 수 있습니다.</p>
   </header>
 
-  <!-- 실습 메뉴 7가지 -->
+  <!-- 실습 메뉴 -->
   <section class="menu">
-    <div class="menu-head"><h2>실습 메뉴 7가지</h2></div>
+    <div class="menu-head"><h2>실습 메뉴 10가지</h2></div>
     <div class="menu-grid" id="menuGrid"></div>
   </section>
 
@@ -485,17 +450,16 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
   <!-- F2. 내 미니 사업계획서 모아보기 -->
   <section class="plan-section">
     <div class="plan-card-outer">
+      <div class="profile-row">
+        <label for="brandInput">브랜드명</label>
+        <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
+      </div>
       <div class="plan-top">
         <div class="plan-title">내 미니 사업계획서</div>
         <div class="plan-progress-wrap">
           <span class="plan-progress-num" id="planProgNum">8칸 중 0칸 완성</span>
           <div class="progress-track"><div class="progress-fill" id="planProgFill"></div></div>
         </div>
-      </div>
-      <div class="profile-row">
-        <label for="brandInput">브랜드명</label>
-        <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
-        <button class="present-toggle" id="presentToggleBtn" type="button">🔍 발표 모드</button>
       </div>
       <div class="plan-grid" id="planGrid"></div>
 
@@ -507,20 +471,11 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
   </section>
 </div>
 
-<div class="present-overlay" id="presentOverlay">
-  <div class="present-card">
-    <button class="present-close" id="presentCloseBtn" type="button">✕</button>
-    <div class="plan-title" id="presentBrand" style="margin-bottom:18px">내 미니 사업계획서</div>
-    <div class="plan-grid" id="presentGrid"></div>
-  </div>
-</div>
-
 <script>
 const PRACTICES = [
   {
     id:"p1", no:"01", name:"내 브랜드 핵심 3줄", time:10,
     part:"교안 PART 01 · 핵심 포인트 3가지",
-    spare:false,
     sub:"비즈니스 모델 · 주요 경쟁력 · 차별화를 딱 한 문장씩 적는 첫 실습.",
     steps:[
       {min:"3분", t:"<b>비즈니스 모델</b> — 누구에게, 무엇을, 팔아서 어떻게 돈이 되는지 한 문장", ex:"예: 30대 캠핑족에게 발수 소재 가방을 온라인 스토어로 판매",
@@ -539,7 +494,6 @@ const PRACTICES = [
   {
     id:"p2", no:"02", name:"아이템 한 문장 정의", time:10,
     part:"교안 PART 03 · 아이템",
-    spare:true,
     sub:"고객 1명 + 문제 1개 + 해결 1개를 한 문장으로 압축합니다.",
     steps:[
       {min:"2분", t:"<b>고객 1명</b>: 내 옷·가방을 실제로 사는 사람을 구체적으로 한 명 정하기 (나이 · 상황 · 성격까지)", ex:"예: 지하철 출퇴근 1시간, 땀 많이 나는 40대 남성",
@@ -556,71 +510,65 @@ const PRACTICES = [
     prep:["필기도구","교안 아이템 예시 슬라이드"],
   },
   {
-    id:"p3", no:"03", name:"숫자로 말하기 바꾸기", time:10,
-    part:"교안 PART 03 · 홍보 방안 / 기대 효과",
-    spare:false,
-    sub:"모호한 문장을 평가위원이 믿을 수 있는 숫자 문장으로 바꿉니다.",
-    steps:[
-      {min:"2분", t:"화면의 <b>나쁜 예시</b> 확인: \\"SNS 홍보를 적극적으로 할 예정입니다.\\" — 왜 안 되는지 토론", ex:"",
-        input:{key:"p3_s1", label:"메모(선택)", placeholder:"토론하며 나온 이야기를 적어도 좋아요", rows:2}},
-      {min:"4분", t:"내 브랜드의 홍보 문장을 <b>숫자가 들어간 문장</b>으로 바꿔 쓰기", ex:"예: 인스타 팔로워 3,000명 · 협업 구매율 00% 기대",
-        input:{key:"p3_s2", label:"숫자 문장", placeholder:"예: 인스타 팔로워 3,000명 · 협업 구매율 00% 기대", rows:2}},
-      {min:"3분", t:"<b>지원사업 전 / 후 비교</b>로 한 번 더 쓰기", ex:"예: 전 — 월 10만원 광고 시 100만원 매출 / 후 — 월 100만원 광고 시 1,000만원 매출 예상",
-        input:{key:"p3_s3", label:"전/후 비교 문장", placeholder:"예: 전 — 월 10만원 광고 시 100만원 매출 / 후 — 월 100만원 광고 시 1,000만원 매출 예상", rows:2}},
-      {min:"1분", t:"짝꿍 교차 확인: <b>\\"이 숫자를 평가위원이 믿을 수 있겠는가?\\"</b>", ex:"",
-        input:{key:"p3_s4", label:"메모(선택)", placeholder:"교차 확인하며 느낀 점을 적어도 좋아요", rows:2}}
-    ],
-    result:["완성되면 이렇게 — 숫자 문장","[인플루언서 협업 구매율 00%] + [인스타 팔로워 3,000명]","[지원사업 후] 월 100만원 광고 집행 시 1,000만원 매출 발생 예상"],
-    tip:"숫자의 근거(지금 팔로워 수, 현재 광고 성과)를 한 줄 덧붙이게 하면 신뢰도가 확 올라갑니다. 근거 없는 큰 숫자는 역효과임을 강조하세요.",
-    prep:["필기도구","현재 SNS 지표(팔로워 수 등)를 볼 수 있는 휴대폰"],
-  },
-  {
-    id:"p4", no:"04", name:"경쟁 브랜드 비교표", time:30,
+    id:"p3", no:"03", name:"경쟁 브랜드 비교표", time:30,
     part:"교안 PART 02 · 평가위원의 기준",
-    spare:false,
     sub:"휴대폰으로 경쟁 브랜드 2곳을 찾아 비교표를 만들고 차별화를 도출합니다.",
     steps:[
       {min:"10분", t:"<b>경쟁 브랜드 2곳 찾기</b> — 인스타그램·스마트스토어·무신사 등에서 내 키워드로 검색", ex:"",
-        input:{key:"p4_s1", label:"찾은 경쟁 브랜드", placeholder:"예: 브랜드A(인스타그램), 브랜드B(스마트스토어)", rows:2}},
+        input:{key:"p3_s1", label:"찾은 경쟁 브랜드", placeholder:"예: 브랜드A(인스타그램), 브랜드B(스마트스토어)", rows:2}},
       {min:"10분", t:"<b>비교표 작성</b> — 가격대 · 타깃 고객 · 판매 채널 · 강점 · 약점 5칸 채우기", ex:"",
-        input:{key:"p4_s2", label:"비교표 핵심 한 줄", placeholder:"예: 두 브랜드 모두 가격대·타깃·채널이 비슷하지만 약점은…", rows:2}},
+        input:{key:"p3_s2", label:"비교표 핵심 한 줄", placeholder:"예: 두 브랜드 모두 가격대·타깃·채널이 비슷하지만 약점은…", rows:2}},
       {min:"10분", t:"<b>공유</b> — \\"내가 유일하게 할 수 있는 것\\" 1개를 도출해 차별화 문장 완성 + 강사 피드백", ex:"",
-        input:{key:"p4_s3", label:"차별화 문장(최종)", placeholder:"예: 경쟁사는 모두 대량생산·20대 타깃인데, 나는 중년 여성 맞춤 소량 생산으로 간다", rows:2}}
+        input:{key:"p3_s3", label:"차별화 문장(최종)", placeholder:"예: 경쟁사는 모두 대량생산·20대 타깃인데, 나는 중년 여성 맞춤 소량 생산으로 간다", rows:2}}
     ],
     result:["완성되면 이렇게 — 비교표 한 줄 요약","경쟁사 A·B는 모두 [앳된 컬러 · 20대 타깃 · 대량생산] → 나는 [중년 여성 · 자체 패턴 · 소량 맞춤]으로 간다"],
     tip:"차별화 후보가 \\"더 싸게\\", \\"더 예쁘게\\"뿐이면 한 번 더 파고들게 하세요. 가격·디자인은 차별화가 아니라 기본값이라는 점을 피드백에서 짚어 주면 좋습니다.",
     prep:["휴대폰(필수)","비교표 워크시트"],
   },
   {
-    id:"p5", no:"05", name:"ESG 한 줄 발굴", time:10,
-    part:"교안 PART 03 · ESG",
-    spare:false,
-    sub:"이미 하고 있는 활동을 ESG 언어로 번역해 한 줄로 씁니다.",
+    id:"p4", no:"04", name:"운영 효율 차별화 찾기", time:20,
+    part:"교안 PART 02 · 차별화 실전 사례",
+    sub:"지금 운영 중인 업무 하나를 골라 느린 구간을 개선하고, 전후 숫자로 비교합니다.",
     steps:[
-      {min:"2분", t:"교안 사례 시연: [폐원단 재생 — 월 10kg → 연 1.2t, 30벌 판매]를 ESG 문장으로 번역하는 과정 보기", ex:"",
-        input:{key:"p5_s1", label:"메모(선택)", placeholder:"시연을 보며 떠오른 아이디어를 적어도 좋아요", rows:2}},
-      {min:"6분", t:"E·S·G 세 칸에 내 브랜드가 <b>이미 하고 있거나 바로 시작할 수 있는</b> 활동 각 1개 적기", ex:"E: 남는 원단 리폼 · S: 지역 봉제공장과 함께 · G: 투명한 수급 설명",
-        input:{key:"p5_s2", label:"E·S·G 각 1개", placeholder:"E: 남는 원단 리폼 · S: 지역 봉제공장과 함께 · G: 투명한 수급 설명", rows:3}},
-      {min:"2분", t:"가장 현실적인 1개를 골라 <b>숫자가 들어간 ESG 한 줄</b>로 완성", ex:"예: 연 00벌 판매 시 연 00kg 폐원단 재생",
-        input:{key:"p5_s3", label:"ESG 한 줄", placeholder:"예: 연 00벌 판매 시 연 00kg 폐원단 재생", rows:2}}
+      {min:"5분", t:"<b>느린 구간 찾기</b> — 내 브랜드 운영 중 가장 오래 걸리거나 비효율적인 업무 1가지 적기", ex:"예: 샘플 피드백을 주고받는 데 평균 1주일 이상 걸림",
+        input:{key:"p4_s1", label:"가장 느린 업무 1가지", placeholder:"예: 샘플 피드백을 주고받는 데 평균 1주일 이상 걸림", rows:2}},
+      {min:"7분", t:"<b>개선 방법 찾기</b> — 그 업무를 더 빠르고 효율적으로 바꿀 구체적인 방법 적기", ex:"예: 샘플 피드백 프로세스를 디지털 설문 + 공유 드라이브로 통합",
+        input:{key:"p4_s2", label:"개선 방법", placeholder:"예: 샘플 피드백 프로세스를 디지털 설문 + 공유 드라이브로 통합", rows:2}},
+      {min:"8분", t:"<b>전/후 숫자로 비교</b> — 개선 전과 후를 시간 · 횟수 · 비용 등 숫자로 비교해 한 줄 완성", ex:"예: 샘플 피드백 평균 소요 시간 7일 → 60% 단축",
+        input:{key:"p4_s3", label:"전/후 비교(숫자)", placeholder:"예: 샘플 피드백 평균 소요 시간 7일 → 60% 단축", rows:2}}
     ],
-    result:["완성되면 이렇게 — ESG 한 줄","[폐원단 재생] 월 100만원 매출 = 300벌 판매 = 월 100kg 폐원단 재생 (연 1.2t)"],
-    tip:"\\"없다\\"고 쓰는 사람이 많습니다. 생산 방식, 협력 공장, 고용 형태만 물어봐도 E·S·G 후보가 반드시 나옵니다. 있는 것을 찾아 주는 실습임을 먼저 알려 주세요.",
-    prep:["E·S·G 3칸 워크시트","필기도구"],
+    result:["완성되면 이렇게 — 전/후 비교","포장 속도: 자재를 미리 카트 단위로 구성해 1건 포장 평균 소요 시간을 7분 → 3분으로 단축","고객 응대: 카카오채널·인스타DM 등 접점을 통합하고 사전 응대 가이드를 만들어 반응 속도 개선"],
+    tip:"\\"더 열심히 하겠습니다\\"가 아니라 숫자로 비교되는 개선이어야 평가위원이 믿습니다. 시간 · 횟수 · 비용 중 하나만 골라도 충분합니다.",
+    prep:["필기도구","현재 운영 중인 업무 프로세스를 떠올릴 수 있는 메모"],
   },
   {
-    id:"p6", no:"06", name:"기대효과 매출 계산", time:10,
+    id:"p5", no:"05", name:"홍보 방안 숫자로 말하기", time:10,
+    part:"교안 PART 03 · 홍보 방안",
+    sub:"모호한 홍보 문장을 평가위원이 믿을 수 있는 숫자 문장으로 바꿉니다.",
+    steps:[
+      {min:"2분", t:"화면의 <b>나쁜 예시</b> 확인: \\"SNS 홍보를 적극적으로 할 예정입니다.\\" — 왜 안 되는지 토론", ex:"",
+        input:{key:"p5_s1", label:"메모(선택)", placeholder:"토론하며 나온 이야기를 적어도 좋아요", rows:2}},
+      {min:"6분", t:"내 브랜드의 홍보 문장을 <b>숫자가 들어간 문장</b>으로 바꿔 쓰기", ex:"예: 인스타 팔로워 3,000명 · 협업 구매율 00% 기대",
+        input:{key:"p5_s2", label:"숫자 문장", placeholder:"예: 인스타 팔로워 3,000명 · 협업 구매율 00% 기대", rows:2}},
+      {min:"2분", t:"짝꿍 교차 확인: <b>\\"이 숫자를 평가위원이 믿을 수 있겠는가?\\"</b>", ex:"",
+        input:{key:"p5_s3", label:"메모(선택)", placeholder:"교차 확인하며 느낀 점을 적어도 좋아요", rows:2}}
+    ],
+    result:["완성되면 이렇게 — 숫자 문장","[인플루언서 협업 구매율 00%] + [인스타 팔로워 3,000명]","→ 숫자의 근거(현재 팔로워 수, 광고 성과)를 한 줄 덧붙이면 신뢰도가 올라갑니다."],
+    tip:"숫자의 근거를 함께 적게 하세요. 근거 없는 큰 숫자는 역효과입니다.",
+    prep:["필기도구","현재 SNS 지표(팔로워 수 등)를 볼 수 있는 휴대폰"],
+  },
+  {
+    id:"p6", no:"06", name:"기대효과 매출 계산", time:20,
     part:"교안 PART 03 · 기대 효과",
-    spare:true,
     sub:"판매가 × 수량으로 기대 매출을 직접 계산해 숫자를 만듭니다.",
     steps:[
-      {min:"2분", t:"<b>판매 단가</b> 정하기 — 실제 내 스토어 판매가 기준", ex:"예: 원피스 1벌 79,000원",
+      {min:"3분", t:"<b>판매 단가</b> 정하기 — 실제 내 스토어 판매가 기준", ex:"예: 원피스 1벌 79,000원",
         input:{key:"p6_s1", label:"판매 단가", placeholder:"예: 원피스 1벌 79,000원", rows:2}},
-      {min:"3분", t:"<b>월 판매 수량</b> — 지원사업 전 / 후 두 단계로 나눠 현실적으로 잡기", ex:"전: 월 13벌 / 후: 월 130벌",
+      {min:"5분", t:"<b>월 판매 수량</b> — 지원사업 전 / 후 두 단계로 나눠 현실적으로 잡기", ex:"전: 월 13벌 / 후: 월 130벌",
         input:{key:"p6_s2", label:"월 판매 수량(전/후)", placeholder:"전: 월 13벌 / 후: 월 130벌", rows:2}},
-      {min:"3분", t:"<b>곱해서 기대 매출 완성</b> — 연 단위로도 환산", ex:"전: 월 100만원 / 후: 월 1,000만원 (연 1.2억)",
+      {min:"7분", t:"<b>곱해서 기대 매출 완성</b> — 연 단위로도 환산", ex:"전: 월 100만원 / 후: 월 1,000만원 (연 1.2억)",
         input:{key:"p6_s3", label:"기대 매출(최종)", placeholder:"전: 월 100만원 / 후: 월 1,000만원 (연 1.2억)", rows:2}},
-      {min:"2분", t:"옆 사람의 숫자를 듣고 <b>너무 낙관적이진 않은지</b> 서로 점검", ex:"",
+      {min:"5분", t:"옆 사람의 숫자를 듣고 <b>너무 낙관적이진 않은지</b> 서로 점검", ex:"",
         input:{key:"p6_s4", label:"메모(선택)", placeholder:"점검하며 느낀 점을 적어도 좋아요", rows:2}}
     ],
     result:["완성되면 이렇게 — 기대 효과","폐원단 재생 기준: 월 100만원 매출 = 30벌 판매 = 월 10kg 재생 → 지원사업 후 월 1,000만원 = 300벌 = 연 1.2t 재생"],
@@ -628,22 +576,66 @@ const PRACTICES = [
     prep:["휴대폰 계산기","내 스토어 판매가 (알고 있으면 충분)"],
   },
   {
-    id:"p7", no:"07", name:"미니 사업계획서 1페이지 + 1분 발표", time:30,
+    id:"p7", no:"07", name:"ESG 한 줄 발굴", time:15,
+    part:"교안 PART 03 · ESG",
+    sub:"이미 하고 있는 활동을 ESG 언어로 번역해 한 줄로 씁니다.",
+    steps:[
+      {min:"3분", t:"교안 사례 시연: [폐원단 재생 — 월 10kg → 연 1.2t, 30벌 판매]를 ESG 문장으로 번역하는 과정 보기", ex:"",
+        input:{key:"p7_s1", label:"메모(선택)", placeholder:"시연을 보며 떠오른 아이디어를 적어도 좋아요", rows:2}},
+      {min:"8분", t:"E·S·G 세 칸에 내 브랜드가 <b>이미 하고 있거나 바로 시작할 수 있는</b> 활동 각 1개 적기", ex:"E: 남는 원단 리폼 · S: 지역 봉제공장과 함께 · G: 투명한 수급 설명",
+        input:{key:"p7_s2", label:"E·S·G 각 1개", placeholder:"E: 남는 원단 리폼 · S: 지역 봉제공장과 함께 · G: 투명한 수급 설명", rows:3}},
+      {min:"4분", t:"가장 현실적인 1개를 골라 <b>숫자가 들어간 ESG 한 줄</b>로 완성", ex:"예: 연 00벌 판매 시 연 00kg 폐원단 재생",
+        input:{key:"p7_s3", label:"ESG 한 줄", placeholder:"예: 연 00벌 판매 시 연 00kg 폐원단 재생", rows:2}}
+    ],
+    result:["완성되면 이렇게 — ESG 한 줄","[폐원단 재생] 월 100만원 매출 = 300벌 판매 = 월 100kg 폐원단 재생 (연 1.2t)"],
+    tip:"\\"없다\\"고 쓰는 사람이 많습니다. 생산 방식, 협력 공장, 고용 형태만 물어봐도 E·S·G 후보가 반드시 나옵니다. 있는 것을 찾아 주는 실습임을 먼저 알려 주세요.",
+    prep:["E·S·G 3칸 워크시트","필기도구"],
+  },
+  {
+    id:"p8", no:"08", name:"향후 계획 세우기", time:15,
+    part:"교안 PART 03 · 향후 계획",
+    sub:"이후 어떻게 확장하고 지속 성장시킬지 단계별로 정리합니다.",
+    steps:[
+      {min:"5분", t:"<b>1년 내 계획</b> — 가장 먼저 시도할 확장 계획 1가지 적기", ex:"예: 상의 중심에서 상하의 세트로 카테고리 확장",
+        input:{key:"p8_s1", label:"1년 내 계획", placeholder:"예: 상의 중심에서 상하의 세트로 카테고리 확장", rows:2}},
+      {min:"5분", t:"<b>2~3년 내 계획</b> — 더 멀리 내다본 확장 · 성장 계획 적기", ex:"예: 글로벌 진출, 오프라인 팝업 운영",
+        input:{key:"p8_s2", label:"2~3년 내 계획", placeholder:"예: 글로벌 진출, 오프라인 팝업 운영", rows:2}},
+      {min:"5분", t:"<b>한 문장으로 완성</b> — 1·2번을 시기 순서가 드러나는 한 문장으로 합치기", ex:"예: 1년차엔 카테고리 확장, 2년차엔 글로벌 진출 계획",
+        input:{key:"p8_s3", label:"향후 계획(최종)", placeholder:"예: 1년차엔 카테고리 확장, 2년차엔 글로벌 진출 계획", rows:2}}
+    ],
+    result:["완성되면 이렇게 — 향후 계획","1년차: 상하의 세트로 카테고리 확장","2년차: 글로벌 진출 계획","→ \\"언젠가\\"가 아니라 \\"몇 년차에 무엇\\"처럼 시기가 보이게 쓰세요."],
+    tip:"막연한 포부보다 \\"몇 년차에 무엇\\"처럼 시기가 분명한 계획이 평가위원에게 더 믿음을 줍니다.",
+    prep:["필기도구"],
+  },
+  {
+    id:"p9", no:"09", name:"인력 구성 점검", time:20,
+    part:"교안 PART 03 · 인력 구성",
+    sub:"이 사업을 함께 끌고 갈 구성원이 준비되어 있는지 점검합니다.",
+    steps:[
+      {min:"7분", t:"<b>필요한 역할 적기</b> — 지금 사업에 꼭 필요한 역할(디자인 · 생산 · 마케팅 등) 적어보기", ex:"예: 디자인, 생산(봉제), 마케팅, CS",
+        input:{key:"p9_s1", label:"필요한 역할", placeholder:"예: 디자인, 생산(봉제), 마케팅, CS", rows:2}},
+      {min:"7분", t:"<b>현재 담당 확인</b> — 각 역할을 지금 누가 맡고 있는지 적기(없음 / 외주용역 / 내부 팀)", ex:"예: 디자인 — 대표 직접, 생산 — 외주 공장, 마케팅 — 없음",
+        input:{key:"p9_s2", label:"현재 담당 현황", placeholder:"예: 디자인 — 대표 직접, 생산 — 외주 공장, 마케팅 — 없음", rows:2}},
+      {min:"6분", t:"<b>부족한 역할 채울 계획</b> — 비어 있는 역할을 어떻게 채울지 계획 한 문장으로 완성", ex:"예: 마케팅은 지원사업 예산으로 외주 대행사와 계약 예정",
+        input:{key:"p9_s3", label:"인력 구성(최종)", placeholder:"예: 마케팅은 지원사업 예산으로 외주 대행사와 계약 예정", rows:2}}
+    ],
+    result:["완성되면 이렇게 — 인력 구성","디자인·생산 — 대표 직접 + 외주 공장 협업","마케팅 — 지원사업 예산으로 외주 대행사 계약 예정","→ \\"없음\\"이어도 괜찮습니다, 채울 계획이 있다는 것만 보여주면 됩니다."],
+    tip:"모든 역할을 직접 할 필요는 없습니다. \\"없음\\"도 괜찮으니, 어떻게 채울지 계획만 명확하게 쓰게 하세요.",
+    prep:["필기도구"],
+  },
+  {
+    id:"p10", no:"10", name:"미니 사업계획서 1페이지 + 1분 발표", time:30,
     part:"교안 PART 03 · 9요소 종합",
-    spare:false,
     sub:"앞선 실습 결과물을 모아 1페이지를 완성하고 평가위원 앞에서 발표합니다.",
     steps:[
-      {min:"5분", t:"<b>재료 모으기</b> — 앞선 실습에서 쓴 문장(핵심 3줄 · 숫자 문장 · ESG 한 줄) 찾아 펼치기", ex:"",
-        input:{key:"p7_s1", label:"메모(선택)", placeholder:"모은 문장들을 적어도 좋아요", rows:2}},
-      {min:"15분", t:"<b>1페이지 완성</b> — 아이템 · 비즈니스 모델 · 차별화 · 향후 계획 · 홍보 방안(숫자) · 기대 효과 · ESG · 인력 구성 8칸 채우기", ex:"",
-        inputs:[
-          {key:"p7_future", label:"향후 계획", placeholder:"예: 6개월 내 오프라인 팝업 1회, 1년 내 두 번째 라인 출시", rows:2},
-          {key:"p7_team", label:"인력 구성", placeholder:"예: 대표 1명 디자인·생산 총괄, 외주 패턴사 1명", rows:2}
-        ]},
+      {min:"5분", t:"<b>재료 모으기</b> — 앞선 실습에서 쓴 문장(핵심 3줄 · 숫자 문장 · ESG 한 줄 등) 찾아 펼치기", ex:"",
+        input:{key:"p10_s1", label:"메모(선택)", placeholder:"모은 문장들을 적어도 좋아요", rows:2}},
+      {min:"15분", t:"<b>1페이지 완성</b> — 앞선 9개 실습에서 쓴 문장을 모아 아이템 · 비즈니스 모델 · 차별화 · 향후 계획 · 홍보 방안 · 기대 효과 · ESG · 인력 구성 8칸 채우기", ex:"",
+        input:{key:"p10_s2", label:"메모(선택)", placeholder:"8칸을 채우며 어려웠던 부분이나 다짐을 적어도 좋아요", rows:2}},
       {min:"7분", t:"<b>1분 발표</b> — 2~3명 앞에서 발표, 나머지는 평가위원 롤플레이", ex:"",
-        input:{key:"p7_s3", label:"메모(선택)", placeholder:"발표하며 느낀 점을 적어도 좋아요", rows:2}},
+        input:{key:"p10_s3", label:"메모(선택)", placeholder:"발표하며 느낀 점을 적어도 좋아요", rows:2}},
       {min:"3분", t:"<b>평가위원 질문</b> — \\"이 사업이 돌아갈 구조인가?\\" \\"왜 하필 당신인가?\\"로 마무리 피드백", ex:"",
-        input:{key:"p7_s4", label:"메모(선택)", placeholder:"받은 질문과 답변을 적어도 좋아요", rows:2}}
+        input:{key:"p10_s4", label:"메모(선택)", placeholder:"받은 질문과 답변을 적어도 좋아요", rows:2}}
     ],
     result:["완성되면 이렇게 — 1페이지 사업계획서","아이템: [땀이 많이 나는 고객을 위한 항균 속건 원단 이너웨어]","홍보: [인스타 팔로워 3,000명 · 협업 구매율 00%]","ESG: [연 00kg 폐원단 재생] — 앞선 실습이 칸마다 그대로 들어갑니다."],
     tip:"발표자는 반드시 방금 쓴 문장을 그대로 읽게 하지 말고, 눈을 보고 말하게 하세요. 사업계획서는 문서지만 지원사업은 결국 사람을 설득하는 일임을 보여 주는 장면입니다.",
@@ -664,12 +656,17 @@ const PLAN_SLOTS = [
   {label:"아이템 (한 문장)", keys:["p2_s3"], goto:"p2"},
   {label:"비즈니스 모델", keys:["p1_s1"], goto:"p1"},
   {label:"주요 경쟁력", keys:["p1_s2"], goto:"p1"},
-  {label:"차별화", keys:["p4_s3","p1_s3"], goto:"p4", pickFirst:true},
-  {label:"홍보 방안 (숫자)", keys:["p3_s2","p3_s3"], goto:"p3", join:true},
+  {label:"차별화", keys:["p3_s3","p1_s3"], goto:"p3", pickFirst:true},
+  {label:"홍보 방안 (숫자)", keys:["p5_s2"], goto:"p5"},
   {label:"기대 효과", keys:["p6_s3"], goto:"p6"},
-  {label:"ESG 한 줄", keys:["p5_s3"], goto:"p5"},
-  {label:"향후 계획 · 인력 구성", keys:["p7_future","p7_team"], goto:"p7", join:true},
+  {label:"ESG 한 줄", keys:["p7_s3"], goto:"p7"},
+  {label:"향후 계획 · 인력 구성", keys:["p8_s3","p9_s3"], goto:"p8", join:true},
 ];
+
+function noOf(id){
+  const p = PRACTICES.find(x=>x.id===id);
+  return p ? p.no : id;
+}
 
 // ── localStorage 헬퍼 ───────────────────────
 const LS_PREFIX = "gsap_v2_";
@@ -760,10 +757,9 @@ function openPractice(id, userClicked){
 
   holder.innerHTML = \`
   <article class="sheet" id="sheet-\${p.id}">
-    <span class="c3"></span><span class="c4"></span>
     <div class="sheet-head">
       <div>
-        <span class="sheet-no">실습 \${p.no} / 07</span>
+        <span class="sheet-no">실습 \${p.no} / 10</span>
         <div class="sheet-title">\${p.name}</div>
         <p class="sheet-sub">\${p.sub}</p>
       </div>
@@ -774,33 +770,26 @@ function openPractice(id, userClicked){
       </div>
     </div>
     <div class="sheet-body">
-      <div class="col-main">
-        <h3 class="block-label">진행 단계 — 끝낼 때마다 눌러서 체크, 아래 칸에 답을 적으면 자동으로 저장돼요</h3>
-        <div class="steps" id="steps-\${p.id}">
-          \${p.steps.map((s,i)=>\`
-            <div class="step\${lsGetStepDone(p.id,i)?' done':''}" data-idx="\${i}">
-              <div class="step-row" role="checkbox" aria-checked="\${lsGetStepDone(p.id,i)}" tabindex="0" onclick="toggleStep(this)" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleStep(this)}">
-                <span class="box">✓</span>
-                <span class="step-min">\${s.min}</span>
-                <span class="step-text">\${s.t}\${s.ex?\`<span class="ex">\${s.ex}</span>\`:''}</span>
-              </div>
-              \${stepInputsHtml(s, p.id)}
-            </div>\`).join('')}
-        </div>
-        <div class="progress-row">
-          <span class="progress-num" id="progNum-\${p.id}">0 / \${p.steps.length} 단계</span>
-          <div class="progress-track"><div class="progress-fill" id="progFill-\${p.id}"></div></div>
-        </div>
-
-        <h3 class="block-label">완성물 예시</h3>
-        <div class="example">
-          \${p.result.map((r,i)=> i===0 ? \`<p><b>\${r}</b></p>\` : \`<p>\${r}</p>\`).join('')}
-        </div>
+      <h3 class="block-label">진행 단계 — 끝낼 때마다 눌러서 체크, 아래 칸에 답을 적으면 자동으로 저장돼요</h3>
+      <div class="steps" id="steps-\${p.id}">
+        \${p.steps.map((s,i)=>\`
+          <div class="step\${lsGetStepDone(p.id,i)?' done':''}" data-idx="\${i}">
+            <div class="step-row" role="checkbox" aria-checked="\${lsGetStepDone(p.id,i)}" tabindex="0" onclick="toggleStep(this)" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleStep(this)}">
+              <span class="box">✓</span>
+              <span class="step-min">\${s.min}</span>
+              <span class="step-text">\${s.t}\${s.ex?\`<span class="ex">\${s.ex}</span>\`:''}</span>
+            </div>
+            \${stepInputsHtml(s, p.id)}
+          </div>\`).join('')}
       </div>
-      <div class="col-side">
-        <div class="side-item">
-          <div class="kv"><b>준비물</b><ul>\${p.prep.map(x=>\`<li>\${x}</li>\`).join('')}</ul></div>
-        </div>
+      <div class="progress-row">
+        <span class="progress-num" id="progNum-\${p.id}">0 / \${p.steps.length} 단계</span>
+        <div class="progress-track"><div class="progress-fill" id="progFill-\${p.id}"></div></div>
+      </div>
+
+      <h3 class="block-label">완성물 예시</h3>
+      <div class="example">
+        \${p.result.map((r,i)=> i===0 ? \`<p><b>\${r}</b></p>\` : \`<p>\${r}</p>\`).join('')}
       </div>
     </div>
   </article>\`;
@@ -899,8 +888,8 @@ function buildPlanCellsHtml(){
     return \`
       <div class="plan-cell \${val?'filled':'empty'}" onclick="openPractice('\${slot.goto}', true)">
         <div class="plan-cell-label">\${slot.label}</div>
-        <div class="plan-cell-val">\${val ? val.replace(/</g,'&lt;') : '실습 '+slot.goto.replace('p','0')+'를 먼저 채워 주세요'}</div>
-        \${!val? \`<span class="plan-cell-goto">실습 \${slot.goto.replace('p','0')}로 이동 →</span>\` : ''}
+        <div class="plan-cell-val">\${val ? val.replace(/</g,'&lt;') : '실습 '+noOf(slot.goto)+'를 먼저 채워 주세요'}</div>
+        \${!val? \`<span class="plan-cell-goto">실습 \${noOf(slot.goto)}로 이동 →</span>\` : ''}
       </div>\`;
   }).join('');
   return {html, filled};
@@ -917,16 +906,7 @@ const brandInput = document.getElementById('brandInput');
 brandInput.value = lsGetProfile().brand || '';
 brandInput.addEventListener('input', ()=> lsSetProfile({brand: brandInput.value}));
 
-/* 발표 모드 */
-document.getElementById('presentToggleBtn').onclick = ()=>{
-  const {html} = buildPlanCellsHtml();
-  document.getElementById('presentGrid').innerHTML = html;
-  document.getElementById('presentBrand').textContent = (brandInput.value || '내 미니 사업계획서');
-  document.getElementById('presentOverlay').classList.add('on');
-};
-document.getElementById('presentCloseBtn').onclick = ()=> document.getElementById('presentOverlay').classList.remove('on');
-
-/* ── F3. 업로드 & 내보내기 ───────────────────────── */
+/* ── F3. 업로드 ───────────────────────── */
 function collectAllAnswers(){
   const out = {};
   PRACTICES.forEach(p=> allStepKeysOfPractice(p).forEach(key=>{
@@ -1120,11 +1100,11 @@ const PLAN_SLOTS = [
   {label:"아이템 (한 문장)", keys:["p2_s3"]},
   {label:"비즈니스 모델", keys:["p1_s1"]},
   {label:"주요 경쟁력", keys:["p1_s2"]},
-  {label:"차별화", keys:["p4_s3","p1_s3"], pickFirst:true},
-  {label:"홍보 방안 (숫자)", keys:["p3_s2","p3_s3"], join:true},
+  {label:"차별화", keys:["p3_s3","p1_s3"], pickFirst:true},
+  {label:"홍보 방안 (숫자)", keys:["p5_s2"]},
   {label:"기대 효과", keys:["p6_s3"]},
-  {label:"ESG 한 줄", keys:["p5_s3"]},
-  {label:"향후 계획 · 인력 구성", keys:["p7_future","p7_team"], join:true},
+  {label:"ESG 한 줄", keys:["p7_s3"]},
+  {label:"향후 계획 · 인력 구성", keys:["p8_s3","p9_s3"], join:true},
 ];
 
 function slotValue(slot, answers){
@@ -1267,7 +1247,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,hy=`mwumewhx`;function gy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var _y=e=>e?`
+`,hy=`mwunffz2`;function gy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var _y=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
