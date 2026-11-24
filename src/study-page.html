@@ -127,6 +127,7 @@ h3.block-label{
 .step-text b{font-weight:700;color:var(--title)}
 .step-text .ex{display:block;font-size:13px;color:var(--sub);margin-top:4px}
 .step-input-wrap{margin-top:10px;margin-left:34px}
+.plan-flag{font-size:11.5px;font-weight:600;color:var(--main);margin-bottom:5px}
 .step-input-field{
   width:100%;font-family:var(--font);font-size:14.5px;color:var(--title);
   border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:#fff;resize:vertical;
@@ -406,7 +407,7 @@ const PRACTICES = [
   {
     id:"p10", no:"10", name:"평가위원 예상 질문 대비", time:30,
     part:"교안 PART 02 · 평가위원 질문 대응",
-    sub:"자주 나오는 평가위원 질문에 미리 답을 써보고, 실제 질의응답처럼 연습합니다.",
+    sub:"자주 나오는 평가위원 질문에 미리 답을 써보고, 실제 질의응답처럼 연습합니다. (앞선 8개 실습과 달리 모아보기 8칸에는 반영되지 않아요 — 발표 리허설 자체가 목적이에요.)",
     steps:[
       {min:"8분", t:"<b>\"왜 하필 당신인가?\"</b>에 대한 답 적기 — 앞선 실습의 비즈니스 모델 · 경쟁력 · 차별화 문장을 활용해 한 문단으로 완성", ex:"예: 10년간 패턴 제작 경험과 폐원단 수급망을 가진 제가 아니면 이 소량 맞춤 생산 구조는 유지되기 어렵습니다.",
         input:{key:"p10_s1", label:"\"왜 하필 당신인가?\" 답변", placeholder:"예: 10년간 패턴 제작 경험과 폐원단 수급망을 가진 제가 아니면 이 소량 맞춤 생산 구조는 유지되기 어렵습니다.", rows:3}},
@@ -447,6 +448,13 @@ function noOf(id){
   const p = PRACTICES.find(x=>x.id===id);
   return p ? p.no : id;
 }
+
+// 모아보기(F2) 8칸에 실제로 반영되는 입력 키 모음 — 해당 입력칸에 "모아보기 반영" 표시를 보여주기 위함
+const PLAN_KEYS = new Set();
+PLAN_SLOTS.forEach(slot=>{
+  slot.keys.forEach(k=>PLAN_KEYS.add(k));
+  if (slot.fallbackKeys) slot.fallbackKeys.forEach(k=>PLAN_KEYS.add(k));
+});
 
 // ── localStorage 헬퍼 ───────────────────────
 const LS_PREFIX = "gsap_v2_";
@@ -516,6 +524,7 @@ function stepInputsHtml(s, pid){
     const val = saved ? saved.text : '';
     return `
       <div class="step-input-wrap">
+        ${PLAN_KEYS.has(inp.key) ? '<div class="plan-flag">📋 이 답변이 모아보기(미니 사업계획서)에 반영돼요</div>' : ''}
         <textarea class="step-input-field" data-key="${inp.key}" rows="${inp.rows||2}"
           placeholder="${inp.placeholder.replace(/"/g,'&quot;')}"
           aria-label="${inp.label.replace(/"/g,'&quot;')}"
