@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>실습 교안 — 강사용 모아보기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --main:#3182F6;
+  --main-dark:#1B64DA;
+  --bg:#F2F4F6;
+  --card:#FFFFFF;
+  --border:#E5E8EB;
+  --title:#191F28;
+  --body1:#333D4B;
+  --body2:#4E5968;
+  --sub:#6B7684;
+  --ph:#8B95A1;
+  --danger:#D8452B;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Pretendard Variable',Pretendard,-apple-system,sans-serif;
+  background:var(--bg);color:var(--title);line-height:1.6;
+}
+.wrap{max-width:1100px;margin:0 auto;padding:36px 20px 80px}
+header{margin-bottom:24px}
+.eyebrow{font-size:13px;font-weight:600;color:var(--main);margin-bottom:6px}
+h1{font-size:26px;font-weight:700;color:var(--title)}
+.sub{color:var(--sub);font-size:14px;margin-top:6px}
+
+.btn{
+  cursor:pointer;font-weight:700;font-size:14px;border:none;border-radius:999px;padding:11px 20px;transition:.15s;
+}
+.btn.primary{background:var(--main);color:#fff}
+.btn.primary:hover{background:var(--main-dark)}
+.btn.ghost{background:#fff;border:1.5px solid var(--border);color:var(--body1)}
+.btn.ghost:hover{border-color:var(--main);color:var(--main)}
+.btn.danger{background:#fff;border:1.5px solid var(--danger);color:var(--danger)}
+.btn.danger:hover{background:var(--danger);color:#fff}
+.btn.danger.armed{background:var(--danger);color:#fff}
+
+/* 비밀번호 입장 화면 */
+.login-overlay{
+  position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;z-index:300;
+}
+.login-card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:40px 32px;width:100%;max-width:360px;text-align:center;
+}
+.login-card .eyebrow{justify-content:center}
+.login-card h2{font-size:19px;font-weight:700;margin-bottom:6px}
+.login-card .sub{margin-bottom:20px}
+.login-card input{
+  width:100%;font-size:16px;letter-spacing:.1em;text-align:center;
+  border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;
+}
+.login-card input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
+.login-card .btn{width:100%}
+.login-err{font-size:13px;color:var(--danger);margin-top:10px;min-height:16px}
+
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.toolbar .count{font-size:14px;color:var(--body2);font-weight:600}
+.toolbar .actions{display:flex;gap:8px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 18px 16px;cursor:pointer;transition:.15s;
+}
+.card:hover{border-color:var(--main);box-shadow:0 2px 10px rgba(49,130,246,.10)}
+.card .brand{font-size:16px;font-weight:700;color:var(--title);margin-bottom:4px}
+.card .time{font-size:12px;color:var(--ph);margin-bottom:10px}
+.card .preview{font-size:13.5px;color:var(--body2);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+
+.empty-state{
+  background:var(--card);border:1px dashed var(--border);border-radius:14px;
+  padding:48px 20px;text-align:center;color:var(--sub);font-size:14px;
+}
+
+.overlay{position:fixed;inset:0;background:rgba(25,31,40,.6);display:none;align-items:center;justify-content:center;padding:24px;z-index:400}
+.overlay.on{display:flex}
+.modal{
+  background:var(--card);border-radius:16px;max-width:620px;width:100%;max-height:86vh;overflow:auto;
+  padding:32px 28px;position:relative;
+}
+.modal .close{position:absolute;top:14px;right:14px;border:none;background:none;font-size:20px;color:var(--ph);cursor:pointer}
+.modal h2{font-size:20px;margin-bottom:4px}
+.modal .meta{font-size:12.5px;color:var(--sub);margin-bottom:18px}
+.slot{border-bottom:1px solid var(--border);padding:12px 0}
+.slot:last-child{border-bottom:none}
+.slot .lbl{font-size:12px;color:var(--sub);font-weight:600;margin-bottom:4px}
+.slot .val{font-size:14.5px;color:var(--body1);white-space:pre-line}
+.slot .val.empty{color:var(--ph)}
+
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+  background:var(--title);color:#fff;padding:10px 20px;border-radius:999px;font-size:13.5px;
+  opacity:0;transition:opacity .2s;pointer-events:none;z-index:500;
+}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="eyebrow">EZlook 강의 도구</div>
+    <h2>강사용 모아보기</h2>
+    <p class="sub">비밀번호를 입력해주세요</p>
+    <input type="password" id="pwInput" inputmode="numeric" placeholder="비밀번호" autocomplete="off">
+    <button class="btn primary" id="pwSubmitBtn" type="button">입장</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<div class="wrap" id="mainWrap" style="display:none">
+  <header>
+    <div class="eyebrow">EZlook 강의 도구</div>
+    <h1>실습 교안 — 강사용 모아보기</h1>
+    <p class="sub">학생들이 업로드한 미니 사업계획서를 브랜드명으로 모아봐요.</p>
+  </header>
+
+  <div class="toolbar">
+    <span class="count" id="countLabel">학생이 업로드하면 이 화면에 나타나요</span>
+    <div class="actions">
+      <button class="btn ghost" id="refreshBtn" type="button">↻ 새로고침</button>
+      <button class="btn danger" id="resetBtn" type="button">전체 초기화</button>
+    </div>
+  </div>
+
+  <div id="gridHolder"><div class="empty-state">불러오는 중…</div></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <button class="close" id="modalClose" type="button">✕</button>
+    <h2 id="modalBrand">브랜드명</h2>
+    <div class="meta" id="modalMeta"></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PW_STORAGE_KEY = 'gsap_v2_admin_pw';
+
+const PLAN_SLOTS = [
+  {label:"아이템 (한 문장)", keys:["p2_s3"]},
+  {label:"비즈니스 모델", keys:["p1_s1"]},
+  {label:"주요 경쟁력", keys:["p1_s2"]},
+  {label:"차별화", keys:["p4_s3","p1_s3"], pickFirst:true},
+  {label:"홍보 방안 (숫자)", keys:["p3_s2","p3_s3"], join:true},
+  {label:"기대 효과", keys:["p6_s3"]},
+  {label:"ESG 한 줄", keys:["p5_s3"]},
+  {label:"향후 계획 · 인력 구성", keys:["p7_future","p7_team"], join:true},
+];
+
+function slotValue(slot, answers){
+  if (slot.join) return slot.keys.map(k=>(answers[k]||'').trim()).filter(Boolean).join('\n');
+  if (slot.pickFirst){ for (const k of slot.keys){ if ((answers[k]||'').trim()) return answers[k].trim(); } return ''; }
+  return (answers[slot.keys[0]]||'').trim();
+}
+function previewText(answers){
+  return PLAN_SLOTS.map(s=>slotValue(s,answers)).filter(Boolean).join(' · ') || '(아직 작성된 내용이 없어요)';
+}
+
+let currentPassword = '';
+let currentSubmissions = [];
+let refreshTimer = null;
+
+const loginOverlay = document.getElementById('loginOverlay');
+const mainWrap = document.getElementById('mainWrap');
+const pwInput = document.getElementById('pwInput');
+const loginErr = document.getElementById('loginErr');
+const gridHolder = document.getElementById('gridHolder');
+const countLabel = document.getElementById('countLabel');
+const toastEl = document.getElementById('toast');
+
+function showToast(msg){
+  toastEl.textContent = msg; toastEl.classList.add('show');
+  setTimeout(()=> toastEl.classList.remove('show'), 2200);
+}
+
+async function tryLogin(password, silent){
+  const res = await fetch('/api/study/submissions', { headers:{ 'X-Study-Admin-Password': password } }).catch(()=>null);
+  if (!res){ if (!silent) loginErr.textContent = '네트워크 문제가 있어요'; return false; }
+  if (res.status === 401){ if (!silent) loginErr.textContent = '비밀번호가 올바르지 않아요'; return false; }
+  const data = await res.json().catch(()=>null);
+  if (!data || !data.success){ if (!silent) loginErr.textContent = (data && data.message) || '불러오지 못했어요'; return false; }
+  currentPassword = password;
+  try{ sessionStorage.setItem(PW_STORAGE_KEY, password); }catch{}
+  loginOverlay.style.display = 'none';
+  mainWrap.style.display = 'block';
+  renderSubmissions(data.submissions || []);
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(loadSubmissions, 15000);
+  return true;
+}
+
+document.getElementById('pwSubmitBtn').onclick = ()=>{
+  loginErr.textContent = '';
+  const pw = pwInput.value.trim();
+  if (!pw){ loginErr.textContent = '비밀번호를 입력해주세요'; return; }
+  tryLogin(pw, false);
+};
+pwInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') document.getElementById('pwSubmitBtn').click(); });
+
+document.getElementById('refreshBtn').onclick = ()=> loadSubmissions();
+
+function renderSubmissions(submissions){
+  currentSubmissions = submissions;
+  countLabel.textContent = `제출 ${currentSubmissions.length}건`;
+  if (!currentSubmissions.length){
+    gridHolder.innerHTML = '<div class="empty-state">아직 업로드한 학생이 없어요</div>';
+    return;
+  }
+  gridHolder.innerHTML = '<div class="grid" id="grid"></div>';
+  const gridEl = document.getElementById('grid');
+  currentSubmissions.forEach((s)=>{
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `
+      <div class="brand">${(s.brandAlias||'(이름 없음)').replace(/</g,'&lt;')}</div>
+      <div class="time">${s.updatedAt||''}</div>
+      <div class="preview">${previewText(s.answers||{}).replace(/</g,'&lt;')}</div>`;
+    el.onclick = ()=> openModal(s);
+    gridEl.appendChild(el);
+  });
+}
+
+async function loadSubmissions(){
+  if (!currentPassword) return;
+  try{
+    const res = await fetch('/api/study/submissions', { headers:{ 'X-Study-Admin-Password': currentPassword } });
+    if (res.status === 401){ logout(); return; }
+    const data = await res.json();
+    if (!data || !data.success){
+      gridHolder.innerHTML = `<div class="empty-state">${(data && data.message) || '조회하지 못했어요'}</div>`;
+      countLabel.textContent = '조회 실패';
+      return;
+    }
+    renderSubmissions(data.submissions || []);
+  }catch{
+    gridHolder.innerHTML = '<div class="empty-state">네트워크 문제로 불러오지 못했어요</div>';
+  }
+}
+
+function logout(){
+  currentPassword = '';
+  try{ sessionStorage.removeItem(PW_STORAGE_KEY); }catch{}
+  if (refreshTimer) clearInterval(refreshTimer);
+  mainWrap.style.display = 'none';
+  loginOverlay.style.display = 'flex';
+  pwInput.value = '';
+  loginErr.textContent = '세션이 만료됐어요. 다시 입력해주세요';
+}
+
+const overlay = document.getElementById('overlay');
+function openModal(s){
+  document.getElementById('modalBrand').textContent = s.brandAlias || '(이름 없음)';
+  document.getElementById('modalMeta').textContent = '업데이트: '+(s.updatedAt||'');
+  document.getElementById('modalBody').innerHTML = PLAN_SLOTS.map(slot=>{
+    const val = slotValue(slot, s.answers||{});
+    return `<div class="slot"><div class="lbl">${slot.label}</div><div class="val${val?'':' empty'}">${val? val.replace(/</g,'&lt;') : '(미작성)'}</div></div>`;
+  }).join('');
+  overlay.classList.add('on');
+}
+document.getElementById('modalClose').onclick = ()=> overlay.classList.remove('on');
+overlay.addEventListener('click', (e)=>{ if (e.target===overlay) overlay.classList.remove('on'); });
+
+let resetArmed = false;
+document.getElementById('resetBtn').onclick = async ()=>{
+  if (!currentPassword) return;
+  const btn = document.getElementById('resetBtn');
+  if (!resetArmed){
+    resetArmed = true; btn.classList.add('armed'); btn.textContent = '정말 전체 삭제할까요? 한 번 더 눌러주세요';
+    setTimeout(()=>{ resetArmed=false; btn.classList.remove('armed'); btn.textContent='전체 초기화'; }, 3000);
+    return;
+  }
+  resetArmed = false; btn.classList.remove('armed'); btn.textContent='전체 초기화';
+  try{
+    const res = await fetch('/api/study/reset', { method:'POST', headers:{ 'X-Study-Admin-Password': currentPassword } });
+    if (res.status === 401){ logout(); return; }
+    const data = await res.json();
+    if (data && data.success){ showToast('모든 제출물을 삭제했어요'); loadSubmissions(); }
+    else showToast('삭제하지 못했어요');
+  }catch{ showToast('네트워크 문제가 있어요'); }
+};
+
+(function init(){
+  let saved = '';
+  try{ saved = sessionStorage.getItem(PW_STORAGE_KEY) || ''; }catch{}
+  if (saved) tryLogin(saved, true);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>실습 교안 — 정부지원사업 작성, 패션·뷰티 소상공인 강의용</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+:root{
+  --main:#3182F6;
+  --main-dark:#1B64DA;
+  --bg:#F2F4F6;
+  --card:#FFFFFF;
+  --border:#E5E8EB;
+  --title:#191F28;
+  --body1:#333D4B;
+  --body2:#4E5968;
+  --sub:#6B7684;
+  --ph:#8B95A1;
+  --success:#00C896;
+  --success-soft:#E6F9F3;
+  --danger:#F04452;
+  --font:'Pretendard Variable',Pretendard,-apple-system,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--title);
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1100px;margin:0 auto;padding:0 32px 80px}
+
+header{
+  padding:40px 0 22px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:32px;flex-wrap:wrap;
+}
+.eyebrow{font-size:13px;font-weight:600;color:var(--main);margin-bottom:8px}
+h1{font-weight:700;font-size:clamp(24px,3.2vw,34px);line-height:1.3;letter-spacing:-.01em;color:var(--title)}
+h1 em{font-style:normal;color:var(--main);position:relative;white-space:nowrap}
+h1 em svg{display:none}
+.head-note{max-width:420px;color:var(--sub);font-size:14.5px;padding-bottom:4px}
+.head-note strong{color:var(--body1)}
+
+/* ── 실습 메뉴 (7개) ─────────────────────── */
+section.menu{padding:28px 0 6px}
+.menu-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.menu-head h2{font-size:18px;font-weight:700;color:var(--title)}
+.menu-head span{font-size:12.5px;color:var(--sub)}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.chip{
+  position:relative;text-align:left;cursor:pointer;
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:14px 16px;transition:.15s;
+  font-family:var(--font);
+}
+.chip:hover{border-color:var(--main)}
+.chip.active{background:var(--main);border-color:var(--main);color:#fff}
+.chip.active .chip-part{color:rgba(255,255,255,.75)}
+.chip.active .chip-no{color:rgba(255,255,255,.75)}
+.chip.active .chip-time{background:rgba(255,255,255,.2);border-color:transparent;color:#fff}
+.chip-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.chip-no{font-size:12px;font-weight:600;color:var(--sub)}
+.chip-time{
+  font-size:11.5px;font-weight:600;
+  border-radius:999px;padding:2px 10px;background:#EAF2FF;color:var(--main);
+}
+.chip-name{font-weight:700;font-size:16px;line-height:1.35;color:inherit}
+.chip-part{display:block;font-size:12px;color:var(--sub);margin-top:5px}
+
+/* ── 실습 상세 시트 ───────────────────────── */
+.sheet{
+  background:var(--card);
+  border:1px solid var(--border);border-radius:16px;
+  margin-top:24px;
+}
+.sheet-head{
+  display:flex;flex-direction:column;gap:10px;
+  padding:22px 20px 18px;border-bottom:1px solid var(--border);
+}
+.sheet-no{font-size:12.5px;color:var(--main);font-weight:600}
+.sheet-title{font-weight:700;font-size:clamp(19px,5vw,22px);line-height:1.35;color:var(--title)}
+.sheet-sub{color:var(--sub);font-size:14px;margin-top:6px}
+.sheet-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.badge{
+  font-size:12.5px;font-weight:600;
+  border:1px solid var(--border);border-radius:999px;padding:5px 12px;background:#fff;color:var(--body2);
+}
+.badge.time{background:#EAF2FF;border-color:transparent;color:var(--main)}
+.badge.reserve-badge{color:var(--sub)}
+.btn-clear{
+  cursor:pointer;font-weight:600;font-size:12.5px;
+  background:#fff;color:var(--danger);border:1px solid var(--danger);border-radius:999px;
+  padding:6px 14px;transition:.15s;
+}
+.btn-clear:hover{background:var(--danger);color:#fff}
+.btn-clear.armed{background:var(--danger);color:#fff}
+
+.sheet-body{display:grid;grid-template-columns:1.6fr 1fr;gap:0}
+.col-main{padding:24px 28px;border-right:1px solid var(--border)}
+.col-side{padding:24px 28px}
+
+h3.block-label{
+  font-size:12.5px;font-weight:700;
+  color:var(--sub);margin:0 0 12px;
+}
+.col-main h3.block-label:not(:first-child){margin-top:26px}
+
+/* 진행 단계 체크리스트 */
+.steps{display:flex;flex-direction:column;gap:10px}
+.step{
+  border:1px solid var(--border);border-radius:12px;background:#fff;
+  padding:13px 14px;transition:.15s;
+}
+.step-row{display:flex;gap:12px;align-items:flex-start;cursor:pointer;user-select:none}
+.step .box{
+  flex:0 0 auto;width:22px;height:22px;margin-top:2px;border:2px solid var(--border);border-radius:7px;
+  display:grid;place-items:center;font-size:12px;font-weight:700;color:transparent;
+  transition:.15s;
+}
+.step.done{background:var(--success-soft);border-color:var(--success)}
+.step.done .box{background:var(--success);border-color:var(--success);color:#fff}
+.step.done .step-text{text-decoration:line-through;text-decoration-color:rgba(0,0,0,.25);color:var(--sub)}
+.step-min{
+  flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--main);
+  background:#EAF2FF;border-radius:6px;padding:3px 8px;margin-top:1px;white-space:nowrap;
+}
+.step-text{font-size:14.5px;color:var(--body1)}
+.step-text b{font-weight:700;color:var(--title)}
+.step-text .ex{display:block;font-size:13px;color:var(--sub);margin-top:4px}
+.step-input-wrap{margin-top:10px;margin-left:34px}
+.step-input-field{
+  width:100%;font-family:var(--font);font-size:14.5px;color:var(--title);
+  border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:#fff;resize:vertical;
+}
+.step-input-field:focus-visible{outline:3px solid var(--main);outline-offset:1px;border-color:var(--main)}
+.step-input-field::placeholder{color:var(--ph)}
+.step-save-status{font-size:11.5px;color:var(--sub);margin-top:5px;min-height:14px}
+.step-save-status.saving{color:#B9770E}
+.step-save-status.saved{color:var(--success)}
+.step-save-status.warn{color:var(--danger)}
+
+.progress-row{display:flex;align-items:center;gap:10px;margin-top:14px}
+.progress-track{flex:1;height:6px;background:var(--border);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:var(--main);border-radius:99px;transition:width .3s}
+.progress-num{font-size:12.5px;font-weight:600;color:var(--sub);white-space:nowrap}
+
+/* 완성물 예시 */
+.example{
+  border-left:3px solid var(--main);background:#EAF2FF;
+  border-radius:0 10px 10px 0;padding:14px 16px;font-size:14.5px;color:var(--body1);
+}
+.example p+p{margin-top:8px}
+
+.side-item{margin-bottom:24px}
+.side-item .kv{font-size:14.5px}
+.side-item .kv b{display:block;font-size:12.5px;color:var(--sub);font-weight:700;margin-bottom:6px}
+.side-item .kv ul{list-style:none}
+.side-item .kv li{padding-left:16px;position:relative;margin-bottom:3px;color:var(--body1)}
+.side-item .kv li::before{content:"—";position:absolute;left:0;color:var(--main)}
+
+/* ── F2. 내 미니 사업계획서 모아보기 ───────── */
+.plan-section{margin-top:32px}
+.plan-card-outer{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 30px;
+}
+.plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.plan-title{font-weight:700;font-size:19px;color:var(--title)}
+.plan-progress-wrap{display:flex;align-items:center;gap:10px;min-width:180px}
+.plan-progress-num{font-size:12.5px;font-weight:600;color:var(--sub);white-space:nowrap}
+.profile-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.profile-row label{font-size:13px;color:var(--sub)}
+.profile-row input{
+  font-family:var(--font);font-size:14.5px;border:1px solid var(--border);border-radius:10px;
+  padding:8px 12px;min-width:160px;background:#fff;color:var(--title);flex:1;
+}
+.profile-row input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
+.present-toggle{
+  cursor:pointer;font-weight:700;font-size:12.5px;
+  background:#fff;color:var(--body1);border:1px solid var(--border);border-radius:999px;padding:8px 14px;
+}
+.present-toggle:hover{border-color:var(--main);color:var(--main)}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.plan-cell{
+  border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:#fff;cursor:pointer;transition:.15s;
+}
+.plan-cell:hover{border-color:var(--main)}
+.plan-cell.filled{border-color:var(--success);background:var(--success-soft)}
+.plan-cell-label{font-size:12px;font-weight:600;color:var(--sub);margin-bottom:6px}
+.plan-cell-val{font-size:14.5px;white-space:pre-line;color:var(--body1)}
+.plan-cell.empty .plan-cell-val{color:var(--ph)}
+.plan-cell-goto{font-size:12px;color:var(--main);margin-top:6px;display:inline-block;font-weight:600}
+
+/* 발표 모드 */
+.present-overlay{
+  position:fixed;inset:0;background:rgba(25,31,40,.6);z-index:500;display:none;
+  align-items:center;justify-content:center;padding:20px;
+}
+.present-overlay.on{display:flex}
+.present-card{
+  background:var(--card);border-radius:16px;max-width:480px;width:100%;max-height:88vh;overflow:auto;
+  padding:32px 24px;position:relative;
+}
+.present-close{
+  position:absolute;top:14px;right:14px;cursor:pointer;background:none;border:none;
+  font-size:20px;color:var(--ph);
+}
+.present-card .plan-grid{grid-template-columns:1fr}
+.present-card .plan-cell-val{font-size:16px}
+
+/* ── F3. 업로드 ───────── */
+.action-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.btn-pill{
+  cursor:pointer;font-family:var(--font);font-weight:700;font-size:15px;
+  border-radius:999px;padding:13px 36px;border:none;transition:.15s;
+}
+.btn-pill.primary{background:var(--main);color:#fff}
+.btn-pill.primary:hover{background:var(--main-dark)}
+.upload-status{font-size:13px;margin-top:10px;min-height:16px;color:var(--sub)}
+.upload-status.ok{color:var(--success);font-weight:600}
+.upload-status.err{color:var(--danger);font-weight:600}
+
+/* 접근성 */
+button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* 좁은 화면(휴대폰)에서는 1단으로 */
+@media (max-width:760px){
+  .wrap{padding:0 16px 60px}
+  header{align-items:stretch}
+  .sheet-body{grid-template-columns:1fr}
+  .col-main{border-right:0;border-bottom:1px solid var(--border)}
+  .btn-pill{width:100%}
+}
+
+@media print{
+  .sheet{box-shadow:none;page-break-inside:avoid}
+  .chip{display:none}
+  .action-row,.present-toggle{display:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <div class="eyebrow">강의 보조 도구 · 실습 진행 시트</div>
+      <h1>정부지원사업, 내 브랜드에 맞게 <em>제대로 쓰는 실습</em></h1>
+    </div>
+    <p class="head-note"><strong>패션·뷰티 소상공인 강의 현장용.</strong> 강의 중 이 페이지를 열고 실습을 하나씩 여세요. 단계별 체크로 참여자가 진행 상황을 그대로 따라갈 수 있습니다.</p>
+  </header>
+
+  <!-- 실습 메뉴 7가지 -->
+  <section class="menu">
+    <div class="menu-head"><h2>실습 메뉴 7가지</h2></div>
+    <div class="menu-grid" id="menuGrid"></div>
+  </section>
+
+  <!-- 실습 상세 (JS로 렌더) -->
+  <div id="sheetHolder"></div>
+
+  <!-- F2. 내 미니 사업계획서 모아보기 -->
+  <section class="plan-section">
+    <div class="plan-card-outer">
+      <div class="plan-top">
+        <div class="plan-title">내 미니 사업계획서</div>
+        <div class="plan-progress-wrap">
+          <span class="plan-progress-num" id="planProgNum">8칸 중 0칸 완성</span>
+          <div class="progress-track"><div class="progress-fill" id="planProgFill"></div></div>
+        </div>
+      </div>
+      <div class="profile-row">
+        <label for="brandInput">브랜드명</label>
+        <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
+        <button class="present-toggle" id="presentToggleBtn" type="button">🔍 발표 모드</button>
+      </div>
+      <div class="plan-grid" id="planGrid"></div>
+
+      <div class="action-row">
+        <button class="btn-pill primary" id="uploadBtn" type="button">업로드</button>
+      </div>
+      <div class="upload-status" id="uploadStatus"></div>
+    </div>
+  </section>
+</div>
+
+<div class="present-overlay" id="presentOverlay">
+  <div class="present-card">
+    <button class="present-close" id="presentCloseBtn" type="button">✕</button>
+    <div class="plan-title" id="presentBrand" style="margin-bottom:18px">내 미니 사업계획서</div>
+    <div class="plan-grid" id="presentGrid"></div>
+  </div>
+</div>
+
+<script>
+const PRACTICES = [
+  {
+    id:"p1", no:"01", name:"내 브랜드 핵심 3줄", time:10,
+    part:"교안 PART 01 · 핵심 포인트 3가지",
+    spare:false,
+    sub:"비즈니스 모델 · 주요 경쟁력 · 차별화를 딱 한 문장씩 적는 첫 실습.",
+    steps:[
+      {min:"3분", t:"<b>비즈니스 모델</b> — 누구에게, 무엇을, 팔아서 어떻게 돈이 되는지 한 문장", ex:"예: 30대 캠핑족에게 발수 소재 가방을 온라인 스토어로 판매",
+        input:{key:"p1_s1", label:"비즈니스 모델 한 문장", placeholder:"예: 30대 캠핑족에게 발수 소재 가방을 온라인 스토어로 판매합니다", rows:2}},
+      {min:"3분", t:"<b>주요 경쟁력</b> — 다른 브랜드에는 없고 나만 가진 것 한 문장", ex:"예: 폐원단을 직접 수급해 소량 생산하는 봉제 공장 협업망",
+        input:{key:"p1_s2", label:"주요 경쟁력 한 문장", placeholder:"예: 폐원단을 직접 수급해 소량 생산하는 봉제 공장 협업망이 있어요", rows:2}},
+      {min:"3분", t:"<b>차별화</b> — 고객이 나를 선택해야 하는 이유 한 문장", ex:"예: 내 몸 사이즈를 3일 안에 재단·수선해 주는 맞춤 서비스",
+        input:{key:"p1_s3", label:"차별화 한 문장", placeholder:"예: 내 몸 사이즈를 3일 안에 재단·수선해 주는 맞춤 서비스예요", rows:2}},
+      {min:"1분", t:"옆 사람에게 3문장 읽어 주고, 서로 <b>\"이 문장만 읽어도 뭘 파는 브랜드인지 알겠는가?\"</b> 확인", ex:"",
+        input:{key:"p1_s4", label:"메모(선택)", placeholder:"받은 피드백이나 느낀 점을 적어도 좋아요", rows:2}}
+    ],
+    result:["완성되면 이렇게 — 한 장 세 줄","비즈니스 모델: 20~30대 직장인 여성에게 [모던 정장 원피스]를 [온라인 스토어]로 판매","주요 경쟁력: [10년차 패턴 제작자의 자체 패턴] 보유","차별화: [손 떨림·관절 불편 고객을 위한 착용 도움 디자인]"],
+    tip:"\"예쁘다\", \"좋은 품질\" 같은 형용사가 나오면 바로 멈추고 \"그래서 뭐가 다른데?\"를 한 번 더 묻게 하세요. 평가위원이 하는 질문 그대로입니다.",
+    prep:["A4 워크시트 1장 (3칸)","필기도구"],
+  },
+  {
+    id:"p2", no:"02", name:"아이템 한 문장 정의", time:10,
+    part:"교안 PART 03 · 아이템",
+    spare:true,
+    sub:"고객 1명 + 문제 1개 + 해결 1개를 한 문장으로 압축합니다.",
+    steps:[
+      {min:"2분", t:"<b>고객 1명</b>: 내 옷·가방을 실제로 사는 사람을 구체적으로 한 명 정하기 (나이 · 상황 · 성격까지)", ex:"예: 지하철 출퇴근 1시간, 땀 많이 나는 40대 남성",
+        input:{key:"p2_s1", label:"고객 1명", placeholder:"예: 지하철 출퇴근 1시간, 땀 많이 나는 40대 남성", rows:2}},
+      {min:"3분", t:"<b>문제 1개</b>: 그 사람이 지금 겪는 불편을 정확히 한 문장으로", ex:"예: 셔츠 안에 입을 속옷이 잘 마르지 않아 하루 종일 불쾌하다",
+        input:{key:"p2_s2", label:"문제 1개", placeholder:"예: 셔츠 안에 입을 속옷이 잘 마르지 않아 하루 종일 불쾌하다", rows:2}},
+      {min:"4분", t:"<b>해결 1개</b>: 내 제품이 그 문제를 어떻게 없애는지 한 문장으로 합치기", ex:"예: [땀이 많이 나는 고객을 위한 항균 속건 원단 이너웨어]",
+        input:{key:"p2_s3", label:"아이템 한 문장", placeholder:"예: 땀이 많이 나는 고객을 위한 항균 속건 원단 이너웨어", rows:2}},
+      {min:"1분", t:"완성 문장을 소리 내어 읽고, <b>제품명만 말해도 고객과 문제가 떠오르는지</b> 점검", ex:"",
+        input:{key:"p2_s4", label:"메모(선택)", placeholder:"점검하며 느낀 점을 적어도 좋아요", rows:2}}
+    ],
+    result:["완성되면 이렇게 — 아이템 한 문장","[캠핑족을 위한 발수 가방, 식기 분리형 백]","[과거 판매 이력과 SNS 반응으로 수요를 예측한 한정판 티셔츠]","→ 누가 쓰는지 + 무슨 문제를 푸는지가 제품명 안에 들어 있습니다."],
+    tip:"\"누구나\" \"모두를 위한\"이라고 쓰면 다시 돌아와서 한 명으로 좁히게 하세요. 아이템은 좁을수록 명확해집니다.",
+    prep:["필기도구","교안 아이템 예시 슬라이드"],
+  },
+  {
+    id:"p3", no:"03", name:"숫자로 말하기 바꾸기", time:10,
+    part:"교안 PART 03 · 홍보 방안 / 기대 효과",
+    spare:false,
+    sub:"모호한 문장을 평가위원이 믿을 수 있는 숫자 문장으로 바꿉니다.",
+    steps:[
+      {min:"2분", t:"화면의 <b>나쁜 예시</b> 확인: \"SNS 홍보를 적극적으로 할 예정입니다.\" — 왜 안 되는지 토론", ex:"",
+        input:{key:"p3_s1", label:"메모(선택)", placeholder:"토론하며 나온 이야기를 적어도 좋아요", rows:2}},
+      {min:"4분", t:"내 브랜드의 홍보 문장을 <b>숫자가 들어간 문장</b>으로 바꿔 쓰기", ex:"예: 인스타 팔로워 3,000명 · 협업 구매율 00% 기대",
+        input:{key:"p3_s2", label:"숫자 문장", placeholder:"예: 인스타 팔로워 3,000명 · 협업 구매율 00% 기대", rows:2}},
+      {min:"3분", t:"<b>지원사업 전 / 후 비교</b>로 한 번 더 쓰기", ex:"예: 전 — 월 10만원 광고 시 100만원 매출 / 후 — 월 100만원 광고 시 1,000만원 매출 예상",
+        input:{key:"p3_s3", label:"전/후 비교 문장", placeholder:"예: 전 — 월 10만원 광고 시 100만원 매출 / 후 — 월 100만원 광고 시 1,000만원 매출 예상", rows:2}},
+      {min:"1분", t:"짝꿍 교차 확인: <b>\"이 숫자를 평가위원이 믿을 수 있겠는가?\"</b>", ex:"",
+        input:{key:"p3_s4", label:"메모(선택)", placeholder:"교차 확인하며 느낀 점을 적어도 좋아요", rows:2}}
+    ],
+    result:["완성되면 이렇게 — 숫자 문장","[인플루언서 협업 구매율 00%] + [인스타 팔로워 3,000명]","[지원사업 후] 월 100만원 광고 집행 시 1,000만원 매출 발생 예상"],
+    tip:"숫자의 근거(지금 팔로워 수, 현재 광고 성과)를 한 줄 덧붙이게 하면 신뢰도가 확 올라갑니다. 근거 없는 큰 숫자는 역효과임을 강조하세요.",
+    prep:["필기도구","현재 SNS 지표(팔로워 수 등)를 볼 수 있는 휴대폰"],
+  },
+  {
+    id:"p4", no:"04", name:"경쟁 브랜드 비교표", time:30,
+    part:"교안 PART 02 · 평가위원의 기준",
+    spare:false,
+    sub:"휴대폰으로 경쟁 브랜드 2곳을 찾아 비교표를 만들고 차별화를 도출합니다.",
+    steps:[
+      {min:"10분", t:"<b>경쟁 브랜드 2곳 찾기</b> — 인스타그램·스마트스토어·무신사 등에서 내 키워드로 검색", ex:"",
+        input:{key:"p4_s1", label:"찾은 경쟁 브랜드", placeholder:"예: 브랜드A(인스타그램), 브랜드B(스마트스토어)", rows:2}},
+      {min:"10분", t:"<b>비교표 작성</b> — 가격대 · 타깃 고객 · 판매 채널 · 강점 · 약점 5칸 채우기", ex:"",
+        input:{key:"p4_s2", label:"비교표 핵심 한 줄", placeholder:"예: 두 브랜드 모두 가격대·타깃·채널이 비슷하지만 약점은…", rows:2}},
+      {min:"10분", t:"<b>공유</b> — \"내가 유일하게 할 수 있는 것\" 1개를 도출해 차별화 문장 완성 + 강사 피드백", ex:"",
+        input:{key:"p4_s3", label:"차별화 문장(최종)", placeholder:"예: 경쟁사는 모두 대량생산·20대 타깃인데, 나는 중년 여성 맞춤 소량 생산으로 간다", rows:2}}
+    ],
+    result:["완성되면 이렇게 — 비교표 한 줄 요약","경쟁사 A·B는 모두 [앳된 컬러 · 20대 타깃 · 대량생산] → 나는 [중년 여성 · 자체 패턴 · 소량 맞춤]으로 간다"],
+    tip:"차별화 후보가 \"더 싸게\", \"더 예쁘게\"뿐이면 한 번 더 파고들게 하세요. 가격·디자인은 차별화가 아니라 기본값이라는 점을 피드백에서 짚어 주면 좋습니다.",
+    prep:["휴대폰(필수)","비교표 워크시트"],
+  },
+  {
+    id:"p5", no:"05", name:"ESG 한 줄 발굴", time:10,
+    part:"교안 PART 03 · ESG",
+    spare:false,
+    sub:"이미 하고 있는 활동을 ESG 언어로 번역해 한 줄로 씁니다.",
+    steps:[
+      {min:"2분", t:"교안 사례 시연: [폐원단 재생 — 월 10kg → 연 1.2t, 30벌 판매]를 ESG 문장으로 번역하는 과정 보기", ex:"",
+        input:{key:"p5_s1", label:"메모(선택)", placeholder:"시연을 보며 떠오른 아이디어를 적어도 좋아요", rows:2}},
+      {min:"6분", t:"E·S·G 세 칸에 내 브랜드가 <b>이미 하고 있거나 바로 시작할 수 있는</b> 활동 각 1개 적기", ex:"E: 남는 원단 리폼 · S: 지역 봉제공장과 함께 · G: 투명한 수급 설명",
+        input:{key:"p5_s2", label:"E·S·G 각 1개", placeholder:"E: 남는 원단 리폼 · S: 지역 봉제공장과 함께 · G: 투명한 수급 설명", rows:3}},
+      {min:"2분", t:"가장 현실적인 1개를 골라 <b>숫자가 들어간 ESG 한 줄</b>로 완성", ex:"예: 연 00벌 판매 시 연 00kg 폐원단 재생",
+        input:{key:"p5_s3", label:"ESG 한 줄", placeholder:"예: 연 00벌 판매 시 연 00kg 폐원단 재생", rows:2}}
+    ],
+    result:["완성되면 이렇게 — ESG 한 줄","[폐원단 재생] 월 100만원 매출 = 300벌 판매 = 월 100kg 폐원단 재생 (연 1.2t)"],
+    tip:"\"없다\"고 쓰는 사람이 많습니다. 생산 방식, 협력 공장, 고용 형태만 물어봐도 E·S·G 후보가 반드시 나옵니다. 있는 것을 찾아 주는 실습임을 먼저 알려 주세요.",
+    prep:["E·S·G 3칸 워크시트","필기도구"],
+  },
+  {
+    id:"p6", no:"06", name:"기대효과 매출 계산", time:10,
+    part:"교안 PART 03 · 기대 효과",
+    spare:true,
+    sub:"판매가 × 수량으로 기대 매출을 직접 계산해 숫자를 만듭니다.",
+    steps:[
+      {min:"2분", t:"<b>판매 단가</b> 정하기 — 실제 내 스토어 판매가 기준", ex:"예: 원피스 1벌 79,000원",
+        input:{key:"p6_s1", label:"판매 단가", placeholder:"예: 원피스 1벌 79,000원", rows:2}},
+      {min:"3분", t:"<b>월 판매 수량</b> — 지원사업 전 / 후 두 단계로 나눠 현실적으로 잡기", ex:"전: 월 13벌 / 후: 월 130벌",
+        input:{key:"p6_s2", label:"월 판매 수량(전/후)", placeholder:"전: 월 13벌 / 후: 월 130벌", rows:2}},
+      {min:"3분", t:"<b>곱해서 기대 매출 완성</b> — 연 단위로도 환산", ex:"전: 월 100만원 / 후: 월 1,000만원 (연 1.2억)",
+        input:{key:"p6_s3", label:"기대 매출(최종)", placeholder:"전: 월 100만원 / 후: 월 1,000만원 (연 1.2억)", rows:2}},
+      {min:"2분", t:"옆 사람의 숫자를 듣고 <b>너무 낙관적이진 않은지</b> 서로 점검", ex:"",
+        input:{key:"p6_s4", label:"메모(선택)", placeholder:"점검하며 느낀 점을 적어도 좋아요", rows:2}}
+    ],
+    result:["완성되면 이렇게 — 기대 효과","폐원단 재생 기준: 월 100만원 매출 = 30벌 판매 = 월 10kg 재생 → 지원사업 후 월 1,000만원 = 300벌 = 연 1.2t 재생"],
+    tip:"계산기 어플을 켜게 하세요. 숫자를 '뽑아낸' 경험이 있으면 발표·면접에서 그 숫자를 지킬 수 있습니다. 대충 외운 숫자는 질문 한 방에 무너집니다.",
+    prep:["휴대폰 계산기","내 스토어 판매가 (알고 있으면 충분)"],
+  },
+  {
+    id:"p7", no:"07", name:"미니 사업계획서 1페이지 + 1분 발표", time:30,
+    part:"교안 PART 03 · 9요소 종합",
+    spare:false,
+    sub:"앞선 실습 결과물을 모아 1페이지를 완성하고 평가위원 앞에서 발표합니다.",
+    steps:[
+      {min:"5분", t:"<b>재료 모으기</b> — 앞선 실습에서 쓴 문장(핵심 3줄 · 숫자 문장 · ESG 한 줄) 찾아 펼치기", ex:"",
+        input:{key:"p7_s1", label:"메모(선택)", placeholder:"모은 문장들을 적어도 좋아요", rows:2}},
+      {min:"15분", t:"<b>1페이지 완성</b> — 아이템 · 비즈니스 모델 · 차별화 · 향후 계획 · 홍보 방안(숫자) · 기대 효과 · ESG · 인력 구성 8칸 채우기", ex:"",
+        inputs:[
+          {key:"p7_future", label:"향후 계획", placeholder:"예: 6개월 내 오프라인 팝업 1회, 1년 내 두 번째 라인 출시", rows:2},
+          {key:"p7_team", label:"인력 구성", placeholder:"예: 대표 1명 디자인·생산 총괄, 외주 패턴사 1명", rows:2}
+        ]},
+      {min:"7분", t:"<b>1분 발표</b> — 2~3명 앞에서 발표, 나머지는 평가위원 롤플레이", ex:"",
+        input:{key:"p7_s3", label:"메모(선택)", placeholder:"발표하며 느낀 점을 적어도 좋아요", rows:2}},
+      {min:"3분", t:"<b>평가위원 질문</b> — \"이 사업이 돌아갈 구조인가?\" \"왜 하필 당신인가?\"로 마무리 피드백", ex:"",
+        input:{key:"p7_s4", label:"메모(선택)", placeholder:"받은 질문과 답변을 적어도 좋아요", rows:2}}
+    ],
+    result:["완성되면 이렇게 — 1페이지 사업계획서","아이템: [땀이 많이 나는 고객을 위한 항균 속건 원단 이너웨어]","홍보: [인스타 팔로워 3,000명 · 협업 구매율 00%]","ESG: [연 00kg 폐원단 재생] — 앞선 실습이 칸마다 그대로 들어갑니다."],
+    tip:"발표자는 반드시 방금 쓴 문장을 그대로 읽게 하지 말고, 눈을 보고 말하게 하세요. 사업계획서는 문서지만 지원사업은 결국 사람을 설득하는 일임을 보여 주는 장면입니다.",
+    prep:["1페이지 템플릿 (8칸)","앞선 실습 워크시트 전부"],
+  }
+];
+
+// 각 step의 input(s)을 하나의 배열 형태로 통일
+PRACTICES.forEach(p=>{
+  p.steps.forEach(s=>{
+    if (s.inputs) return;
+    s.inputs = s.input ? [s.input] : [];
+  });
+});
+
+// F2. 사업계획서 8칸 매핑
+const PLAN_SLOTS = [
+  {label:"아이템 (한 문장)", keys:["p2_s3"], goto:"p2"},
+  {label:"비즈니스 모델", keys:["p1_s1"], goto:"p1"},
+  {label:"주요 경쟁력", keys:["p1_s2"], goto:"p1"},
+  {label:"차별화", keys:["p4_s3","p1_s3"], goto:"p4", pickFirst:true},
+  {label:"홍보 방안 (숫자)", keys:["p3_s2","p3_s3"], goto:"p3", join:true},
+  {label:"기대 효과", keys:["p6_s3"], goto:"p6"},
+  {label:"ESG 한 줄", keys:["p5_s3"], goto:"p5"},
+  {label:"향후 계획 · 인력 구성", keys:["p7_future","p7_team"], goto:"p7", join:true},
+];
+
+// ── localStorage 헬퍼 ───────────────────────
+const LS_PREFIX = "gsap_v2_";
+function lsGetInput(key){
+  try { const raw = localStorage.getItem(LS_PREFIX+"input_"+key); return raw ? JSON.parse(raw) : null; }
+  catch { return null; }
+}
+function lsSetInput(key, text){
+  try { localStorage.setItem(LS_PREFIX+"input_"+key, JSON.stringify({text, updatedAt:Date.now()})); return true; }
+  catch { return false; }
+}
+function lsGetStepDone(practiceId, idx){
+  try { return localStorage.getItem(LS_PREFIX+"stepdone_"+practiceId+"_"+idx) === "1"; } catch { return false; }
+}
+function lsSetStepDone(practiceId, idx, done){
+  try { localStorage.setItem(LS_PREFIX+"stepdone_"+practiceId+"_"+idx, done ? "1" : "0"); } catch {}
+}
+function lsGetProfile(){
+  try { const raw = localStorage.getItem(LS_PREFIX+"profile"); return raw ? JSON.parse(raw) : {brand:""}; } catch { return {brand:""}; }
+}
+function lsSetProfile(p){ try { localStorage.setItem(LS_PREFIX+"profile", JSON.stringify(p)); } catch {} }
+function lsGetSubmissionId(){
+  try {
+    let id = localStorage.getItem(LS_PREFIX+"submission_id");
+    if (!id) { id = (crypto.randomUUID ? crypto.randomUUID() : (Date.now()+"-"+Math.random().toString(36).slice(2))); localStorage.setItem(LS_PREFIX+"submission_id", id); }
+    return id;
+  } catch { return "tmp-"+Date.now(); }
+}
+
+function allStepKeysOfPractice(p){
+  const out = [];
+  p.steps.forEach(s=> s.inputs.forEach(i=> out.push(i.key)));
+  return out;
+}
+
+function nowLabel(){
+  const d = new Date();
+  let h = d.getHours(); const ampm = h < 12 ? "오전" : "오후"; h = h % 12; if (h===0) h = 12;
+  const m = String(d.getMinutes()).padStart(2,"0");
+  return ampm+" "+h+":"+m;
+}
+
+const grid = document.getElementById('menuGrid');
+const holder = document.getElementById('sheetHolder');
+let current = null;
+let clearArmed = {};
+
+/* 메뉴 칩 */
+PRACTICES.forEach((p)=>{
+  const b=document.createElement('button');
+  b.className='chip'; b.id='chip-'+p.id;
+  b.innerHTML = `
+    <div class="chip-row">
+      <span class="chip-no">실습 ${p.no}</span>
+      <span class="chip-time">⏱ ${p.time}분</span>
+    </div>
+    <div class="chip-name">${p.name}</div>
+    <span class="chip-part">${p.part}</span>`;
+  b.onclick=()=>openPractice(p.id, true);
+  grid.appendChild(b);
+});
+
+function stepInputsHtml(s, pid){
+  if (!s.inputs.length) return '';
+  return s.inputs.map(inp=>{
+    const saved = lsGetInput(inp.key);
+    const val = saved ? saved.text : '';
+    return `
+      <div class="step-input-wrap">
+        <textarea class="step-input-field" data-key="${inp.key}" rows="${inp.rows||2}"
+          placeholder="${inp.placeholder.replace(/"/g,'&quot;')}"
+          aria-label="${inp.label.replace(/"/g,'&quot;')}"
+          onclick="event.stopPropagation()"
+        >${val.replace(/</g,'&lt;')}</textarea>
+        <div class="step-save-status" id="save-${inp.key}"></div>
+      </div>`;
+  }).join('');
+}
+
+/* 상세 시트 렌더 */
+function openPractice(id, userClicked){
+  const p=PRACTICES.find(x=>x.id===id);
+  current=p;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  const chipEl = document.getElementById('chip-'+id);
+  if (chipEl) chipEl.classList.add('active');
+  if (userClicked) history.replaceState(null, '', '#'+id);
+
+  holder.innerHTML = `
+  <article class="sheet" id="sheet-${p.id}">
+    <span class="c3"></span><span class="c4"></span>
+    <div class="sheet-head">
+      <div>
+        <span class="sheet-no">실습 ${p.no} / 07</span>
+        <div class="sheet-title">${p.name}</div>
+        <p class="sheet-sub">${p.sub}</p>
+      </div>
+      <div class="sheet-meta">
+        <span class="badge reserve-badge">${p.part}</span>
+        <span class="badge time">⏱ ${p.time}분</span>
+        <button class="btn-clear" id="clearBtn-${p.id}" type="button">🗑 내 답안 지우기</button>
+      </div>
+    </div>
+    <div class="sheet-body">
+      <div class="col-main">
+        <h3 class="block-label">진행 단계 — 끝낼 때마다 눌러서 체크, 아래 칸에 답을 적으면 자동으로 저장돼요</h3>
+        <div class="steps" id="steps-${p.id}">
+          ${p.steps.map((s,i)=>`
+            <div class="step${lsGetStepDone(p.id,i)?' done':''}" data-idx="${i}">
+              <div class="step-row" role="checkbox" aria-checked="${lsGetStepDone(p.id,i)}" tabindex="0" onclick="toggleStep(this)" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleStep(this)}">
+                <span class="box">✓</span>
+                <span class="step-min">${s.min}</span>
+                <span class="step-text">${s.t}${s.ex?`<span class="ex">${s.ex}</span>`:''}</span>
+              </div>
+              ${stepInputsHtml(s, p.id)}
+            </div>`).join('')}
+        </div>
+        <div class="progress-row">
+          <span class="progress-num" id="progNum-${p.id}">0 / ${p.steps.length} 단계</span>
+          <div class="progress-track"><div class="progress-fill" id="progFill-${p.id}"></div></div>
+        </div>
+
+        <h3 class="block-label">완성물 예시</h3>
+        <div class="example">
+          ${p.result.map((r,i)=> i===0 ? `<p><b>${r}</b></p>` : `<p>${r}</p>`).join('')}
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="side-item">
+          <div class="kv"><b>준비물</b><ul>${p.prep.map(x=>`<li>${x}</li>`).join('')}</ul></div>
+        </div>
+      </div>
+    </div>
+  </article>`;
+
+  updateProgress(p.id);
+  bindStepInputs(p.id);
+  document.getElementById('clearBtn-'+p.id).onclick = ()=> handleClear(p);
+  if (userClicked) holder.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* 체크 */
+function toggleStep(el){
+  const stepEl = el.parentElement;
+  stepEl.classList.toggle('done');
+  el.setAttribute('aria-checked', stepEl.classList.contains('done'));
+  const idx = parseInt(stepEl.dataset.idx,10);
+  lsSetStepDone(current.id, idx, stepEl.classList.contains('done'));
+  updateProgress(current.id);
+}
+function updateProgress(pid){
+  const p = PRACTICES.find(x=>x.id===pid);
+  const stepsEl = document.querySelectorAll('#steps-'+pid+' .step');
+  let done=0; stepsEl.forEach(s=>{ if (s.classList.contains('done')) done++; });
+  const numEl = document.getElementById('progNum-'+pid);
+  const fillEl = document.getElementById('progFill-'+pid);
+  if (numEl) numEl.textContent = `${done} / ${stepsEl.length} 단계`;
+  if (fillEl) fillEl.style.width = (stepsEl.length? (done/stepsEl.length*100):0)+'%';
+}
+
+/* 자동저장: 디바운스 500ms */
+let saveTimers = {};
+function bindStepInputs(pid){
+  document.querySelectorAll('#sheet-'+pid+' .step-input-field').forEach(ta=>{
+    const key = ta.dataset.key;
+    const statusEl = document.getElementById('save-'+key);
+    ta.addEventListener('input', ()=>{
+      if (statusEl){ statusEl.textContent = '● 작성 중…'; statusEl.className='step-save-status saving'; }
+      clearTimeout(saveTimers[key]);
+      saveTimers[key] = setTimeout(()=> flushInput(key, ta.value, statusEl), 500);
+    });
+  });
+}
+function flushInput(key, text, statusEl){
+  const ok = lsSetInput(key, text);
+  if (statusEl){
+    if (ok){ statusEl.textContent = '✓ 저장됨 '+nowLabel(); statusEl.className='step-save-status saved'; }
+    else { statusEl.textContent = '⚠ 이 브라우저에서는 저장이 안 됩니다'; statusEl.className='step-save-status warn'; }
+  }
+  renderPlan();
+}
+function flushAllVisible(){
+  document.querySelectorAll('.step-input-field').forEach(ta=>{
+    const key = ta.dataset.key;
+    clearTimeout(saveTimers[key]);
+    lsSetInput(key, ta.value);
+  });
+}
+window.addEventListener('beforeunload', flushAllVisible);
+document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState==='hidden') flushAllVisible(); });
+
+/* 내 답안 지우기 — 두 번 눌러야 실행 */
+function handleClear(p){
+  const btn = document.getElementById('clearBtn-'+p.id);
+  if (!clearArmed[p.id]){
+    clearArmed[p.id] = true;
+    btn.classList.add('armed');
+    btn.textContent = '정말 지울까요? 한 번 더 눌러주세요';
+    setTimeout(()=>{ clearArmed[p.id]=false; if(btn){btn.classList.remove('armed'); btn.textContent='🗑 내 답안 지우기';} }, 3000);
+    return;
+  }
+  clearArmed[p.id] = false;
+  allStepKeysOfPractice(p).forEach(key=>{ try{ localStorage.removeItem(LS_PREFIX+'input_'+key); }catch{} });
+  p.steps.forEach((s,i)=> lsSetStepDone(p.id, i, false));
+  openPractice(p.id, false);
+  renderPlan();
+}
+
+/* ── F2. 모아보기 ───────────────────────── */
+function getSlotValue(slot){
+  if (slot.join){
+    const parts = slot.keys.map(k=>{ const v=lsGetInput(k); return v && v.text ? v.text.trim() : ''; }).filter(Boolean);
+    return parts.join('\n');
+  }
+  if (slot.pickFirst){
+    for (const k of slot.keys){ const v=lsGetInput(k); if (v && v.text && v.text.trim()) return v.text.trim(); }
+    return '';
+  }
+  const v = lsGetInput(slot.keys[0]);
+  return v && v.text ? v.text.trim() : '';
+}
+function buildPlanCellsHtml(){
+  let filled = 0;
+  const html = PLAN_SLOTS.map(slot=>{
+    const val = getSlotValue(slot);
+    if (val) filled++;
+    return `
+      <div class="plan-cell ${val?'filled':'empty'}" onclick="openPractice('${slot.goto}', true)">
+        <div class="plan-cell-label">${slot.label}</div>
+        <div class="plan-cell-val">${val ? val.replace(/</g,'&lt;') : '실습 '+slot.goto.replace('p','0')+'를 먼저 채워 주세요'}</div>
+        ${!val? `<span class="plan-cell-goto">실습 ${slot.goto.replace('p','0')}로 이동 →</span>` : ''}
+      </div>`;
+  }).join('');
+  return {html, filled};
+}
+function renderPlan(){
+  const {html, filled} = buildPlanCellsHtml();
+  document.getElementById('planGrid').innerHTML = html;
+  document.getElementById('planProgNum').textContent = `${PLAN_SLOTS.length}칸 중 ${filled}칸 완성`;
+  document.getElementById('planProgFill').style.width = (filled/PLAN_SLOTS.length*100)+'%';
+}
+
+/* 브랜드명 */
+const brandInput = document.getElementById('brandInput');
+brandInput.value = lsGetProfile().brand || '';
+brandInput.addEventListener('input', ()=> lsSetProfile({brand: brandInput.value}));
+
+/* 발표 모드 */
+document.getElementById('presentToggleBtn').onclick = ()=>{
+  const {html} = buildPlanCellsHtml();
+  document.getElementById('presentGrid').innerHTML = html;
+  document.getElementById('presentBrand').textContent = (brandInput.value || '내 미니 사업계획서');
+  document.getElementById('presentOverlay').classList.add('on');
+};
+document.getElementById('presentCloseBtn').onclick = ()=> document.getElementById('presentOverlay').classList.remove('on');
+
+/* ── F3. 업로드 & 내보내기 ───────────────────────── */
+function collectAllAnswers(){
+  const out = {};
+  PRACTICES.forEach(p=> allStepKeysOfPractice(p).forEach(key=>{
+    const v = lsGetInput(key);
+    out[key] = v && v.text ? v.text : '';
+  }));
+  return out;
+}
+const uploadStatusEl = document.getElementById('uploadStatus');
+document.getElementById('uploadBtn').onclick = async ()=>{
+  flushAllVisible();
+  const brandAlias = (brandInput.value||'').trim();
+  if (!brandAlias){ uploadStatusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; uploadStatusEl.className='upload-status err'; brandInput.focus(); return; }
+  uploadStatusEl.textContent='업로드 중…'; uploadStatusEl.className='upload-status';
+  try{
+    const res = await fetch('/api/study/submit', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ submissionId:lsGetSubmissionId(), brandAlias, answers:collectAllAnswers() })
+    });
+    const data = await res.json().catch(()=>({success:false}));
+    if (data && data.success){ uploadStatusEl.textContent='✓ 업로드 완료했어요 '+nowLabel(); uploadStatusEl.className='upload-status ok'; }
+    else { uploadStatusEl.textContent='⚠ '+(data && data.message ? data.message : '업로드에 실패했어요'); uploadStatusEl.className='upload-status err'; }
+  }catch(e){
+    uploadStatusEl.textContent='⚠ 네트워크 문제로 업로드하지 못했어요. 다시 시도해주세요'; uploadStatusEl.className='upload-status err';
+  }
+};
+
+/* F4. 딥링크 */
+window.addEventListener('hashchange', ()=>{
+  const id = location.hash.replace('#','');
+  if (PRACTICES.find(x=>x.id===id)) openPractice(id, false);
+});
+
+/* 첫 화면: 해시가 있으면 그 실습, 없으면 실습 1 */
+const initialId = location.hash.replace('#','');
+openPractice(PRACTICES.find(x=>x.id===initialId) ? initialId : 'p1', false);
+renderPlan();
+</script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4edd5f8ec12a48cfa682ab8261b80a79","spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
