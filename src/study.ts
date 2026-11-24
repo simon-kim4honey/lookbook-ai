@@ -81,6 +81,30 @@ studyApi.post('/submit', async (c) => {
   }
 })
 
+// GET /api/study/restore?brandAlias=XXX — 학생이 다른 기기에서 이어서 작성할 수 있도록
+// 같은 브랜드명으로 올린 가장 최근 제출물을 불러온다. 비밀번호 없이 브랜드명만으로
+// 조회하지만(강사 승인 없이 학생 스스로 쓰는 기능), 무차별 스캔 방지로 IP당 호출 수는 제한한다.
+studyApi.get('/restore', async (c) => {
+  try {
+    const brandAlias = String(c.req.query('brandAlias') || '').trim().slice(0, 60)
+    if (!brandAlias) return c.json({ success: false, message: '브랜드명을 입력해주세요.' }, 400)
+
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown'
+    const ok = await checkRateLimit(c.env.LOOKBOOK_KV, `study_restore_rl_${ip}`, 20, 60)
+    if (!ok) return c.json({ success: false, message: '요청이 너무 많아요. 잠시 후 다시 시도해주세요.' }, 429)
+
+    const db = c.env.LOOKBOOK_DB
+    const row: any = await db.prepare(
+      `SELECT id, answers_json, updated_at FROM study_submissions WHERE brand_alias = ? ORDER BY updated_at DESC LIMIT 1`
+    ).bind(brandAlias).first()
+    if (!row) return c.json({ success: false, message: '이 브랜드명으로 업로드된 답안을 찾지 못했어요.' }, 404)
+
+    return c.json({ success: true, id: row.id, answers: JSON.parse(row.answers_json || '{}'), updatedAt: row.updated_at })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
 // GET /api/study/submissions — 강사 조회. 비밀번호로 보호.
 studyApi.get('/submissions', studyAdminAuth, async (c) => {
   try {
