@@ -224,318 +224,261 @@ ${t.statText?`[수치] ${t.statText}`:``}
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>실습 교안 — 정부지원사업 작성, 패션·뷰티 소상공인 강의용</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
 :root{
-  --paper:#F4F5F2;        /* 제도지 배경 */
-  --sheet:#FDFDFB;        /* 카드 종이 */
-  --ink:#20262B;          /* 먹선 */
-  --ink-soft:#5A646C;     /* 연한 먹 */
-  --line:#C9CFCC;         /* 절취선 */
-  --thread:#D8452B;       /* 빨간 실 (강조) */
-  --thread-soft:#F7E3DE;  /* 실 물들인 배경 */
-  --needle:#2E6E5E;       /* 재단 초록(완료/긍정) */
-  --needle-soft:#E2EEE9;
-  --tape:#E9B44C;         /* 안전핀 금색 */
-  --ez-blue:#3182F6;      /* EZlook 메인 컬러 — v2에서 새로 추가하는 요소(업로드 버튼 등)에만 사용 */
-  --ez-blue-dark:#1B64DA;
-  --mono:'IBM Plex Mono',ui-monospace,monospace;
-  --body:'Pretendard Variable',Pretendard,-apple-system,sans-serif;
-  --disp:'Nanum Myeongjo',serif;
+  --main:#3182F6;
+  --main-dark:#1B64DA;
+  --bg:#F2F4F6;
+  --card:#FFFFFF;
+  --border:#E5E8EB;
+  --title:#191F28;
+  --body1:#333D4B;
+  --body2:#4E5968;
+  --sub:#6B7684;
+  --ph:#8B95A1;
+  --success:#00C896;
+  --success-soft:#E6F9F3;
+  --danger:#F04452;
+  --font:'Pretendard Variable',Pretendard,-apple-system,sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{
-  font-family:var(--body);
-  background:var(--paper);
-  color:var(--ink);
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--title);
   line-height:1.6;
   -webkit-font-smoothing:antialiased;
 }
-/* ── 눈금 종이 배경 ───────────────────────── */
-body::before{
-  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-  background-image:
-    linear-gradient(var(--line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size:36px 36px;
-  opacity:.28;
-}
-.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 28px 90px}
+.wrap{max-width:480px;margin:0 auto;padding:0 16px 80px}
 
-/* ── 상단 헤더: 작업지시서 머리 ───────────── */
-header{
-  padding:44px 0 26px;
-  display:flex;align-items:flex-end;justify-content:space-between;gap:32px;flex-wrap:wrap;
-  border-bottom:2px solid var(--ink);
-}
-.eyebrow{
-  font-family:var(--mono);font-size:12px;letter-spacing:.22em;
-  color:var(--thread);font-weight:600;text-transform:uppercase;
-  display:flex;align-items:center;gap:10px;margin-bottom:14px;
-}
-.eyebrow::before{content:"";width:34px;height:2px;background:var(--thread)}
-h1{font-family:var(--disp);font-weight:800;font-size:clamp(30px,4.4vw,46px);line-height:1.22;letter-spacing:-.01em}
-h1 em{font-style:normal;color:var(--thread);position:relative;white-space:nowrap}
-h1 em svg{position:absolute;left:0;bottom:-4px;width:100%;height:12px}
-.head-note{max-width:430px;color:var(--ink-soft);font-size:15px;padding-bottom:6px}
-.head-note strong{color:var(--ink)}
+header{padding:28px 0 18px}
+.eyebrow{font-size:13px;font-weight:600;color:var(--main);margin-bottom:8px}
+h1{font-weight:700;font-size:clamp(22px,6vw,27px);line-height:1.35;letter-spacing:-.01em;color:var(--title)}
+h1 em{font-style:normal;color:var(--main);position:relative;white-space:nowrap}
+h1 em svg{display:none}
+.head-note{color:var(--sub);font-size:14px;margin-top:10px}
+.head-note strong{color:var(--body1)}
 
-/* ── 수업 코드 바 (v2 신규) ───────────────── */
+/* ── 수업 코드 바 ───────────────── */
 .classbar{
-  margin-top:18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-  background:var(--sheet);border:1.5px solid var(--ink);border-radius:10px;padding:10px 14px;
+  margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;
 }
-.classbar label{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;color:var(--ink-soft);white-space:nowrap}
+.classbar label{font-size:13px;color:var(--sub);white-space:nowrap}
 .classbar input{
-  font-family:var(--mono);font-size:15px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
-  border:1.5px solid var(--line);border-radius:8px;padding:6px 10px;width:110px;background:#fff;color:var(--ink);
+  font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  border:1px solid var(--border);border-radius:8px;padding:7px 10px;width:104px;background:#fff;color:var(--title);
 }
-.classbar input:focus-visible{outline:3px solid var(--tape);outline-offset:1px}
+.classbar input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
 .classbar button{
-  font-family:var(--mono);font-weight:700;font-size:12.5px;cursor:pointer;
-  background:var(--ez-blue);color:#fff;border:none;border-radius:999px;padding:7px 16px;transition:.15s;
+  font-weight:700;font-size:13px;cursor:pointer;
+  background:var(--main);color:#fff;border:none;border-radius:999px;padding:8px 16px;transition:.15s;
 }
-.classbar button:hover{background:var(--ez-blue-dark)}
-.classbar .cb-status{font-family:var(--mono);font-size:12px;color:var(--ink-soft)}
-.classbar .cb-status.ok{color:var(--needle);font-weight:600}
+.classbar button:hover{background:var(--main-dark)}
+.classbar .cb-status{font-size:12.5px;color:var(--sub)}
+.classbar .cb-status.ok{color:var(--success);font-weight:600}
 
 /* ── 실습 메뉴 (7개) ─────────────────────── */
-section.menu{padding:34px 0 8px}
-.menu-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
-.menu-head h2{font-family:var(--disp);font-size:22px;font-weight:800}
-.menu-head span{font-family:var(--mono);font-size:12px;color:var(--ink-soft);letter-spacing:.14em}
-.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:14px}
+section.menu{padding:28px 0 6px}
+.menu-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.menu-head h2{font-size:18px;font-weight:700;color:var(--title)}
+.menu-head span{font-size:12.5px;color:var(--sub)}
+.menu-grid{display:grid;grid-template-columns:1fr;gap:10px}
 .chip{
   position:relative;text-align:left;cursor:pointer;
-  background:var(--sheet);border:1.5px solid var(--ink);border-radius:12px;
-  padding:16px 16px 14px;transition:.15s;
-  font-family:var(--body);
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:14px 16px;transition:.15s;
+  font-family:var(--font);
 }
-.chip:hover{transform:translateY(-2px);box-shadow:3px 4px 0 rgba(32,38,43,.14)}
-.chip.active{background:var(--ink);color:#F4F5F2}
-.chip.active .chip-part{color:#9FB0B8}
-.chip.active .chip-time{background:var(--thread);border-color:var(--thread);color:#fff}
-.chip-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
-.chip-no{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.18em;color:var(--ink-soft)}
+.chip:hover{border-color:var(--main)}
+.chip.active{background:var(--main);border-color:var(--main);color:#fff}
+.chip.active .chip-part{color:rgba(255,255,255,.75)}
+.chip.active .chip-no{color:rgba(255,255,255,.75)}
+.chip.active .chip-time{background:rgba(255,255,255,.2);border-color:transparent;color:#fff}
+.chip-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.chip-no{font-size:12px;font-weight:600;color:var(--sub)}
 .chip-time{
-  font-family:var(--mono);font-size:11px;font-weight:600;
-  border:1.5px solid var(--ink);border-radius:999px;padding:2px 10px;
+  font-size:11.5px;font-weight:600;
+  border-radius:999px;padding:2px 10px;background:#EAF2FF;color:var(--main);
 }
-.chip-time.reserve{border-style:dashed;color:var(--ink-soft)}
-.chip.active .chip-time.reserve{color:#E8ECEA}
-.chip-name{font-family:var(--disp);font-weight:700;font-size:16.5px;line-height:1.35}
-.chip-part{display:block;font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:7px;letter-spacing:.04em}
-.chip .spare{position:absolute;top:-9px;right:10px;background:var(--tape);color:var(--ink);
-  font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.12em;
-  padding:2px 9px;border-radius:4px;transform:rotate(2deg)}
+.chip-time.reserve{background:var(--bg);color:var(--sub)}
+.chip-name{font-weight:700;font-size:16px;line-height:1.35;color:inherit}
+.chip-part{display:block;font-size:12px;color:var(--sub);margin-top:5px}
+.chip .spare{position:absolute;top:-8px;right:10px;background:#FFF3DB;color:#B9770E;
+  font-size:10.5px;font-weight:700;
+  padding:2px 9px;border-radius:999px}
 
 /* ── 실습 상세 시트 ───────────────────────── */
 .sheet{
-  background:var(--sheet);
-  border:1.5px solid var(--ink);border-radius:4px;
-  box-shadow:6px 6px 0 rgba(32,38,43,.10);
-  margin-top:30px;position:relative;
+  background:var(--card);
+  border:1px solid var(--border);border-radius:16px;
+  margin-top:24px;
 }
-/* 네 귀퉁이 재단 표시 */
-.sheet::before,.sheet::after,.sheet .c3,.sheet .c4{content:"";position:absolute;width:18px;height:18px;border:0 solid var(--thread);z-index:2}
-.sheet::before{top:-1.5px;left:-1.5px;border-top-width:2.5px;border-left-width:2.5px}
-.sheet::after{top:-1.5px;right:-1.5px;border-top-width:2.5px;border-right-width:2.5px}
-.sheet .c3{bottom:-1.5px;left:-1.5px;border-bottom-width:2.5px;border-left-width:2.5px}
-.sheet .c4{bottom:-1.5px;right:-1.5px;border-bottom-width:2.5px;border-right-width:2.5px}
-
 .sheet-head{
-  display:flex;justify-content:space-between;align-items:flex-start;gap:20px;flex-wrap:wrap;
-  padding:26px 30px 22px;border-bottom:1.5px dashed var(--line);
+  display:flex;flex-direction:column;gap:10px;
+  padding:22px 20px 18px;border-bottom:1px solid var(--border);
 }
-.sheet-no{font-family:var(--mono);font-size:12px;letter-spacing:.22em;color:var(--thread);font-weight:600;margin-bottom:8px;display:block}
-.sheet-title{font-family:var(--disp);font-weight:800;font-size:clamp(24px,3vw,32px);line-height:1.3}
-.sheet-sub{color:var(--ink-soft);font-size:14.5px;margin-top:8px;max-width:560px}
-.sheet-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sheet-no{font-size:12.5px;color:var(--main);font-weight:600}
+.sheet-title{font-weight:700;font-size:clamp(19px,5vw,22px);line-height:1.35;color:var(--title)}
+.sheet-sub{color:var(--sub);font-size:14px;margin-top:6px}
+.sheet-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .badge{
-  font-family:var(--mono);font-size:12px;font-weight:600;
-  border:1.5px solid var(--ink);border-radius:999px;padding:5px 14px;background:var(--sheet);
+  font-size:12.5px;font-weight:600;
+  border:1px solid var(--border);border-radius:999px;padding:5px 12px;background:#fff;color:var(--body2);
 }
-.badge.time{background:var(--thread);border-color:var(--thread);color:#fff;font-size:13px;padding:6px 16px}
-.badge.reserve-badge{border-style:dashed;color:var(--ink-soft)}
+.badge.time{background:#EAF2FF;border-color:transparent;color:var(--main)}
+.badge.reserve-badge{color:var(--sub)}
 .btn-clear{
-  cursor:pointer;font-family:var(--mono);font-weight:600;font-size:12px;
-  background:var(--sheet);color:var(--thread);border:1.5px solid var(--thread);border-radius:999px;
+  cursor:pointer;font-weight:600;font-size:12.5px;
+  background:#fff;color:var(--danger);border:1px solid var(--danger);border-radius:999px;
   padding:6px 14px;transition:.15s;
 }
-.btn-clear:hover{background:var(--thread);color:#fff}
-.btn-clear.armed{background:var(--thread);color:#fff}
+.btn-clear:hover{background:var(--danger);color:#fff}
+.btn-clear.armed{background:var(--danger);color:#fff}
 
-.sheet-body{display:grid;grid-template-columns:1.6fr 1fr;gap:0}
-.col-main{padding:26px 30px;border-right:1.5px dashed var(--line)}
-.col-side{padding:26px 30px 30px}
+.sheet-body{display:block}
+.col-main{padding:20px}
+.col-side{padding:0 20px 20px}
 
 h3.block-label{
-  font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.2em;
-  color:var(--ink-soft);margin:0 0 14px;display:flex;align-items:center;gap:10px;
+  font-size:12.5px;font-weight:700;
+  color:var(--sub);margin:0 0 12px;
 }
-h3.block-label::after{content:"";flex:1;border-top:1px solid var(--line)}
-.col-main h3.block-label:not(:first-child){margin-top:30px}
+.col-main h3.block-label:not(:first-child){margin-top:26px}
 
 /* 진행 단계 체크리스트 */
 .steps{display:flex;flex-direction:column;gap:10px}
 .step{
-  border:1.5px solid var(--line);border-radius:10px;background:var(--sheet);
-  padding:13px 16px;transition:.15s;
+  border:1px solid var(--border);border-radius:12px;background:#fff;
+  padding:13px 14px;transition:.15s;
 }
-.step:hover{border-color:var(--ink)}
-.step-row{display:flex;gap:14px;align-items:flex-start;cursor:pointer;user-select:none}
+.step-row{display:flex;gap:12px;align-items:flex-start;cursor:pointer;user-select:none}
 .step .box{
-  flex:0 0 auto;width:22px;height:22px;margin-top:3px;border:2px solid var(--ink);border-radius:6px;
-  display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:600;color:transparent;
+  flex:0 0 auto;width:22px;height:22px;margin-top:2px;border:2px solid var(--border);border-radius:7px;
+  display:grid;place-items:center;font-size:12px;font-weight:700;color:transparent;
   transition:.15s;
 }
-.step.done{background:var(--needle-soft);border-color:var(--needle)}
-.step.done .box{background:var(--needle);border-color:var(--needle);color:#fff}
-.step.done .step-text{text-decoration:line-through;text-decoration-color:rgba(46,110,94,.5);color:var(--ink-soft)}
+.step.done{background:var(--success-soft);border-color:var(--success)}
+.step.done .box{background:var(--success);border-color:var(--success);color:#fff}
+.step.done .step-text{text-decoration:line-through;text-decoration-color:rgba(0,0,0,.25);color:var(--sub)}
 .step-min{
-  flex:0 0 auto;font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--thread);
-  background:var(--thread-soft);border-radius:6px;padding:3px 8px;margin-top:2px;white-space:nowrap;
+  flex:0 0 auto;font-size:11.5px;font-weight:700;color:var(--main);
+  background:#EAF2FF;border-radius:6px;padding:3px 8px;margin-top:1px;white-space:nowrap;
 }
-.step-text{font-size:15px}
-.step-text b{font-weight:700}
-.step-text .ex{display:block;font-size:13px;color:var(--ink-soft);margin-top:4px}
-.step-input-wrap{margin-top:10px;margin-left:36px}
+.step-text{font-size:14.5px;color:var(--body1)}
+.step-text b{font-weight:700;color:var(--title)}
+.step-text .ex{display:block;font-size:13px;color:var(--sub);margin-top:4px}
+.step-input-wrap{margin-top:10px;margin-left:34px}
 .step-input-field{
-  width:100%;font-family:var(--body);font-size:14.5px;color:var(--ink);
-  border:1.5px solid var(--line);border-radius:8px;padding:9px 12px;background:#fff;resize:vertical;
+  width:100%;font-family:var(--font);font-size:14.5px;color:var(--title);
+  border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:#fff;resize:vertical;
 }
-.step-input-field:focus-visible{outline:3px solid var(--tape);outline-offset:1px;border-color:var(--ink)}
-.step-input-field::placeholder{color:#9AA3A8}
-.step-save-status{font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:5px;min-height:14px}
-.step-save-status.saving{color:var(--tape)}
-.step-save-status.saved{color:var(--needle)}
-.step-save-status.warn{color:var(--thread)}
+.step-input-field:focus-visible{outline:3px solid var(--main);outline-offset:1px;border-color:var(--main)}
+.step-input-field::placeholder{color:var(--ph)}
+.step-save-status{font-size:11.5px;color:var(--sub);margin-top:5px;min-height:14px}
+.step-save-status.saving{color:#B9770E}
+.step-save-status.saved{color:var(--success)}
+.step-save-status.warn{color:var(--danger)}
 
-.progress-row{display:flex;align-items:center;gap:12px;margin-top:14px}
-.progress-track{flex:1;height:8px;background:var(--line);border-radius:99px;overflow:hidden}
-.progress-fill{height:100%;width:0%;background:var(--needle);border-radius:99px;transition:width .3s}
-.progress-num{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink-soft);white-space:nowrap}
+.progress-row{display:flex;align-items:center;gap:10px;margin-top:14px}
+.progress-track{flex:1;height:6px;background:var(--border);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:var(--main);border-radius:99px;transition:width .3s}
+.progress-num{font-size:12.5px;font-weight:600;color:var(--sub);white-space:nowrap}
 
 /* 완성물 예시 */
 .example{
-  border-left:3px solid var(--tape);background:rgba(233,180,76,.10);
-  border-radius:0 10px 10px 0;padding:14px 18px;font-size:14.5px;
+  border-left:3px solid var(--main);background:#EAF2FF;
+  border-radius:0 10px 10px 0;padding:14px 16px;font-size:14.5px;color:var(--body1);
 }
 .example p+p{margin-top:8px}
 
 /* 강사 팁 */
 .tip{
-  background:var(--thread-soft);border-radius:10px;padding:14px 18px;font-size:14px;
+  background:#FFF8E8;border-radius:10px;padding:14px 16px;font-size:14px;color:var(--body1);
 }
-.tip b{color:var(--thread);font-weight:700}
+.tip b{color:#B9770E;font-weight:700}
 
 .side-item{margin-bottom:24px}
 .side-item .kv{font-size:14.5px}
-.side-item .kv b{display:block;font-size:12px;font-family:var(--mono);letter-spacing:.16em;color:var(--ink-soft);font-weight:600;margin-bottom:6px}
+.side-item .kv b{display:block;font-size:12.5px;color:var(--sub);font-weight:700;margin-bottom:6px}
 .side-item .kv ul{list-style:none}
-.side-item .kv li{padding-left:18px;position:relative;margin-bottom:3px}
-.side-item .kv li::before{content:"—";position:absolute;left:0;color:var(--thread);font-family:var(--mono);font-size:12px}
+.side-item .kv li{padding-left:16px;position:relative;margin-bottom:3px;color:var(--body1)}
+.side-item .kv li::before{content:"—";position:absolute;left:0;color:var(--main)}
 
-/* ── F2. 내 미니 사업계획서 모아보기 (v2 신규) ───────── */
-.plan-section{margin-top:40px}
+/* ── F2. 내 미니 사업계획서 모아보기 ───────── */
+.plan-section{margin-top:32px}
 .plan-card-outer{
-  background:var(--sheet);border:1.5px solid var(--ink);border-radius:4px;
-  box-shadow:6px 6px 0 rgba(32,38,43,.10);padding:28px 30px;
+  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px 20px;
 }
-.plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px}
-.plan-title{font-family:var(--disp);font-weight:800;font-size:22px}
-.plan-progress-wrap{display:flex;align-items:center;gap:10px;min-width:220px}
-.plan-progress-num{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink-soft);white-space:nowrap}
-.profile-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
-.profile-row label{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--ink-soft)}
+.plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.plan-title{font-weight:700;font-size:19px;color:var(--title)}
+.plan-progress-wrap{display:flex;align-items:center;gap:10px;min-width:180px}
+.plan-progress-num{font-size:12.5px;font-weight:600;color:var(--sub);white-space:nowrap}
+.profile-row{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.profile-row label{font-size:13px;color:var(--sub)}
 .profile-row input{
-  font-family:var(--body);font-size:14.5px;border:1.5px solid var(--line);border-radius:8px;
-  padding:8px 12px;min-width:200px;background:#fff;
+  font-family:var(--font);font-size:14.5px;border:1px solid var(--border);border-radius:10px;
+  padding:8px 12px;min-width:160px;background:#fff;color:var(--title);flex:1;
 }
-.profile-row input:focus-visible{outline:3px solid var(--tape);outline-offset:1px}
+.profile-row input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
 .present-toggle{
-  cursor:pointer;font-family:var(--mono);font-weight:700;font-size:12.5px;
-  background:#fff;color:var(--ink);border:1.5px solid var(--ink);border-radius:999px;padding:7px 15px;
+  cursor:pointer;font-weight:700;font-size:12.5px;
+  background:#fff;color:var(--body1);border:1px solid var(--border);border-radius:999px;padding:8px 14px;
 }
-.present-toggle:hover{background:var(--ink);color:#fff}
-.plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.present-toggle:hover{border-color:var(--main);color:var(--main)}
+.plan-grid{display:grid;grid-template-columns:1fr;gap:10px}
 .plan-cell{
-  border:1.5px solid var(--line);border-radius:10px;padding:14px 16px;background:#fff;cursor:pointer;transition:.15s;
+  border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:#fff;cursor:pointer;transition:.15s;
 }
-.plan-cell:hover{border-color:var(--ink)}
-.plan-cell.filled{border-color:var(--needle);background:var(--needle-soft)}
-.plan-cell-label{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--ink-soft);margin-bottom:6px}
-.plan-cell-val{font-size:14.5px;white-space:pre-line}
-.plan-cell.empty .plan-cell-val{color:#9AA3A8}
-.plan-cell-goto{font-family:var(--mono);font-size:11.5px;color:var(--thread);margin-top:6px;display:inline-block}
+.plan-cell:hover{border-color:var(--main)}
+.plan-cell.filled{border-color:var(--success);background:var(--success-soft)}
+.plan-cell-label{font-size:12px;font-weight:600;color:var(--sub);margin-bottom:6px}
+.plan-cell-val{font-size:14.5px;white-space:pre-line;color:var(--body1)}
+.plan-cell.empty .plan-cell-val{color:var(--ph)}
+.plan-cell-goto{font-size:12px;color:var(--main);margin-top:6px;display:inline-block;font-weight:600}
 
 /* 발표 모드 */
 .present-overlay{
-  position:fixed;inset:0;background:rgba(32,38,43,.82);z-index:500;display:none;
-  align-items:center;justify-content:center;padding:28px;
+  position:fixed;inset:0;background:rgba(25,31,40,.6);z-index:500;display:none;
+  align-items:center;justify-content:center;padding:20px;
 }
 .present-overlay.on{display:flex}
 .present-card{
-  background:var(--sheet);border-radius:14px;max-width:760px;width:100%;max-height:88vh;overflow:auto;
-  padding:40px 36px;position:relative;
+  background:var(--card);border-radius:16px;max-width:480px;width:100%;max-height:88vh;overflow:auto;
+  padding:32px 24px;position:relative;
 }
 .present-close{
-  position:absolute;top:16px;right:16px;cursor:pointer;background:none;border:none;
-  font-size:20px;color:var(--ink-soft);
+  position:absolute;top:14px;right:14px;cursor:pointer;background:none;border:none;
+  font-size:20px;color:var(--ph);
 }
 .present-card .plan-grid{grid-template-columns:1fr}
-.present-card .plan-cell-val{font-size:18px}
+.present-card .plan-cell-val{font-size:16px}
 
-/* ── F3. 제출 & 내보내기 (v2 신규) ───────── */
-.action-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+/* ── F3. 업로드 ───────── */
+.action-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
 .btn-pill{
-  cursor:pointer;font-family:var(--body);font-weight:700;font-size:14px;
-  border-radius:999px;padding:11px 22px;border:none;transition:.15s;
+  cursor:pointer;font-family:var(--font);font-weight:700;font-size:15px;
+  border-radius:999px;padding:13px 22px;border:none;transition:.15s;width:100%;
 }
-.btn-pill.primary{background:var(--ez-blue);color:#fff}
-.btn-pill.primary:hover{background:var(--ez-blue-dark)}
-.btn-pill.ghost{background:#fff;border:1.5px solid var(--ink);color:var(--ink)}
-.btn-pill.ghost:hover{background:var(--ink);color:#fff}
-.upload-status{font-family:var(--mono);font-size:12.5px;margin-top:10px;min-height:16px}
-.upload-status.ok{color:var(--needle);font-weight:600}
-.upload-status.err{color:var(--thread);font-weight:600}
-#restoreFileInput{display:none}
+.btn-pill.primary{background:var(--main);color:#fff}
+.btn-pill.primary:hover{background:var(--main-dark)}
+.upload-status{font-size:13px;margin-top:10px;min-height:16px;color:var(--sub)}
+.upload-status.ok{color:var(--success);font-weight:600}
+.upload-status.err{color:var(--danger);font-weight:600}
 
 footer{
-  margin-top:44px;padding-top:20px;border-top:1.5px dashed var(--line);
-  display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
-  font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);letter-spacing:.06em;
+  margin-top:36px;padding-top:18px;border-top:1px solid var(--border);
+  display:flex;flex-direction:column;gap:4px;
+  font-size:12px;color:var(--ph);
 }
 
 /* 접근성 */
-button:focus-visible,.step-row:focus-visible{outline:3px solid var(--tape);outline-offset:2px}
+button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-@media (max-width:900px){
-  .sheet-body{grid-template-columns:1fr}
-  .col-main{border-right:0;border-bottom:1.5px dashed var(--line)}
-  header{align-items:stretch}
-}
-
-/* 모아보기만 인쇄(PDF로 저장) */
-body.print-plan-mode .wrap > *:not(#printTarget){display:none!important}
-body.print-plan-mode #printTarget{display:block!important}
-
-/* 빈 워크시트 인쇄 */
-#blankPrintHolder{display:none}
-body.blank-print-mode .wrap > *:not(#blankPrintHolder){display:none!important}
-body.blank-print-mode #blankPrintHolder{display:block!important}
-.blank-line{border-bottom:1.5px dashed var(--line);height:26px;margin-top:6px}
-.blank-sheet{page-break-after:always;padding:20px 0}
-.blank-sheet h2{font-family:var(--disp);font-size:22px;margin-bottom:4px}
-.blank-sheet .bs-step{margin:14px 0}
-.blank-sheet .bs-step .lbl{font-size:14px;margin-bottom:4px}
 
 @media print{
-  body::before{display:none}
   .sheet{box-shadow:none;page-break-inside:avoid}
   .chip{display:none}
   .classbar,.action-row,.present-toggle{display:none!important}
@@ -570,7 +513,7 @@ body.blank-print-mode #blankPrintHolder{display:block!important}
   <div id="sheetHolder"></div>
 
   <!-- F2. 내 미니 사업계획서 모아보기 -->
-  <section class="plan-section" id="printTarget">
+  <section class="plan-section">
     <div class="plan-card-outer">
       <div class="plan-top">
         <div class="plan-title">내 미니 사업계획서</div>
@@ -588,12 +531,6 @@ body.blank-print-mode #blankPrintHolder{display:block!important}
 
       <div class="action-row">
         <button class="btn-pill primary" id="uploadBtn" type="button">업로드</button>
-        <button class="btn-pill ghost" id="printPdfBtn" type="button">🖨 PDF로 저장</button>
-        <button class="btn-pill ghost" id="copyTextBtn" type="button">📋 텍스트 복사</button>
-        <button class="btn-pill ghost" id="exportBackupBtn" type="button">💾 백업 내보내기</button>
-        <button class="btn-pill ghost" id="importBackupBtn" type="button">📂 백업 불러오기</button>
-        <button class="btn-pill ghost" id="blankPrintBtn" type="button">🖨 빈 워크시트 인쇄</button>
-        <input type="file" id="restoreFileInput" accept="application/json">
       </div>
       <div class="upload-status" id="uploadStatus"></div>
     </div>
@@ -612,8 +549,6 @@ body.blank-print-mode #blankPrintHolder{display:block!important}
     <div class="plan-grid" id="presentGrid"></div>
   </div>
 </div>
-
-<div id="blankPrintHolder"></div>
 
 <script>
 const PRACTICES = [
@@ -1084,74 +1019,6 @@ document.getElementById('uploadBtn').onclick = async ()=>{
   }
 };
 
-document.getElementById('printPdfBtn').onclick = ()=>{
-  document.body.classList.add('print-plan-mode');
-  window.print();
-  setTimeout(()=> document.body.classList.remove('print-plan-mode'), 500);
-};
-
-document.getElementById('copyTextBtn').onclick = async ()=>{
-  const lines = [ '브랜드명: '+(brandInput.value||'') ];
-  PLAN_SLOTS.forEach(slot=> lines.push(slot.label+': '+(getSlotValue(slot)||'(미작성)')));
-  const text = lines.join('\\n');
-  try{
-    await navigator.clipboard.writeText(text);
-    uploadStatusEl.textContent='✓ 답안을 클립보드에 복사했어요'; uploadStatusEl.className='upload-status ok';
-  }catch{
-    uploadStatusEl.textContent='⚠ 복사에 실패했어요. 직접 선택해서 복사해주세요'; uploadStatusEl.className='upload-status err';
-  }
-};
-
-document.getElementById('exportBackupBtn').onclick = ()=>{
-  const data = {};
-  for (let i=0;i<localStorage.length;i++){
-    const k = localStorage.key(i);
-    if (k && k.indexOf(LS_PREFIX)===0) data[k]=localStorage.getItem(k);
-  }
-  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = 'gov-support-practice-backup.json';
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-};
-
-const restoreFileInput = document.getElementById('restoreFileInput');
-document.getElementById('importBackupBtn').onclick = ()=> restoreFileInput.click();
-restoreFileInput.onchange = ()=>{
-  const file = restoreFileInput.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ()=>{
-    try{
-      const data = JSON.parse(reader.result);
-      Object.keys(data).forEach(k=>{ if (k.indexOf(LS_PREFIX)===0) localStorage.setItem(k, data[k]); });
-      location.reload();
-    }catch{
-      uploadStatusEl.textContent='⚠ 백업 파일을 읽지 못했어요'; uploadStatusEl.className='upload-status err';
-    }
-  };
-  reader.readAsText(file);
-};
-
-/* 빈 워크시트 인쇄 */
-document.getElementById('blankPrintBtn').onclick = ()=>{
-  const holderEl = document.getElementById('blankPrintHolder');
-  holderEl.innerHTML = PRACTICES.map(p=>\`
-    <div class="blank-sheet">
-      <h2>실습 \${p.no} · \${p.name}</h2>
-      <div style="font-family:var(--mono);font-size:12px;color:var(--ink-soft);margin-bottom:10px">\${p.part} · ⏱ \${p.time}분\${p.spare?' · 예비 실습':''}</div>
-      \${p.steps.map(s=>\`
-        <div class="bs-step">
-          <div class="lbl">\${s.t.replace(/<[^>]+>/g,'')}</div>
-          \${s.inputs.map(()=>'<div class="blank-line"></div>').join('')}
-        </div>\`).join('')}
-    </div>\`).join('');
-  document.body.classList.add('blank-print-mode');
-  window.print();
-  setTimeout(()=>{ document.body.classList.remove('blank-print-mode'); holderEl.innerHTML=''; }, 500);
-};
-
 /* F4. 딥링크 */
 window.addEventListener('hashchange', ()=>{
   const id = location.hash.replace('#','');
@@ -1452,7 +1319,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,gy=`mwuiekaw`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+`,gy=`mwuiwguv`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
