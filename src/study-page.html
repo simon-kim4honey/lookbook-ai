@@ -163,6 +163,7 @@ h3.block-label{
   padding:8px 12px;min-width:160px;background:#fff;color:var(--title);flex:1;
 }
 .profile-row input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
+.profile-row input.pin-input{flex:0 0 auto;width:84px;text-align:center;letter-spacing:.15em;font-weight:600}
 .btn-restore{
   cursor:pointer;font-weight:600;font-size:12.5px;white-space:nowrap;
   background:#fff;color:var(--main);border:1px solid var(--main);border-radius:999px;
@@ -241,9 +242,11 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
       <div class="profile-row">
         <label for="brandInput">브랜드명</label>
         <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
-        <button class="btn-restore" id="restoreBtn" type="button">📂 이 브랜드명으로 불러오기</button>
+        <label for="pinInput">번호</label>
+        <input type="text" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 숫자">
+        <button class="btn-restore" id="restoreBtn" type="button">📂 불러오기</button>
       </div>
-      <p class="restore-hint">다른 컴퓨터로 접속했나요? 지난번에 쓴 브랜드명을 입력하고 눌러주세요.</p>
+      <p class="restore-hint">다른 컴퓨터로 접속했나요? 지난번에 쓴 브랜드명 + 4자리 숫자를 입력하고 눌러주세요. (처음이라면 이 4자리 숫자를 기억해두세요 — 업로드할 때 함께 저장돼요.)</p>
       <div class="plan-top">
         <div class="plan-title">내 미니 사업계획서</div>
         <div class="plan-progress-wrap">
@@ -482,7 +485,7 @@ function lsSetStepDone(practiceId, idx, done){
   try { localStorage.setItem(LS_PREFIX+"stepdone_"+practiceId+"_"+idx, done ? "1" : "0"); } catch {}
 }
 function lsGetProfile(){
-  try { const raw = localStorage.getItem(LS_PREFIX+"profile"); return raw ? JSON.parse(raw) : {brand:""}; } catch { return {brand:""}; }
+  try { const raw = localStorage.getItem(LS_PREFIX+"profile"); return raw ? JSON.parse(raw) : {brand:"",pin:""}; } catch { return {brand:"",pin:""}; }
 }
 function lsSetProfile(p){ try { localStorage.setItem(LS_PREFIX+"profile", JSON.stringify(p)); } catch {} }
 function lsGetSubmissionId(){
@@ -704,28 +707,36 @@ function renderPlan(){
   document.getElementById('planProgFill').style.width = (filled/PLAN_SLOTS.length*100)+'%';
 }
 
-/* 브랜드명 */
+/* 브랜드명 + 4자리 번호 */
 const brandInput = document.getElementById('brandInput');
+const pinInput = document.getElementById('pinInput');
 brandInput.value = lsGetProfile().brand || '';
-brandInput.addEventListener('input', ()=> lsSetProfile({brand: brandInput.value}));
+pinInput.value = lsGetProfile().pin || '';
+brandInput.addEventListener('input', ()=> lsSetProfile({brand: brandInput.value, pin: pinInput.value}));
+pinInput.addEventListener('input', ()=>{
+  pinInput.value = pinInput.value.replace(/[^0-9]/g,'').slice(0,4);
+  lsSetProfile({brand: brandInput.value, pin: pinInput.value});
+});
 
-/* 다른 기기에서 이어서 작성하기 — 브랜드명으로 서버에 올린 가장 최근 답안을 불러온다 */
+/* 다른 기기에서 이어서 작성하기 — 브랜드명 + 4자리 번호로 서버에 올린 가장 최근 답안을 불러온다 */
 let restoreArmed = false;
 document.getElementById('restoreBtn').onclick = async ()=>{
   const statusEl = document.getElementById('uploadStatus');
   const brandAlias = (brandInput.value||'').trim();
+  const pin = (pinInput.value||'').trim();
   if (!brandAlias){ statusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; statusEl.className='upload-status err'; brandInput.focus(); return; }
+  if (!/^[0-9]{4}$/.test(pin)){ statusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; statusEl.className='upload-status err'; pinInput.focus(); return; }
   const btn = document.getElementById('restoreBtn');
   if (!restoreArmed){
     restoreArmed = true;
     btn.textContent = '정말 불러올까요? 지금 답은 덮어써져요';
-    setTimeout(()=>{ restoreArmed=false; btn.textContent='📂 이 브랜드명으로 불러오기'; }, 3000);
+    setTimeout(()=>{ restoreArmed=false; btn.textContent='📂 불러오기'; }, 3000);
     return;
   }
-  restoreArmed = false; btn.textContent = '📂 이 브랜드명으로 불러오기';
+  restoreArmed = false; btn.textContent = '📂 불러오기';
   statusEl.textContent = '불러오는 중…'; statusEl.className = 'upload-status';
   try{
-    const res = await fetch('/api/study/restore?brandAlias='+encodeURIComponent(brandAlias));
+    const res = await fetch('/api/study/restore?brandAlias='+encodeURIComponent(brandAlias)+'&pin='+encodeURIComponent(pin));
     const data = await res.json().catch(()=>null);
     if (!data || !data.success){
       statusEl.textContent = '⚠ '+(data && data.message ? data.message : '불러오지 못했어요');
@@ -757,12 +768,14 @@ const uploadStatusEl = document.getElementById('uploadStatus');
 document.getElementById('uploadBtn').onclick = async ()=>{
   flushAllVisible();
   const brandAlias = (brandInput.value||'').trim();
+  const pin = (pinInput.value||'').trim();
   if (!brandAlias){ uploadStatusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; uploadStatusEl.className='upload-status err'; brandInput.focus(); return; }
+  if (!/^[0-9]{4}$/.test(pin)){ uploadStatusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; uploadStatusEl.className='upload-status err'; pinInput.focus(); return; }
   uploadStatusEl.textContent='업로드 중…'; uploadStatusEl.className='upload-status';
   try{
     const res = await fetch('/api/study/submit', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ submissionId:lsGetSubmissionId(), brandAlias, answers:collectAllAnswers() })
+      body: JSON.stringify({ submissionId:lsGetSubmissionId(), brandAlias, pin, answers:collectAllAnswers() })
     });
     const data = await res.json().catch(()=>({success:false}));
     if (data && data.success){ uploadStatusEl.textContent='✓ 업로드 완료했어요 '+nowLabel(); uploadStatusEl.className='upload-status ok'; }
