@@ -14,6 +14,9 @@ import {
 import { buildGovSupportDocx } from './gov/docxExport.ts'
 import { Packer } from 'docx'
 import { rewriteForCardNews, renderCardSvg } from './card-image'
+import studyApi from './study'
+import STUDY_PAGE_HTML from './study-page.html?raw'
+import STUDY_ADMIN_PAGE_HTML from './study-admin-page.html?raw'
 
 // Vite 빌드 시 vite.config.ts define으로 주입된 빌드 타임 해시
 // → 배포할 때마다 값이 바뀌어 브라우저가 새 파일로 인식 (캐시 자동 무효화)
@@ -178,6 +181,10 @@ app.route('/api/admin/content-digest', contentDigestApp)
 // 기존 /api/admin/gov-support/*(2단계 section/item)와 당분간 공존한다 — P3에서
 // admin02 UI가 교체되기 전까지는 두 API가 각자 다른 테이블을 보고 서로 침범하지 않는다.
 app.route('/api/admin/gov', govNodesApp)
+
+// "정부지원사업 실습 교안" 인터랙티브 실습 페이지 — 숨겨진 교육용 라우트(메인 메뉴 노출 안 함).
+// 접근 보호는 로그인이 아니라 고정 비밀번호(/study_admin)와 브랜드명 구분 방식이다.
+app.route('/api/study', studyApi)
 
 // ────────────────────────────────────────────────────
 // 지원사업 구조 모듈 빌더 UI (P3) — /admin02/gov/:programId/builder
@@ -1121,6 +1128,17 @@ app.get('/admin02/gov/:programId/builder', (c) => {
   if (!/^[a-zA-Z0-9_-]+$/.test(raw)) return c.text('잘못된 programId', 400)
   c.header('Cache-Control', 'no-store')
   return c.html(GOV_BUILDER_PAGE_HTML.replace('__GB_PROGRAM_ID_JSON__', JSON.stringify(raw)))
+})
+
+// "정부지원사업 실습 교안" 인터랙티브 실습 페이지 — 숨겨진 교육용 라우트(메인 메뉴 노출 안 함).
+// /study: 수강생이 실습 입력 + 업로드. /study_admin: 강사가 고정 비밀번호로 제출물을 모아본다.
+app.get('/study', (c) => {
+  c.header('Cache-Control', 'no-store')
+  return c.html(STUDY_PAGE_HTML)
+})
+app.get('/study_admin', (c) => {
+  c.header('Cache-Control', 'no-store')
+  return c.html(STUDY_ADMIN_PAGE_HTML)
 })
 
 // ────────────────────────────────────────────────────
