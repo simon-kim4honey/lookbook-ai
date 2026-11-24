@@ -287,12 +287,8 @@ section.menu{padding:28px 0 6px}
   font-size:11.5px;font-weight:600;
   border-radius:999px;padding:2px 10px;background:#EAF2FF;color:var(--main);
 }
-.chip-time.reserve{background:var(--bg);color:var(--sub)}
 .chip-name{font-weight:700;font-size:16px;line-height:1.35;color:inherit}
 .chip-part{display:block;font-size:12px;color:var(--sub);margin-top:5px}
-.chip .spare{position:absolute;top:-8px;right:10px;background:#FFF3DB;color:#B9770E;
-  font-size:10.5px;font-weight:700;
-  padding:2px 9px;border-radius:999px}
 
 /* ── 실습 상세 시트 ───────────────────────── */
 .sheet{
@@ -378,12 +374,6 @@ h3.block-label{
 }
 .example p+p{margin-top:8px}
 
-/* 강사 팁 */
-.tip{
-  background:#FFF8E8;border-radius:10px;padding:14px 16px;font-size:14px;color:var(--body1);
-}
-.tip b{color:#B9770E;font-weight:700}
-
 .side-item{margin-bottom:24px}
 .side-item .kv{font-size:14.5px}
 .side-item .kv b{display:block;font-size:12.5px;color:var(--sub);font-weight:700;margin-bottom:6px}
@@ -452,12 +442,6 @@ h3.block-label{
 .upload-status.ok{color:var(--success);font-weight:600}
 .upload-status.err{color:var(--danger);font-weight:600}
 
-footer{
-  margin-top:36px;padding-top:18px;border-top:1px solid var(--border);
-  display:flex;flex-direction:column;gap:4px;
-  font-size:12px;color:var(--ph);
-}
-
 /* 접근성 */
 button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -491,7 +475,7 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
 
   <!-- 실습 메뉴 7가지 -->
   <section class="menu">
-    <div class="menu-head"><h2>실습 메뉴 7가지</h2><span>다섯 개는 본 실습, 두 개는 시간 남을 때 쓰는 예비 메뉴</span></div>
+    <div class="menu-head"><h2>실습 메뉴 7가지</h2></div>
     <div class="menu-grid" id="menuGrid"></div>
   </section>
 
@@ -521,11 +505,6 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
       <div class="upload-status" id="uploadStatus"></div>
     </div>
   </section>
-
-  <footer>
-    <span>실습 교안 · 정부지원사업 작성방법 강의 (패션·뷰티 소상공인)</span>
-    <span>본 실습 5 + 예비 2 = 총 7메뉴 · 인쇄해서 워크시트로 배부 가능</span>
-  </footer>
 </div>
 
 <div class="present-overlay" id="presentOverlay">
@@ -743,10 +722,9 @@ PRACTICES.forEach((p)=>{
   const b=document.createElement('button');
   b.className='chip'; b.id='chip-'+p.id;
   b.innerHTML = \`
-    \${p.spare?'<span class="spare">예비</span>':''}
     <div class="chip-row">
       <span class="chip-no">실습 \${p.no}</span>
-      <span class="chip-time\${p.spare?' reserve':''}">⏱ \${p.time}분</span>
+      <span class="chip-time">⏱ \${p.time}분</span>
     </div>
     <div class="chip-name">\${p.name}</div>
     <span class="chip-part">\${p.part}</span>\`;
@@ -785,7 +763,7 @@ function openPractice(id, userClicked){
     <span class="c3"></span><span class="c4"></span>
     <div class="sheet-head">
       <div>
-        <span class="sheet-no">실습 \${p.no} / 07 \${p.spare?' · 예비 실습':''}</span>
+        <span class="sheet-no">실습 \${p.no} / 07</span>
         <div class="sheet-title">\${p.name}</div>
         <p class="sheet-sub">\${p.sub}</p>
       </div>
@@ -818,9 +796,6 @@ function openPractice(id, userClicked){
         <div class="example">
           \${p.result.map((r,i)=> i===0 ? \`<p><b>\${r}</b></p>\` : \`<p>\${r}</p>\`).join('')}
         </div>
-
-        <h3 class="block-label">강사 팁</h3>
-        <div class="tip"><b>⚑</b> \${p.tip}</div>
       </div>
       <div class="col-side">
         <div class="side-item">
@@ -1292,7 +1267,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,hy=`mwum9jxw`;function gy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var _y=e=>e?`
+`,hy=`mwumfuv6`;function gy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var _y=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
