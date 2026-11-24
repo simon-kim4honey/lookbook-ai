@@ -17,8 +17,6 @@
   --body2:#4E5968;
   --sub:#6B7684;
   --ph:#8B95A1;
-  --needle:#2E6E5E;
-  --needle-soft:#E2EEE9;
   --danger:#D8452B;
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -32,15 +30,6 @@ header{margin-bottom:24px}
 h1{font-size:26px;font-weight:700;color:var(--title)}
 .sub{color:var(--sub);font-size:14px;margin-top:6px}
 
-.codecard{
-  background:var(--card);border:1px solid var(--border);border-radius:16px;
-  padding:28px 26px;margin-bottom:22px;display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between;
-}
-.codecard .left{display:flex;flex-direction:column;gap:6px}
-.codecard .code-label{font-size:12px;color:var(--sub);font-weight:600;letter-spacing:.06em}
-.codecard .code-value{font-size:40px;font-weight:800;letter-spacing:.08em;color:var(--main)}
-.codecard .code-value.empty{color:var(--ph);font-size:20px;font-weight:600}
-.codecard .right{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .btn{
   cursor:pointer;font-weight:700;font-size:14px;border:none;border-radius:999px;padding:11px 20px;transition:.15s;
 }
@@ -52,12 +41,24 @@ h1{font-size:26px;font-weight:700;color:var(--title)}
 .btn.danger:hover{background:var(--danger);color:#fff}
 .btn.danger.armed{background:var(--danger);color:#fff}
 
-.lookup-row{display:flex;gap:8px;align-items:center}
-.lookup-row input{
-  font-size:16px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-  border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;width:130px;
+/* 비밀번호 입장 화면 */
+.login-overlay{
+  position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;z-index:300;
 }
-.lookup-row input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
+.login-card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:40px 32px;width:100%;max-width:360px;text-align:center;
+}
+.login-card .eyebrow{justify-content:center}
+.login-card h2{font-size:19px;font-weight:700;margin-bottom:6px}
+.login-card .sub{margin-bottom:20px}
+.login-card input{
+  width:100%;font-size:16px;letter-spacing:.1em;text-align:center;
+  border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;
+}
+.login-card input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
+.login-card .btn{width:100%}
+.login-err{font-size:13px;color:var(--danger);margin-top:10px;min-height:16px}
 
 .toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .toolbar .count{font-size:14px;color:var(--body2);font-weight:600}
@@ -101,36 +102,34 @@ h1{font-size:26px;font-weight:700;color:var(--title)}
 </style>
 </head>
 <body>
-<div class="wrap">
+
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="eyebrow">EZlook 강의 도구</div>
+    <h2>강사용 모아보기</h2>
+    <p class="sub">비밀번호를 입력해주세요</p>
+    <input type="password" id="pwInput" inputmode="numeric" placeholder="비밀번호" autocomplete="off">
+    <button class="btn primary" id="pwSubmitBtn" type="button">입장</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<div class="wrap" id="mainWrap" style="display:none">
   <header>
     <div class="eyebrow">EZlook 강의 도구</div>
     <h1>실습 교안 — 강사용 모아보기</h1>
-    <p class="sub">수업 코드를 공유해 학생들의 미니 사업계획서를 프로젝터로 함께 확인해요.</p>
+    <p class="sub">학생들이 업로드한 미니 사업계획서를 브랜드명으로 모아봐요.</p>
   </header>
-
-  <div class="codecard">
-    <div class="left">
-      <span class="code-label">현재 보고 있는 수업 코드</span>
-      <span class="code-value empty" id="codeValue">수업 코드를 만들거나 입력해주세요</span>
-    </div>
-    <div class="right">
-      <div class="lookup-row">
-        <input type="text" id="lookupInput" maxlength="8" placeholder="코드 입력">
-        <button class="btn ghost" id="lookupBtn" type="button">보기</button>
-      </div>
-      <button class="btn primary" id="newClassBtn" type="button">새 수업 시작</button>
-    </div>
-  </div>
 
   <div class="toolbar">
     <span class="count" id="countLabel">학생이 업로드하면 이 화면에 나타나요</span>
     <div class="actions">
       <button class="btn ghost" id="refreshBtn" type="button">↻ 새로고침</button>
-      <button class="btn danger" id="resetBtn" type="button">수업 전체 초기화</button>
+      <button class="btn danger" id="resetBtn" type="button">전체 초기화</button>
     </div>
   </div>
 
-  <div id="gridHolder"><div class="empty-state">수업 코드를 먼저 만들거나 입력해주세요</div></div>
+  <div id="gridHolder"><div class="empty-state">불러오는 중…</div></div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -145,6 +144,8 @@ h1{font-size:26px;font-weight:700;color:var(--title)}
 <div class="toast" id="toast"></div>
 
 <script>
+const PW_STORAGE_KEY = 'gsap_v2_admin_pw';
+
 const PLAN_SLOTS = [
   {label:"아이템 (한 문장)", keys:["p2_s3"]},
   {label:"비즈니스 모델", keys:["p1_s1"]},
@@ -165,12 +166,14 @@ function previewText(answers){
   return PLAN_SLOTS.map(s=>slotValue(s,answers)).filter(Boolean).join(' · ') || '(아직 작성된 내용이 없어요)';
 }
 
-let currentCode = '';
+let currentPassword = '';
 let currentSubmissions = [];
 let refreshTimer = null;
 
-const codeValueEl = document.getElementById('codeValue');
-const lookupInput = document.getElementById('lookupInput');
+const loginOverlay = document.getElementById('loginOverlay');
+const mainWrap = document.getElementById('mainWrap');
+const pwInput = document.getElementById('pwInput');
+const loginErr = document.getElementById('loginErr');
 const gridHolder = document.getElementById('gridHolder');
 const countLabel = document.getElementById('countLabel');
 const toastEl = document.getElementById('toast');
@@ -180,68 +183,78 @@ function showToast(msg){
   setTimeout(()=> toastEl.classList.remove('show'), 2200);
 }
 
-function setCurrentCode(code){
-  currentCode = code;
-  try{ localStorage.setItem('gsap_v2_admin_lastcode', code); }catch{}
-  if (code){ codeValueEl.textContent = code; codeValueEl.classList.remove('empty'); }
-  else { codeValueEl.textContent = '수업 코드를 만들거나 입력해주세요'; codeValueEl.classList.add('empty'); }
+async function tryLogin(password, silent){
+  const res = await fetch('/api/study/submissions', { headers:{ 'X-Study-Admin-Password': password } }).catch(()=>null);
+  if (!res){ if (!silent) loginErr.textContent = '네트워크 문제가 있어요'; return false; }
+  if (res.status === 401){ if (!silent) loginErr.textContent = '비밀번호가 올바르지 않아요'; return false; }
+  const data = await res.json().catch(()=>null);
+  if (!data || !data.success){ if (!silent) loginErr.textContent = (data && data.message) || '불러오지 못했어요'; return false; }
+  currentPassword = password;
+  try{ sessionStorage.setItem(PW_STORAGE_KEY, password); }catch{}
+  loginOverlay.style.display = 'none';
+  mainWrap.style.display = 'block';
+  renderSubmissions(data.submissions || []);
   if (refreshTimer) clearInterval(refreshTimer);
-  if (code){
-    loadSubmissions();
-    refreshTimer = setInterval(loadSubmissions, 15000);
-  }
+  refreshTimer = setInterval(loadSubmissions, 15000);
+  return true;
 }
 
-document.getElementById('newClassBtn').onclick = async ()=>{
-  try{
-    const res = await fetch('/api/study/class/new', { method:'POST' });
-    const data = await res.json();
-    if (data && data.success){ lookupInput.value = data.code; setCurrentCode(data.code); showToast('새 수업을 시작했어요'); }
-    else showToast('수업을 시작하지 못했어요');
-  }catch{ showToast('네트워크 문제가 있어요'); }
+document.getElementById('pwSubmitBtn').onclick = ()=>{
+  loginErr.textContent = '';
+  const pw = pwInput.value.trim();
+  if (!pw){ loginErr.textContent = '비밀번호를 입력해주세요'; return; }
+  tryLogin(pw, false);
 };
-
-document.getElementById('lookupBtn').onclick = ()=>{
-  const code = lookupInput.value.toUpperCase().trim();
-  if (!code){ showToast('수업 코드를 입력해주세요'); return; }
-  lookupInput.value = code;
-  setCurrentCode(code);
-};
-lookupInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') document.getElementById('lookupBtn').click(); });
+pwInput.addEventListener('keydown', (e)=>{ if (e.key==='Enter') document.getElementById('pwSubmitBtn').click(); });
 
 document.getElementById('refreshBtn').onclick = ()=> loadSubmissions();
 
+function renderSubmissions(submissions){
+  currentSubmissions = submissions;
+  countLabel.textContent = `제출 ${currentSubmissions.length}건`;
+  if (!currentSubmissions.length){
+    gridHolder.innerHTML = '<div class="empty-state">아직 업로드한 학생이 없어요</div>';
+    return;
+  }
+  gridHolder.innerHTML = '<div class="grid" id="grid"></div>';
+  const gridEl = document.getElementById('grid');
+  currentSubmissions.forEach((s)=>{
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `
+      <div class="brand">${(s.brandAlias||'(이름 없음)').replace(/</g,'&lt;')}</div>
+      <div class="time">${s.updatedAt||''}</div>
+      <div class="preview">${previewText(s.answers||{}).replace(/</g,'&lt;')}</div>`;
+    el.onclick = ()=> openModal(s);
+    gridEl.appendChild(el);
+  });
+}
+
 async function loadSubmissions(){
-  if (!currentCode) return;
+  if (!currentPassword) return;
   try{
-    const res = await fetch('/api/study/submissions?class='+encodeURIComponent(currentCode));
+    const res = await fetch('/api/study/submissions', { headers:{ 'X-Study-Admin-Password': currentPassword } });
+    if (res.status === 401){ logout(); return; }
     const data = await res.json();
     if (!data || !data.success){
       gridHolder.innerHTML = `<div class="empty-state">${(data && data.message) || '조회하지 못했어요'}</div>`;
       countLabel.textContent = '조회 실패';
       return;
     }
-    currentSubmissions = data.submissions || [];
-    countLabel.textContent = `제출 ${currentSubmissions.length}건`;
-    if (!currentSubmissions.length){
-      gridHolder.innerHTML = '<div class="empty-state">아직 업로드한 학생이 없어요</div>';
-      return;
-    }
-    gridHolder.innerHTML = '<div class="grid" id="grid"></div>';
-    const gridEl = document.getElementById('grid');
-    currentSubmissions.forEach((s)=>{
-      const el = document.createElement('div');
-      el.className = 'card';
-      el.innerHTML = `
-        <div class="brand">${(s.brandAlias||'(이름 없음)').replace(/</g,'&lt;')}</div>
-        <div class="time">${s.updatedAt||''}</div>
-        <div class="preview">${previewText(s.answers||{}).replace(/</g,'&lt;')}</div>`;
-      el.onclick = ()=> openModal(s);
-      gridEl.appendChild(el);
-    });
+    renderSubmissions(data.submissions || []);
   }catch{
     gridHolder.innerHTML = '<div class="empty-state">네트워크 문제로 불러오지 못했어요</div>';
   }
+}
+
+function logout(){
+  currentPassword = '';
+  try{ sessionStorage.removeItem(PW_STORAGE_KEY); }catch{}
+  if (refreshTimer) clearInterval(refreshTimer);
+  mainWrap.style.display = 'none';
+  loginOverlay.style.display = 'flex';
+  pwInput.value = '';
+  loginErr.textContent = '세션이 만료됐어요. 다시 입력해주세요';
 }
 
 const overlay = document.getElementById('overlay');
@@ -259,27 +272,27 @@ overlay.addEventListener('click', (e)=>{ if (e.target===overlay) overlay.classLi
 
 let resetArmed = false;
 document.getElementById('resetBtn').onclick = async ()=>{
-  if (!currentCode){ showToast('수업 코드를 먼저 선택해주세요'); return; }
+  if (!currentPassword) return;
   const btn = document.getElementById('resetBtn');
   if (!resetArmed){
     resetArmed = true; btn.classList.add('armed'); btn.textContent = '정말 전체 삭제할까요? 한 번 더 눌러주세요';
-    setTimeout(()=>{ resetArmed=false; btn.classList.remove('armed'); btn.textContent='수업 전체 초기화'; }, 3000);
+    setTimeout(()=>{ resetArmed=false; btn.classList.remove('armed'); btn.textContent='전체 초기화'; }, 3000);
     return;
   }
-  resetArmed = false; btn.classList.remove('armed'); btn.textContent='수업 전체 초기화';
+  resetArmed = false; btn.classList.remove('armed'); btn.textContent='전체 초기화';
   try{
-    const res = await fetch('/api/study/class/'+encodeURIComponent(currentCode)+'/reset', { method:'POST' });
+    const res = await fetch('/api/study/reset', { method:'POST', headers:{ 'X-Study-Admin-Password': currentPassword } });
+    if (res.status === 401){ logout(); return; }
     const data = await res.json();
-    if (data && data.success){ showToast('수업 데이터를 모두 삭제했어요'); loadSubmissions(); }
+    if (data && data.success){ showToast('모든 제출물을 삭제했어요'); loadSubmissions(); }
     else showToast('삭제하지 못했어요');
   }catch{ showToast('네트워크 문제가 있어요'); }
 };
 
 (function init(){
-  const qs = new URLSearchParams(location.search);
-  let code = (qs.get('class')||'').toUpperCase().trim();
-  if (!code){ try{ code = localStorage.getItem('gsap_v2_admin_lastcode') || ''; }catch{} }
-  if (code){ lookupInput.value = code; setCurrentCode(code); }
+  let saved = '';
+  try{ saved = sessionStorage.getItem(PW_STORAGE_KEY) || ''; }catch{}
+  if (saved) tryLogin(saved, true);
 })();
 </script>
 </body>

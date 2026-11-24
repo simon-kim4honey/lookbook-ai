@@ -44,25 +44,6 @@ h1 em svg{display:none}
 .head-note{max-width:420px;color:var(--sub);font-size:14.5px;padding-bottom:4px}
 .head-note strong{color:var(--body1)}
 
-/* ── 수업 코드 바 ───────────────── */
-.classbar{
-  margin-top:16px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-  background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;
-}
-.classbar label{font-size:13px;color:var(--sub);white-space:nowrap}
-.classbar input{
-  font-size:15px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
-  border:1px solid var(--border);border-radius:8px;padding:7px 10px;width:104px;background:#fff;color:var(--title);
-}
-.classbar input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
-.classbar button{
-  font-weight:700;font-size:13px;cursor:pointer;
-  background:var(--main);color:#fff;border:none;border-radius:999px;padding:8px 16px;transition:.15s;
-}
-.classbar button:hover{background:var(--main-dark)}
-.classbar .cb-status{font-size:12.5px;color:var(--sub)}
-.classbar .cb-status.ok{color:var(--success);font-weight:600}
-
 /* ── 실습 메뉴 (7개) ─────────────────────── */
 section.menu{padding:28px 0 6px}
 .menu-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap}
@@ -273,7 +254,7 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
 @media print{
   .sheet{box-shadow:none;page-break-inside:avoid}
   .chip{display:none}
-  .classbar,.action-row,.present-toggle{display:none!important}
+  .action-row,.present-toggle{display:none!important}
 }
 </style>
 </head>
@@ -287,13 +268,6 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
     </div>
     <p class="head-note"><strong>패션·뷰티 소상공인 강의 현장용.</strong> 강의 중 이 페이지를 열고 실습을 하나씩 여세요. 단계별 체크로 참여자가 진행 상황을 그대로 따라갈 수 있습니다.</p>
   </header>
-
-  <div class="classbar">
-    <label>수업 코드</label>
-    <input type="text" id="classCodeInput" maxlength="8" placeholder="예: AB12CD" autocomplete="off">
-    <button id="classCodeSaveBtn" type="button">저장</button>
-    <span class="cb-status" id="classCodeStatus">강사가 알려준 수업 코드를 입력해주세요</span>
-  </div>
 
   <!-- 실습 메뉴 7가지 -->
   <section class="menu">
@@ -518,8 +492,6 @@ function lsGetProfile(){
   try { const raw = localStorage.getItem(LS_PREFIX+"profile"); return raw ? JSON.parse(raw) : {brand:""}; } catch { return {brand:""}; }
 }
 function lsSetProfile(p){ try { localStorage.setItem(LS_PREFIX+"profile", JSON.stringify(p)); } catch {} }
-function lsGetClassCode(){ try { return localStorage.getItem(LS_PREFIX+"classcode") || ""; } catch { return ""; } }
-function lsSetClassCode(code){ try { localStorage.setItem(LS_PREFIX+"classcode", code); } catch {} }
 function lsGetSubmissionId(){
   try {
     let id = localStorage.getItem(LS_PREFIX+"submission_id");
@@ -759,27 +731,6 @@ document.getElementById('presentToggleBtn').onclick = ()=>{
 };
 document.getElementById('presentCloseBtn').onclick = ()=> document.getElementById('presentOverlay').classList.remove('on');
 
-/* ── 수업 코드 ───────────────────────── */
-const classInput = document.getElementById('classCodeInput');
-const classStatus = document.getElementById('classCodeStatus');
-function setClassStatus(code){
-  if (code){ classStatus.textContent = '✓ 입력됨 — 업로드 시 이 코드로 저장돼요'; classStatus.className='cb-status ok'; }
-  else { classStatus.textContent = '강사가 알려준 수업 코드를 입력해주세요'; classStatus.className='cb-status'; }
-}
-(function initClassCode(){
-  const qs = new URLSearchParams(location.search);
-  const fromQuery = (qs.get('class')||'').toUpperCase().trim();
-  const code = fromQuery || lsGetClassCode();
-  if (code){ classInput.value = code; lsSetClassCode(code); }
-  setClassStatus(code);
-})();
-document.getElementById('classCodeSaveBtn').onclick = ()=>{
-  const code = classInput.value.toUpperCase().trim();
-  classInput.value = code;
-  lsSetClassCode(code);
-  setClassStatus(code);
-};
-
 /* ── F3. 업로드 & 내보내기 ───────────────────────── */
 function collectAllAnswers(){
   const out = {};
@@ -792,16 +743,13 @@ function collectAllAnswers(){
 const uploadStatusEl = document.getElementById('uploadStatus');
 document.getElementById('uploadBtn').onclick = async ()=>{
   flushAllVisible();
-  const classCode = (classInput.value||'').toUpperCase().trim();
   const brandAlias = (brandInput.value||'').trim();
-  if (!classCode){ uploadStatusEl.textContent='⚠ 수업 코드를 먼저 입력해주세요'; uploadStatusEl.className='upload-status err'; classInput.focus(); return; }
   if (!brandAlias){ uploadStatusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; uploadStatusEl.className='upload-status err'; brandInput.focus(); return; }
-  lsSetClassCode(classCode);
   uploadStatusEl.textContent='업로드 중…'; uploadStatusEl.className='upload-status';
   try{
     const res = await fetch('/api/study/submit', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ classCode, submissionId:lsGetSubmissionId(), brandAlias, answers:collectAllAnswers() })
+      body: JSON.stringify({ submissionId:lsGetSubmissionId(), brandAlias, answers:collectAllAnswers() })
     });
     const data = await res.json().catch(()=>({success:false}));
     if (data && data.success){ uploadStatusEl.textContent='✓ 업로드 완료했어요 '+nowLabel(); uploadStatusEl.className='upload-status ok'; }
