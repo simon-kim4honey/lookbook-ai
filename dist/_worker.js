@@ -484,7 +484,7 @@ const PRACTICES = [
         input:{key:"p1_s2", label:"주요 경쟁력 한 문장", placeholder:"예: 폐원단을 직접 수급해 소량 생산하는 봉제 공장 협업망이 있어요", rows:2}},
       {min:"3분", t:"<b>차별화</b> — 고객이 나를 선택해야 하는 이유 한 문장", ex:"예: 내 몸 사이즈를 3일 안에 재단·수선해 주는 맞춤 서비스",
         input:{key:"p1_s3", label:"차별화 한 문장", placeholder:"예: 내 몸 사이즈를 3일 안에 재단·수선해 주는 맞춤 서비스예요", rows:2}},
-      {min:"1분", t:"옆 사람에게 3문장 읽어 주고, 서로 <b>\\"이 문장만 읽어도 뭘 파는 브랜드인지 알겠는가?\\"</b> 확인", ex:"",
+      {min:"1분", t:"<b>소리 내어 점검</b> — 완성한 3문장을 소리 내어 읽고, \\"이 문장만 읽어도 뭘 파는 브랜드인지 알겠는가?\\" 스스로 확인(가능하면 옆 사람에게 읽어줘도 좋아요)", ex:"",
         input:{key:"p1_s4", label:"메모(선택)", placeholder:"받은 피드백이나 느낀 점을 적어도 좋아요", rows:2}}
     ],
     result:["완성되면 이렇게 — 한 장 세 줄","비즈니스 모델: 20~30대 직장인 여성에게 [모던 정장 원피스]를 [온라인 스토어]로 판매","주요 경쟁력: [10년차 패턴 제작자의 자체 패턴] 보유","차별화: [손 떨림·관절 불편 고객을 위한 착용 도움 디자인]"],
@@ -550,7 +550,7 @@ const PRACTICES = [
         input:{key:"p5_s1", label:"메모(선택)", placeholder:"토론하며 나온 이야기를 적어도 좋아요", rows:2}},
       {min:"6분", t:"내 브랜드의 홍보 문장을 <b>숫자가 들어간 문장</b>으로 바꿔 쓰기", ex:"예: 인스타 팔로워 3,000명 · 협업 구매율 00% 기대",
         input:{key:"p5_s2", label:"숫자 문장", placeholder:"예: 인스타 팔로워 3,000명 · 협업 구매율 00% 기대", rows:2}},
-      {min:"2분", t:"짝꿍 교차 확인: <b>\\"이 숫자를 평가위원이 믿을 수 있겠는가?\\"</b>", ex:"",
+      {min:"2분", t:"<b>소리 내어 점검</b> — 완성한 숫자 문장을 소리 내어 읽고 \\"이 숫자를 평가위원이 믿을 수 있겠는가?\\" 스스로 확인(가능하면 옆 사람과 교차 확인해도 좋아요)", ex:"",
         input:{key:"p5_s3", label:"메모(선택)", placeholder:"교차 확인하며 느낀 점을 적어도 좋아요", rows:2}}
     ],
     result:["완성되면 이렇게 — 숫자 문장","[인플루언서 협업 구매율 00%] + [인스타 팔로워 3,000명]","→ 숫자의 근거(현재 팔로워 수, 광고 성과)를 한 줄 덧붙이면 신뢰도가 올라갑니다."],
@@ -568,7 +568,7 @@ const PRACTICES = [
         input:{key:"p6_s2", label:"월 판매 수량(전/후)", placeholder:"전: 월 13벌 / 후: 월 130벌", rows:2}},
       {min:"7분", t:"<b>곱해서 기대 매출 완성</b> — 연 단위로도 환산", ex:"전: 월 100만원 / 후: 월 1,000만원 (연 1.2억)",
         input:{key:"p6_s3", label:"기대 매출(최종)", placeholder:"전: 월 100만원 / 후: 월 1,000만원 (연 1.2억)", rows:2}},
-      {min:"5분", t:"옆 사람의 숫자를 듣고 <b>너무 낙관적이진 않은지</b> 서로 점검", ex:"",
+      {min:"5분", t:"<b>다시 점검하기</b> — 적은 숫자를 다시 한번 살펴보고 너무 낙관적이진 않은지 스스로 점검(가능하면 옆 사람과 함께 봐도 좋아요)", ex:"",
         input:{key:"p6_s4", label:"메모(선택)", placeholder:"점검하며 느낀 점을 적어도 좋아요", rows:2}}
     ],
     result:["완성되면 이렇게 — 기대 효과","폐원단 재생 기준: 월 100만원 매출 = 30벌 판매 = 월 10kg 재생 → 지원사업 후 월 1,000만원 = 300벌 = 연 1.2t 재생"],
@@ -630,14 +630,14 @@ const PRACTICES = [
     steps:[
       {min:"8분", t:"<b>\\"왜 하필 당신인가?\\"</b>에 대한 답 적기 — 앞선 실습의 비즈니스 모델 · 경쟁력 · 차별화 문장을 활용해 한 문단으로 완성", ex:"예: 10년간 패턴 제작 경험과 폐원단 수급망을 가진 제가 아니면 이 소량 맞춤 생산 구조는 유지되기 어렵습니다.",
         input:{key:"p10_s1", label:"\\"왜 하필 당신인가?\\" 답변", placeholder:"예: 10년간 패턴 제작 경험과 폐원단 수급망을 가진 제가 아니면 이 소량 맞춤 생산 구조는 유지되기 어렵습니다.", rows:3}},
-      {min:"8분", t:"<b>\\"이 사업이 실제로 돌아갈 구조인가?\\"</b>에 대한 답 적기 — 기대 효과 · 인력 구성 문장을 근거로 설명", ex:"예: 월 100만원 광고로 1,000만원 매출을 내는 구조이며, 생산은 외주 공장과 협업해 소량이어도 품질을 유지합니다.",
-        input:{key:"p10_s2", label:"\\"돌아갈 구조인가?\\" 답변", placeholder:"예: 월 100만원 광고로 1,000만원 매출을 내는 구조이며, 생산은 외주 공장과 협업해 소량이어도 품질을 유지합니다.", rows:3}},
+      {min:"8분", t:"<b>\\"한 달에 얼마를 팔아야 손해를 안 보나요?\\"</b>에 대한 답 적기 — 월 고정비(원단비 · 인건비 · 대관료 등)와 판매 단가로 손익분기점(BEP) 판매량을 직접 계산해 설명", ex:"예: 월 고정비 150만원 ÷ 원피스 1벌 79,000원 ≈ 20벌만 팔면 손익분기점, 현재 월 평균 25벌 판매 중이라 이미 흑자 구조",
+        input:{key:"p10_s2", label:"손익분기점(BEP) 답변", placeholder:"예: 월 고정비 150만원 ÷ 원피스 1벌 79,000원 ≈ 20벌만 팔면 손익분기점, 현재 월 평균 25벌 판매 중이라 이미 흑자 구조", rows:3}},
       {min:"8분", t:"<b>\\"정부 지원금 없이도 가능한가?\\"</b>에 대한 답 적기 — 지원금은 속도를 높이는 역할일 뿐, 없어도 사업이 무너지지 않는다는 점 설명", ex:"예: 지원금 없이도 현재 매출로 운영 가능하며, 지원금은 확장 속도를 앞당기는 역할입니다.",
         input:{key:"p10_s3", label:"\\"지원금 없이도 가능한가?\\" 답변", placeholder:"예: 지원금 없이도 현재 매출로 운영 가능하며, 지원금은 확장 속도를 앞당기는 역할입니다.", rows:3}},
-      {min:"6분", t:"짝꿍과 역할을 바꿔가며 세 질문을 실제로 묻고 답하는 <b>모의 질의응답</b> 진행", ex:"",
-        input:{key:"p10_s4", label:"메모(선택)", placeholder:"질의응답하며 느낀 점이나 받은 피드백을 적어도 좋아요", rows:2}}
+      {min:"6분", t:"<b>셀프 질의응답</b> — 세 질문과 답을 소리 내어 번갈아 말해보며 혼자 연습(가능하면 옆 사람과 역할을 바꿔가며 연습해도 좋고, 휴대폰으로 녹음해서 다시 들어봐도 좋아요)", ex:"",
+        input:{key:"p10_s4", label:"메모(선택)", placeholder:"연습하며 느낀 점이나 막혔던 질문을 적어도 좋아요", rows:2}}
     ],
-    result:["완성되면 이렇게 — 예상 질문 답변","\\"왜 하필 당신인가?\\": 10년간 패턴 제작 경험과 폐원단 수급망을 가진 제가 아니면 이 구조는 유지되기 어렵습니다.","\\"이 사업이 돌아갈 구조인가?\\": 월 100만원 광고로 1,000만원 매출을 내는 구조이며, 외주 공장과 협업해 소량이어도 품질을 유지합니다."],
+    result:["완성되면 이렇게 — 예상 질문 답변","\\"왜 하필 당신인가?\\": 10년간 패턴 제작 경험과 폐원단 수급망을 가진 제가 아니면 이 구조는 유지되기 어렵습니다.","\\"한 달에 얼마를 팔아야 손해를 안 보나요?\\": 월 고정비 150만원 ÷ 1벌 79,000원 ≈ 20벌이면 손익분기점, 현재 월 평균 25벌 판매 중이라 이미 흑자 구조입니다."],
     tip:"답변은 외운 티가 나면 오히려 역효과입니다. 핵심 숫자와 키워드만 기억하고, 나머지는 자기 말로 설명하게 연습시키세요.",
     prep:["필기도구","앞선 실습 워크시트 전부"],
   }
@@ -656,7 +656,7 @@ const PLAN_SLOTS = [
   {label:"아이템 (한 문장)", keys:["p2_s3"], goto:"p2"},
   {label:"비즈니스 모델", keys:["p1_s1"], goto:"p1"},
   {label:"주요 경쟁력", keys:["p1_s2"], goto:"p1"},
-  {label:"차별화", keys:["p3_s3","p1_s3"], goto:"p3", pickFirst:true},
+  {label:"차별화", keys:["p3_s3","p4_s3"], goto:"p3", join:true, fallbackKeys:["p1_s3"]},
   {label:"홍보 방안 (숫자)", keys:["p5_s2"], goto:"p5"},
   {label:"기대 효과", keys:["p6_s3"], goto:"p6"},
   {label:"ESG 한 줄", keys:["p7_s3"], goto:"p7"},
@@ -871,7 +871,11 @@ function handleClear(p){
 function getSlotValue(slot){
   if (slot.join){
     const parts = slot.keys.map(k=>{ const v=lsGetInput(k); return v && v.text ? v.text.trim() : ''; }).filter(Boolean);
-    return parts.join('\\n');
+    if (parts.length) return parts.join('\\n');
+    if (slot.fallbackKeys){
+      for (const k of slot.fallbackKeys){ const v=lsGetInput(k); if (v && v.text && v.text.trim()) return v.text.trim(); }
+    }
+    return '';
   }
   if (slot.pickFirst){
     for (const k of slot.keys){ const v=lsGetInput(k); if (v && v.text && v.text.trim()) return v.text.trim(); }
@@ -1100,7 +1104,7 @@ const PLAN_SLOTS = [
   {label:"아이템 (한 문장)", keys:["p2_s3"]},
   {label:"비즈니스 모델", keys:["p1_s1"]},
   {label:"주요 경쟁력", keys:["p1_s2"]},
-  {label:"차별화", keys:["p3_s3","p1_s3"], pickFirst:true},
+  {label:"차별화", keys:["p3_s3","p4_s3"], join:true, fallbackKeys:["p1_s3"]},
   {label:"홍보 방안 (숫자)", keys:["p5_s2"]},
   {label:"기대 효과", keys:["p6_s3"]},
   {label:"ESG 한 줄", keys:["p7_s3"]},
@@ -1108,7 +1112,12 @@ const PLAN_SLOTS = [
 ];
 
 function slotValue(slot, answers){
-  if (slot.join) return slot.keys.map(k=>(answers[k]||'').trim()).filter(Boolean).join('\\n');
+  if (slot.join){
+    const parts = slot.keys.map(k=>(answers[k]||'').trim()).filter(Boolean);
+    if (parts.length) return parts.join('\\n');
+    if (slot.fallbackKeys){ for (const k of slot.fallbackKeys){ if ((answers[k]||'').trim()) return answers[k].trim(); } }
+    return '';
+  }
   if (slot.pickFirst){ for (const k of slot.keys){ if ((answers[k]||'').trim()) return answers[k].trim(); } return ''; }
   return (answers[slot.keys[0]]||'').trim();
 }
@@ -1247,7 +1256,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,hy=`mwunw2kr`;function gy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var _y=e=>e?`
+`,hy=`mwuo80vy`;function gy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var _y=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
