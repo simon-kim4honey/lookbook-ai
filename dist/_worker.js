@@ -372,12 +372,12 @@ h3.block-label{
 }
 .example p+p{margin-top:8px}
 
-/* ── F2. 내 미니 사업계획서 모아보기 ───────── */
-.plan-section{margin-top:32px}
-.plan-card-outer{
-  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 30px;
+/* ── 브랜드명/번호(불러오기) ───────── */
+.profile-section{margin:4px 0 28px}
+.profile-card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 24px;
 }
-.profile-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.profile-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .profile-row label{font-size:13px;color:var(--sub)}
 .profile-row input{
   font-family:var(--font);font-size:14.5px;border:1px solid var(--border);border-radius:10px;
@@ -391,7 +391,13 @@ h3.block-label{
   padding:7px 14px;transition:.15s;
 }
 .btn-restore:hover{background:var(--main);color:#fff}
-.restore-hint{font-size:12.5px;color:var(--ph);margin:-12px 0 20px}
+.restore-hint{font-size:12.5px;color:var(--ph);margin:0}
+
+/* ── F2. 내 미니 사업계획서 모아보기 ───────── */
+.plan-section{margin-top:32px}
+.plan-card-outer{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 30px;
+}
 .plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px}
 .plan-title{font-weight:700;font-size:19px;color:var(--title)}
 .plan-progress-wrap{display:flex;align-items:center;gap:10px;min-width:180px}
@@ -448,6 +454,20 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
     <p class="head-note"><strong>패션·뷰티 소상공인 강의 현장용.</strong> 강의 중 이 페이지를 열고 실습을 하나씩 여세요. 단계별 체크로 참여자가 진행 상황을 그대로 따라갈 수 있습니다.</p>
   </header>
 
+  <!-- 브랜드명/번호(불러오기) -->
+  <section class="profile-section">
+    <div class="profile-card">
+      <div class="profile-row">
+        <label for="brandInput">브랜드명</label>
+        <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
+        <label for="pinInput">번호</label>
+        <input type="text" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 숫자">
+        <button class="btn-restore" id="restoreBtn" type="button">📂 불러오기</button>
+      </div>
+      <p class="restore-hint">다른 컴퓨터로 접속했나요? 지난번에 쓴 브랜드명 + 4자리 숫자를 입력하고 눌러주세요. (처음이라면 이 4자리 숫자를 기억해두세요 — 업로드할 때 함께 저장돼요.)</p>
+    </div>
+  </section>
+
   <!-- 실습 메뉴 -->
   <section class="menu">
     <div class="menu-head"><h2>실습 메뉴 10가지</h2></div>
@@ -460,14 +480,6 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
   <!-- F2. 내 미니 사업계획서 모아보기 -->
   <section class="plan-section">
     <div class="plan-card-outer">
-      <div class="profile-row">
-        <label for="brandInput">브랜드명</label>
-        <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
-        <label for="pinInput">번호</label>
-        <input type="text" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 숫자">
-        <button class="btn-restore" id="restoreBtn" type="button">📂 불러오기</button>
-      </div>
-      <p class="restore-hint">다른 컴퓨터로 접속했나요? 지난번에 쓴 브랜드명 + 4자리 숫자를 입력하고 눌러주세요. (처음이라면 이 4자리 숫자를 기억해두세요 — 업로드할 때 함께 저장돼요.)</p>
       <div class="plan-top">
         <div class="plan-title">내 미니 사업계획서</div>
         <div class="plan-progress-wrap">
@@ -1324,7 +1336,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,gy=`mwvcbkwm`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+`,gy=`mwvcmr1k`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
