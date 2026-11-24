@@ -251,14 +251,17 @@ body{
   line-height:1.6;
   -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:480px;margin:0 auto;padding:0 16px 80px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 32px 80px}
 
-header{padding:28px 0 18px}
+header{
+  padding:40px 0 22px;
+  display:flex;align-items:flex-end;justify-content:space-between;gap:32px;flex-wrap:wrap;
+}
 .eyebrow{font-size:13px;font-weight:600;color:var(--main);margin-bottom:8px}
-h1{font-weight:700;font-size:clamp(22px,6vw,27px);line-height:1.35;letter-spacing:-.01em;color:var(--title)}
+h1{font-weight:700;font-size:clamp(24px,3.2vw,34px);line-height:1.3;letter-spacing:-.01em;color:var(--title)}
 h1 em{font-style:normal;color:var(--main);position:relative;white-space:nowrap}
 h1 em svg{display:none}
-.head-note{color:var(--sub);font-size:14px;margin-top:10px}
+.head-note{max-width:420px;color:var(--sub);font-size:14.5px;padding-bottom:4px}
 .head-note strong{color:var(--body1)}
 
 /* ── 수업 코드 바 ───────────────── */
@@ -285,7 +288,7 @@ section.menu{padding:28px 0 6px}
 .menu-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .menu-head h2{font-size:18px;font-weight:700;color:var(--title)}
 .menu-head span{font-size:12.5px;color:var(--sub)}
-.menu-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
 .chip{
   position:relative;text-align:left;cursor:pointer;
   background:var(--card);border:1px solid var(--border);border-radius:14px;
@@ -338,9 +341,9 @@ section.menu{padding:28px 0 6px}
 .btn-clear:hover{background:var(--danger);color:#fff}
 .btn-clear.armed{background:var(--danger);color:#fff}
 
-.sheet-body{display:block}
-.col-main{padding:20px}
-.col-side{padding:0 20px 20px}
+.sheet-body{display:grid;grid-template-columns:1.6fr 1fr;gap:0}
+.col-main{padding:24px 28px;border-right:1px solid var(--border)}
+.col-side{padding:24px 28px}
 
 h3.block-label{
   font-size:12.5px;font-weight:700;
@@ -410,7 +413,7 @@ h3.block-label{
 /* ── F2. 내 미니 사업계획서 모아보기 ───────── */
 .plan-section{margin-top:32px}
 .plan-card-outer{
-  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px 20px;
+  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 30px;
 }
 .plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px}
 .plan-title{font-weight:700;font-size:19px;color:var(--title)}
@@ -428,7 +431,7 @@ h3.block-label{
   background:#fff;color:var(--body1);border:1px solid var(--border);border-radius:999px;padding:8px 14px;
 }
 .present-toggle:hover{border-color:var(--main);color:var(--main)}
-.plan-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.plan-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
 .plan-cell{
   border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:#fff;cursor:pointer;transition:.15s;
 }
@@ -457,10 +460,10 @@ h3.block-label{
 .present-card .plan-cell-val{font-size:16px}
 
 /* ── F3. 업로드 ───────── */
-.action-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.action-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .btn-pill{
   cursor:pointer;font-family:var(--font);font-weight:700;font-size:15px;
-  border-radius:999px;padding:13px 22px;border:none;transition:.15s;width:100%;
+  border-radius:999px;padding:13px 36px;border:none;transition:.15s;
 }
 .btn-pill.primary{background:var(--main);color:#fff}
 .btn-pill.primary:hover{background:var(--main-dark)}
@@ -478,6 +481,15 @@ footer{
 button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
+/* 좁은 화면(휴대폰)에서는 1단으로 */
+@media (max-width:760px){
+  .wrap{padding:0 16px 60px}
+  header{align-items:stretch}
+  .sheet-body{grid-template-columns:1fr}
+  .col-main{border-right:0;border-bottom:1px solid var(--border)}
+  .btn-pill{width:100%}
+}
+
 @media print{
   .sheet{box-shadow:none;page-break-inside:avoid}
   .chip{display:none}
@@ -491,7 +503,7 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
   <header>
     <div>
       <div class="eyebrow">강의 보조 도구 · 실습 진행 시트</div>
-      <h1>정부지원사업, 내 브랜드에 맞게<em>제대로 쓰는 실습<svg viewBox="0 0 120 12" preserveAspectRatio="none"><path d="M2 9 C 30 2, 60 11, 118 4" fill="none" stroke="#D8452B" stroke-width="3" stroke-linecap="round"/></svg></em></h1>
+      <h1>정부지원사업, 내 브랜드에 맞게 <em>제대로 쓰는 실습</em></h1>
     </div>
     <p class="head-note"><strong>패션·뷰티 소상공인 강의 현장용.</strong> 강의 중 이 페이지를 열고 실습을 하나씩 여세요. 단계별 체크로 참여자가 진행 상황을 그대로 따라갈 수 있습니다.</p>
   </header>
@@ -1319,7 +1331,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,gy=`mwuiuq26`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+`,gy=`mwulpiob`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
