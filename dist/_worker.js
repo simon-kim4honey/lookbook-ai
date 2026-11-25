@@ -1384,7 +1384,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,Cy=`mwvdns9y`;function wy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Ty=e=>e?`
+`,Cy=`mwvi1984`;function wy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Ty=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3123,9 +3123,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     }
     gsmLoad();
   <\/script>
-  `)))),Q.get(`/gov-support`,e=>{let t=fx.filter(e=>e.id!==`standard`).map(e=>`
-    <button type="button" class="gs-prog-btn" id="gsBtn-${e.id}" onclick="selectGsProgram('${e.id}', '${e.name.replace(/'/g,`\\'`)}')">${e.name}</button>
-  `).join(``);return e.html(PS(`지원사업 도우미`,`
+  `)))),Q.get(`/gov-support`,async e=>{let t=e.env.LOOKBOOK_DB,n=new Set((await Promise.all(fx.map(async e=>[e.id,await vx(t,e.id)]))).filter(([,e])=>e).map(([e])=>e)),r=n.has(`standard`),i=fx.filter(e=>e.id!==`standard`).map(e=>n.has(e.id)?`<button type="button" class="gs-prog-btn" id="gsBtn-${e.id}" onclick="selectGsProgram('${e.id}', '${e.name.replace(/'/g,`\\'`)}')">${e.name}</button>`:`<button type="button" class="gs-prog-btn" id="gsBtn-${e.id}" disabled>${e.name} <span class="gs-prog-pending-tag">AI 생성 준비 중</span></button>`).join(``);return e.html(PS(`지원사업 도우미`,`
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
@@ -3142,6 +3140,9 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     .gs-prog-btn:active { transform: scale(.98); }
     .gs-prog-btn.selected { border-color: #3182F6; color: #3182F6; background: #EAF2FF; }
     .gs-prog-btn-etc { color: #4E5968; }
+    .gs-prog-btn:disabled { background: #F2F4F6; color: #B0B8C1; box-shadow: none; cursor: not-allowed; }
+    .gs-prog-btn:disabled:active { transform: none; }
+    .gs-prog-pending-tag { font-size: 11.5px; font-weight: 700; color: #B0B8C1; margin-left: 2px; }
     .gs-footer-disclaimer { font-size: 11.5px; color: #8B95A1; line-height: 1.6; margin-top: 20px; text-align: center; padding-bottom: 90px; }
     .gs-next-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #E5E8EB; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 20; }
     .gs-next-btn { display: block; width: 100%; max-width: 448px; margin: 0 auto; padding: 15px; background: #3182F6; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
@@ -3163,8 +3164,8 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       </div>
 
       <div class="gs-prog-grid">
-        ${t}
-        <button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-standard" onclick="selectGsProgram('standard', '기타(사업계획서 표준형)')">기타(사업계획서 표준형)</button>
+        ${i}
+        ${r?`<button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-standard" onclick="selectGsProgram('standard', '기타(사업계획서 표준형)')">기타(사업계획서 표준형)</button>`:`<button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-standard" disabled>기타(사업계획서 표준형) <span class="gs-prog-pending-tag">AI 생성 준비 중</span></button>`}
       </div>
 
       <div class="gs-footer-disclaimer">본 콘텐츠는 정부지원사업 신청을 돕기 위한 참고 자료이며, 법률·세무 자문이 아닙니다.</div>
