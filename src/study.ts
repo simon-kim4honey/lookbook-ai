@@ -50,7 +50,13 @@ const studyAdminAuth = async (c: any, next: any) => {
   await next()
 }
 
+function isValidPin(pin: string): boolean {
+  return /^[0-9]{4}$/.test(pin)
+}
+
 // POST /api/study/submit — 학생 업로드. 같은 submissionId로 다시 업로드하면 갱신(덮어쓰기)된다.
+// pin(4자리 숫자)은 학생이 직접 정하는 값 — 브랜드명 중복을 허용하는 설계라, 다른 기기에서
+// 불러올 때 브랜드명만으로는 다른 학생의 답안과 구분이 안 되는 문제를 막기 위한 구분 키다.
 studyApi.post('/submit', async (c) => {
   try {
     const body = await c.req.json().catch(() => null)
@@ -58,24 +64,53 @@ studyApi.post('/submit', async (c) => {
 
     const submissionId = String(body.submissionId || '').trim()
     const brandAlias = String(body.brandAlias || '').trim().slice(0, 60)
+    const pin = String(body.pin || '').trim()
 
     if (!/^[a-zA-Z0-9_-]{8,64}$/.test(submissionId)) return c.json({ success: false, message: '잘못된 요청이에요.' }, 400)
     if (!brandAlias) return c.json({ success: false, message: '브랜드명을 입력해주세요.' }, 400)
+    if (!isValidPin(pin)) return c.json({ success: false, message: '4자리 비밀번호를 입력해주세요.' }, 400)
 
     const answers = body.answers && typeof body.answers === 'object' ? body.answers : {}
     const answersJson = JSON.stringify(answers).slice(0, 20000)
 
     const db = c.env.LOOKBOOK_DB
     await db.prepare(
-      `INSERT INTO study_submissions (id, brand_alias, answers_json, submitted_at, updated_at)
-       VALUES (?, ?, ?, datetime('now'), datetime('now'))
+      `INSERT INTO study_submissions (id, brand_alias, pin, answers_json, submitted_at, updated_at)
+       VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
        ON CONFLICT(id) DO UPDATE SET
          brand_alias = excluded.brand_alias,
+         pin = excluded.pin,
          answers_json = excluded.answers_json,
          updated_at = datetime('now')`
-    ).bind(submissionId, brandAlias, answersJson).run()
+    ).bind(submissionId, brandAlias, pin, answersJson).run()
 
     return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ success: false, message: err.message }, 500)
+  }
+})
+
+// GET /api/study/restore?brandAlias=XXX&pin=YYYY — 학생이 다른 기기에서 이어서 작성할 수
+// 있도록 같은 브랜드명 + 4자리 숫자로 올린 가장 최근 제출물을 불러온다. 비밀번호 없이
+// 조회하지만(강사 승인 없이 학생 스스로 쓰는 기능), 무차별 대입 방지로 IP당 호출 수는 제한한다.
+studyApi.get('/restore', async (c) => {
+  try {
+    const brandAlias = String(c.req.query('brandAlias') || '').trim().slice(0, 60)
+    const pin = String(c.req.query('pin') || '').trim()
+    if (!brandAlias) return c.json({ success: false, message: '브랜드명을 입력해주세요.' }, 400)
+    if (!isValidPin(pin)) return c.json({ success: false, message: '4자리 비밀번호를 입력해주세요.' }, 400)
+
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown'
+    const ok = await checkRateLimit(c.env.LOOKBOOK_KV, `study_restore_rl_${ip}`, 20, 60)
+    if (!ok) return c.json({ success: false, message: '요청이 너무 많아요. 잠시 후 다시 시도해주세요.' }, 429)
+
+    const db = c.env.LOOKBOOK_DB
+    const row: any = await db.prepare(
+      `SELECT id, answers_json, updated_at FROM study_submissions WHERE brand_alias = ? AND pin = ? ORDER BY updated_at DESC LIMIT 1`
+    ).bind(brandAlias, pin).first()
+    if (!row) return c.json({ success: false, message: '브랜드명 또는 비밀번호가 일치하는 답안을 찾지 못했어요.' }, 404)
+
+    return c.json({ success: true, id: row.id, answers: JSON.parse(row.answers_json || '{}'), updatedAt: row.updated_at })
   } catch (err: any) {
     return c.json({ success: false, message: err.message }, 500)
   }
