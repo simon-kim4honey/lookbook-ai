@@ -127,6 +127,7 @@ h3.block-label{
 .step-text b{font-weight:700;color:var(--title)}
 .step-text .ex{display:block;font-size:13px;color:var(--sub);margin-top:4px}
 .step-input-wrap{margin-top:10px;margin-left:34px}
+.plan-flag{font-size:11.5px;font-weight:600;color:var(--main);margin-bottom:5px}
 .step-input-field{
   width:100%;font-family:var(--font);font-size:14.5px;color:var(--title);
   border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:#fff;resize:vertical;
@@ -150,18 +151,35 @@ h3.block-label{
 }
 .example p+p{margin-top:8px}
 
-/* ── F2. 내 미니 사업계획서 모아보기 ───────── */
-.plan-section{margin-top:32px}
-.plan-card-outer{
-  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 30px;
+/* ── 브랜드명/번호(불러오기) ───────── */
+.profile-section{margin:4px 0 28px}
+.profile-card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px 24px;
 }
-.profile-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap}
+.profile-row{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
 .profile-row label{font-size:13px;color:var(--sub)}
 .profile-row input{
   font-family:var(--font);font-size:14.5px;border:1px solid var(--border);border-radius:10px;
   padding:8px 12px;min-width:160px;background:#fff;color:var(--title);flex:1;
 }
 .profile-row input:focus-visible{outline:3px solid var(--main);outline-offset:1px}
+.profile-row input.pin-input{flex:0 0 auto;width:84px;text-align:center;letter-spacing:.15em;font-weight:600}
+.btn-restore{
+  cursor:pointer;font-weight:600;font-size:12.5px;white-space:nowrap;
+  background:#fff;color:var(--main);border:1px solid var(--main);border-radius:999px;
+  padding:7px 14px;transition:.15s;
+}
+.btn-restore:hover{background:var(--main);color:#fff}
+.restore-hint{font-size:12.5px;color:var(--ph);margin:0}
+.profile-status{font-size:13px;margin-top:10px;min-height:16px;color:var(--sub)}
+.profile-status.ok{color:var(--success);font-weight:600}
+.profile-status.err{color:var(--danger);font-weight:600}
+
+/* ── F2. 내 미니 사업계획서 모아보기 ───────── */
+.plan-section{margin-top:32px}
+.plan-card-outer{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 30px;
+}
 .plan-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px}
 .plan-title{font-weight:700;font-size:19px;color:var(--title)}
 .plan-progress-wrap{display:flex;align-items:center;gap:10px;min-width:180px}
@@ -218,6 +236,21 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
     <p class="head-note"><strong>패션·뷰티 소상공인 강의 현장용.</strong> 강의 중 이 페이지를 열고 실습을 하나씩 여세요. 단계별 체크로 참여자가 진행 상황을 그대로 따라갈 수 있습니다.</p>
   </header>
 
+  <!-- 브랜드명/번호(불러오기) -->
+  <section class="profile-section">
+    <div class="profile-card">
+      <div class="profile-row">
+        <label for="brandInput">브랜드명</label>
+        <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
+        <label for="pinInput">번호</label>
+        <input type="text" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 숫자">
+        <button class="btn-restore" id="restoreBtn" type="button">확인</button>
+      </div>
+      <p class="restore-hint" id="restoreHint">처음이라면 브랜드명과 4자리 숫자를 정하고 <b>확인</b>을 눌러주세요(이 숫자는 꼭 기억해두세요). 다른 컴퓨터로 이어서 쓰려면 같은 브랜드명 + 숫자를 입력하고 <b>불러오기</b>를 눌러주세요.</p>
+      <div class="profile-status" id="profileStatus"></div>
+    </div>
+  </section>
+
   <!-- 실습 메뉴 -->
   <section class="menu">
     <div class="menu-head"><h2>실습 메뉴 10가지</h2></div>
@@ -230,10 +263,6 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
   <!-- F2. 내 미니 사업계획서 모아보기 -->
   <section class="plan-section">
     <div class="plan-card-outer">
-      <div class="profile-row">
-        <label for="brandInput">브랜드명</label>
-        <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
-      </div>
       <div class="plan-top">
         <div class="plan-title">내 미니 사업계획서</div>
         <div class="plan-progress-wrap">
@@ -406,7 +435,7 @@ const PRACTICES = [
   {
     id:"p10", no:"10", name:"평가위원 예상 질문 대비", time:30,
     part:"교안 PART 02 · 평가위원 질문 대응",
-    sub:"자주 나오는 평가위원 질문에 미리 답을 써보고, 실제 질의응답처럼 연습합니다.",
+    sub:"자주 나오는 평가위원 질문에 미리 답을 써보고, 실제 질의응답처럼 연습합니다. (앞선 8개 실습과 달리 모아보기 8칸에는 반영되지 않아요 — 발표 리허설 자체가 목적이에요.)",
     steps:[
       {min:"8분", t:"<b>\"왜 하필 당신인가?\"</b>에 대한 답 적기 — 앞선 실습의 비즈니스 모델 · 경쟁력 · 차별화 문장을 활용해 한 문단으로 완성", ex:"예: 10년간 패턴 제작 경험과 폐원단 수급망을 가진 제가 아니면 이 소량 맞춤 생산 구조는 유지되기 어렵습니다.",
         input:{key:"p10_s1", label:"\"왜 하필 당신인가?\" 답변", placeholder:"예: 10년간 패턴 제작 경험과 폐원단 수급망을 가진 제가 아니면 이 소량 맞춤 생산 구조는 유지되기 어렵습니다.", rows:3}},
@@ -448,6 +477,13 @@ function noOf(id){
   return p ? p.no : id;
 }
 
+// 모아보기(F2) 8칸에 실제로 반영되는 입력 키 모음 — 해당 입력칸에 "모아보기 반영" 표시를 보여주기 위함
+const PLAN_KEYS = new Set();
+PLAN_SLOTS.forEach(slot=>{
+  slot.keys.forEach(k=>PLAN_KEYS.add(k));
+  if (slot.fallbackKeys) slot.fallbackKeys.forEach(k=>PLAN_KEYS.add(k));
+});
+
 // ── localStorage 헬퍼 ───────────────────────
 const LS_PREFIX = "gsap_v2_";
 function lsGetInput(key){
@@ -465,7 +501,7 @@ function lsSetStepDone(practiceId, idx, done){
   try { localStorage.setItem(LS_PREFIX+"stepdone_"+practiceId+"_"+idx, done ? "1" : "0"); } catch {}
 }
 function lsGetProfile(){
-  try { const raw = localStorage.getItem(LS_PREFIX+"profile"); return raw ? JSON.parse(raw) : {brand:""}; } catch { return {brand:""}; }
+  try { const raw = localStorage.getItem(LS_PREFIX+"profile"); return raw ? JSON.parse(raw) : {brand:"",pin:""}; } catch { return {brand:"",pin:""}; }
 }
 function lsSetProfile(p){ try { localStorage.setItem(LS_PREFIX+"profile", JSON.stringify(p)); } catch {} }
 function lsGetSubmissionId(){
@@ -475,6 +511,10 @@ function lsGetSubmissionId(){
     return id;
   } catch { return "tmp-"+Date.now(); }
 }
+// submission_id는 lsGetSubmissionId()가 처음 호출될 때(=첫 업로드 또는 불러오기 성공 시)
+// 비로소 생기므로, 이 값의 존재 여부로 "이 기기에서 이미 한 번이라도 서버와
+// 연결된 적이 있는지"를 판단한다 — 확인/불러오기 버튼 전환 기준.
+function lsHasSubmissionId(){ try { return !!localStorage.getItem(LS_PREFIX+"submission_id"); } catch { return false; } }
 
 function allStepKeysOfPractice(p){
   const out = [];
@@ -516,6 +556,7 @@ function stepInputsHtml(s, pid){
     const val = saved ? saved.text : '';
     return `
       <div class="step-input-wrap">
+        ${PLAN_KEYS.has(inp.key) ? '<div class="plan-flag">📋 이 답변이 모아보기(미니 사업계획서)에 반영돼요</div>' : ''}
         <textarea class="step-input-field" data-key="${inp.key}" rows="${inp.rows||2}"
           placeholder="${inp.placeholder.replace(/"/g,'&quot;')}"
           aria-label="${inp.label.replace(/"/g,'&quot;')}"
@@ -628,7 +669,8 @@ function flushAllVisible(){
   });
 }
 window.addEventListener('beforeunload', flushAllVisible);
-document.addEventListener('visibilitychange', ()=>{ if (document.visibilityState==='hidden') flushAllVisible(); });
+function flushOnHide(){ if (document.visibilityState==='hidden') flushAllVisible(); }
+document.addEventListener('visibilitychange', flushOnHide);
 
 /* 내 답안 지우기 — 두 번 눌러야 실행 */
 function handleClear(p){
@@ -685,10 +727,69 @@ function renderPlan(){
   document.getElementById('planProgFill').style.width = (filled/PLAN_SLOTS.length*100)+'%';
 }
 
-/* 브랜드명 */
+/* 브랜드명 + 4자리 번호 */
 const brandInput = document.getElementById('brandInput');
+const pinInput = document.getElementById('pinInput');
+const restoreBtn = document.getElementById('restoreBtn');
 brandInput.value = lsGetProfile().brand || '';
-brandInput.addEventListener('input', ()=> lsSetProfile({brand: brandInput.value}));
+pinInput.value = lsGetProfile().pin || '';
+brandInput.addEventListener('input', ()=> lsSetProfile({brand: brandInput.value, pin: pinInput.value}));
+pinInput.addEventListener('input', ()=>{
+  pinInput.value = pinInput.value.replace(/[^0-9]/g,'').slice(0,4);
+  lsSetProfile({brand: brandInput.value, pin: pinInput.value});
+});
+
+// 이 기기에서 서버와 연결된 적(업로드/불러오기)이 없으면 "확인"만 보여주고,
+// 생긴 뒤부터는 "불러오기"(다른 기기에서 이어서 작성)로 바뀐다.
+function updateRestoreBtnMode(){
+  restoreBtn.textContent = lsHasSubmissionId() ? '📂 불러오기' : '확인';
+}
+updateRestoreBtnMode();
+
+/* 다른 기기에서 이어서 작성하기 — 브랜드명 + 4자리 번호로 서버에 올린 가장 최근 답안을 불러온다 */
+let restoreArmed = false;
+restoreBtn.onclick = async ()=>{
+  const statusEl = document.getElementById('profileStatus');
+  const brandAlias = (brandInput.value||'').trim();
+  const pin = (pinInput.value||'').trim();
+  if (!brandAlias){ statusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; statusEl.className='profile-status err'; brandInput.focus(); return; }
+  if (!/^[0-9]{4}$/.test(pin)){ statusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; statusEl.className='profile-status err'; pinInput.focus(); return; }
+
+  if (!lsHasSubmissionId()){
+    // 아직 서버와 연결된 적 없는 기기 — 실제 불러오기가 아니라 입력값 확인만.
+    // 브랜드명/번호는 이미 input 이벤트에서 localStorage에 자동 저장돼 있다.
+    statusEl.textContent = '✓ 확인했어요. 이 번호를 꼭 기억해두세요 — 다른 기기에서 이어서 쓸 때 필요해요.';
+    statusEl.className = 'profile-status ok';
+    return;
+  }
+
+  if (!restoreArmed){
+    restoreArmed = true;
+    restoreBtn.textContent = '정말 불러올까요? 지금 답은 덮어써져요';
+    setTimeout(()=>{ restoreArmed=false; updateRestoreBtnMode(); }, 3000);
+    return;
+  }
+  restoreArmed = false; updateRestoreBtnMode();
+  statusEl.textContent = '불러오는 중…'; statusEl.className = 'profile-status';
+  try{
+    const res = await fetch('/api/study/restore?brandAlias='+encodeURIComponent(brandAlias)+'&pin='+encodeURIComponent(pin));
+    const data = await res.json().catch(()=>null);
+    if (!data || !data.success){
+      statusEl.textContent = '⚠ '+(data && data.message ? data.message : '불러오지 못했어요');
+      statusEl.className = 'profile-status err';
+      return;
+    }
+    Object.keys(data.answers||{}).forEach(key=> lsSetInput(key, data.answers[key]));
+    try{ localStorage.setItem(LS_PREFIX+'submission_id', data.id); }catch{}
+    // reload 직전 beforeunload/visibilitychange가 화면에 떠있는(아직 비어있는) textarea 값을
+    // 그대로 다시 저장해 방금 복원한 값을 덮어쓰지 않도록, 리로드 전에 flush 리스너를 해제한다.
+    window.removeEventListener('beforeunload', flushAllVisible);
+    document.removeEventListener('visibilitychange', flushOnHide);
+    location.reload();
+  }catch(e){
+    statusEl.textContent = '⚠ 네트워크 문제로 불러오지 못했어요'; statusEl.className = 'profile-status err';
+  }
+};
 
 /* ── F3. 업로드 ───────────────────────── */
 function collectAllAnswers(){
@@ -703,15 +804,17 @@ const uploadStatusEl = document.getElementById('uploadStatus');
 document.getElementById('uploadBtn').onclick = async ()=>{
   flushAllVisible();
   const brandAlias = (brandInput.value||'').trim();
+  const pin = (pinInput.value||'').trim();
   if (!brandAlias){ uploadStatusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; uploadStatusEl.className='upload-status err'; brandInput.focus(); return; }
+  if (!/^[0-9]{4}$/.test(pin)){ uploadStatusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; uploadStatusEl.className='upload-status err'; pinInput.focus(); return; }
   uploadStatusEl.textContent='업로드 중…'; uploadStatusEl.className='upload-status';
   try{
     const res = await fetch('/api/study/submit', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ submissionId:lsGetSubmissionId(), brandAlias, answers:collectAllAnswers() })
+      body: JSON.stringify({ submissionId:lsGetSubmissionId(), brandAlias, pin, answers:collectAllAnswers() })
     });
     const data = await res.json().catch(()=>({success:false}));
-    if (data && data.success){ uploadStatusEl.textContent='✓ 업로드 완료했어요 '+nowLabel(); uploadStatusEl.className='upload-status ok'; }
+    if (data && data.success){ uploadStatusEl.textContent='✓ 업로드 완료했어요 '+nowLabel(); uploadStatusEl.className='upload-status ok'; updateRestoreBtnMode(); }
     else { uploadStatusEl.textContent='⚠ '+(data && data.message ? data.message : '업로드에 실패했어요'); uploadStatusEl.className='upload-status err'; }
   }catch(e){
     uploadStatusEl.textContent='⚠ 네트워크 문제로 업로드하지 못했어요. 다시 시도해주세요'; uploadStatusEl.className='upload-status err';
