@@ -1384,7 +1384,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,Cy=`mwvi1984`;function wy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Ty=e=>e?`
+`,Cy=`mwwruzxw`;function wy(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var Ty=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3123,7 +3123,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     }
     gsmLoad();
   <\/script>
-  `)))),Q.get(`/gov-support`,async e=>{let t=e.env.LOOKBOOK_DB,n=new Set((await Promise.all(fx.map(async e=>[e.id,await vx(t,e.id)]))).filter(([,e])=>e).map(([e])=>e)),r=n.has(`standard`),i=fx.filter(e=>e.id!==`standard`).map(e=>n.has(e.id)?`<button type="button" class="gs-prog-btn" id="gsBtn-${e.id}" onclick="selectGsProgram('${e.id}', '${e.name.replace(/'/g,`\\'`)}')">${e.name}</button>`:`<button type="button" class="gs-prog-btn" id="gsBtn-${e.id}" disabled>${e.name} <span class="gs-prog-pending-tag">AI 생성 준비 중</span></button>`).join(``);return e.html(PS(`지원사업 도우미`,`
+  `)))),Q.get(`/gov-support`,async e=>{let t=e.env.LOOKBOOK_DB,n=new Set((await Promise.all(fx.map(async e=>[e.id,await vx(t,e.id)]))).filter(([,e])=>e).map(([e])=>e)),r=n.has(`standard`),i=fx.filter(e=>e.id!==`standard`).slice().sort((e,t)=>!n.has(e.id)-+!n.has(t.id)).map(e=>n.has(e.id)?`<button type="button" class="gs-prog-btn" id="gsBtn-${e.id}" onclick="selectGsProgram('${e.id}', '${e.name.replace(/'/g,`\\'`)}')">${e.name}</button>`:`<button type="button" class="gs-prog-btn" id="gsBtn-${e.id}" disabled>${e.name} <span class="gs-prog-pending-tag">AI 생성 준비 중</span></button>`).join(``);return e.html(PS(`지원사업 도우미`,`
   <div class="toast-container" id="toastContainer"></div>
 
   <style>
