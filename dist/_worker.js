@@ -213,13 +213,13 @@ ${t.statText?`[수치] ${t.statText}`:``}
       </linearGradient>
     </defs>
     <rect width="${n}" height="${r}" fill="url(#bg)"/>
-  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=new De,uy=`3325`;async function dy(e,t,n,r){try{let i=await e.get(t),a=i?parseInt(i,10):0;return a>=n?!1:(await e.put(t,String(a+1),{expirationTtl:r}),!0)}catch{return!0}}var fy=async(e,t)=>{let n=e.req.header(`cf-connecting-ip`)||e.req.header(`x-forwarded-for`)||`unknown`;if(!await dy(e.env.LOOKBOOK_KV,`study_admin_rl_${n}`,20,60))return e.json({success:!1,message:`요청이 너무 많아요. 잠시 후 다시 시도해주세요.`},429);if(e.req.header(`X-Study-Admin-Password`)!==uy)return e.json({success:!1,message:`비밀번호가 올바르지 않아요.`},401);await t()};function py(e){return/^[0-9]{4}$/.test(e)}ly.post(`/submit`,async e=>{try{let t=await e.req.json().catch(()=>null);if(!t)return e.json({success:!1,message:`잘못된 요청이에요.`},400);let n=String(t.submissionId||``).trim(),r=String(t.brandAlias||``).trim().slice(0,60),i=String(t.pin||``).trim();if(!/^[a-zA-Z0-9_-]{8,64}$/.test(n))return e.json({success:!1,message:`잘못된 요청이에요.`},400);if(!r)return e.json({success:!1,message:`브랜드명을 입력해주세요.`},400);if(!py(i))return e.json({success:!1,message:`4자리 숫자를 입력해주세요.`},400);let a=t.answers&&typeof t.answers==`object`?t.answers:{},o=JSON.stringify(a).slice(0,2e4);return await e.env.LOOKBOOK_DB.prepare(`INSERT INTO study_submissions (id, brand_alias, pin, answers_json, submitted_at, updated_at)
+  `),e.statText&&(u.push(`<text x="64" y="${l+110}" font-family="${sy}" font-size="128" font-weight="800" fill="${ay(e.statColor||`#ffffff`)}">${ay(e.statText)}</text>`),l+=o+26),i.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*82-22}" font-family="${sy}" font-size="64" font-weight="800" fill="#ffffff">${ay(e)}</text>`)}),l+=i.length*82+26,a.forEach((e,t)=>{u.push(`<text x="64" y="${l+(t+1)*44-12}" font-family="${sy}" font-size="32" font-weight="500" fill="rgba(255,255,255,0.78)">${ay(e)}</text>`)}),`<svg xmlns="http://www.w3.org/2000/svg" width="${n}" height="${r}" viewBox="0 0 ${n} ${r}">${u.join(``)}</svg>`}var ly=new De,uy=`3325`;async function dy(e,t,n,r){try{let i=await e.get(t),a=i?parseInt(i,10):0;return a>=n?!1:(await e.put(t,String(a+1),{expirationTtl:r}),!0)}catch{return!0}}var fy=async(e,t)=>{let n=e.req.header(`cf-connecting-ip`)||e.req.header(`x-forwarded-for`)||`unknown`;if(!await dy(e.env.LOOKBOOK_KV,`study_admin_rl_${n}`,20,60))return e.json({success:!1,message:`요청이 너무 많아요. 잠시 후 다시 시도해주세요.`},429);if(e.req.header(`X-Study-Admin-Password`)!==uy)return e.json({success:!1,message:`비밀번호가 올바르지 않아요.`},401);await t()};function py(e){return/^[0-9]{4}$/.test(e)}ly.post(`/submit`,async e=>{try{let t=await e.req.json().catch(()=>null);if(!t)return e.json({success:!1,message:`잘못된 요청이에요.`},400);let n=String(t.submissionId||``).trim(),r=String(t.brandAlias||``).trim().slice(0,60),i=String(t.pin||``).trim();if(!/^[a-zA-Z0-9_-]{8,64}$/.test(n))return e.json({success:!1,message:`잘못된 요청이에요.`},400);if(!r)return e.json({success:!1,message:`브랜드명을 입력해주세요.`},400);if(!py(i))return e.json({success:!1,message:`4자리 비밀번호를 입력해주세요.`},400);let a=t.answers&&typeof t.answers==`object`?t.answers:{},o=JSON.stringify(a).slice(0,2e4);return await e.env.LOOKBOOK_DB.prepare(`INSERT INTO study_submissions (id, brand_alias, pin, answers_json, submitted_at, updated_at)
        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
        ON CONFLICT(id) DO UPDATE SET
          brand_alias = excluded.brand_alias,
          pin = excluded.pin,
          answers_json = excluded.answers_json,
-         updated_at = datetime('now')`).bind(n,r,i,o).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.get(`/restore`,async e=>{try{let t=String(e.req.query(`brandAlias`)||``).trim().slice(0,60),n=String(e.req.query(`pin`)||``).trim();if(!t)return e.json({success:!1,message:`브랜드명을 입력해주세요.`},400);if(!py(n))return e.json({success:!1,message:`4자리 숫자를 입력해주세요.`},400);let r=e.req.header(`cf-connecting-ip`)||e.req.header(`x-forwarded-for`)||`unknown`;if(!await dy(e.env.LOOKBOOK_KV,`study_restore_rl_${r}`,20,60))return e.json({success:!1,message:`요청이 너무 많아요. 잠시 후 다시 시도해주세요.`},429);let i=await e.env.LOOKBOOK_DB.prepare(`SELECT id, answers_json, updated_at FROM study_submissions WHERE brand_alias = ? AND pin = ? ORDER BY updated_at DESC LIMIT 1`).bind(t,n).first();return i?e.json({success:!0,id:i.id,answers:JSON.parse(i.answers_json||`{}`),updatedAt:i.updated_at}):e.json({success:!1,message:`브랜드명 또는 4자리 숫자가 일치하는 답안을 찾지 못했어요.`},404)}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.get(`/submissions`,fy,async e=>{try{let t=((await e.env.LOOKBOOK_DB.prepare(`SELECT id, brand_alias, answers_json, submitted_at, updated_at FROM study_submissions ORDER BY updated_at DESC`).all()).results||[]).map(e=>({id:e.id,brandAlias:e.brand_alias,answers:JSON.parse(e.answers_json||`{}`),submittedAt:e.submitted_at,updatedAt:e.updated_at}));return e.json({success:!0,count:t.length,submissions:t})}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.post(`/reset`,fy,async e=>{try{return await e.env.LOOKBOOK_DB.prepare(`DELETE FROM study_submissions`).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}});var my=`<!DOCTYPE html>
+         updated_at = datetime('now')`).bind(n,r,i,o).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.get(`/restore`,async e=>{try{let t=String(e.req.query(`brandAlias`)||``).trim().slice(0,60),n=String(e.req.query(`pin`)||``).trim();if(!t)return e.json({success:!1,message:`브랜드명을 입력해주세요.`},400);if(!py(n))return e.json({success:!1,message:`4자리 비밀번호를 입력해주세요.`},400);let r=e.req.header(`cf-connecting-ip`)||e.req.header(`x-forwarded-for`)||`unknown`;if(!await dy(e.env.LOOKBOOK_KV,`study_restore_rl_${r}`,20,60))return e.json({success:!1,message:`요청이 너무 많아요. 잠시 후 다시 시도해주세요.`},429);let i=await e.env.LOOKBOOK_DB.prepare(`SELECT id, answers_json, updated_at FROM study_submissions WHERE brand_alias = ? AND pin = ? ORDER BY updated_at DESC LIMIT 1`).bind(t,n).first();return i?e.json({success:!0,id:i.id,answers:JSON.parse(i.answers_json||`{}`),updatedAt:i.updated_at}):e.json({success:!1,message:`브랜드명 또는 비밀번호가 일치하는 답안을 찾지 못했어요.`},404)}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.get(`/submissions`,fy,async e=>{try{let t=((await e.env.LOOKBOOK_DB.prepare(`SELECT id, brand_alias, answers_json, submitted_at, updated_at FROM study_submissions ORDER BY updated_at DESC`).all()).results||[]).map(e=>({id:e.id,brandAlias:e.brand_alias,answers:JSON.parse(e.answers_json||`{}`),submittedAt:e.submitted_at,updatedAt:e.updated_at}));return e.json({success:!0,count:t.length,submissions:t})}catch(t){return e.json({success:!1,message:t.message},500)}}),ly.post(`/reset`,fy,async e=>{try{return await e.env.LOOKBOOK_DB.prepare(`DELETE FROM study_submissions`).run(),e.json({success:!0})}catch(t){return e.json({success:!1,message:t.message},500)}});var my=`<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -391,6 +391,8 @@ h3.block-label{
   padding:7px 14px;transition:.15s;
 }
 .btn-restore:hover{background:var(--main);color:#fff}
+.btn-new{color:var(--sub);border-color:var(--border)}
+.btn-new:hover{background:var(--danger);border-color:var(--danger);color:#fff}
 .restore-hint{font-size:12.5px;color:var(--ph);margin:0}
 .profile-status{font-size:13px;margin-top:10px;min-height:16px;color:var(--sub)}
 .profile-status.ok{color:var(--success);font-weight:600}
@@ -463,11 +465,12 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
       <div class="profile-row">
         <label for="brandInput">브랜드명</label>
         <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
-        <label for="pinInput">번호</label>
-        <input type="text" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 숫자">
+        <label for="pinInput">비밀번호</label>
+        <input type="text" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 비밀번호">
         <button class="btn-restore" id="restoreBtn" type="button">확인</button>
+        <button class="btn-restore btn-new" id="newBtn" type="button">🆕 새로 만들기</button>
       </div>
-      <p class="restore-hint" id="restoreHint">처음이라면 브랜드명과 4자리 숫자를 정하고 <b>확인</b>을 눌러주세요(이 숫자는 꼭 기억해두세요). 다른 컴퓨터로 이어서 쓰려면 같은 브랜드명 + 숫자를 입력하고 <b>불러오기</b>를 눌러주세요.</p>
+      <p class="restore-hint" id="restoreHint">처음이라면 브랜드명과 4자리 비밀번호를 정하고 <b>확인</b>을 눌러주세요(이 비밀번호는 꼭 기억해두세요). 다른 컴퓨터로 이어서 쓰려면 같은 브랜드명 + 비밀번호를 입력하고 <b>불러오기</b>를 눌러주세요. 같은 컴퓨터에서 다른 사람이 새로 시작하려면 <b>새로 만들기</b>를 눌러주세요(지금 작성한 내용은 사라져요).</p>
       <div class="profile-status" id="profileStatus"></div>
     </div>
   </section>
@@ -974,12 +977,12 @@ restoreBtn.onclick = async ()=>{
   const brandAlias = (brandInput.value||'').trim();
   const pin = (pinInput.value||'').trim();
   if (!brandAlias){ statusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; statusEl.className='profile-status err'; brandInput.focus(); return; }
-  if (!/^[0-9]{4}$/.test(pin)){ statusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; statusEl.className='profile-status err'; pinInput.focus(); return; }
+  if (!/^[0-9]{4}$/.test(pin)){ statusEl.textContent='⚠ 4자리 비밀번호를 입력해주세요'; statusEl.className='profile-status err'; pinInput.focus(); return; }
 
   if (!lsHasSubmissionId()){
     // 아직 서버와 연결된 적 없는 기기 — 실제 불러오기가 아니라 입력값 확인만.
-    // 브랜드명/번호는 이미 input 이벤트에서 localStorage에 자동 저장돼 있다.
-    statusEl.textContent = '✓ 확인했어요. 이 번호를 꼭 기억해두세요 — 다른 기기에서 이어서 쓸 때 필요해요.';
+    // 브랜드명/비밀번호는 이미 input 이벤트에서 localStorage에 자동 저장돼 있다.
+    statusEl.textContent = '✓ 확인했어요. 이 비밀번호를 꼭 기억해두세요 — 다른 기기에서 이어서 쓸 때 필요해요.';
     statusEl.className = 'profile-status ok';
     return;
   }
@@ -1012,6 +1015,28 @@ restoreBtn.onclick = async ()=>{
   }
 };
 
+/* 새로 만들기 — 같은 컴퓨터를 다른 사람이 이어서 쓸 때, 이 기기의 실습 데이터를
+   전부 지우고 새 제출물(새 submission_id)로 처음부터 시작한다. 두 번 눌러야 실행. */
+const newBtn = document.getElementById('newBtn');
+let newArmed = false;
+newBtn.onclick = ()=>{
+  if (!newArmed){
+    newArmed = true;
+    newBtn.textContent = '정말 새로 시작할까요? 지금 작성한 내용은 사라져요';
+    setTimeout(()=>{ newArmed=false; newBtn.textContent='🆕 새로 만들기'; }, 3000);
+    return;
+  }
+  newArmed = false;
+  try{
+    Object.keys(localStorage).filter(k=> k.startsWith(LS_PREFIX)).forEach(k=> localStorage.removeItem(k));
+  }catch{}
+  // reload 직전 beforeunload/visibilitychange가 화면에 떠있는 값을 다시 저장해
+  // 방금 지운 상태를 되살리지 않도록, 리로드 전에 flush 리스너를 해제한다.
+  window.removeEventListener('beforeunload', flushAllVisible);
+  document.removeEventListener('visibilitychange', flushOnHide);
+  location.reload();
+};
+
 /* ── F3. 업로드 ───────────────────────── */
 function collectAllAnswers(){
   const out = {};
@@ -1027,7 +1052,7 @@ document.getElementById('uploadBtn').onclick = async ()=>{
   const brandAlias = (brandInput.value||'').trim();
   const pin = (pinInput.value||'').trim();
   if (!brandAlias){ uploadStatusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; uploadStatusEl.className='upload-status err'; brandInput.focus(); return; }
-  if (!/^[0-9]{4}$/.test(pin)){ uploadStatusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; uploadStatusEl.className='upload-status err'; pinInput.focus(); return; }
+  if (!/^[0-9]{4}$/.test(pin)){ uploadStatusEl.textContent='⚠ 4자리 비밀번호를 입력해주세요'; uploadStatusEl.className='upload-status err'; pinInput.focus(); return; }
   uploadStatusEl.textContent='업로드 중…'; uploadStatusEl.className='upload-status';
   try{
     const res = await fetch('/api/study/submit', {
@@ -1360,7 +1385,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,gy=`mwvd0rkr`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+`,gy=`mwvd6385`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
