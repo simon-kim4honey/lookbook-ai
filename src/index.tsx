@@ -4740,7 +4740,16 @@ app.get('/gov-support', async (c) => {
   const isStandardReady = generationReadyIds.has('standard')
   // 'standard'("기타(사업계획서 표준형)")는 실제 공고가 있는 사업이 아니라 화면 하단에
   // 별도 버튼(gs-prog-btn-etc)으로 그린다 — 이 그리드에는 포함하지 않는다.
-  const buttonsHtml = GOV_SUPPORT_PROGRAMS.filter((p) => p.id !== 'standard').map((p) => {
+  // 2026-11-25 사용자 지시 — 활성화(AI 생성 가능)된 사업을 위로, 비활성화(준비 중)된
+  // 사업을 아래로 묶어서 보여준다 — GOV_SUPPORT_PROGRAMS 배열 자체의 순서(다른 화면·
+  // 어드민에서도 쓰임)는 그대로 두고, 이 렌더링에서만 안정 정렬(각 그룹 내 원래 순서
+  // 유지)로 재배치한다.
+  const sortedPrograms = GOV_SUPPORT_PROGRAMS.filter((p) => p.id !== 'standard').slice().sort((a, b) => {
+    const aReady = generationReadyIds.has(a.id) ? 0 : 1
+    const bReady = generationReadyIds.has(b.id) ? 0 : 1
+    return aReady - bReady
+  })
+  const buttonsHtml = sortedPrograms.map((p) => {
     const ready = generationReadyIds.has(p.id)
     if (!ready) {
       return `<button type="button" class="gs-prog-btn" id="gsBtn-${p.id}" disabled>${p.name} <span class="gs-prog-pending-tag">AI 생성 준비 중</span></button>`
