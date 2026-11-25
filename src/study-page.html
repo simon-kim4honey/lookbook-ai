@@ -127,7 +127,6 @@ h3.block-label{
 .step-text b{font-weight:700;color:var(--title)}
 .step-text .ex{display:block;font-size:13px;color:var(--sub);margin-top:4px}
 .step-input-wrap{margin-top:10px;margin-left:34px}
-.plan-flag{font-size:11.5px;font-weight:600;color:var(--main);margin-bottom:5px}
 .step-input-field{
   width:100%;font-family:var(--font);font-size:14.5px;color:var(--title);
   border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:#fff;resize:vertical;
@@ -170,6 +169,8 @@ h3.block-label{
   padding:7px 14px;transition:.15s;
 }
 .btn-restore:hover{background:var(--main);color:#fff}
+.btn-new{color:var(--sub);border-color:var(--border)}
+.btn-new:hover{background:var(--danger);border-color:var(--danger);color:#fff}
 .restore-hint{font-size:12.5px;color:var(--ph);margin:0}
 .profile-status{font-size:13px;margin-top:10px;min-height:16px;color:var(--sub)}
 .profile-status.ok{color:var(--success);font-weight:600}
@@ -242,11 +243,12 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
       <div class="profile-row">
         <label for="brandInput">브랜드명</label>
         <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
-        <label for="pinInput">번호</label>
-        <input type="text" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 숫자">
+        <label for="pinInput">비밀번호</label>
+        <input type="text" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 비밀번호">
         <button class="btn-restore" id="restoreBtn" type="button">확인</button>
+        <button class="btn-restore btn-new" id="newBtn" type="button">🆕 새로 만들기</button>
       </div>
-      <p class="restore-hint" id="restoreHint">처음이라면 브랜드명과 4자리 숫자를 정하고 <b>확인</b>을 눌러주세요(이 숫자는 꼭 기억해두세요). 다른 컴퓨터로 이어서 쓰려면 같은 브랜드명 + 숫자를 입력하고 <b>불러오기</b>를 눌러주세요.</p>
+      <p class="restore-hint" id="restoreHint">처음이라면 브랜드명과 4자리 비밀번호를 정하고 <b>확인</b>을 눌러주세요(이 비밀번호는 꼭 기억해두세요). 다른 컴퓨터로 이어서 쓰려면 같은 브랜드명 + 비밀번호를 입력하고 <b>불러오기</b>를 눌러주세요. 같은 컴퓨터에서 다른 사람이 새로 시작하려면 <b>새로 만들기</b>를 눌러주세요(지금 작성한 내용은 사라져요).</p>
       <div class="profile-status" id="profileStatus"></div>
     </div>
   </section>
@@ -477,13 +479,6 @@ function noOf(id){
   return p ? p.no : id;
 }
 
-// 모아보기(F2) 8칸에 실제로 반영되는 입력 키 모음 — 해당 입력칸에 "모아보기 반영" 표시를 보여주기 위함
-const PLAN_KEYS = new Set();
-PLAN_SLOTS.forEach(slot=>{
-  slot.keys.forEach(k=>PLAN_KEYS.add(k));
-  if (slot.fallbackKeys) slot.fallbackKeys.forEach(k=>PLAN_KEYS.add(k));
-});
-
 // ── localStorage 헬퍼 ───────────────────────
 const LS_PREFIX = "gsap_v2_";
 function lsGetInput(key){
@@ -556,7 +551,6 @@ function stepInputsHtml(s, pid){
     const val = saved ? saved.text : '';
     return `
       <div class="step-input-wrap">
-        ${PLAN_KEYS.has(inp.key) ? '<div class="plan-flag">📋 이 답변이 모아보기(미니 사업계획서)에 반영돼요</div>' : ''}
         <textarea class="step-input-field" data-key="${inp.key}" rows="${inp.rows||2}"
           placeholder="${inp.placeholder.replace(/"/g,'&quot;')}"
           aria-label="${inp.label.replace(/"/g,'&quot;')}"
@@ -753,12 +747,12 @@ restoreBtn.onclick = async ()=>{
   const brandAlias = (brandInput.value||'').trim();
   const pin = (pinInput.value||'').trim();
   if (!brandAlias){ statusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; statusEl.className='profile-status err'; brandInput.focus(); return; }
-  if (!/^[0-9]{4}$/.test(pin)){ statusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; statusEl.className='profile-status err'; pinInput.focus(); return; }
+  if (!/^[0-9]{4}$/.test(pin)){ statusEl.textContent='⚠ 4자리 비밀번호를 입력해주세요'; statusEl.className='profile-status err'; pinInput.focus(); return; }
 
   if (!lsHasSubmissionId()){
     // 아직 서버와 연결된 적 없는 기기 — 실제 불러오기가 아니라 입력값 확인만.
-    // 브랜드명/번호는 이미 input 이벤트에서 localStorage에 자동 저장돼 있다.
-    statusEl.textContent = '✓ 확인했어요. 이 번호를 꼭 기억해두세요 — 다른 기기에서 이어서 쓸 때 필요해요.';
+    // 브랜드명/비밀번호는 이미 input 이벤트에서 localStorage에 자동 저장돼 있다.
+    statusEl.textContent = '✓ 확인했어요. 이 비밀번호를 꼭 기억해두세요 — 다른 기기에서 이어서 쓸 때 필요해요.';
     statusEl.className = 'profile-status ok';
     return;
   }
@@ -791,6 +785,28 @@ restoreBtn.onclick = async ()=>{
   }
 };
 
+/* 새로 만들기 — 같은 컴퓨터를 다른 사람이 이어서 쓸 때, 이 기기의 실습 데이터를
+   전부 지우고 새 제출물(새 submission_id)로 처음부터 시작한다. 두 번 눌러야 실행. */
+const newBtn = document.getElementById('newBtn');
+let newArmed = false;
+newBtn.onclick = ()=>{
+  if (!newArmed){
+    newArmed = true;
+    newBtn.textContent = '정말 새로 시작할까요? 지금 작성한 내용은 사라져요';
+    setTimeout(()=>{ newArmed=false; newBtn.textContent='🆕 새로 만들기'; }, 3000);
+    return;
+  }
+  newArmed = false;
+  try{
+    Object.keys(localStorage).filter(k=> k.startsWith(LS_PREFIX)).forEach(k=> localStorage.removeItem(k));
+  }catch{}
+  // reload 직전 beforeunload/visibilitychange가 화면에 떠있는 값을 다시 저장해
+  // 방금 지운 상태를 되살리지 않도록, 리로드 전에 flush 리스너를 해제한다.
+  window.removeEventListener('beforeunload', flushAllVisible);
+  document.removeEventListener('visibilitychange', flushOnHide);
+  location.reload();
+};
+
 /* ── F3. 업로드 ───────────────────────── */
 function collectAllAnswers(){
   const out = {};
@@ -806,7 +822,7 @@ document.getElementById('uploadBtn').onclick = async ()=>{
   const brandAlias = (brandInput.value||'').trim();
   const pin = (pinInput.value||'').trim();
   if (!brandAlias){ uploadStatusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; uploadStatusEl.className='upload-status err'; brandInput.focus(); return; }
-  if (!/^[0-9]{4}$/.test(pin)){ uploadStatusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; uploadStatusEl.className='upload-status err'; pinInput.focus(); return; }
+  if (!/^[0-9]{4}$/.test(pin)){ uploadStatusEl.textContent='⚠ 4자리 비밀번호를 입력해주세요'; uploadStatusEl.className='upload-status err'; pinInput.focus(); return; }
   uploadStatusEl.textContent='업로드 중…'; uploadStatusEl.className='upload-status';
   try{
     const res = await fetch('/api/study/submit', {

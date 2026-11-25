@@ -68,7 +68,7 @@ studyApi.post('/submit', async (c) => {
 
     if (!/^[a-zA-Z0-9_-]{8,64}$/.test(submissionId)) return c.json({ success: false, message: '잘못된 요청이에요.' }, 400)
     if (!brandAlias) return c.json({ success: false, message: '브랜드명을 입력해주세요.' }, 400)
-    if (!isValidPin(pin)) return c.json({ success: false, message: '4자리 숫자를 입력해주세요.' }, 400)
+    if (!isValidPin(pin)) return c.json({ success: false, message: '4자리 비밀번호를 입력해주세요.' }, 400)
 
     const answers = body.answers && typeof body.answers === 'object' ? body.answers : {}
     const answersJson = JSON.stringify(answers).slice(0, 20000)
@@ -98,7 +98,7 @@ studyApi.get('/restore', async (c) => {
     const brandAlias = String(c.req.query('brandAlias') || '').trim().slice(0, 60)
     const pin = String(c.req.query('pin') || '').trim()
     if (!brandAlias) return c.json({ success: false, message: '브랜드명을 입력해주세요.' }, 400)
-    if (!isValidPin(pin)) return c.json({ success: false, message: '4자리 숫자를 입력해주세요.' }, 400)
+    if (!isValidPin(pin)) return c.json({ success: false, message: '4자리 비밀번호를 입력해주세요.' }, 400)
 
     const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || 'unknown'
     const ok = await checkRateLimit(c.env.LOOKBOOK_KV, `study_restore_rl_${ip}`, 20, 60)
@@ -108,7 +108,7 @@ studyApi.get('/restore', async (c) => {
     const row: any = await db.prepare(
       `SELECT id, answers_json, updated_at FROM study_submissions WHERE brand_alias = ? AND pin = ? ORDER BY updated_at DESC LIMIT 1`
     ).bind(brandAlias, pin).first()
-    if (!row) return c.json({ success: false, message: '브랜드명 또는 4자리 숫자가 일치하는 답안을 찾지 못했어요.' }, 404)
+    if (!row) return c.json({ success: false, message: '브랜드명 또는 비밀번호가 일치하는 답안을 찾지 못했어요.' }, 404)
 
     return c.json({ success: true, id: row.id, answers: JSON.parse(row.answers_json || '{}'), updatedAt: row.updated_at })
   } catch (err: any) {
