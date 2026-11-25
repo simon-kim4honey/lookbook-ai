@@ -84,6 +84,14 @@ hasModel && hasBg` 분기)은 실제 AI 생성 결과물의 품질을 직접 좌
 
 - `claude/lookbook-ai-handoff-eqvygd` (핸드오프/개발) → `develop` (스테이징, Cloudflare
   Pages 자동 배포) → 확인 후 `promote-*-to-main` 브랜치 + PR + merge → `main` (운영).
+- **실제 접속 주소(URL)는 Cloudflare Pages의 기본 `*.pages.dev` 도메인이 아니라 커스텀
+  도메인이다.** 운영(`main`)은 **`https://www.aifashion.co.kr`**, 스테이징(`develop`)은
+  `https://develop.lookbook-ai.pages.dev` (스테이징은 커스텀 도메인 없음, pages.dev
+  그대로 사용). `lookbook-ai.pages.dev`(pages.dev 기본 도메인)도 같은 운영 배포를
+  서빙하긴 하지만, 사용자에게 안내할 때는 실제 쓰는 주소인 `www.aifashion.co.kr`을
+  말할 것 — pages.dev 기본 도메인만 보고 "이게 운영 주소"라고 단정하지 말고, 헷갈리면
+  `curl -s https://api.cloudflare.com/client/v4/accounts/{account_id}/pages/projects/lookbook-ai/domains`
+  로 커스텀 도메인 목록을 먼저 확인할 것.
 - `dist/_worker.js`, `dist/static/*`는 빌드 산출물이지만 저장소에 커밋되어 있다
   (`npm run build` 후 항상 함께 커밋).
 - `wrangler.jsonc`는 브랜치별로 다르다 — `develop`/handoff는 스테이징 D1/KV를,
