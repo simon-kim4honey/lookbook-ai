@@ -392,6 +392,9 @@ h3.block-label{
 }
 .btn-restore:hover{background:var(--main);color:#fff}
 .restore-hint{font-size:12.5px;color:var(--ph);margin:0}
+.profile-status{font-size:13px;margin-top:10px;min-height:16px;color:var(--sub)}
+.profile-status.ok{color:var(--success);font-weight:600}
+.profile-status.err{color:var(--danger);font-weight:600}
 
 /* ── F2. 내 미니 사업계획서 모아보기 ───────── */
 .plan-section{margin-top:32px}
@@ -462,9 +465,10 @@ button:focus-visible,.step-row:focus-visible{outline:3px solid var(--main);outli
         <input type="text" id="brandInput" maxlength="60" placeholder="내 브랜드명을 입력해주세요">
         <label for="pinInput">번호</label>
         <input type="text" id="pinInput" class="pin-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 숫자">
-        <button class="btn-restore" id="restoreBtn" type="button">📂 불러오기</button>
+        <button class="btn-restore" id="restoreBtn" type="button">확인</button>
       </div>
-      <p class="restore-hint">다른 컴퓨터로 접속했나요? 지난번에 쓴 브랜드명 + 4자리 숫자를 입력하고 눌러주세요. (처음이라면 이 4자리 숫자를 기억해두세요 — 업로드할 때 함께 저장돼요.)</p>
+      <p class="restore-hint" id="restoreHint">처음이라면 브랜드명과 4자리 숫자를 정하고 <b>확인</b>을 눌러주세요(이 숫자는 꼭 기억해두세요). 다른 컴퓨터로 이어서 쓰려면 같은 브랜드명 + 숫자를 입력하고 <b>불러오기</b>를 눌러주세요.</p>
+      <div class="profile-status" id="profileStatus"></div>
     </div>
   </section>
 
@@ -728,6 +732,10 @@ function lsGetSubmissionId(){
     return id;
   } catch { return "tmp-"+Date.now(); }
 }
+// submission_id는 lsGetSubmissionId()가 처음 호출될 때(=첫 업로드 또는 불러오기 성공 시)
+// 비로소 생기므로, 이 값의 존재 여부로 "이 기기에서 이미 한 번이라도 서버와
+// 연결된 적이 있는지"를 판단한다 — 확인/불러오기 버튼 전환 기준.
+function lsHasSubmissionId(){ try { return !!localStorage.getItem(LS_PREFIX+"submission_id"); } catch { return false; } }
 
 function allStepKeysOfPractice(p){
   const out = [];
@@ -943,6 +951,7 @@ function renderPlan(){
 /* 브랜드명 + 4자리 번호 */
 const brandInput = document.getElementById('brandInput');
 const pinInput = document.getElementById('pinInput');
+const restoreBtn = document.getElementById('restoreBtn');
 brandInput.value = lsGetProfile().brand || '';
 pinInput.value = lsGetProfile().pin || '';
 brandInput.addEventListener('input', ()=> lsSetProfile({brand: brandInput.value, pin: pinInput.value}));
@@ -951,29 +960,44 @@ pinInput.addEventListener('input', ()=>{
   lsSetProfile({brand: brandInput.value, pin: pinInput.value});
 });
 
+// 이 기기에서 서버와 연결된 적(업로드/불러오기)이 없으면 "확인"만 보여주고,
+// 생긴 뒤부터는 "불러오기"(다른 기기에서 이어서 작성)로 바뀐다.
+function updateRestoreBtnMode(){
+  restoreBtn.textContent = lsHasSubmissionId() ? '📂 불러오기' : '확인';
+}
+updateRestoreBtnMode();
+
 /* 다른 기기에서 이어서 작성하기 — 브랜드명 + 4자리 번호로 서버에 올린 가장 최근 답안을 불러온다 */
 let restoreArmed = false;
-document.getElementById('restoreBtn').onclick = async ()=>{
-  const statusEl = document.getElementById('uploadStatus');
+restoreBtn.onclick = async ()=>{
+  const statusEl = document.getElementById('profileStatus');
   const brandAlias = (brandInput.value||'').trim();
   const pin = (pinInput.value||'').trim();
-  if (!brandAlias){ statusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; statusEl.className='upload-status err'; brandInput.focus(); return; }
-  if (!/^[0-9]{4}$/.test(pin)){ statusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; statusEl.className='upload-status err'; pinInput.focus(); return; }
-  const btn = document.getElementById('restoreBtn');
-  if (!restoreArmed){
-    restoreArmed = true;
-    btn.textContent = '정말 불러올까요? 지금 답은 덮어써져요';
-    setTimeout(()=>{ restoreArmed=false; btn.textContent='📂 불러오기'; }, 3000);
+  if (!brandAlias){ statusEl.textContent='⚠ 브랜드명을 먼저 입력해주세요'; statusEl.className='profile-status err'; brandInput.focus(); return; }
+  if (!/^[0-9]{4}$/.test(pin)){ statusEl.textContent='⚠ 4자리 숫자를 입력해주세요'; statusEl.className='profile-status err'; pinInput.focus(); return; }
+
+  if (!lsHasSubmissionId()){
+    // 아직 서버와 연결된 적 없는 기기 — 실제 불러오기가 아니라 입력값 확인만.
+    // 브랜드명/번호는 이미 input 이벤트에서 localStorage에 자동 저장돼 있다.
+    statusEl.textContent = '✓ 확인했어요. 이 번호를 꼭 기억해두세요 — 다른 기기에서 이어서 쓸 때 필요해요.';
+    statusEl.className = 'profile-status ok';
     return;
   }
-  restoreArmed = false; btn.textContent = '📂 불러오기';
-  statusEl.textContent = '불러오는 중…'; statusEl.className = 'upload-status';
+
+  if (!restoreArmed){
+    restoreArmed = true;
+    restoreBtn.textContent = '정말 불러올까요? 지금 답은 덮어써져요';
+    setTimeout(()=>{ restoreArmed=false; updateRestoreBtnMode(); }, 3000);
+    return;
+  }
+  restoreArmed = false; updateRestoreBtnMode();
+  statusEl.textContent = '불러오는 중…'; statusEl.className = 'profile-status';
   try{
     const res = await fetch('/api/study/restore?brandAlias='+encodeURIComponent(brandAlias)+'&pin='+encodeURIComponent(pin));
     const data = await res.json().catch(()=>null);
     if (!data || !data.success){
       statusEl.textContent = '⚠ '+(data && data.message ? data.message : '불러오지 못했어요');
-      statusEl.className = 'upload-status err';
+      statusEl.className = 'profile-status err';
       return;
     }
     Object.keys(data.answers||{}).forEach(key=> lsSetInput(key, data.answers[key]));
@@ -984,7 +1008,7 @@ document.getElementById('restoreBtn').onclick = async ()=>{
     document.removeEventListener('visibilitychange', flushOnHide);
     location.reload();
   }catch(e){
-    statusEl.textContent = '⚠ 네트워크 문제로 불러오지 못했어요'; statusEl.className = 'upload-status err';
+    statusEl.textContent = '⚠ 네트워크 문제로 불러오지 못했어요'; statusEl.className = 'profile-status err';
   }
 };
 
@@ -1011,7 +1035,7 @@ document.getElementById('uploadBtn').onclick = async ()=>{
       body: JSON.stringify({ submissionId:lsGetSubmissionId(), brandAlias, pin, answers:collectAllAnswers() })
     });
     const data = await res.json().catch(()=>({success:false}));
-    if (data && data.success){ uploadStatusEl.textContent='✓ 업로드 완료했어요 '+nowLabel(); uploadStatusEl.className='upload-status ok'; }
+    if (data && data.success){ uploadStatusEl.textContent='✓ 업로드 완료했어요 '+nowLabel(); uploadStatusEl.className='upload-status ok'; updateRestoreBtnMode(); }
     else { uploadStatusEl.textContent='⚠ '+(data && data.message ? data.message : '업로드에 실패했어요'); uploadStatusEl.className='upload-status err'; }
   }catch(e){
     uploadStatusEl.textContent='⚠ 네트워크 문제로 업로드하지 못했어요. 다시 시도해주세요'; uploadStatusEl.className='upload-status err';
@@ -1336,7 +1360,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,gy=`mwvcnoeu`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+`,gy=`mwvd1kob`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
