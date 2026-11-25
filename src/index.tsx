@@ -4596,6 +4596,19 @@ const GOV_SUPPORT_PROGRAMS = [
     eligibility: ['제조업 중심 소기업 (매출액 140억 원 이하, 일부 바우처는 1,800억 이하)', '소상공인 제조업자 포함 여부는 바우처 유형별 확인'],
     criteria: [['이용 필요성', 40], ['서비스 적합성', 40], ['실행가능성', 20]],
   },
+  // 2026-11-24: 사용자 지정 — 목록에 없는 지원사업을 위해 "기타"를 눌렀을 때 이름/양식
+  // 업로드 후 관리자 검토를 기다리던 요청폼을, 예비창업패키지의 검증된 표준 PSST 구조를
+  // 그대로 복제한 범용 "표준형"으로 완전히 대체한다 — 바로 위저드→AI 초안 생성까지 이어진다.
+  // 버튼은 다른 사업과 똑같이 목록에 그려지지 않고 화면 하단에 별도로 둔다(아래
+  // buttonsHtml에서 이 id는 제외) — 실제 공고가 있는 사업이 아니라서 agency/funding 등은
+  // 기존 사업들과 톤을 맞추기 위한 설명용 문구일 뿐 특정 공고를 가리키지 않는다.
+  {
+    id: 'standard', name: '기타(사업계획서 표준형)', agency: '—', formType: '사업계획서형 (PSST, 범용)',
+    funding: '지원사업별로 상이 (본 도우미는 양식 작성만 지원)',
+    target: '목록에 없는 지원사업에 지원하며 범용 사업계획서 초안이 필요한 경우',
+    eligibility: ['특정 공고 요건이 아니라, 정부지원사업 사업계획서에 공통적으로 쓰이는 PSST(문제인식·실현가능성·성장전략·팀구성) 표준 구조를 사용'],
+    criteria: [['사업성', 40], ['실행가능성', 40], ['자기효능감', 20]],
+  },
 ]
 
 // 2026-10-24: 임시저장/생성완료된 사업계획서로 돌아갈 길이 없던 것을 메우는 목록 페이지.
@@ -4713,7 +4726,9 @@ app.get('/gov-support/my', (c) => {
 })
 
 app.get('/gov-support', (c) => {
-  const buttonsHtml = GOV_SUPPORT_PROGRAMS.map((p) => `
+  // 'standard'("기타(사업계획서 표준형)")는 실제 공고가 있는 사업이 아니라 화면 하단에
+  // 별도 버튼(gs-prog-btn-etc)으로 그린다 — 이 그리드에는 포함하지 않는다.
+  const buttonsHtml = GOV_SUPPORT_PROGRAMS.filter((p) => p.id !== 'standard').map((p) => `
     <button type="button" class="gs-prog-btn" id="gsBtn-${p.id}" onclick="selectGsProgram('${p.id}', '${p.name.replace(/'/g, "\\'")}')">${p.name}</button>
   `).join('')
 
@@ -4738,14 +4753,6 @@ app.get('/gov-support', (c) => {
     .gs-next-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #E5E8EB; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 20; }
     .gs-next-btn { display: block; width: 100%; max-width: 448px; margin: 0 auto; padding: 15px; background: #3182F6; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
     .gs-next-btn:disabled { background: #D1D6DB; cursor: not-allowed; }
-    .gs-etc-form { display: none; background: #FFFFFF; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,0.06); padding: 18px; margin-top: 10px; }
-    .gs-etc-form.open { display: block; }
-    .gs-etc-label { font-size: 13px; font-weight: 700; color: #333D4B; margin: 0 0 6px; }
-    .gs-etc-input { width: 100%; box-sizing: border-box; padding: 12px 14px; border: 1px solid #E5E8EB; border-radius: 10px; font-size: 14px; color: #191F28; margin-bottom: 14px; }
-    .gs-etc-file { width: 100%; font-size: 13px; color: #4E5968; margin-bottom: 14px; }
-    .gs-etc-submit { width: 100%; padding: 13px; background: #3182F6; color: #fff; border: none; border-radius: 10px; font-size: 14.5px; font-weight: 700; cursor: pointer; }
-    .gs-etc-submit:disabled { opacity: .5; cursor: not-allowed; }
-    .gs-etc-hint { font-size: 11.5px; color: #8B95A1; margin-top: 8px; line-height: 1.5; }
   </style>
 
   <div class="gs-wrap">
@@ -4764,16 +4771,7 @@ app.get('/gov-support', (c) => {
 
       <div class="gs-prog-grid">
         ${buttonsHtml}
-        <button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-etc" onclick="toggleGsEtcForm()">기타(사업계획서 표준형)</button>
-      </div>
-
-      <div class="gs-etc-form" id="gsEtcForm">
-        <div class="gs-etc-label">지원사업명</div>
-        <input type="text" class="gs-etc-input" id="gsEtcName" placeholder="예: OO지역 청년창업 지원사업" maxlength="100" />
-        <div class="gs-etc-label">해당 사업 양식 파일</div>
-        <input type="file" class="gs-etc-file" id="gsEtcFile" accept=".pdf,.hwp,.hwpx,.doc,.docx" />
-        <button type="button" class="gs-etc-submit" id="gsEtcSubmitBtn" onclick="submitGsEtcRequest()">요청 보내기</button>
-        <div class="gs-etc-hint">업로드해주신 양식은 검토 후 추가 지원 여부를 안내드립니다. (PDF·HWP·DOC, 최대 10MB)</div>
+        <button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-standard" onclick="selectGsProgram('standard', '기타(사업계획서 표준형)')">기타(사업계획서 표준형)</button>
       </div>
 
       <div class="gs-footer-disclaimer">본 콘텐츠는 정부지원사업 신청을 돕기 위한 참고 자료이며, 법률·세무 자문이 아닙니다.</div>
@@ -4795,22 +4793,10 @@ app.get('/gov-support', (c) => {
       gsSelected = id;
       gsSelectedName = name;
       document.getElementById('gsBtn-' + id).classList.add('selected');
-      document.getElementById('gsEtcForm').classList.remove('open');
       document.getElementById('gsNextBtn').disabled = false;
     }
 
-    function toggleGsEtcForm() {
-      if (gsSelected) {
-        var prev = document.getElementById('gsBtn-' + gsSelected);
-        if (prev) prev.classList.remove('selected');
-        gsSelected = null;
-        gsSelectedName = null;
-        document.getElementById('gsNextBtn').disabled = true;
-      }
-      document.getElementById('gsEtcForm').classList.toggle('open');
-    }
-
-    var GS_WIZARD_READY = ['yebi','choi','hope-return','youth-academy','local-creator','innov-sop','export-voucher','smart-store','online-channel','innov-voucher'];
+    var GS_WIZARD_READY = ['yebi','choi','hope-return','youth-academy','local-creator','innov-sop','export-voucher','smart-store','online-channel','innov-voucher','standard'];
 
     async function goToGsWizard() {
       if (!gsSelected) return;
@@ -4837,101 +4823,28 @@ app.get('/gov-support', (c) => {
       }
     }
 
-    function fileToBase64(file) {
-      return new Promise(function (resolve, reject) {
-        var reader = new FileReader();
-        reader.onload = function () { resolve(String(reader.result).split(',')[1] || ''); };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-    }
-
-    async function submitGsEtcRequest() {
-      var token = localStorage.getItem('lookbook_token') || '';
-      if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); return; }
-
-      var name = document.getElementById('gsEtcName').value.trim();
-      var fileInput = document.getElementById('gsEtcFile');
-      var file = fileInput.files[0];
-      if (!name) { showToast('지원사업명을 입력해주세요.', 'error'); return; }
-      if (!file) { showToast('양식 파일을 첨부해주세요.', 'error'); return; }
-      if (file.size > 10 * 1024 * 1024) { showToast('파일 용량은 최대 10MB까지 가능해요.', 'error'); return; }
-
-      var btn = document.getElementById('gsEtcSubmitBtn');
-      btn.disabled = true; btn.textContent = '전송 중...';
-      try {
-        var fileBase64 = await fileToBase64(file);
-        var res = await fetch('/api/gov-support/custom-request', {
-          method: 'POST',
-          headers: { 'X-Session-Token': token, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ programName: name, fileName: file.name, contentType: file.type, fileBase64: fileBase64 }),
-        });
-        var data = await res.json();
-        if (!data.success) { showToast(data.message || '요청 전송에 실패했어요.', 'error'); btn.disabled = false; btn.textContent = '요청 보내기'; return; }
-        showToast('요청이 접수됐어요. 검토 후 안내드릴게요!', 'success');
-        document.getElementById('gsEtcName').value = '';
-        fileInput.value = '';
-        document.getElementById('gsEtcForm').classList.remove('open');
-        btn.disabled = false; btn.textContent = '요청 보내기';
-      } catch (e) {
-        showToast('네트워크 오류가 발생했어요.', 'error');
-        btn.disabled = false; btn.textContent = '요청 보내기';
-      }
-    }
   </script>
   `, '', '패션 제조 브랜드를 위한 정부지원사업 사업계획서 작성 도우미 — 예비창업패키지·초기창업패키지 등 9개 사업', c.env.GA4_MEASUREMENT_ID))
-})
-
-// POST /api/gov-support/custom-request — 목록 9개에 없는 지원사업을 사용자가 "기타"로
-// 요청할 때, 업로드한 양식 파일을 KV에 base64로 저장하고 요청 정보를 D1에 기록한다.
-// 관리자가 검토해 새 프로그램 JSON(GOV_SUPPORT_PROGRAMS)으로 추가할지 판단하는 용도.
-app.post('/api/gov-support/custom-request', async (c) => {
-  const db: D1Database = c.env.LOOKBOOK_DB
-  const kv = c.env.LOOKBOOK_KV
-  try {
-    const sessionToken = c.req.header('X-Session-Token') || ''
-    const sess = await db.prepare(
-      `SELECT user_id FROM user_sessions WHERE token = ? AND expires_at > datetime('now')`
-    ).bind(sessionToken).first() as any
-    if (!sess) return c.json({ success: false, message: '로그인이 필요합니다.' }, 401)
-
-    const body = await c.req.json()
-    const programName = String(body.programName || '').trim().slice(0, 200)
-    const fileName = String(body.fileName || '').slice(0, 200)
-    const contentType = String(body.contentType || '').slice(0, 100)
-    const fileBase64 = String(body.fileBase64 || '')
-    if (!programName) return c.json({ success: false, message: '지원사업명을 입력해주세요.' }, 400)
-    if (!fileBase64) return c.json({ success: false, message: '파일을 첨부해주세요.' }, 400)
-    // base64는 원본 대비 ~1.37배 — 10MB 원본 기준 여유있게 15MB로 제한(KV 값 25MB 한도 이내)
-    if (fileBase64.length > 15 * 1024 * 1024) return c.json({ success: false, message: '파일 용량이 너무 큽니다 (최대 약 10MB).' }, 400)
-
-    const kvKey = `gov_support_custom:${crypto.randomUUID()}`
-    await kv.put(kvKey, fileBase64, { metadata: { contentType, fileName } })
-
-    await db.prepare(
-      `INSERT INTO gov_support_custom_requests (user_id, program_name, file_name, kv_key, content_type) VALUES (?,?,?,?,?)`
-    ).bind(sess.user_id, programName, fileName, kvKey, contentType).run()
-
-    return c.json({ success: true })
-  } catch (err: any) {
-    return c.json({ success: false, message: err.message }, 500)
-  }
 })
 
 // ────────────────────────────────────────────────────
 // 지원사업 도우미 — 위저드(입력 수집) API + 화면
 // 수출바우처/초기창업패키지/희망리턴패키지는 질문이 달라 전용 위저드로 분리됐고,
 // 나머지 전체(예비창업패키지/청년사관학교/로컬크리에이터/혁신소상공인/스마트상점/
-// 온라인판로/중소기업 혁신바우처)는 공통 12단계 위저드(예비창업패키지 질문 세트)를
-// 그대로 공유한다. 2026-11-10 사용자 지시 — "경량 신청서형" 3종(스마트상점/온라인판로/
-// 혁신바우처)도 별도 축약 위저드를 새로 만들지 않고 우선 이 공통 위저드로 입력을
-// 받는다 — 사업별 특화 질문/생성 구조는 추후 각각 별도로 전달받아 반영 예정.
+// 온라인판로/중소기업 혁신바우처/기타(사업계획서 표준형))는 공통 12단계 위저드(예비창업
+// 패키지 질문 세트)를 그대로 공유한다. 2026-11-10 사용자 지시 — "경량 신청서형" 3종
+// (스마트상점/온라인판로/혁신바우처)도 별도 축약 위저드를 새로 만들지 않고 우선 이
+// 공통 위저드로 입력을 받는다 — 사업별 특화 질문/생성 구조는 추후 각각 별도로 전달받아
+// 반영 예정. 2026-11-24 사용자 지시 — "기타(사업계획서 표준형)"는 이름/양식 업로드 후
+// 관리자 검토를 기다리던 기존 요청폼(POST /api/gov-support/custom-request, 이제 삭제)을
+// 완전히 대체한다 — program_id='standard'로 예비창업패키지의 검증된 표준 PSST
+// 구조(gov_support_nodes)를 그대로 복제해 바로 위저드→AI 초안 생성까지 이어진다.
 //
 // AI 섹션 생성 구조(gov_support_nodes)가 아직 없는 프로그램은 위저드 입력은 받되
 // "AI가 초안을 만들어주는 기능은 아직 준비 중"으로 안내한다(gsIsGenerationReady 참고).
 // 여기서는 입력 수집 + 중간 저장(자동 저장 + 수동 "임시저장" 버튼)까지만 다룬다.
 // ────────────────────────────────────────────────────
-const GS_WIZARD_READY_IDS = ['yebi', 'choi', 'hope-return', 'youth-academy', 'local-creator', 'innov-sop', 'export-voucher', 'smart-store', 'online-channel', 'innov-voucher']
+const GS_WIZARD_READY_IDS = ['yebi', 'choi', 'hope-return', 'youth-academy', 'local-creator', 'innov-sop', 'export-voucher', 'smart-store', 'online-channel', 'innov-voucher', 'standard']
 
 app.post('/api/gov-support/projects', async (c) => {
   const db: D1Database = c.env.LOOKBOOK_DB
