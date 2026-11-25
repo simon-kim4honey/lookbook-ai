@@ -348,7 +348,6 @@ h3.block-label{
 .step-text b{font-weight:700;color:var(--title)}
 .step-text .ex{display:block;font-size:13px;color:var(--sub);margin-top:4px}
 .step-input-wrap{margin-top:10px;margin-left:34px}
-.plan-flag{font-size:11.5px;font-weight:600;color:var(--main);margin-bottom:5px}
 .step-input-field{
   width:100%;font-family:var(--font);font-size:14.5px;color:var(--title);
   border:1px solid var(--border);border-radius:10px;padding:9px 12px;background:#fff;resize:vertical;
@@ -701,13 +700,6 @@ function noOf(id){
   return p ? p.no : id;
 }
 
-// 모아보기(F2) 8칸에 실제로 반영되는 입력 키 모음 — 해당 입력칸에 "모아보기 반영" 표시를 보여주기 위함
-const PLAN_KEYS = new Set();
-PLAN_SLOTS.forEach(slot=>{
-  slot.keys.forEach(k=>PLAN_KEYS.add(k));
-  if (slot.fallbackKeys) slot.fallbackKeys.forEach(k=>PLAN_KEYS.add(k));
-});
-
 // ── localStorage 헬퍼 ───────────────────────
 const LS_PREFIX = "gsap_v2_";
 function lsGetInput(key){
@@ -780,7 +772,6 @@ function stepInputsHtml(s, pid){
     const val = saved ? saved.text : '';
     return \`
       <div class="step-input-wrap">
-        \${PLAN_KEYS.has(inp.key) ? '<div class="plan-flag">📋 이 답변이 모아보기(미니 사업계획서)에 반영돼요</div>' : ''}
         <textarea class="step-input-field" data-key="\${inp.key}" rows="\${inp.rows||2}"
           placeholder="\${inp.placeholder.replace(/"/g,'&quot;')}"
           aria-label="\${inp.label.replace(/"/g,'&quot;')}"
@@ -1385,7 +1376,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,gy=`mwvd7qf9`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+`,gy=`mwvdcuep`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
