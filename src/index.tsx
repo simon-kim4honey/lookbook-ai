@@ -4725,12 +4725,28 @@ app.get('/gov-support/my', (c) => {
   `))
 })
 
-app.get('/gov-support', (c) => {
+app.get('/gov-support', async (c) => {
+  const db: D1Database = c.env.LOOKBOOK_DB
+  // 2026-11-25 사용자 지시 — AI 초안 생성까지 가능한 지원사업(gsIsGenerationReady, 실제
+  // 생성 라우트가 쓰는 것과 동일한 판정 기준)은 평소대로 활성화해 보여주고, 위저드(입력
+  // 수집)만 가능하고 아직 생성 구조가 없는 나머지는 버튼 자체를 비활성화(밝은 그레이)
+  // 해서 눌러도 아무 반응이 없게 한다 — 예전엔 끝까지 입력하고 "생성하기"를 눌러야만
+  // "아직 준비 중"임을 알 수 있었다.
+  const generationReadyIds = new Set(
+    (await Promise.all(GOV_SUPPORT_PROGRAMS.map(async (p) => [p.id, await gsIsGenerationReady(db, p.id)] as const)))
+      .filter(([, ready]) => ready)
+      .map(([id]) => id)
+  )
+  const isStandardReady = generationReadyIds.has('standard')
   // 'standard'("기타(사업계획서 표준형)")는 실제 공고가 있는 사업이 아니라 화면 하단에
   // 별도 버튼(gs-prog-btn-etc)으로 그린다 — 이 그리드에는 포함하지 않는다.
-  const buttonsHtml = GOV_SUPPORT_PROGRAMS.filter((p) => p.id !== 'standard').map((p) => `
-    <button type="button" class="gs-prog-btn" id="gsBtn-${p.id}" onclick="selectGsProgram('${p.id}', '${p.name.replace(/'/g, "\\'")}')">${p.name}</button>
-  `).join('')
+  const buttonsHtml = GOV_SUPPORT_PROGRAMS.filter((p) => p.id !== 'standard').map((p) => {
+    const ready = generationReadyIds.has(p.id)
+    if (!ready) {
+      return `<button type="button" class="gs-prog-btn" id="gsBtn-${p.id}" disabled>${p.name} <span class="gs-prog-pending-tag">AI 생성 준비 중</span></button>`
+    }
+    return `<button type="button" class="gs-prog-btn" id="gsBtn-${p.id}" onclick="selectGsProgram('${p.id}', '${p.name.replace(/'/g, "\\'")}')">${p.name}</button>`
+  }).join('')
 
   return c.html(htmlShell('지원사업 도우미', `
   <div class="toast-container" id="toastContainer"></div>
@@ -4749,6 +4765,9 @@ app.get('/gov-support', (c) => {
     .gs-prog-btn:active { transform: scale(.98); }
     .gs-prog-btn.selected { border-color: #3182F6; color: #3182F6; background: #EAF2FF; }
     .gs-prog-btn-etc { color: #4E5968; }
+    .gs-prog-btn:disabled { background: #F2F4F6; color: #B0B8C1; box-shadow: none; cursor: not-allowed; }
+    .gs-prog-btn:disabled:active { transform: none; }
+    .gs-prog-pending-tag { font-size: 11.5px; font-weight: 700; color: #B0B8C1; margin-left: 2px; }
     .gs-footer-disclaimer { font-size: 11.5px; color: #8B95A1; line-height: 1.6; margin-top: 20px; text-align: center; padding-bottom: 90px; }
     .gs-next-bar { position: fixed; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-top: 1px solid #E5E8EB; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); z-index: 20; }
     .gs-next-btn { display: block; width: 100%; max-width: 448px; margin: 0 auto; padding: 15px; background: #3182F6; color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700; cursor: pointer; }
@@ -4771,7 +4790,9 @@ app.get('/gov-support', (c) => {
 
       <div class="gs-prog-grid">
         ${buttonsHtml}
-        <button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-standard" onclick="selectGsProgram('standard', '기타(사업계획서 표준형)')">기타(사업계획서 표준형)</button>
+        ${isStandardReady
+          ? `<button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-standard" onclick="selectGsProgram('standard', '기타(사업계획서 표준형)')">기타(사업계획서 표준형)</button>`
+          : `<button type="button" class="gs-prog-btn gs-prog-btn-etc" id="gsBtn-standard" disabled>기타(사업계획서 표준형) <span class="gs-prog-pending-tag">AI 생성 준비 중</span></button>`}
       </div>
 
       <div class="gs-footer-disclaimer">본 콘텐츠는 정부지원사업 신청을 돕기 위한 참고 자료이며, 법률·세무 자문이 아닙니다.</div>
