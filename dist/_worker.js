@@ -1376,7 +1376,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,gy=`mwwsm8ck`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+`,gy=`mwwt28hh`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3052,6 +3052,15 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
           <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
 
+          <div class="form-group">
+            <select class="form-input" id="signupReferrer">
+              <option value="">추천인 선택 (선택 사항)</option>
+              <option value="BFM회원">BFM회원</option>
+              <option value="코오롱 FnC">코오롱 FnC</option>
+              <option value="한섬">한섬</option>
+            </select>
+          </div>
+
           <div style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:13px 16px;border-bottom:1px solid var(--border-color,#e8e8e8);background:var(--white,#fff);" onclick="toggleAgreeAll(event)">
               <input type="checkbox" id="agreeAll" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" />
@@ -3072,14 +3081,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           <div class="form-group"><input type="text" class="form-input" id="signupName" placeholder="이름" autocomplete="name" /></div>
           <div class="form-group"><input type="email" class="form-input" id="signupEmail" placeholder="이메일" autocomplete="email" /></div>
           <div class="form-group"><input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" /></div>
-          <div class="form-group">
-            <select class="form-input" id="signupReferrer">
-              <option value="">추천인 선택 (선택 사항)</option>
-              <option value="BFM회원">BFM회원</option>
-              <option value="코오롱 FnC">코오롱 FnC</option>
-              <option value="한섬">한섬</option>
-            </select>
-          </div>
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
         </form>
       </div>
@@ -7774,6 +7775,15 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
           <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
 
+          <div class="form-group">
+            <select class="form-input" id="signupReferrer">
+              <option value="">추천인 선택 (선택 사항)</option>
+              <option value="BFM회원">BFM회원</option>
+              <option value="코오롱 FnC">코오롱 FnC</option>
+              <option value="한섬">한섬</option>
+            </select>
+          </div>
+
           <!-- 약관 동의 체크박스 — 에러 바로 아래, 입력필드 위 -->
           <div style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:13px 16px;border-bottom:1px solid var(--border-color,#e8e8e8);background:var(--white,#fff);" onclick="toggleAgreeAll(event)">
@@ -7800,14 +7810,6 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           </div>
           <div class="form-group">
             <input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" />
-          </div>
-          <div class="form-group">
-            <select class="form-input" id="signupReferrer">
-              <option value="">추천인 선택 (선택 사항)</option>
-              <option value="BFM회원">BFM회원</option>
-              <option value="코오롱 FnC">코오롱 FnC</option>
-              <option value="한섬">한섬</option>
-            </select>
           </div>
 
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:12px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
@@ -9282,6 +9284,15 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
           <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
 
+          <div class="form-group">
+            <select class="form-input" id="signupReferrer">
+              <option value="">추천인 선택 (선택 사항)</option>
+              <option value="BFM회원">BFM회원</option>
+              <option value="코오롱 FnC">코오롱 FnC</option>
+              <option value="한섬">한섬</option>
+            </select>
+          </div>
+
           <div style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:13px 16px;border-bottom:1px solid var(--border-color,#e8e8e8);background:var(--white,#fff);" onclick="toggleAgreeAll(event)">
               <input type="checkbox" id="agreeAll" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" />
@@ -9302,14 +9313,6 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           <div class="form-group"><input type="text" class="form-input" id="signupName" placeholder="이름" autocomplete="name" /></div>
           <div class="form-group"><input type="email" class="form-input" id="signupEmail" placeholder="이메일" autocomplete="email" /></div>
           <div class="form-group"><input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" /></div>
-          <div class="form-group">
-            <select class="form-input" id="signupReferrer">
-              <option value="">추천인 선택 (선택 사항)</option>
-              <option value="BFM회원">BFM회원</option>
-              <option value="코오롱 FnC">코오롱 FnC</option>
-              <option value="한섬">한섬</option>
-            </select>
-          </div>
           <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
         </form>
       </div>
