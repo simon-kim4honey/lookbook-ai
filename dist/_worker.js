@@ -1376,7 +1376,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,gy=`mwwrtuml`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+`,gy=`mwwsmubx`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3010,7 +3010,83 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
         </div>
       </div>
     </div>
-  </div>`}var ax=[{id:`yebi`,name:`예비창업패키지`,agency:`중소벤처기업부 · 창업진흥원`,formType:`사업계획서형 (PSST)`,funding:`최대 8,000만 원 (평균 4,000만 원 내외)`,target:`사업자등록 전 예비창업자`,eligibility:[`공고일 기준 사업자등록이 되어 있지 않은 예비창업자`,`동종 업종 폐업 후 재창업은 폐업일로부터 3년 경과(부도·파산 2년)`,`나이 제한 없음 (특화분야: 여성·소셜벤처·사내벤처)`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]},{id:`choi`,name:`초기창업패키지`,agency:`중소벤처기업부 · 창업진흥원`,formType:`사업계획서형 (PSST)`,funding:`최대 1억 원 (평균 5,000만 원 내외)`,target:`창업 3년 미만 대표자`,eligibility:[`창업(사업자등록) 3년 미만 기업 대표`,`재창업·특화분야 요건은 공고 확인`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]},{id:`hope-return`,name:`희망리턴패키지(재창업)`,agency:`소상공인시장진흥공단`,formType:`자기역량기술서 + 사업계획서`,funding:`최대 4,000만 원 (트랙·기관별 상이)`,target:`경영위기·폐업(예정) 소상공인`,eligibility:[`경영상 어려움(폐업 예정 포함) 또는 폐업 후 재기를 준비하는 소상공인`,`자립지원 트랙: 장기실업 청년 등 (요건 공고 확인)`,`사전 진단·교육 이수가 선결 조건인 트랙 있음`],criteria:[[`신청자 역량`,30],[`사업계획의 적절성`,40],[`성장가능성`,30]]},{id:`youth-academy`,name:`청년창업사관학교`,agency:`중소벤처기업부 · 창업진흥원`,formType:`입교신청서형 사업계획서 + 발표평가`,funding:`최대 1억 원 (평균 7,000만 원 내외)`,target:`만 39세 이하, 창업 3년 이내(경험창업자 7년 이내)`,eligibility:[`대표자 만 39세 이하`,`창업 3년 이내 대표자 (예비창업자 가능)`,`재창업 등 세부 요건은 공고 확인`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]},{id:`local-creator`,name:`로컬크리에이터 육성`,agency:`중소벤처기업부 · 소상공인시장진흥공단`,formType:`신청서 + 사업계획서 (지역자원 활용 중심)`,funding:`BM 구체화·멘토링·브랜딩·마케팅 자금 (280개사 내외 선정)`,target:`지역 자원을 활용하는 소상공인`,eligibility:[`지역의 자연환경·문화적 자산과 아이디어를 결합해 사업적 가치를 창출하는 창업가`,`기창업자 중심 (예비창업자 대상 지자체별 공고 별도 존재)`],criteria:[[`지역자원 활용방안`,40],[`사업성`,30],[`신청자 역량·실행가능성`,30]]},{id:`export-voucher`,name:`수출바우처`,agency:`중소벤처기업부 · 중소기업유통센터`,formType:`수출역량진단 + 사업계획서형`,funding:`기업당 최대 3,000만 원(자기부담률 수출입실적 등에 따라 20~70%, 바우처 포인트로 사용처 선택)`,target:`해외 진출(수출)을 준비·확대하려는 중소기업`,eligibility:[`중소기업기본법상 중소기업`,`수출역량진단 참여 후 통합관리기관 심의를 통과한 기업`,`한국무역협회 등 사업수행기관 등록 절차 필요(세부 요건 공고 확인)`],criteria:[[`수출 준비도·필요성`,35],[`목표시장 전략의 구체성`,35],[`사업화 실행가능성`,30]]},{id:`innov-sop`,name:`혁신소상공인 창업지원`,agency:`중소벤처기업부 · 소상공인시장진흥공단`,formType:`신청서 + 창업 아이템 계획 (오디션 발표 포함)`,funding:`창업교육 + 사업화 자금 (560명 내외 선정)`,target:`예비창업자 (교육 이수 후 오디션 통과자가 사업화 자금 대상)`,eligibility:[`예비창업자 (신사업 등 유망 아이디어·아이템 기반)`,`교육 이수 후 오디션 통과자가 사업화 자금 지원 대상`],criteria:[[`사업성`,40],[`실현가능성`,40],[`창업의지`,20]]},{id:`smart-store`,name:`스마트상점 기술보급사업`,agency:`중소벤처기업부 · 소상공인시장진흥공단`,formType:`신청서형 (경량)`,funding:`도입비용 50~70% 지원 (사회적 배려대상 최대 80%, 최대 1,000만 원 내외)`,target:`점포를 운영 중인 소상공인`,eligibility:[`점포를 운영 중인 소상공인`,`기술공급기업과 계약 가능한 매장 (세부 요건 공고 확인)`],criteria:[[`도입 필요성`,40],[`기술 활용 적합성`,40],[`실행가능성`,20]]},{id:`online-channel`,name:`온라인 판로지원사업`,agency:`중소벤처기업부 · 소상공인시장진흥공단 (판판대로)`,formType:`신청서형 (경량)`,funding:`세부사업별 연간 단가 한도 내 지원 (연 600만 원 수준)`,target:`온라인 판매 진출·고도화를 준비하는 소상공인`,eligibility:[`온라인 판매 진출(또는 고도화)을 준비하는 소상공인`,`판판대로 회원가입 필수`],criteria:[[`진출 필요성`,40],[`활용 적합성`,40],[`기대효과`,20]]},{id:`innov-voucher`,name:`중소기업 혁신바우처 지원사업`,agency:`중소벤처기업부`,formType:`신청서형 (경량)`,funding:`기업당 최대 5,000만 원 (바우처 서비스 조합)`,target:`제조업 중심 소기업`,eligibility:[`제조업 중심 소기업 (매출액 140억 원 이하, 일부 바우처는 1,800억 이하)`,`소상공인 제조업자 포함 여부는 바우처 유형별 확인`],criteria:[[`이용 필요성`,40],[`서비스 적합성`,40],[`실행가능성`,20]]},{id:`standard`,name:`기타(사업계획서 표준형)`,agency:`—`,formType:`사업계획서형 (PSST, 범용)`,funding:`지원사업별로 상이 (본 도우미는 양식 작성만 지원)`,target:`목록에 없는 지원사업에 지원하며 범용 사업계획서 초안이 필요한 경우`,eligibility:[`특정 공고 요건이 아니라, 정부지원사업 사업계획서에 공통적으로 쓰이는 PSST(문제인식·실현가능성·성장전략·팀구성) 표준 구조를 사용`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]}];Q.get(`/gov-support/my`,e=>(e.header(`Cache-Control`,`no-store`),e.html(DS(`내 사업계획서`,`
+  </div>
+  <div class="modal-overlay" id="loginModal" style="z-index:10000;">
+    <div class="modal-box" style="max-width:630px;">
+      <button class="modal-close" onclick="closeModal('loginModal')">×</button>
+      <div style="text-align:center;margin-bottom:20px;">
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:4px;">로그인이 필요해요</h2>
+        <p style="font-size:13px;color:var(--text-muted);">가입 즉시 무료 크레딧을 드려요!</p>
+      </div>
+      <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
+        <button id="tabLogin"  onclick="switchAuthTab('login')"  style="flex:1;padding:10px;background:none;border:none;font-size:20.25px;font-weight:700;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;cursor:pointer;" data-i18n="nav-login">로그인</button>
+        <button id="tabSignup" onclick="switchAuthTab('signup')" style="flex:1;padding:10px;background:none;border:none;font-size:20.25px;font-weight:600;color:var(--text-muted);cursor:pointer;" data-i18n="nav-signup2">회원가입</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+        <button onclick="oauthLogin('kakao', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#FEE500;border:none;border-radius:10px;font-size:20.25px;font-weight:700;color:#3C1E1E;cursor:pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="#3C1E1E"><path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.7 1.628 5.073 4.09 6.51L4.993 21l4.457-2.387A11.3 11.3 0 0 0 12 18.6c5.523 0 10-3.477 10-7.8S17.523 3 12 3z"/></svg>
+          카카오로 시작하기
+        </button>
+        <button onclick="oauthLogin('google', this)" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px;background:#fff;border:1px solid #dadce0;border-radius:10px;font-size:20.25px;font-weight:600;color:#3c4043;cursor:pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Google로 시작하기
+        </button>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+        <span style="font-size:12px;color:var(--text-muted);">또는 이메일로</span>
+        <div style="flex:1;height:1px;background:var(--border);"></div>
+      </div>
+      <div id="authFormLogin">
+        <form id="loginForm" onsubmit="handleLogin(event)" novalidate>
+          <div id="loginError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="loginErrorText"></span></div>
+          <div class="form-group"><input type="email" class="form-input" id="loginEmail" placeholder="이메일" autocomplete="email" /></div>
+          <div class="form-group"><input type="password" class="form-input" id="loginPassword" placeholder="비밀번호" autocomplete="current-password" /></div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="loginBtn" style="margin-top:4px;" data-i18n="nav-login">로그인</button>
+          <p style="text-align:center;margin:10px 0 0;">
+            <a href="javascript:void(0)" onclick="closeModal('loginModal');openForgotPasswordModal()" style="font-size:12.5px;color:var(--text-muted);text-decoration:underline;">비밀번호를 잊으셨나요?</a>
+          </p>
+        </form>
+      </div>
+      <div id="authFormSignup" style="display:none;">
+        <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
+          <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
+
+          <div style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:13px 16px;border-bottom:1px solid var(--border-color,#e8e8e8);background:var(--white,#fff);" onclick="toggleAgreeAll(event)">
+              <input type="checkbox" id="agreeAll" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" />
+              <span style="font-size:14px;font-weight:700;color:var(--text-primary,#111);">전체 동의</span>
+            </label>
+            <div style="display:flex;flex-direction:column;gap:0;padding:10px 16px 12px;">
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-secondary,#555);line-height:1.5;padding:6px 0;">
+                <input type="checkbox" id="agreePrivacy" style="margin-top:2px;width:16px;height:16px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" onchange="syncAgreeAll()" />
+                <span><a href="/privacy" target="_blank" style="color:var(--primary,#6366f1);font-weight:600;text-decoration:underline;">개인정보처리방침</a>에 따른 개인정보 수집 및 이용에 동의합니다. <span style="color:#e53e3e;font-weight:700;">(필수)</span></span>
+              </label>
+              <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:13px;color:var(--text-secondary,#555);line-height:1.5;padding:6px 0;">
+                <input type="checkbox" id="agreeMarketing" style="margin-top:2px;width:16px;height:16px;cursor:pointer;accent-color:var(--primary,#6366f1);flex-shrink:0;" onchange="syncAgreeAll()" />
+                <span>가끔 프로모션 이메일 및 알림을 수신합니다. 언제든지 수신 거부할 수 있습니다. <span style="color:var(--text-muted,#999);">(선택)</span></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group"><input type="text" class="form-input" id="signupName" placeholder="이름" autocomplete="name" /></div>
+          <div class="form-group"><input type="email" class="form-input" id="signupEmail" placeholder="이메일" autocomplete="email" /></div>
+          <div class="form-group"><input type="password" class="form-input" id="signupPassword" placeholder="비밀번호 (8자 이상)" autocomplete="new-password" /></div>
+          <div class="form-group">
+            <select class="form-input" id="signupReferrer">
+              <option value="">추천인 선택 (선택 사항)</option>
+              <option value="BFM회원">BFM회원</option>
+              <option value="코오롱 FnC">코오롱 FnC</option>
+              <option value="한섬">한섬</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="signupBtn" style="margin-top:4px;" data-i18n="signupBtn">가입하고 무료 시작 🎁</button>
+        </form>
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;">가입 시 <a href="/terms" target="_blank" style="color:var(--primary);text-decoration:underline;">이용약관</a> 및 <a href="/privacy" target="_blank" style="color:var(--primary);text-decoration:underline;">개인정보처리방침</a>에 동의합니다.</p>
+    </div>
+  </div>
+  ${ES()}`}var ax=[{id:`yebi`,name:`예비창업패키지`,agency:`중소벤처기업부 · 창업진흥원`,formType:`사업계획서형 (PSST)`,funding:`최대 8,000만 원 (평균 4,000만 원 내외)`,target:`사업자등록 전 예비창업자`,eligibility:[`공고일 기준 사업자등록이 되어 있지 않은 예비창업자`,`동종 업종 폐업 후 재창업은 폐업일로부터 3년 경과(부도·파산 2년)`,`나이 제한 없음 (특화분야: 여성·소셜벤처·사내벤처)`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]},{id:`choi`,name:`초기창업패키지`,agency:`중소벤처기업부 · 창업진흥원`,formType:`사업계획서형 (PSST)`,funding:`최대 1억 원 (평균 5,000만 원 내외)`,target:`창업 3년 미만 대표자`,eligibility:[`창업(사업자등록) 3년 미만 기업 대표`,`재창업·특화분야 요건은 공고 확인`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]},{id:`hope-return`,name:`희망리턴패키지(재창업)`,agency:`소상공인시장진흥공단`,formType:`자기역량기술서 + 사업계획서`,funding:`최대 4,000만 원 (트랙·기관별 상이)`,target:`경영위기·폐업(예정) 소상공인`,eligibility:[`경영상 어려움(폐업 예정 포함) 또는 폐업 후 재기를 준비하는 소상공인`,`자립지원 트랙: 장기실업 청년 등 (요건 공고 확인)`,`사전 진단·교육 이수가 선결 조건인 트랙 있음`],criteria:[[`신청자 역량`,30],[`사업계획의 적절성`,40],[`성장가능성`,30]]},{id:`youth-academy`,name:`청년창업사관학교`,agency:`중소벤처기업부 · 창업진흥원`,formType:`입교신청서형 사업계획서 + 발표평가`,funding:`최대 1억 원 (평균 7,000만 원 내외)`,target:`만 39세 이하, 창업 3년 이내(경험창업자 7년 이내)`,eligibility:[`대표자 만 39세 이하`,`창업 3년 이내 대표자 (예비창업자 가능)`,`재창업 등 세부 요건은 공고 확인`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]},{id:`local-creator`,name:`로컬크리에이터 육성`,agency:`중소벤처기업부 · 소상공인시장진흥공단`,formType:`신청서 + 사업계획서 (지역자원 활용 중심)`,funding:`BM 구체화·멘토링·브랜딩·마케팅 자금 (280개사 내외 선정)`,target:`지역 자원을 활용하는 소상공인`,eligibility:[`지역의 자연환경·문화적 자산과 아이디어를 결합해 사업적 가치를 창출하는 창업가`,`기창업자 중심 (예비창업자 대상 지자체별 공고 별도 존재)`],criteria:[[`지역자원 활용방안`,40],[`사업성`,30],[`신청자 역량·실행가능성`,30]]},{id:`export-voucher`,name:`수출바우처`,agency:`중소벤처기업부 · 중소기업유통센터`,formType:`수출역량진단 + 사업계획서형`,funding:`기업당 최대 3,000만 원(자기부담률 수출입실적 등에 따라 20~70%, 바우처 포인트로 사용처 선택)`,target:`해외 진출(수출)을 준비·확대하려는 중소기업`,eligibility:[`중소기업기본법상 중소기업`,`수출역량진단 참여 후 통합관리기관 심의를 통과한 기업`,`한국무역협회 등 사업수행기관 등록 절차 필요(세부 요건 공고 확인)`],criteria:[[`수출 준비도·필요성`,35],[`목표시장 전략의 구체성`,35],[`사업화 실행가능성`,30]]},{id:`innov-sop`,name:`혁신소상공인 창업지원`,agency:`중소벤처기업부 · 소상공인시장진흥공단`,formType:`신청서 + 창업 아이템 계획 (오디션 발표 포함)`,funding:`창업교육 + 사업화 자금 (560명 내외 선정)`,target:`예비창업자 (교육 이수 후 오디션 통과자가 사업화 자금 대상)`,eligibility:[`예비창업자 (신사업 등 유망 아이디어·아이템 기반)`,`교육 이수 후 오디션 통과자가 사업화 자금 지원 대상`],criteria:[[`사업성`,40],[`실현가능성`,40],[`창업의지`,20]]},{id:`smart-store`,name:`스마트상점 기술보급사업`,agency:`중소벤처기업부 · 소상공인시장진흥공단`,formType:`신청서형 (경량)`,funding:`도입비용 50~70% 지원 (사회적 배려대상 최대 80%, 최대 1,000만 원 내외)`,target:`점포를 운영 중인 소상공인`,eligibility:[`점포를 운영 중인 소상공인`,`기술공급기업과 계약 가능한 매장 (세부 요건 공고 확인)`],criteria:[[`도입 필요성`,40],[`기술 활용 적합성`,40],[`실행가능성`,20]]},{id:`online-channel`,name:`온라인 판로지원사업`,agency:`중소벤처기업부 · 소상공인시장진흥공단 (판판대로)`,formType:`신청서형 (경량)`,funding:`세부사업별 연간 단가 한도 내 지원 (연 600만 원 수준)`,target:`온라인 판매 진출·고도화를 준비하는 소상공인`,eligibility:[`온라인 판매 진출(또는 고도화)을 준비하는 소상공인`,`판판대로 회원가입 필수`],criteria:[[`진출 필요성`,40],[`활용 적합성`,40],[`기대효과`,20]]},{id:`innov-voucher`,name:`중소기업 혁신바우처 지원사업`,agency:`중소벤처기업부`,formType:`신청서형 (경량)`,funding:`기업당 최대 5,000만 원 (바우처 서비스 조합)`,target:`제조업 중심 소기업`,eligibility:[`제조업 중심 소기업 (매출액 140억 원 이하, 일부 바우처는 1,800억 이하)`,`소상공인 제조업자 포함 여부는 바우처 유형별 확인`],criteria:[[`이용 필요성`,40],[`서비스 적합성`,40],[`실행가능성`,20]]},{id:`standard`,name:`기타(사업계획서 표준형)`,agency:`—`,formType:`사업계획서형 (PSST, 범용)`,funding:`지원사업별로 상이 (본 도우미는 양식 작성만 지원)`,target:`목록에 없는 지원사업에 지원하며 범용 사업계획서 초안이 필요한 경우`,eligibility:[`특정 공고 요건이 아니라, 정부지원사업 사업계획서에 공통적으로 쓰이는 PSST(문제인식·실현가능성·성장전략·팀구성) 표준 구조를 사용`],criteria:[[`사업성`,40],[`실행가능성`,40],[`자기효능감`,20]]}];Q.get(`/gov-support/my`,e=>(e.header(`Cache-Control`,`no-store`),e.html(DS(`내 사업계획서`,`
   <div class="toast-container" id="toastContainer"></div>
   <style>
     body { background: #F2F4F6; }
@@ -3187,7 +3263,7 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
     async function goToGsWizard() {
       if (!gsSelected) return;
       var token = localStorage.getItem('lookbook_token') || '';
-      if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); return; }
+      if (!token) { showToast('로그인 후 이용할 수 있어요.', 'error'); openModal('loginModal'); return; }
       if (GS_WIZARD_READY.indexOf(gsSelected) === -1) {
         showToast('"' + gsSelectedName + '"은(는) 입력 양식을 준비 중입니다. 조금만 기다려주세요!', 'info');
         return;
