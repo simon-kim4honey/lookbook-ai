@@ -1221,6 +1221,7 @@ document.addEventListener('contextmenu', (e) => {
 function switchAuthTab(tab) {
   const loginForm   = document.getElementById('authFormLogin');
   const signupForm  = document.getElementById('authFormSignup');
+  const referrerWrap= document.getElementById('signupReferrerWrap');
   const tabLoginBtn = document.getElementById('tabLogin');
   const tabSignupBtn= document.getElementById('tabSignup');
 
@@ -1229,8 +1230,9 @@ function switchAuthTab(tab) {
   clearAuthError('signupError');
 
   if (tab === 'login') {
-    if (loginForm)   loginForm.style.display  = '';
-    if (signupForm)  signupForm.style.display = 'none';
+    if (loginForm)    loginForm.style.display    = '';
+    if (signupForm)   signupForm.style.display   = 'none';
+    if (referrerWrap) referrerWrap.style.display = 'none';
     if (tabLoginBtn) {
       tabLoginBtn.style.color  = 'var(--primary)';
       tabLoginBtn.style.borderBottom = '2px solid var(--primary)';
@@ -1242,8 +1244,9 @@ function switchAuthTab(tab) {
       tabSignupBtn.style.fontWeight = '600';
     }
   } else {
-    if (loginForm)   loginForm.style.display  = 'none';
-    if (signupForm)  signupForm.style.display = '';
+    if (loginForm)    loginForm.style.display    = 'none';
+    if (signupForm)   signupForm.style.display   = '';
+    if (referrerWrap) referrerWrap.style.display = '';
     if (tabSignupBtn) {
       tabSignupBtn.style.color = 'var(--primary)';
       tabSignupBtn.style.borderBottom = '2px solid var(--primary)';

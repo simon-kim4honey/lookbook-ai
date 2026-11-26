@@ -1376,7 +1376,7 @@ document.getElementById('resetBtn').onclick = async ()=>{
 <\/script>
 </body>
 </html>
-`,gy=`mwwt2wwn`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
+`,gy=`mwwu6f7n`;function _y(e){return e.env.TECHPACK_MENU_VISIBLE===`true`}var vy=e=>e?`
   <script async src="https://www.googletagmanager.com/gtag/js?id=${e}"><\/script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -3032,6 +3032,14 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
           Google로 시작하기
         </button>
       </div>
+      <div id="signupReferrerWrap" class="form-group" style="display:none;margin-bottom:16px;">
+        <select class="form-input" id="signupReferrer">
+          <option value="">추천인 선택 (선택 사항)</option>
+          <option value="BFM회원">BFM회원</option>
+          <option value="코오롱 FnC">코오롱 FnC</option>
+          <option value="한섬">한섬</option>
+        </select>
+      </div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
         <div style="flex:1;height:1px;background:var(--border);"></div>
         <span style="font-size:12px;color:var(--text-muted);">또는 이메일로</span>
@@ -3051,15 +3059,6 @@ Return ONLY the JSON, no explanation.`);if(t===null)return e.json({success:!1,me
       <div id="authFormSignup" style="display:none;">
         <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
           <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
-
-          <div class="form-group">
-            <select class="form-input" id="signupReferrer">
-              <option value="">추천인 선택 (선택 사항)</option>
-              <option value="BFM회원">BFM회원</option>
-              <option value="코오롱 FnC">코오롱 FnC</option>
-              <option value="한섬">한섬</option>
-            </select>
-          </div>
 
           <div style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:13px 16px;border-bottom:1px solid var(--border-color,#e8e8e8);background:var(--white,#fff);" onclick="toggleAgreeAll(event)">
@@ -7747,6 +7746,15 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
         </button>
       </div>
 
+      <div id="signupReferrerWrap" class="form-group" style="display:none;margin-bottom:20px;">
+        <select class="form-input" id="signupReferrer">
+          <option value="">추천인 선택 (선택 사항)</option>
+          <option value="BFM회원">BFM회원</option>
+          <option value="코오롱 FnC">코오롱 FnC</option>
+          <option value="한섬">한섬</option>
+        </select>
+      </div>
+
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
         <div style="flex:1;height:1px;background:var(--border);"></div>
         <span style="font-size:12px;color:var(--text-muted);">또는 이메일로</span>
@@ -7774,15 +7782,6 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
       <div id="authFormSignup" style="display:none;">
         <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
           <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
-
-          <div class="form-group">
-            <select class="form-input" id="signupReferrer">
-              <option value="">추천인 선택 (선택 사항)</option>
-              <option value="BFM회원">BFM회원</option>
-              <option value="코오롱 FnC">코오롱 FnC</option>
-              <option value="한섬">한섬</option>
-            </select>
-          </div>
 
           <!-- 약관 동의 체크박스 — 에러 바로 아래, 입력필드 위 -->
           <div style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
@@ -9264,6 +9263,14 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
           Google로 시작하기
         </button>
       </div>
+      <div id="signupReferrerWrap" class="form-group" style="display:none;margin-bottom:16px;">
+        <select class="form-input" id="signupReferrer">
+          <option value="">추천인 선택 (선택 사항)</option>
+          <option value="BFM회원">BFM회원</option>
+          <option value="코오롱 FnC">코오롱 FnC</option>
+          <option value="한섬">한섬</option>
+        </select>
+      </div>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
         <div style="flex:1;height:1px;background:var(--border);"></div>
         <span style="font-size:12px;color:var(--text-muted);">또는 이메일로</span>
@@ -9283,15 +9290,6 @@ EZlook은 의류 이미지를 업로드하면 AI가 그 옷을 입은 모델의 
             <div id="authFormSignup" style="display:none;">
         <form id="signupForm" onsubmit="handleSignup(event)" novalidate>
           <div id="signupError" class="auth-message error" role="alert" style="display:none;"><span class="auth-msg-icon">❌</span><span id="signupErrorText"></span></div>
-
-          <div class="form-group">
-            <select class="form-input" id="signupReferrer">
-              <option value="">추천인 선택 (선택 사항)</option>
-              <option value="BFM회원">BFM회원</option>
-              <option value="코오롱 FnC">코오롱 FnC</option>
-              <option value="한섬">한섬</option>
-            </select>
-          </div>
 
           <div style="display:flex;flex-direction:column;gap:0;margin-bottom:14px;background:var(--bg-secondary,#f8f8f8);border-radius:10px;border:1px solid var(--border-color,#e8e8e8);overflow:hidden;">
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:13px 16px;border-bottom:1px solid var(--border-color,#e8e8e8);background:var(--white,#fff);" onclick="toggleAgreeAll(event)">
